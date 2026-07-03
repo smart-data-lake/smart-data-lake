@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,11 +16,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, UserDefinedSchema}
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
@@ -56,7 +58,7 @@ trait SparkFileDataObjectSchemaBehavior {
       )
 
       val path = tempFilePath(fileExtension)
-      val session = context.sparkSession
+      val session = getSparkSession
       import session.implicits._
       Environment._enableSparkPlanNoDataCheck = Some(false)
       createFile(path, Seq.empty[String].toDF())
@@ -84,7 +86,7 @@ trait SparkFileDataObjectSchemaBehavior {
       )
 
       val path = tempFilePath(fileExtension)
-      implicit val session: SparkSession = context.sparkSession
+      implicit val session: SparkSession = getSparkSession
       Environment._enableSparkPlanNoDataCheck = Some(false)
       createFile(path, getEmptyDataFrame(StructType(userSchema)))
       Environment._enableSparkPlanNoDataCheck = Some(true)
@@ -105,7 +107,7 @@ trait SparkFileDataObjectSchemaBehavior {
       )
 
       val path = tempFilePath(fileExtension)
-      implicit val session: SparkSession = context.sparkSession
+      implicit val session: SparkSession = getSparkSession
       Environment._enableSparkPlanNoDataCheck = Some(false)
       createFile(path, getEmptyDataFrame(StructType(embeddedSchema)))
       Environment._enableSparkPlanNoDataCheck = Some(true)
@@ -125,7 +127,7 @@ trait SparkFileDataObjectSchemaBehavior {
                                fileExtension: String = null)
                               (implicit context: ActionPipelineContext): Unit = {
 
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = getSparkSession
     import session.implicits._
 
     val schemaMin = Seq(
@@ -263,7 +265,7 @@ trait SparkFileDataObjectSchemaBehavior {
                               fileExtension: String = null)
                              (implicit context: ActionPipelineContext): Unit = {
 
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = getSparkSession
     import session.implicits._
 
     val schemaMin = Seq(

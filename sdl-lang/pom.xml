@@ -2,7 +2,7 @@
 <!--
   ~ Smart Data Lake - Build your data lake the smart way.
   ~
-  ~ Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+  ~ Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
   ~
   ~ This program is free software: you can redistribute it and/or modify
   ~ it under the terms of the GNU General Public License as published by
@@ -24,12 +24,12 @@
     <parent>
         <artifactId>sdl-parent</artifactId>
         <groupId>io.smartdatalake</groupId>
-        <version>2.9.0-SNAPSHOT</version>
+        <version>3.0.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>sdl-lang_${scala.minor.version}</artifactId>
+    <artifactId>sdl-lang_2.13</artifactId>
     <packaging>jar</packaging>
 
     <name>sdl-lang</name>
@@ -77,12 +77,6 @@
         </dependency>
         <dependency>
             <groupId>io.smartdatalake</groupId>
-            <artifactId>sdl-jms_${scala.minor.version}</artifactId>
-            <version>${project.parent.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-kafka_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
             <optional>true</optional>
@@ -98,12 +92,6 @@
         <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-snowflake_${scala.minor.version}</artifactId>
-            <version>${project.parent.version}</version>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>io.smartdatalake</groupId>
-            <artifactId>sdl-splunk_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
             <optional>true</optional>
         </dependency>
@@ -126,17 +114,24 @@
             <version>${scopt.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.scala-lang.modules</groupId>
-            <artifactId>scala-collection-compat_${scala.minor.version}</artifactId>
-        </dependency>
-
         <!-- TEST dependencies -->
         <dependency>
             <groupId>org.scalatest</groupId>
             <artifactId>scalatest_${scala.minor.version}</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.scalatestplus</groupId>
+            <artifactId>scalacheck-1-18_${scala.minor.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.hsqldb</groupId>
+            <artifactId>hsqldb</artifactId>
+            <version>${hsqldb.version}</version>
+            <scope>test</scope>
+        </dependency>
+
         <!--		 sdl-core test utils-->
         <dependency>
             <groupId>io.smartdatalake</groupId>
@@ -191,12 +186,6 @@
                 <artifactId>scala-maven-plugin</artifactId>
             </plugin>
 
-            <!-- rewrite pom for compiling with different scala version profiles -->
-            <plugin>
-                <groupId>org.spurint.maven.plugins</groupId>
-                <artifactId>scala-cross-maven-plugin</artifactId>
-            </plugin>
-
             <!-- Copies files in resources folders to target folder. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -231,6 +220,18 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
+                <configuration>
+                    <!-- These SDL modules are loaded via reflection for schema generation, not directly referenced in bytecode -->
+                    <ignoredDependencies>
+                        <ignoredDependency>io.smartdatalake:sdl-snowflake_${scala.minor.version}</ignoredDependency>
+                        <ignoredDependency>io.smartdatalake:sdl-deltalake_${scala.minor.version}</ignoredDependency>
+                        <ignoredDependency>io.smartdatalake:sdl-azure_${scala.minor.version}</ignoredDependency>
+                        <ignoredDependency>io.smartdatalake:sdl-kafka_${scala.minor.version}</ignoredDependency>
+                        <ignoredDependency>io.smartdatalake:sdl-iceberg_${scala.minor.version}</ignoredDependency>
+                        <ignoredDependency>io.smartdatalake:sdl-gcp_${scala.minor.version}</ignoredDependency>
+                        <ignoredDependency>io.smartdatalake:sdl-debezium_${scala.minor.version}</ignoredDependency>
+                    </ignoredDependencies>
+                </configuration>
             </plugin>
 
             <!-- check for dependency version conflicts -->
@@ -247,12 +248,16 @@
                     <execution>
                         <id>generate-json-schema</id>
                         <phase>prepare-package</phase>
-                        <goals><goal>java</goal></goals>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
                         <configuration>
                             <mainClass>io.smartdatalake.meta.jsonschema.JsonSchemaExporter</mainClass>
                             <arguments>
-                                <argument>--filename</argument><argument>${project.build.outputDirectory}/sdl-schema.json</argument>
-                                <argument>--version</argument><argument>${project.parent.version}</argument>
+                                <argument>--filename</argument>
+                                <argument>${project.build.outputDirectory}/sdl-schema.json</argument>
+                                <argument>--version</argument>
+                                <argument>${project.parent.version}</argument>
                             </arguments>
                         </configuration>
                     </execution>

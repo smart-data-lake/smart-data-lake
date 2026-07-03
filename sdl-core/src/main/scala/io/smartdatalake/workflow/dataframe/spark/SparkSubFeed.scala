@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,25 +16,28 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.spark
 
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.evolution.TypeEvolutionUtil
 import io.smartdatalake.util.spark.{DummyStreamProvider, NullAwareMurmur3HashExpr, dataset}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
+import io.smartdatalake.workflow.connection.SparkClassicConnection
 import io.smartdatalake.workflow.dataframe._
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
+import org.apache.spark.sql._
+import org.apache.spark.sql.classic.ColumnConversions.toRichColumn
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, DataFrame, Encoder, Encoders, Row, functions}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe.{Type, typeOf}
-import scala.reflect.runtime.universe.TypeTag
+import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
+import scala.util.Try
 
 /**
  * A SparkSubFeed is used to transport [[DataFrame]]'s between Actions.
@@ -45,7 +48,7 @@ import scala.reflect.runtime.universe.TypeTag
  * @param isDAGStart true if this subfeed is a start node of the dag
  * @param isSkipped true if this subfeed is the result of a skipped action
  * @param isDummy true if this subfeed only contains a dummy DataFrame. Dummy DataFrames can be used for validating the lineage in init phase, but not for the exec phase.
- * @param filter a spark sql filter expression. This is used by DataFrameIncrementalMode.
+ * @param filter a spark SQL filter expression. This is used by DataFrameIncrementalMode.
  */
 case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame],
                         override val dataObjectId: DataObjectId,
@@ -96,7 +99,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
   private[smartdatalake] def convertToDummy(schema: SparkSchema)(implicit context: ActionPipelineContext): SparkSubFeed = {
     val dummyDf = dataFrame.map{
       dataFrame =>
-        if (dataFrame.inner.isStreaming) SparkDataFrame(DummyStreamProvider.getDummyDf(schema.inner)(context.sparkSession))
+        if (dataFrame.inner.isStreaming) SparkDataFrame(DummyStreamProvider.getDummyDf(schema.inner)(getSparkSession))
         else schema.getEmptyDataFrame(dataObjectId)
     }
     this.copy(dataFrame = dummyDf, isDummy = true)
@@ -188,6 +191,12 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     SparkColumn(functions.greatest(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
+  override def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn = {
+    column match {
+      case sparkColumn: SparkColumn => SparkColumn(functions.substring(sparkColumn.inner, pos, len))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
   override def explode(column: GenericColumn): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn => SparkColumn(functions.explode(sparkColumn.inner))
@@ -196,11 +205,11 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   }
   override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SparkDataFrame = {
     val sparkSchema = SchemaConverter.convert(schema, subFeedType).asInstanceOf[SparkSchema]
-    SparkDataFrame(dataset.getEmptyDataFrame(sparkSchema.inner)(context.sparkSession))
+    SparkDataFrame(dataset.getEmptyDataFrame(sparkSchema.inner)(getSparkSession))
   }
   override def getEmptyStreamingDataFrame(schema: GenericSchema)(implicit context: ActionPipelineContext): SparkDataFrame = {
     schema match {
-      case sparkSchema: SparkSchema => SparkDataFrame(DummyStreamProvider.getDummyDf(sparkSchema.inner)(context.sparkSession))
+      case sparkSchema: SparkSchema => SparkDataFrame(DummyStreamProvider.getDummyDf(sparkSchema.inner)(getSparkSession))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
     }
   }
@@ -244,15 +253,15 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     }
   }
   override def array_construct_compact(columns: GenericColumn*): GenericColumn = {
-    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     SparkColumn(functions.array_compact(functions.array(columns.map(_.asInstanceOf[SparkColumn].inner):_*)))
   }
   override def array(columns: GenericColumn*): GenericColumn = {
-    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     SparkColumn(functions.array(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
   override def struct(columns: GenericColumn*): GenericColumn = {
-    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     SparkColumn(functions.struct(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
   override def expr(sqlExpr: String): GenericColumn = SparkColumn(functions.expr(sqlExpr))
@@ -270,7 +279,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     }
   }
   override def concat(exprs: GenericColumn*): GenericColumn = {
-    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, exprs.toSeq)
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, exprs)
     SparkColumn(functions.concat(exprs.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
   override def regexp_extract(column: GenericColumn, regexp: String, groupIdx: Int): GenericColumn = {
@@ -298,8 +307,9 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
    * This method will treat null values as regular values, which influence hash value of the row.
    */
   def nullAwareHash(cols: Column*): Column = {
+    import org.apache.spark.sql.classic.ColumnConversions._
     val expr = new NullAwareMurmur3HashExpr(cols.map(_.expr))
-    new Column(expr)
+    DatasetHelper.toCol(expr)
   }
 
   override def hash(column: GenericColumn): GenericColumn = {
@@ -310,7 +320,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   }
 
   override def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    SparkDataFrame(context.sparkSession.sql(query))
+    SparkDataFrame(getSparkSession.sql(query))
   }
   override def createSchema(fields: Seq[GenericField]): GenericSchema = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, fields)
@@ -337,7 +347,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     aggFunction.apply() match {
       case sparkAggFunctionColumn: SparkColumn => SparkColumn(sparkAggFunctionColumn
         .inner.over(
-          Window.partitionBy(partitionBy.map(_.asInstanceOf[SparkColumn].inner): _*)
+          Window.partitionBy(partitionBy.map(_.asInstanceOf[SparkColumn].inner).toIndexedSeq: _*)
             .orderBy(orderBy.asInstanceOf[SparkColumn].inner))
       )
       case generic => DataFrameSubFeed.throwIllegalSubFeedTypeException(generic)
@@ -374,8 +384,8 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
 
   override def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf = (srcType, tgtType) match {
     case (srcType, tgtType) if srcType.isSameType(tgtType) => SparkUnaryUdf(x => x)
-    case (srcType: SparkSimpleDataType, tgtType: SparkSimpleDataType) => SparkUnaryUdf(x => x.cast(tgtType.inner))
-    case (srcType: SparkStructDataType, tgtType: SparkStructDataType) => SparkUnaryUdf(TypeEvolutionUtil.schemaEvolutionUdf(srcType.inner, tgtType.inner))
+    case (_: SparkSimpleDataType, tgtType: SparkSimpleDataType) => SparkUnaryUdf(x => x.cast(tgtType.inner))
+    case (srcType: SparkStructDataType, tgtType: SparkStructDataType) => SparkUnaryUdf(x => DatasetHelper.toCol(TypeEvolutionUtil.schemaEvolutionUdf(srcType.inner, tgtType.inner)(x.expr)))
     case (srcType: SparkArrayDataType, tgtType: SparkArrayDataType) => new GenericUnaryUdf {
       override def subFeedType: universe.Type = SparkSubFeed.subFeedType
 
@@ -418,18 +428,38 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
   }
 
   override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    val spark = context.sparkSession
-    import spark.implicits._
     implicit val encoder: Encoder[A] = Encoders.product[A]
-    SparkDataFrame(rows.toDF)
+    val session = getSparkSession
+    import session.implicits._
+    SparkDataFrame(rows.toDF())
   }
 
   override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    val spark = context.sparkSession
-    import spark.implicits._
     implicit val encoder: Encoder[A] = Encoders.product[A]
+    val session = getSparkSession
+    import session.implicits._
     SparkDataFrame(rows.toDF(colNames:_*))
   }
+
+  def getSparkSession(implicit context: ActionPipelineContext): SparkSession = {
+    val frameRequired = "Spark connection is required to create DataFrame!"
+    context.engineConnection match {
+      case Some(null) =>
+        throw new IllegalStateException(s"context.currentAction: ${context.currentAction.map(_.id.toString)} context.engineConnection = Some(null). $frameRequired")
+      case Some(connection) if connection.isInstanceOf[SparkClassicConnection] =>
+        connection.asInstanceOf[SparkClassicConnection].sparkSession
+      case Some(connection) => throw new IllegalStateException(frameRequired +
+        s" But got ${connection.id} of type ${connection.getClass.getSimpleName} in context")
+      case _ =>
+        Try(context.instanceRegistry.get[SparkClassicConnection](ConnectionId(Environment.defaultEngineConnectionId)))
+          .toOption.map(_.sparkSession)
+          .orElse(_defaultSparkSession) // for testing only
+          .getOrElse(throw new IllegalStateException(s"No connection available in context. $frameRequired"))
+    }
+  }
+
+  // This is for testing/lab only: define a default spark connection
+  private[smartdatalake] var _defaultSparkSession: Option[SparkSession] = None
 }
 
 trait SparkWhen extends GenericWhen {
@@ -443,7 +473,7 @@ trait SparkWhen extends GenericWhen {
 
   override def otherwise(value: GenericColumn): GenericColumn = {
     value match {
-      case value: SparkColumn => new SparkColumn(col.inner.otherwise(value.inner))
+      case value: SparkColumn => SparkColumn(col.inner.otherwise(value.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(value)
     }
   }

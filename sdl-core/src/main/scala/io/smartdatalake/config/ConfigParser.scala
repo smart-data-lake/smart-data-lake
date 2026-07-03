@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ import io.smartdatalake.workflow.agent.Agent
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.DataObject
 import org.reflections.Reflections
-import org.reflections.scanners.SubTypesScanner
+import org.reflections.scanners.Scanners
 
 import scala.jdk.CollectionConverters._
 import scala.reflect.runtime.universe._
@@ -40,7 +40,7 @@ import scala.util.matching.Regex
  */
 private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
 
-  final val CONFIG_SECTION_AGENTS = "agents"
+  private final val CONFIG_SECTION_AGENTS = "agents"
 
   /**
    * Parses the supplied config and returns a populated [[InstanceRegistry]].
@@ -212,8 +212,8 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
     if (!rootCause.isInstanceOf[ConfigException]) {
       val rootCauseClassName = rootCause.getClass.getSimpleName
       if (e.getMessage != null && !e.getMessage.contains(rootCauseClassName)) e match {
-        case c: ConfigurationException => c.copy(message = s"${rootCauseClassName}: ${c.getMessage}")
-        case e => ConfigurationException(s"${rootCauseClassName}: ${e.getMessage}", throwable = e)
+        case c: ConfigurationException => c.copy(message = s"$rootCauseClassName: ${c.getMessage}")
+        case e => ConfigurationException(s"$rootCauseClassName: ${e.getMessage}", throwable = e)
       } else e
     } else e
   }
@@ -224,7 +224,8 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   private def enrichExceptionMessageConfigPath(e: Exception, configPath: Option[String]): Exception = {
     if (configPath.isDefined && !e.getMessage.contains(configPath.get)) e match {
       case c: ConfigurationException => c.copy(message = s"(${configPath.get}) ${c.getMessage}")
-      case e => ConfigurationException(s"(${configPath.get}) ${e.getMessage.stripPrefix("[]").trim}", configPath, e)
+      case e => ConfigurationException(message = s"(${configPath.get}) ${e.getMessage.stripPrefix("[]").trim}",
+        configurationPath = configPath, throwable = e)
     } else e
   }
 
@@ -256,7 +257,7 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
       val abstractSymbol = symbolOf[A]
       if (implClasses.isEmpty) {
         // check if type does exist in package, but has wrong type
-        val allReflections = new Reflections(WORKFLOW_PACKAGE, new SubTypesScanner(false /* don't exclude Object.class */))
+        val allReflections = new Reflections(WORKFLOW_PACKAGE, Scanners.SubTypes.filterResultsBy(_ => true) /* don't exclude Object.class */)
         val classes = allReflections.getSubTypesOf(classOf[AnyRef]).asScala.filter(_.getSimpleName == configuredType).toSeq
         classes match {
           case Seq() => throw new ClassNotFoundException(s"$configuredType not found in package $WORKFLOW_PACKAGE")
@@ -271,8 +272,49 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
   }
 
   /**
-   * Substitutes parts inside values by other paths of the configuration
-   * Token for substitution is "~{replacementPath}"
+   * Converts a value to snake_case: inserts an underscore at camelCase boundaries (including acronyms),
+   * replaces dashes with underscores and lowercases the result.
+   * Examples: "camelCase" -> "camel_case", "int-airports" -> "int_airports", "myHTTPServer" -> "my_http_server".
+   */
+  private[config] def toSnakeCase(value: String): String = {
+    value
+      .replaceAll("([a-z0-9])([A-Z])", "$1_$2") // camelCase boundary, e.g. camelCase -> camel_Case
+      .replaceAll("([A-Z]+)([A-Z][a-z])", "$1_$2") // acronym boundary, e.g. HTTPServer -> HTTP_Server
+      .replace('-', '_')
+      .toLowerCase
+  }
+
+  /**
+   * Removes the first part of a value, where parts are separated by a dash ('-'), an underscore ('_')
+   * or a camelCase boundary (a lowercase letter or digit followed by an uppercase letter).
+   * The earliest separator in the value determines the prefix to remove; for dash/underscore the separator
+   * itself is dropped, for a camelCase boundary the leading uppercase letter of the remainder is kept.
+   * Examples: "int-airports" -> "airports", "int_airports" -> "airports", "intAirports" -> "Airports",
+   * "abc" -> "abc" (no separator, unchanged).
+   */
+  private[config] def removePrefix(value: String): String = {
+    val idx = value.indices.find { i =>
+      val c = value(i)
+      c == '-' || c == '_' ||
+        (i > 0 && c.isUpper && (value(i - 1).isLower || value(i - 1).isDigit))
+    }
+    idx match {
+      case Some(i) if value(i) == '-' || value(i) == '_' => value.substring(i + 1) // drop separator
+      case Some(i) => value.substring(i) // keep the uppercase letter that starts the remainder
+      case None => value
+    }
+  }
+
+  /**
+   * Substitutes parts inside values by other paths of the configuration.
+   * Token for substitution is "~{replacementPath}".
+   * One or more modifiers can be appended with a pipe and are applied left-to-right, e.g. "~{replacementPath|snake}"
+   * or chained "~{replacementPath|noPrefix|snake}", to transform the resolved value:
+   *  - "snake": converts the resolved value to snake_case, i.e. inserts underscores at camelCase boundaries, replaces
+   *    dashes ('-') with underscores ('_') and lowercases, e.g. to use an element id like 'int-airports' or 'intAirports'
+   *    as table name 'int_airports'.
+   *  - "noPrefix": removes the first part of the value, separated by a dash ('-'), underscore ('_') or camelCase
+   *    boundary, e.g. an element id like 'int-airports' or 'intAirports' as table name 'airports' resp. 'Airports'.
    *
    * @param config configuration object for local substitution
    * @param path   path to search for local substitution tokens and execute substitution
@@ -282,16 +324,25 @@ private[smartdatalake] object ConfigParser extends SmartDataLakeLogger {
 
     val localSubstituter = (regMatch: Regex.Match) => {
       val replacementPath = regMatch.group(1)
-      if (config.hasPath(replacementPath)) {
-        if (config.getValue(replacementPath).valueType() == ConfigValueType.STRING
-          || config.getValue(replacementPath).valueType() == ConfigValueType.NUMBER) config.getString(replacementPath)
-        else throw ConfigurationException(s"local substitution path '$replacementPath' in path '$path' is not a string")
-      } else throw ConfigurationException(s"local substitution path '$replacementPath' in path '$path' does not exist")
+      val modifiers = Option(regMatch.group(2)).map(_.split('|').filter(_.nonEmpty).toSeq).getOrElse(Seq.empty)
+      val value =
+        if (config.hasPath(replacementPath)) {
+          if (config.getValue(replacementPath).valueType() == ConfigValueType.STRING
+            || config.getValue(replacementPath).valueType() == ConfigValueType.NUMBER) config.getString(replacementPath)
+          else throw ConfigurationException(s"local substitution path '$replacementPath' in path '$path' is not a string")
+        } else throw ConfigurationException(s"local substitution path '$replacementPath' in path '$path' does not exist")
+      modifiers.foldLeft(value) { (v, m) =>
+        m match {
+          case "snake" => toSnakeCase(v)
+          case "noPrefix" => removePrefix(v)
+          case other => throw ConfigurationException(s"unknown local substitution modifier '$other' for path '$replacementPath' in path '$path'. Supported modifiers: snake, noPrefix")
+        }
+      }
     }
 
     if (config.hasPath(path) && config.getValue(path).valueType() == ConfigValueType.STRING) {
       val value = config.getString(path)
-      val valueSubstituted = """~\{(.*?)\}""".r.replaceAllIn(value, localSubstituter)
+      val valueSubstituted = """~\{([^|}]*)((?:\|\w+)*)}""".r.replaceAllIn(value, localSubstituter)
       config.withValue(path, ConfigValueFactory.fromAnyRef(valueSubstituted))
     } else config
   }

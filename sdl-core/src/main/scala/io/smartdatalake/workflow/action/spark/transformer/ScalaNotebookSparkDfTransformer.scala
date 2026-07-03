@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,23 +16,22 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.spark.transformer
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.CustomCodeUtil
-import io.smartdatalake.util.spark.DefaultExpressionData
+import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData}
 import io.smartdatalake.util.webservice.SttpWebserviceClient
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, OptionsSparkDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.connection.authMode.AuthMode
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.spark.sql.DataFrame
 import org.json4s._
-import org.json4s.jackson.{JsonMethods, Serialization}
+import org.json4s.jackson.JsonMethods
 
 import scala.util.{Failure, Success}
 
@@ -48,8 +47,8 @@ import scala.util.{Failure, Success}
  * @param functionName   The notebook needs to contain a Scala-function with this name and type [[fnTransformType]].
  * @param authMode       optional authentication information for webservice, e.g. BasicAuthMode for user/pw authentication
  * @param options        Options to pass to the transformation
- * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
- *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param runtimeOptions optional tuples of [key, spark SQL expression] to be added as additional options when executing transformation.
+ *                       The spark SQL expressions are evaluated against an instance of [[DefaultExpressionData]].
  */
 case class ScalaNotebookSparkDfTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, url: String, functionName: String, authMode: Option[AuthMode] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
   import ScalaNotebookSparkDfTransformer._
@@ -63,7 +62,7 @@ case class ScalaNotebookSparkDfTransformer(override val name: String = "scalaSpa
     fnTransform
   }
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
-    fnTransform(context.sparkSession, options, df, dataObjectId.id)
+    fnTransform(getSparkSession, options, df, dataObjectId.id)
   }
   override def factory: FromConfigFactory[GenericDfTransformer] = ScalaNotebookSparkDfTransformer
 }
@@ -99,29 +98,34 @@ object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransf
    * Parse *.ipynb Notebook content
    * Get code from all cells with cell_type=code and language=scala, ignoring cells which start with "//!IGNORE" comment
    */
-  def parseNotebook(notebookContent: String): String = {
-    val notebookJson = JsonMethods.parse(notebookContent)
-    implicit val formats: Formats = Serialization.formats(NoTypeHints)
-    val notebookCells = (notebookJson \ "cells")
-      .filter(_ \ "cell_type" == JString("code"))
-    val notebookCode = notebookCells
-      .map(_ \ "source")
-      .map {
-        case JString(code) => code
-        case JArray(codeList) => codeList.map{
+    def parseNotebook(notebookContent: String): String = {
+      val notebookJson = JsonMethods.parse(notebookContent)
+      val notebookCells = (notebookJson \ "cells")
+        .filter(_ \ "cell_type" == JString("code"))
+      val notebookCode = notebookCells
+        .map(_ \ "source")
+        .map {
           case JString(code) => code
-        }.mkString(System.lineSeparator)
-      }
-      .filterNot(_.startsWith("//!IGNORE"))
-      .mkString(System.lineSeparator)
-    notebookCode
-  }
+          case JArray(codeList) => codeList.map{
+            case JString(code) => code
+            case t => throw new IllegalArgumentException(s"Unexpected type $t in notebook source code array," +
+                " expected JString for each code line")
+          }.mkString(System.lineSeparator)
+          case t =>
+            throw new IllegalArgumentException(s"Unexpected type $t for notebook cell 'source' field," +
+              " expected JString or JArray of code lines")
+        }
+        .filterNot(_.startsWith("//!IGNORE"))
+        .mkString(System.lineSeparator)
+      notebookCode
+    }
 
   /**
    * Prepare function
    */
   def prepareFunction(notebookCode: String, functionName: String): String = {
-    require(notebookCode.contains(functionName), s"Notebook code doesnt contain a function with name $functionName")
+    require(notebookCode.contains(functionName),
+      s"Notebook code doesn't contain a function with name $functionName")
     val defaultImports = """
         |import org.apache.spark.sql.{DataFrame, SparkSession}
         |""".stripMargin

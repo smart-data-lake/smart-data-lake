@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,27 +16,31 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.app
 
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId, stringToDataObjectId}
 import io.smartdatalake.config.{ConfigParser, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
+import io.smartdatalake.testutils.custom.TestCustomDfsTransformer
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.StateUploader
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode.{DataFrameIncrementalMode, DataObjectStateIncrementalMode, PartitionDiffMode}
 import io.smartdatalake.workflow.action.generic.transformer.{ColumnsTransformer, FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, SparkUDFCreator}
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
+import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaClassSparkDfsTransformer}
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.CountExpectation
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import io.smartdatalake.workflow.{ActionDAGRunState, ActionPipelineContext, ExecutionPhase, HadoopFileActionDAGRunStateStore}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.expressions.UserDefinedFunction
@@ -44,14 +48,16 @@ import org.apache.spark.sql.functions.{lit, raise_error, udf}
 import org.apache.spark.sql.{DataFrame, SparkSession, functions}
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
 
 /**
  * This tests use configuration test/resources/application.conf
  */
-class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
-
+class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
+  with io.smartdatalake.util.spark.dataset.Equality {
+  @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -66,8 +72,11 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
   val statePath = "target/stateTest/"
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithDefaultConf(new Path(statePath))
 
+  loggEnv
+
   before {
     sdlb.instanceRegistry.clear()
+    sdlb.instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("Test command line argument parsing") {
@@ -88,7 +97,64 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val hoconConfig = appConfig.getHoconConfig()(session.sparkContext.hadoopConfiguration)
     assert(hoconConfig.getString("global.abc") == "def")
     assert(hoconConfig.getInt("global.synchronousStreamingTriggerIntervalSec") == 5)
-    assert(hoconConfig.getString("global.sparkUDFs.udfAddX.className") == "io.smartdatalake.app.TestUDFAddXCreator")
+  }
+
+  test("Test custom transformation of jdbc table with query and where clause") {
+
+    // init sdlb
+    val appName = "filtered-jdbc-transformation"
+    val feedName = "add-rownumber"
+
+    // configure SDLPlugin for testing
+    Environment._sdlPlugins = Seq(new TestSDLPlugin)
+
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    val contextExec = actionPipelineContext.copy(phase = ExecutionPhase.Exec)
+
+    // setup DataObjects
+    instanceRegistry.register(jdbcConnection)
+    // prepare data
+    val allData = Table(db = Some("public"), name = "allData")
+    val dataObjectAll = JdbcTableDataObject(id = "jdbcAll", table = allData, connectionId = "jdbcCon1",
+      jdbcOptions = Map("createTableColumnTypes" -> "id int, text varchar(255)"))
+    dataObjectAll.dropTable
+    val dfAll = List((1, "abc"), (2, "def"), (3, "abc"), (4, "ghi"), (5, "abc"), (6, "def")).toDF("id", "text")
+    dataObjectAll
+      .initSparkDataFrame(df = dfAll, partitionValues = Nil)(actionPipelineContext)
+    dataObjectAll
+      .writeSparkDataFrame(df = dfAll, partitionValues = Nil)(contextExec)
+
+    // prepare view dataObject
+    val filteredData = Table(db = Some("public"), name = "filteredData",
+      query = Some("select id, text from public.allData where text<'g'"))
+    val srcDO = JdbcTableDataObject(id = "srcData", table = filteredData, connectionId = "jdbcCon1")
+    instanceRegistry.register(srcDO)
+
+    // prepare target
+    val targetTab = Table(db = Some("public"), name = "target")
+    val tgtDO = JdbcTableDataObject(id = "target", table = targetTab, connectionId = "jdbcCon1",
+      jdbcOptions = Map("createTableColumnTypes" -> "id int, text varchar(255), _rnk int"))
+    tgtDO.dropTable
+    val expected = List((1, "abc", 1), (2, "def", 1), (3, "abc", 2), (5, "abc", 3), (6, "def", 2))
+      .toDF("id", "text", "_rnk")
+    tgtDO.initSparkDataFrame(expected.where($"id"===1), Nil)(actionPipelineContext)
+    tgtDO.writeSparkDataFrame(expected.where($"id"===1), Nil)(contextExec)
+    instanceRegistry.register(tgtDO)
+
+    // define and run the action
+    val action = CustomDataFrameAction(id = "add-rownumber",
+      inputIds = List(srcDO.id), outputIds = Seq(tgtDO.id),
+      metadata = Some(ActionMetadata(feed = Some("add-rownumber"))),
+      transformers = List(ScalaClassSparkDfsTransformer(className = classOf[TestCustomDfsTransformer].getName))
+    )
+    instanceRegistry.register(action.copy())
+
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"),
+      feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+    sdlb.run(sdlConfig)
+    val actual = tgtDO.getSparkDataFrame(Nil)(contextExec).orderBy($"id")
+    assert(actual.equal(expected))
   }
 
   test("sdlb run with 2 actions and positive top-level partition values filter, recovery after action 2 failed the first time") {
@@ -100,23 +166,17 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     // configure SDLPlugin for testing
     Environment._sdlPlugins = Seq(new TestSDLPlugin)
 
-    HdfsUtil.deleteFiles(new Path(statePath), doWarn = false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     // source table has partitions columns dt and type
     val srcDO = MockSparkDataObject("src1", partitions = Seq("dt", "type")).register
-    val tgt1Table = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname", "firstname")))
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
-    tgt1DO.dropTable
-    instanceRegistry.register(tgt1DO)
-    val tgt2Table = Table(Some("default"), "ap_copy2", None, Some(Seq("lastname", "firstname")))
+    val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
     // second table has partition columns dt only (reduced)
-    val tgt2DO = HiveTableDataObject("tgt2", Some(tempPath + s"/${tgt2Table.fullName}"), partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
-    tgt2DO.dropTable
-    instanceRegistry.register(tgt2DO)
+    val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe", "john", 5) // partition 20180101 is included in partition values filter
@@ -151,13 +211,10 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED), (action2fail.id, RuntimeEventState.FAILED))
       assert(resultActionsState == expectedActionsState)
     }
-
-    // now fill tgt1 with both partitions
-    tgt1DO.writeSparkDataFrame(dfSrc, Seq())
 
     // reset actions in registry
     instanceRegistry.register(action1.copy())
@@ -178,8 +235,9 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(x => (x.state, x.executionId)).toMap
-      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 1)), action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)))
+      val resultActionsState = runState.actionsState.view.mapValues(x => (x.state, x.executionId)).toMap
+      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1)),
+        action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues == selectedPartitions)
       assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
@@ -198,23 +256,17 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-recovery2"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     // source table has partitions columns dt and type
     val srcDO = MockSparkDataObject("src1", partitions = Seq("dt", "type")).register
-    val tgt1Table = Table(Some("default"), "ap_copy1", None, Some(Seq("lastname", "firstname")))
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
-    tgt1DO.dropTable
-    instanceRegistry.register(tgt1DO)
-    val tgt2Table = Table(Some("default"), "ap_copy2", None, Some(Seq("lastname", "firstname")))
+    val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
     // second table has partition columns dt only (reduced)
-    val tgt2DO = HiveTableDataObject("tgt2", Some(tempPath + s"/${tgt2Table.fullName}"), partitions = Seq("dt"), table = tgt2Table, numInitialHdfsPartitions = 1)
-    tgt2DO.dropTable
-    instanceRegistry.register(tgt2DO)
+    val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe", "john", 5), ("20190101", "company", "olmo", "-", 10))
@@ -239,7 +291,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SKIPPED), (action2fail.id, RuntimeEventState.FAILED))
       assert(resultActionsState == expectedActionsState)
     }
@@ -262,8 +314,9 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(x => (x.state, x.executionId)).toMap
-      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 1)), action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)))
+      val resultActionsState = runState.actionsState.view.mapValues(x => (x.state, x.executionId)).toMap
+      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1)),
+        action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)))
       assert(resultActionsState == expectedActionsState)
       assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
     }
@@ -276,7 +329,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-recovery3"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -286,7 +339,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val tgt2DO = MockSparkDataObject("tgt2", partitions = Seq("dt")).register
     val tgt3DO = MockSparkDataObject("tgt3", partitions = Seq("dt")).register
     val tgt4DO = MockSparkDataObject("tgt4", partitions = Seq("dt")).register
-    val tgt5DO = MockSparkDataObject("tgt5", partitions = Seq("dt")).register
 
     // prepare data
     val dfSrc = Seq(("20180101", "person", "doe", "john", 5), ("20190101", "company", "olmo", "-", 10))
@@ -322,7 +374,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(_.state).toMap
       val expectedActionsState = Map(
         (action1.id, RuntimeEventState.SKIPPED),
         (action2fail.id, RuntimeEventState.FAILED),
@@ -351,13 +403,13 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(x => (x.state, x.executionId)).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(x => (x.state, x.executionId)).toMap
       val expectedActionsState = Map(
-        action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 1)),
+        action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1)),
         action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)),
         action3.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)),
         action4.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 2)),
-        action5.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 1))
+        action5.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1))
       )
       assert(resultActionsState == expectedActionsState)
       assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
@@ -370,7 +422,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-skipped-skipped"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -404,10 +456,10 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(x => (x.state, x.executionId)).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(x => (x.state, x.executionId)).toMap
       val expectedActionsState = Map(
-        action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 1)),
-        action2.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 1))
+        action1.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1)),
+        action2.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1))
       )
       assert(resultActionsState == expectedActionsState)
     }
@@ -420,7 +472,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-skipped-metrics"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -455,10 +507,10 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(x => (x.state, x.executionId)).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(x => (x.state, x.executionId)).toMap
       val expectedActionsState = Map(
-        action1.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 1)),
-        action2.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1, 1))
+        action1.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1)),
+        action2.id -> (RuntimeEventState.SKIPPED, SDLExecutionId(1))
       )
       assert(resultActionsState == expectedActionsState)
       val action1Metrics = runState.actionsState(action1.id).results.head.metrics.get
@@ -474,7 +526,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-incremental"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -513,7 +565,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     // action4 is skipped in init phase as data is not yet there, but should execute in exec phase
     val action4 = CustomDataFrameAction("d", Seq(tgt3DO.id, src2DO.id), Seq(tgt4DO.id), metadata = Some(ActionMetadata(feed = Some(feedName)))
       , executionMode = Some(DataFrameIncrementalMode("id"))
-      , transformers = Seq(SQLDfsTransformer(code = Map("tgt4" -> "select id, dt, type, lastname, firstname, udfAddX(rating) rating from tgt3")))
+      , transformers = Seq(SQLDfsTransformer(code = Map("tgt4" -> "select id, dt, type, lastname, firstname, rating from tgt3")))
     )
     instanceRegistry.register(action4.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
@@ -522,7 +574,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt4DO.getSparkDataFrame(Seq()).count() == 2)
+    assert(tgt4DO.getSparkDataFrame().count() == 2)
   }
 
   test("sdlb run with executionMode=PartitionDiffMode, increase runId on second run, state listener") {
@@ -531,22 +583,15 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-runId"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.clear()
 
     // setup DataObjects
-    val srcTable = Table(Some("default"), "ap_input")
     // source table has partitions columns dt and type
-    val srcDO = HiveTableDataObject("src1", Some(tempPath + s"/${srcTable.fullName}"), partitions = Seq("dt", "type"), table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable
-    instanceRegistry.register(srcDO)
-    val tgt1Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
+    val srcDO = MockSparkDataObject("src1", partitions = Seq("dt", "type")).register
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = HiveTableDataObject("tgt1", Some(tempPath + s"/${tgt1Table.fullName}"), partitions = Seq("dt", "type"), table = tgt1Table, numInitialHdfsPartitions = 1)
-    tgt1DO.dropTable
-    instanceRegistry.register(tgt1DO)
+    val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // fill src table with first partition
     val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
@@ -557,13 +602,13 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     // use only first partition col (dt) for partition diff mode
 
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from src1"))))
+      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, rating from src1"))))
     instanceRegistry.register(action1.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6)) // +1 because of udfAddX
+    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5))
 
     // check latest state
     {
@@ -572,7 +617,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues == Seq(PartitionValues(Map("dt" -> "20180101"))))
@@ -590,7 +635,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     sdlb.run(sdlConfig)
 
     // check results
-    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
+    assert(tgt1DO.getSparkDataFrame(Seq()).select($"rating").as[Int].collect().toSeq == Seq(5, 10))
 
     // check latest state
     {
@@ -599,7 +644,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 2)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(_.state).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED))
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues == Seq(PartitionValues(Map("dt" -> "20190101"))))
@@ -621,11 +666,10 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-runId"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
-    HdfsUtil.deleteFiles(new Path(tempPath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
+    HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.clear()
 
     // setup DataObjects
     val srcDO1 = TestIncrementalDataObject("src1")
@@ -686,28 +730,19 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-simulation"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.clear()
 
     // setup DataObjects
-    val srcTable = Table(Some("default"), "ap_input")
-    val srcPath = tempPath + s"/${srcTable.fullName}"
     // source table has partitions columns dt and type
-    val srcDO = HiveTableDataObject("src1", Some(srcPath), table = srcTable, numInitialHdfsPartitions = 1)
-    srcDO.dropTable
-    instanceRegistry.register(srcDO)
+    val srcDO = MockSparkDataObject("src1").register
     instanceRegistry.register(jdbcConnection)
     val tgt1Table = Table(Some("public"), "ap_dedup", None, Some(Seq("lastname", "firstname")))
     val tgt1DO = JdbcTableDataObject("tgt1", table = tgt1Table, connectionId = "jdbcCon1")
     tgt1DO.dropTable
     instanceRegistry.register(tgt1DO)
-    val tgt2Table = Table(Some("default"), "ap_copy", None, Some(Seq("lastname", "firstname")))
-    val tgt2Path = tempPath + s"/${tgt2Table.fullName}"
-    val tgt2DO = HiveTableDataObject("tgt2", Some(tgt2Path), table = tgt2Table, numInitialHdfsPartitions = 1)
-    tgt2DO.dropTable
-    instanceRegistry.register(tgt2DO)
+    val tgt2DO = MockSparkDataObject("tgt2", primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // prepare input DataFrame
     val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5))
@@ -719,12 +754,13 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action2)
     val configStart = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName))
-    val (finalSubFeeds, stats) = sdlb.startSimulation(configStart, Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc1)), srcDO.id, Seq())))
+    val (finalSubFeeds, stats) = sdlb.startSimulation(appConfig = configStart,
+      initialSubFeeds = Seq(SparkSubFeed(Some(SparkDataFrame(dfSrc1)), srcDO.id, Seq())))
 
     // check results
     assert(finalSubFeeds.size == 1)
     assert(stats == Map(RuntimeEventState.INITIALIZED -> 2))
-    assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.map(SparkSubFeed.col)).symmetricDifference(SparkDataFrame(dfSrc1)).isEmpty)
+    assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.toList.map(SparkSubFeed.col)).symmetricDifference(SparkDataFrame(dfSrc1)).isEmpty)
   }
 
   test("sdlb run converting col names to lower case") {
@@ -755,7 +791,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
         |""".stripMargin).resolve
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = "ids:act")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
@@ -802,7 +838,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
         |""".stripMargin).resolve
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = "ids:act")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
@@ -820,8 +856,8 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
 
   test("sdlb run with state file using FinalStateWriter, FinalMetricsWriter, uiBackend and Environment setting override from config") {
 
-    val port = 8080 // for some reason, only the default port seems to work
-    val httpsPort = 8443
+    val port = 8888
+    val httpsPort = 8889
     val host = "127.0.0.1"
     val wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
     TestUtil.setupWebserviceStubs()
@@ -874,7 +910,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
     val appName = "sdlb-recovery4"
     val feedName = "test"
 
-    HdfsUtil.deleteFiles(new Path(statePath), false)
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
@@ -890,7 +926,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc, Seq())
 
-    // start first dag run -> fail
+    // start first dag run
     // load partition 20180101 only
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))),
       executionMode = Some(PartitionDiffMode(nbOfPartitionValuesPerRun = Some(1), partitionColNb = Some(1))))
@@ -912,7 +948,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 1)
-      val resultActionsState = runState.actionsState.mapValues(s => (s.state, s.results.head.partitionValues)).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(s => (s.state, s.results.head.partitionValues)).toMap
       val expectedActionsState = Map(
         (action1.id, (RuntimeEventState.SUCCEEDED, Seq(PartitionValues(Map("dt" -> "20180101"))))),
         (action2failRuntime.id, (RuntimeEventState.FAILED, Seq(PartitionValues(Map("dt" -> "20180101")))))
@@ -939,7 +975,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 2)
-      val resultActionsState = runState.actionsState.mapValues(s => (s.state, s.results.head.metrics.flatMap(_.get("testCount")))).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(s => (s.state, s.results.head.metrics.flatMap(_.get("testCount")))).toMap
       val expectedActionsState = Map(
         (action1.id, (RuntimeEventState.SUCCEEDED, None)),
         (action2success.id, (RuntimeEventState.FAILED, Some(1)))
@@ -965,7 +1001,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter {
       val runState = stateStore.recoverRunState(stateFile)
       assert(runState.runId == 1)
       assert(runState.attemptId == 3)
-      val resultActionsState = runState.actionsState.mapValues(s => (s.state, s.results.head.partitionValues)).toMap
+      val resultActionsState = runState.actionsState.view.mapValues(s => (s.state, s.results.head.partitionValues)).toMap
       val expectedActionsState = Map(
         (action1.id, (RuntimeEventState.SUCCEEDED, Seq(PartitionValues(Map("dt" -> "20180101"))))),
         (action2failRuntime.id, (RuntimeEventState.SUCCEEDED, Seq(PartitionValues(Map("dt" -> "20180101")))))
@@ -1022,7 +1058,9 @@ class TestStateListener(options: Map[String, StringOrSecret]) extends StateListe
   var firstState: Option[ActionDAGRunState] = None
   var finalState: Option[ActionDAGRunState] = None
 
-  override def notifyState(state: ActionDAGRunState, context: ActionPipelineContext, changedActionId: Option[ActionId]): Unit = {
+  override def notifyState(state: ActionDAGRunState,
+                           context: ActionPipelineContext,
+                           changedActionId: Option[ActionId]): Unit = {
     if (TestStateListener.context.isEmpty) TestStateListener.context = Some(context)
     if (firstState.isEmpty) firstState = Some(state)
     finalState = Some(state)
@@ -1065,7 +1103,11 @@ object TestSDLPlugin {
 /**
  * This test DataObject delivers the 10 next numbers on every increment.
  */
-case class TestIncrementalDataObject(override val id: DataObjectId, override val metadata: Option[DataObjectMetadata] = None, initVal: Int = 1)
+case class TestIncrementalDataObject(
+                                      override val id: DataObjectId,
+                                      override val metadata: Option[DataObjectMetadata] = None,
+                                      initVal: Int = 1
+                                    )(implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput {
 
   // State is the start number of the last delivered increment
@@ -1074,7 +1116,7 @@ case class TestIncrementalDataObject(override val id: DataObjectId, override val
   var noDataCreated: Boolean = false
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
-    val session = context.sparkSession
+    val session = getSparkSession
     import session.implicits._
     // simulate no data for one request
     if (previousState == 21 && !noDataCreated && context.phase == ExecutionPhase.Exec) {

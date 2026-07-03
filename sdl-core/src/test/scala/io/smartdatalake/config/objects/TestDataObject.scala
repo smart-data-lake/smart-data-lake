@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,9 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.generic.{CanMergeDataFrame, Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.script.CanReceiveScriptNotification
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import org.apache.spark.sql.DataFrame
 
 /**
@@ -45,7 +48,7 @@ case class TestDataObject( id: DataObjectId,
                            override val metadata: Option[DataObjectMetadata] = None)
                          ( implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
-    with CanReceiveScriptNotification {
+    with CanReceiveScriptNotification with CanMergeDataFrame {
 
   override val options: Map[String, String] = Map()
 

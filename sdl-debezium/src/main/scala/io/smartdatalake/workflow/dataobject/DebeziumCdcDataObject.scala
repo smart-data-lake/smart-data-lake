@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.debezium.embedded.Connect
@@ -29,7 +28,9 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanCreateIncrementalOutput, SchemaValidation, Table}
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.kafka.connect.data.Schema.Type
 import org.apache.kafka.connect.data.{Field, Schema, Struct}
@@ -115,7 +116,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     // Always overwrite table.include.list property to include only the changes of the table specified in the data object
     props = props ++ Map("table.include.list" -> table.fullName)
 
-    val propsForEngine = new Properties();
+    val propsForEngine = new Properties()
     props.foreach { case (key, value) => propsForEngine.setProperty(key, value) }
     propsForEngine
   }
@@ -124,7 +125,7 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
 
-    implicit val spark: SparkSession = context.sparkSession
+    implicit val spark: SparkSession = SparkSubFeed.getSparkSession
 
     def getRecordsFromDebeziumEngine(
                                       properties: Properties,
@@ -318,17 +319,15 @@ private object DebeziumEventConverter {
         case Type.BOOLEAN => BooleanType
         case Type.STRING => StringType
         case Type.BYTES => BinaryType
-        case Type.MAP => {
+        case Type.MAP =>
           // Infer key and value types for MapType
           val keyType = inferSparkSchema(field.schema().keySchema())
           val valueType = inferSparkSchema(field.schema().valueSchema())
           MapType(keyType, valueType)
-        }
-        case Type.ARRAY => {
+        case Type.ARRAY =>
           // Infer the element type for ArrayType
           val elementType = inferSparkSchema(field.schema().valueSchema())
           ArrayType(elementType)
-        }
         case Type.STRUCT => inferSparkSchema(field.schema())
         case _ => StringType
       }
@@ -354,7 +353,7 @@ private object DebeziumEventConverter {
       }
     }.toSeq
 
-    Row(values: _*)
+    Row(values.toIndexedSeq: _*)
 
   }
 
@@ -386,7 +385,7 @@ private object DebeziumEventConverter {
     val newColumnOrder = remainingColumns ++ colsToMove
 
     // Reorder DataFrame by selecting columns in the new order
-    val reorderedDF = df.select(newColumnOrder.head, newColumnOrder.tail: _*)
+    val reorderedDF = df.select(newColumnOrder.head, newColumnOrder.tail.toIndexedSeq: _*)
 
     reorderedDF
   }

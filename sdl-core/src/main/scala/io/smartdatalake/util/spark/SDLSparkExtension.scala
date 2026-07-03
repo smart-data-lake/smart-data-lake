@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,14 +16,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.spark
 
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.adaptive.AQEPropagateEmptyRelation
-import org.apache.spark.sql.{DataFrame, DatasetHelper, SparkSessionExtensions}
+import org.apache.spark.sql.{DataFrame, Dataset, DatasetHelper, SparkSessionExtensions, classic}
 
 /**
  * Custom extensions for the Spark Session, e.g. optimizer rules or additional plan strategies.
@@ -49,7 +48,7 @@ object SDLSparkExtension {
   /**
    * Fail on evaluation of DataFrame if it is empty.
    */
-  def assertNotEmpty(df: DataFrame): DataFrame = {
+  def assertNotEmpty(df: classic.Dataset[_]): classic.Dataset[_] = {
     if (Environment.enableSparkPlanNoDataCheck) DatasetHelper.modifyPlan(df, plan => AssertNotEmpty(plan))
     else df
   }

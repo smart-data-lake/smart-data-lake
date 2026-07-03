@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,10 +20,6 @@ package io.smartdatalake.util.misc
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.catalyst.{DeserializerBuildHelper, ScalaReflection, SerializerBuildHelper}
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, Dataset}
 
 import java.time.format.DateTimeFormatter
 import scala.reflect.ClassTag
@@ -48,14 +44,14 @@ object ProductUtil {
   }
 
   /**
-   * Same as getFieldData, but helps extracting an optional field type
+   * Same as getFieldData, but helps to extract an optional field type
    */
   def getOptionalFieldData[T](obj: Product, fieldName: String): Option[T] = {
     getRawFieldData(obj, fieldName).flatMap(_.asInstanceOf[Option[T]])
   }
 
   /**
-   * Same as getFieldData, but helps extracting an field which is optional for some objects but for others not
+   * Same as getFieldData, but helps to extract a field which is optional for some objects but for others not
    */
   def getEventuallyOptionalFieldData[T](obj: Product, fieldName: String): Option[T] = {
     getRawFieldData(obj, fieldName).flatMap {
@@ -94,14 +90,14 @@ object ProductUtil {
         case None => msg.append("None")
         case Some(obj) => addObjToBuilder(msg, obj, spacing = false)
         // handle key->value pairs
-        case obj: Tuple2[Any, Any] =>
+        case obj: Tuple2[_, _] =>
           addObjToBuilder(msg, obj._1, spacing = false)
           msg.append("=")
           addObjToBuilder(msg, obj._2, spacing = false)
         // handle arrays -> convert to Seq (Iterable)
         case obj: Array[Any] => addObjToBuilder(msg, obj.toSeq, spacing = false)
         // handle lists & maps
-        case objs: Iterable[Any] =>
+        case objs: Iterable[_] =>
           msg.append("[")
           val truncatedObjs = objs.take(truncateListLimit)
           // no spacing for first element
@@ -154,41 +150,13 @@ object ProductUtil {
         f.setAccessible(true)
         (f.getName,f.get(obj))
       }
-      addPairs(msg, pairs)
+      addPairs(msg, pairs.toList)
     }
 
     // generate string
-    val msg = StringBuilder.newBuilder
+    val msg = new StringBuilder()
     addObjToBuilder(msg, obj, spacing = false)
     msg.toString
-  }
-
-  /**
-   * Create an Schema for a product based on it's type given as parameter (not as type parameter).
-   */
-  def createSchema(tpe: Type): StructType = {
-    val mirror = ScalaReflection.mirror
-    val cls = mirror.runtimeClass(tpe)
-    ScalaReflection.encoderFor(tpe).schema
-  }
-
-  /**
-   * Create an Encoder for a product based on it's type given as parameter (not as type parameter).
-   */
-  def createEncoder(tpe: Type): ExpressionEncoder[_] = {
-    val mirror = ScalaReflection.mirror
-    val cls = mirror.runtimeClass(tpe)
-    val encoder = ScalaReflection.encoderFor(tpe)
-    val serializer = SerializerBuildHelper.createSerializer(encoder)
-    val deserializer = DeserializerBuildHelper.createDeserializer(encoder)
-    new ExpressionEncoder(serializer, deserializer, ClassTag(cls))
-  }
-
-  /**
-   * Create a Dataset based on the given type of a product.
-   */
-  def createDataset(df: DataFrame, tpe: Type): Dataset[_] = {
-    df.as(createEncoder(tpe))
   }
 
   /**
@@ -237,16 +205,16 @@ object ProductUtil {
   /**
    * Extract case class attributes with values through reflection
    */
-  def attributesWithValuesForCaseClass(obj: Any): Seq[(String, Any)] = {
+  def attributesWithValuesForCaseClass(obj: Any): List[(String, Any)] = {
     val clsSym = currentMirror.classSymbol(obj.getClass)
     val inst = currentMirror.reflect(obj)
 
-    val attributes = classAccessors(clsSym.toType)
+    val attributes: List[MethodSymbol] = classAccessors(clsSym.toType)
     attributes.map { m =>
       val key = m.name.toString
       val value = inst.reflectMethod(m).apply()
       (key, value)
-    }.toSeq
+    }
   }
 
   /**
@@ -258,12 +226,12 @@ object ProductUtil {
     val inst = currentMirror.reflect(obj)
     val copyConstructor = inst.symbol.toType.decls.find(_.name.toString == "copy")
       .getOrElse(throw new IllegalStateException(s"copy constructor method not found in object of type ${obj.getClass.getSimpleName}"))
-    val attributes = classAccessors(clsSym.toType)
+    val attributes: List[(String, Any)] = classAccessors(clsSym.toType)
       .map { m =>
         val key = m.name.toString
         val value = if (key == fieldName) newValue else inst.reflectMethod(m).apply()
         (key, value)
-      }.toSeq
-    inst.reflectMethod(copyConstructor.asMethod).apply(attributes.map(_._2): _*).asInstanceOf[T]
+      }
+    inst.reflectMethod(copyConstructor.asMethod).apply(attributes.map(_._2).toIndexedSeq: _*).asInstanceOf[T]
   }
 }

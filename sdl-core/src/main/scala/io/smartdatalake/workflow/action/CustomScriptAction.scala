@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,10 +20,11 @@ package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
-import io.smartdatalake.workflow.dataobject.{CanReceiveScriptNotification, DataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.script.CanReceiveScriptNotification
 import io.smartdatalake.workflow.{ActionPipelineContext, ScriptSubFeed}
 
 /**
@@ -41,7 +42,7 @@ case class CustomScriptAction(override val id: ActionId,
                               scripts: Seq[ParsableScriptDef] = Seq(),
                               override val executionCondition: Option[Condition] = None,
                               override val metadata: Option[ActionMetadata] = None
-                       )(implicit instanceRegistry: InstanceRegistry) extends ScriptActionImpl {
+                       )(implicit val instanceRegistry: InstanceRegistry) extends ScriptActionImpl {
 
   override val inputs: Seq[DataObject] = inputIds.map(getInputDataObject[DataObject])
   override val outputs: Seq[DataObject with CanReceiveScriptNotification] = outputIds.map(getOutputDataObject[DataObject with CanReceiveScriptNotification])
@@ -60,7 +61,7 @@ case class CustomScriptAction(override val id: ActionId,
   }
 
   private def parseLastLine(stdOut: String): Map[String,String] = {
-    val lastLine = stdOut.linesIterator.toIterable.lastOption
+    val lastLine = stdOut.linesIterator.toList.lastOption
     lastLine.map(_.split(' ').map(_.split('=')).filter(_.length==2).map{case Array(k,v) => (k,v)}.toMap).getOrElse(Map())
   }
 

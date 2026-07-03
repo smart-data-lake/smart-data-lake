@@ -1,7 +1,7 @@
 <!--
   ~ Smart Data Lake - Build your data lake the smart way.
   ~
-  ~ Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+  ~ Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
   ~
   ~ This program is free software: you can redistribute it and/or modify
   ~ it under the terms of the GNU General Public License as published by
@@ -22,11 +22,11 @@
 	<parent>
 		<groupId>io.smartdatalake</groupId>
 		<artifactId>sdl-parent</artifactId>
-        <version>2.9.0-SNAPSHOT</version>
+        <version>3.0.0-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
-	<artifactId>sdl-snowflake_${scala.minor.version}</artifactId>
+	<artifactId>sdl-snowflake_2.13</artifactId>
 	<packaging>jar</packaging>
 
 	<name>sdl-snowflake</name>
@@ -55,19 +55,8 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<scope>${sdl-core.scope}</scope>
-		</dependency>
-
-		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-sql_${scala.minor.version}</artifactId>
-			<scope>${sdl-core.scope}</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
 			<scope>${sdl-core.scope}</scope>
 		</dependency>
 		<dependency>
@@ -184,12 +173,6 @@
 				<artifactId>scala-maven-plugin</artifactId>
 			</plugin>
 
-			<!-- rewrite pom for compiling with different scala version profiles -->
-			<plugin>
-				<groupId>org.spurint.maven.plugins</groupId>
-				<artifactId>scala-cross-maven-plugin</artifactId>
-			</plugin>
-
 			<!-- Copies files in resources folders to target folder. -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -224,6 +207,14 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
+				<configuration>
+					<ignoredUnusedDeclaredDependencies>
+						<!-- directly imported via net.snowflake.spark.snowflake.Utils, but SNOWFLAKE_SOURCE_NAME is a compile-time constant inlined by the compiler so bytecode analyzer misses the reference -->
+						<ignoredUnusedDeclaredDependency>net.snowflake:spark-snowflake_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+						<!-- used in source (scala.util.Try, scala.language.*) but not detected by bytecode analyzer -->
+						<ignoredUnusedDeclaredDependency>org.scala-lang:scala-library</ignoredUnusedDeclaredDependency>
+					</ignoredUnusedDeclaredDependencies>
+				</configuration>
 			</plugin>
 
 			<!-- check for dependency version conflicts -->

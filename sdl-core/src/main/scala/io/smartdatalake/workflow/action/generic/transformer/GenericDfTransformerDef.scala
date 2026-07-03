@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,13 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig, SdlConfigObject}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil}
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfTransformer.PREVIOUS_TRANSFORMER_NAME
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.IS_EXEC
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
@@ -46,14 +45,17 @@ trait PartitionValueTransformer extends Transformer {
    */
   def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = None
 
-  private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValuesMap: Map[PartitionValues,PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
-    val thisPartitionValuesMap = transformPartitionValues(actionId, partitionValuesMap.values.toStream.distinct, executionModeResultOptions) // toStream is lazy: distinct is only calculated if transformPartitionValues creates a mapping.
+  private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValuesMap: Map[PartitionValues, PartitionValues], executionModeResultOptions: Map[String, String])
+                                                (implicit context: ActionPipelineContext): Map[PartitionValues, PartitionValues] = {
+    val thisPartitionValuesMap = transformPartitionValues(actionId, partitionValuesMap.values.to(LazyList).distinct, executionModeResultOptions) // toStream is lazy: distinct is only calculated if transformPartitionValues creates a mapping.
     thisPartitionValuesMap.map { newMapping =>
       // transform is mapping is defined
       def lookupNewValue(key: PartitionValues) =
-        newMapping.getOrElse(key, throw new IllegalStateException(s"($actionId) No entry found for partitionValues=$key in mapping returned from ${this.getClass.getSimpleName}.transformPartitionValues"))
+        newMapping.getOrElse(key,
+          throw new IllegalStateException(s"($actionId) No entry found for partitionValues=$key" +
+            s" in mapping returned from ${this.getClass.getSimpleName}.transformPartitionValues"))
 
-      partitionValuesMap.mapValues(lookupNewValue).toMap
+      partitionValuesMap.view.mapValues(lookupNewValue).toMap
     }.getOrElse(partitionValuesMap)
   }
 }
@@ -148,11 +150,13 @@ trait OptionsGenericDfTransformer extends GenericDfTransformer {
     // transform
     transformWithOptions(actionId, partitionValues, df, dataObjectId, defaultOptions ++ options ++ runtimeOptionsReplaced ++ executionModeResultOptions ++ previousTransformerName.map(PREVIOUS_TRANSFORMER_NAME -> _))
   }
-  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
+
+  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])
+                                   (implicit context: ActionPipelineContext): Map[String, String] = {
     lazy val data = DefaultExpressionData.from(context, partitionValues)
-    runtimeOptions.mapValues {
-      expr => SparkExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
-    }.filter(_._2.isDefined).mapValues(_.get).toMap
+    runtimeOptions.view.mapValues {
+      expr => ExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
+    }.filter(_._2.isDefined).view.mapValues(_.get).toMap
   }
 }
 object OptionsGenericDfTransformer {

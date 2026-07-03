@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.executionMode
 
 import com.typesafe.config.Config
@@ -24,18 +23,18 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.ProductUtil
-import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.util.misc.{ExpressionUtil, ProductUtil}
 import io.smartdatalake.workflow.action.ActionHelper.searchCommonInits
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
-import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.CanHandlePartitions
 import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
 
 import java.sql.Timestamp
 
 /**
  * Partition difference execution mode lists partitions on mainInput & mainOutput DataObject and starts loading all missing partitions.
- * Partition columns to be used for comparision need to be a common 'init' of input and output partition columns.
+ * Partition columns to be used for comparison need to be a common 'init' of input and output partition columns.
  * This mode needs mainInput/Output DataObjects which CanHandlePartitions to list partitions.
  * Partition values are passed to following actions for partition columns which they have in common.
  *
@@ -78,9 +77,9 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
     // validate fail condition
     failConditionsDef.foreach(_.syntaxCheck[PartitionDiffModeExpressionData](actionId, Some("failCondition")))
     // validate select expression
-    selectExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), expression))
+    selectExpression.foreach(expression => ExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), expression))
     // validate select additional input expression
-    selectAdditionalInputExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectAdditionalInputExpression"), expression))
+    selectAdditionalInputExpression.foreach(expression => ExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectAdditionalInputExpression"), expression))
     // check alternativeOutput exists
     alternativeOutput
   }
@@ -116,12 +115,12 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
               val outputOrdering = PartitionValues.getOrdering(outputPartitions)
               val inputOrdering = PartitionValues.getOrdering(inputPartitions)
               // calculate missing partition values
-              val filteredInputPartitionValues = partitionInput.listPartitions.map(_.filterKeys(inputPartitions))
-              val filteredOutputPartitionValues = partitionOutput.listPartitions.map(_.filterKeys(outputPartitions))
-              val inputOutputPartitionValuesMap = if (applyPartitionValuesTransform) {
-                partitionValuesTransform(filteredInputPartitionValues).mapValues(_.filterKeys(outputPartitions))
-              } else PartitionValues.oneToOneMapping(filteredInputPartitionValues) // normally this transformation is 1:1, but it can be implemented in custom transformations for aggregations
-              val outputInputPartitionValuesMap = inputOutputPartitionValuesMap.toSeq.map { case (k, v) => (v, k) }.groupBy(_._1).mapValues(_.map(_._2))
+               val filteredInputPartitionValues = partitionInput.listPartitions.map(pv => pv.elements.view.filterKeys(inputPartitions.contains).toMap).map(PartitionValues(_))
+               val filteredOutputPartitionValues = partitionOutput.listPartitions.map(pv => pv.elements.view.filterKeys(outputPartitions.contains).toMap).map(PartitionValues(_))
+               val inputOutputPartitionValuesMap = if (applyPartitionValuesTransform) {
+                 partitionValuesTransform(filteredInputPartitionValues).view.mapValues(pv => pv.elements.view.filterKeys(outputPartitions.contains).toMap).toMap.map { case (k, v) => (k, PartitionValues(v)) }
+               } else PartitionValues.oneToOneMapping(filteredInputPartitionValues) // normally this transformation is 1:1, but it can be implemented in custom transformations for aggregations
+               val outputInputPartitionValuesMap = inputOutputPartitionValuesMap.toSeq.map { case (k, v) => (v, k) }.groupBy(_._1).view.mapValues(_.map(_._2)).toMap
               var selectedOutputPartitionValues = inputOutputPartitionValuesMap.values.toSet.diff(filteredOutputPartitionValues.toSet).toSeq
               // reverse lookup input partitions as selection of output partitions might have changed
               var selectedInputPartitionValues = selectedOutputPartitionValues.flatMap(outputInputPartitionValuesMap)
@@ -130,7 +129,7 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
                 inputPartitionValues = filteredInputPartitionValues.map(_.getMapString), outputPartitionValues = filteredOutputPartitionValues.map(_.getMapString),
                 selectedInputPartitionValues = selectedInputPartitionValues.map(_.getMapString), selectedOutputPartitionValues = selectedOutputPartitionValues.map(_.getMapString))
               selectedOutputPartitionValues = if (selectExpression.isDefined) {
-                SparkExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), selectExpression.get, data)
+                ExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), selectExpression.get, data)
                   .map(_.map(PartitionValues(_)))
                   .getOrElse(selectedOutputPartitionValues)
                   .sorted(outputOrdering)
@@ -145,7 +144,7 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
               data = data.copy(selectedInputPartitionValues = selectedInputPartitionValues.map(_.getMapString), selectedOutputPartitionValues = selectedOutputPartitionValues.map(_.getMapString))
               // apply optional select additional input partitions expression
               selectedInputPartitionValues = if (selectAdditionalInputExpression.isDefined) {
-                SparkExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectAdditionalInputExpression"), selectAdditionalInputExpression.get, data)
+                ExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectAdditionalInputExpression"), selectAdditionalInputExpression.get, data)
                   .map(_.map(PartitionValues(_)))
                   .getOrElse(selectedInputPartitionValues)
                   .sorted(inputOrdering)

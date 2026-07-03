@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,13 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil}
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.IS_EXEC
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
@@ -79,12 +78,20 @@ trait GenericDfsTransformer extends GenericDfsTransformerDef with ParsableFromCo
 trait SparkDfsTransformer extends GenericDfsTransformer {
   // Note: must have a different name as transform because signature is different only in subtypes of parameters.
   def transformSpark(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame])(implicit context: ActionPipelineContext): Map[String, DataFrame]
-  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], executionModeResultOptions: Map[String,String], outputDataObjectIds: Seq[String])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
-    assert(dfs.values.forall(_.isInstanceOf[SparkDataFrame]), s"($actionId) Unsupported subFeedType(s) ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method transform")
-    val sparkDfs = dfs.mapValues(_.asInstanceOf[SparkDataFrame].inner).toMap
+
+  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues],
+                               dfs: Map[String, GenericDataFrame],
+                               executionModeResultOptions: Map[String, String],
+                               outputDataObjectIds: Seq[String])
+                              (implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
+    assert(dfs.values.forall(_.isInstanceOf[SparkDataFrame]), s"($actionId) Unsupported subFeedType(s)" +
+      s" ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")}" +
+      s" in method transform")
+    val sparkDfs = dfs.view.mapValues(_.asInstanceOf[SparkDataFrame].inner).toMap
     transformSpark(actionId, partitionValues, sparkDfs)
-      .mapValues(SparkDataFrame).toMap
+      .view.mapValues(SparkDataFrame).toMap
   }
+
   override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
 }
 
@@ -132,11 +139,13 @@ trait OptionsGenericDfsTransformer extends GenericDfsTransformer {
     // transform
     transformWithOptions(actionId, partitionValues, dfs, defaultOptions ++ options ++ runtimeOptionsReplaced ++ executionModeResultOptions)
   }
-  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
+
+  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])
+                                   (implicit context: ActionPipelineContext): Map[String, String] = {
     lazy val data = DefaultExpressionData.from(context, partitionValues)
-    runtimeOptions.mapValues {
-      expr => SparkExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
-    }.filter(_._2.isDefined).mapValues(_.get).toMap
+    runtimeOptions.view.mapValues {
+      expr => ExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
+    }.filter(_._2.isDefined).view.mapValues(_.get).toMap
   }
 }
 object OptionsGenericDfsTransformer {
@@ -151,13 +160,17 @@ object OptionsGenericDfsTransformer {
  */
 trait OptionsSparkDfsTransformer extends OptionsGenericDfsTransformer {
   // Note: must have a different name as transform because signature is different only in subtypes of parameters.
-  def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String,String])(implicit context: ActionPipelineContext): Map[String,DataFrame]
-  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], options: Map[String,String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
+  def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame], options: Map[String, String])
+                               (implicit context: ActionPipelineContext): Map[String, DataFrame]
+
+  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], options: Map[String, String])
+                                   (implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
     assert(dfs.values.forall(_.isInstanceOf[SparkDataFrame]), s"($actionId) Unsupported subFeedType(s) ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method transform")
-    val sparkDfs = dfs.mapValues(_.asInstanceOf[SparkDataFrame].inner).toMap
+    val sparkDfs = dfs.view.mapValues(_.asInstanceOf[SparkDataFrame].inner).toMap
     transformSparkWithOptions(actionId, partitionValues, sparkDfs, options)
-      .mapValues(SparkDataFrame).toMap
+      .view.mapValues(SparkDataFrame).toMap
   }
+
   override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
 }
 

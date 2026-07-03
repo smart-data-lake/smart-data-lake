@@ -86,7 +86,7 @@ CREATE TABLE demo.test2 (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 ```
 
-*IMPORTANT": Running Integration Test for MySQL doesnt work with an IntelliJ run configuration, as IntelliJ doesn't
+*IMPORTANT": Running Integration Test for MySQL does not work with an IntelliJ run configuration, as IntelliJ doesn't
 handle classpath with shaded jars / dependency-reduced-pom's correctly.
 Use the following Maven command line instead:
 
@@ -118,7 +118,7 @@ DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_general_ci;
 ```
 
-*IMPORTANT": Running Integration Test for MariaDB doesnt work with an IntelliJ run configuration, as IntelliJ doesn't
+*IMPORTANT": Running Integration Test for MariaDB does not work with an IntelliJ run configuration, as IntelliJ doesn't
 handle classpath with shaded jars / dependency-reduced-pom's correctly.
 Use the following Maven command line instead:
 

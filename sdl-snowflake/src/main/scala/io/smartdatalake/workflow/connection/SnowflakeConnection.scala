@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 Schweizerische Bundesbahnen SBB (<https://www.sbb.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -65,9 +65,8 @@ case class SnowflakeConnection(override val id: ConnectionId,
   // prepare JDBC catalog implementation
   val catalog: DefaultJdbcCatalog = new DefaultJdbcCatalog(this)
   // setup JDBC connection pool for metadata and ddl queries
-  override val pool: GenericObjectPool[SqlConnection] = ConnectionPoolConfig().create(maxParallelConnections = 3, () => Utils.getJDBCConnection(getJdbcAuthOptions("")), initSql = None, autoCommit = false)
-  // set autoCommit=false as recommended
-  override val autoCommit: Boolean = false
+  override val pool: GenericObjectPool[SqlConnection] = ConnectionPoolConfig()
+    .create(maxParallelConnections = 3, () => Utils.getJDBCConnection(getJdbcAuthOptions("")), initSql = None)
   override val jdbcDialect: JdbcDialect = JdbcDialects.get("snowflake")
 
   def getProxyOptions: Map[String,String] = {

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,9 +20,11 @@ package io.smartdatalake.workflow.connection
 
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{ParsableFromConfig, SdlConfigObject}
-import io.smartdatalake.workflow.AtlasExportable
+import io.smartdatalake.workflow.ActionPipelineContext
 
-trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] with AtlasExportable {
+import scala.reflect.runtime.universe.Type
+
+trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] {
 
   /**
    * A unique identifier for this instance.
@@ -38,7 +40,6 @@ trait Connection extends SdlConfigObject with ParsableFromConfig[Connection] wit
     s"$id[${this.getClass.getSimpleName}]"
   }
 
-  override def atlasName: String = id.id
 }
 
 /**
@@ -57,3 +58,18 @@ case class ConnectionMetadata(
                                tags: Seq[String] = Seq()
                              )
 
+/**
+ * A trait for connections that can be used as execution engine.
+ */
+trait EngineConnection {
+  /**
+   * The type of the sub-feed that this engine can execute.
+   */
+  def subFeedType: Type
+
+  /**
+   * A hook for subclasses to perform configurations before the Connection is used for an Action in Init/Exec-phase
+   */
+  def activate(operation: Option[String])(implicit context: ActionPipelineContext): Unit = ()
+
+}

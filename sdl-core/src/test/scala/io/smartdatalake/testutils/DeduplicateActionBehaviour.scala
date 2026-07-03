@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.testutils
 
 import io.smartdatalake.config.InstanceRegistry
@@ -26,9 +25,10 @@ import io.smartdatalake.testutils.GenericTestTool.printFailedTestResult
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.DeduplicateAction
 import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, SQLDfTransformer}
-import io.smartdatalake.workflow.connection.Connection
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase}
 import org.slf4j.Logger
 
@@ -43,14 +43,17 @@ trait DeduplicateActionBehaviour {
 
   import TestUtil.registerDataObject
 
+  def defaultEngineConnection: Connection with EngineConnection
+
   def testDeduplicateTwoRuns(
-      createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
-      createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
       tgtConnection: Option[Connection] = None
   ): Unit = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
@@ -106,13 +109,14 @@ trait DeduplicateActionBehaviour {
   }
 
   def testDeduplicateWithFilter(
-      createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
-      createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
       tgtConnection: Option[Connection] = None
   ): Unit = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
@@ -140,13 +144,14 @@ trait DeduplicateActionBehaviour {
   }
 
   def testDeduplicateWithTransformerChangingSchema(
-      createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
-      createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
       tgtConnection: Option[Connection] = None
   ): Unit = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
@@ -209,6 +214,7 @@ trait DeduplicateActionBehaviour {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val helper = DataFrameSubFeed.getCompanion(subFeedType)
@@ -239,20 +245,21 @@ trait DeduplicateActionBehaviour {
       .deduplicateDataFrame(Option(dfResult1), Seq(colId), dateTime2, ignoreOldDeletedColumns = false, ignoreOldDeletedNestedColumns = true)(df3)
 
     // the expected result is the final passed value with a captured column
-    val dfExpected = Seq((1, "B", 200, ts("2020-08-16 10:00")))
+    val dfExpected: GenericDataFrame = Seq((1, "B", 200, ts("2020-08-16 10:00")))
       .toDF(colId, colValueOld, colValueNew, Environment.capturedColumnName)
 
     assertDataFramesEqualGeneric(dfExpected, dfResult2)
   }
 
   def testDeduplicateWithMergeMode(
-      createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
-      createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
       tgtConnection: Option[Connection] = None
   ): Unit = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
@@ -263,10 +270,10 @@ trait DeduplicateActionBehaviour {
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
     val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
-    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, mergeModeEnable = true)
+    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id)
     val l1 = Seq(
-      ("doe", "john", 5),
-      ("pan", "peter", 5),
+      ("doe",  "john",   5),
+      ("pan",  "peter",  5),
       ("hans", "muster", 5)
     ).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())(context1)
@@ -291,7 +298,7 @@ trait DeduplicateActionBehaviour {
     val refTimestamp2 = LocalDateTime.now()
     val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
     val l2 = Seq(
-      ("doe", "john", 10),
+      ("doe", "john",  10),
       ("pan", "peter", 5)
     ).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l2, Seq())(context2)
@@ -337,13 +344,14 @@ trait DeduplicateActionBehaviour {
   }
 
   def testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
-      createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
-      createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
       tgtConnection: Option[Connection] = None
   ): Unit = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
@@ -354,7 +362,7 @@ trait DeduplicateActionBehaviour {
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
     val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
-    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, mergeModeEnable = true, updateCapturedColumnOnlyWhenChanged = true)
+    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, updateCapturedColumnOnlyWhenChanged = true)
     val l1 = Seq(
       ("doe",  "john",   Some(5)),
       ("pan",  "peter",  Some(5)),
@@ -437,13 +445,14 @@ trait DeduplicateActionBehaviour {
   }
 
   def testDeduplicateWithMergeModeSchemaEvolution(
-      createSrcDataObject: ((String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame),
-      createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame),
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
       tgtConnection: Option[Connection] = None
   ): Unit = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
@@ -458,12 +467,11 @@ trait DeduplicateActionBehaviour {
       "dda",
       srcDO.id,
       tgtDO.id,
-      mergeModeEnable = true,
       transformers = Seq(SQLDfTransformer(code = Some("select lastname, firstname, rating as rating2 from %{inputViewName}")))
     )
     val l1 = Seq(
-      ("doe", "john", 5),
-      ("pan", "peter", 5),
+      ("doe",  "john",   5),
+      ("pan",  "peter",  5),
       ("hans", "muster", 5)
     ).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())(context1)
@@ -489,7 +497,7 @@ trait DeduplicateActionBehaviour {
     val refTimestamp2 = LocalDateTime.now()
     val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
     val l2 = Seq(
-      ("doe", "john", 10),
+      ("doe", "john",  10),
       ("pan", "peter", 5)
     ).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l2, Seq())(context2)

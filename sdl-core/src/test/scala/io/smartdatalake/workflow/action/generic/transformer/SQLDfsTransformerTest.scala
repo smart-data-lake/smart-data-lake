@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
@@ -25,8 +24,9 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.CustomDataFrameAction
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import io.smartdatalake.workflow.dataobject.{JdbcTableDataObject, Table}
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
+import io.smartdatalake.workflow.dataobject.generic.Table
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.funsuite.AnyFunSuite
 
 class SQLDfsTransformerTest extends AnyFunSuite {
@@ -34,7 +34,7 @@ class SQLDfsTransformerTest extends AnyFunSuite {
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
-  implicit val instanceRegistry = new InstanceRegistry()
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   val con1 = JdbcTableConnection("con1", url = "123", driver = "driver") // dummy
@@ -51,7 +51,7 @@ class SQLDfsTransformerTest extends AnyFunSuite {
   val action1 = CustomDataFrameAction("action1", List(srcDO1.id), List(tgtDO1.id))
   instanceRegistry.register(action1)
 
-  val emptyDf = Seq((1,"a")).toDF("num","str")
+  val emptyDf: DataFrame = Seq((1,"a")).toDF("num","str")
 
   test("options and view name token are replaced and sql can be parsed") {
     val customTransformer = SQLDfsTransformer(code = Map(tgtDO1.id.id -> s"select %{inputViewName_src1}.num, %{option1} from %{inputViewName_src1}"))

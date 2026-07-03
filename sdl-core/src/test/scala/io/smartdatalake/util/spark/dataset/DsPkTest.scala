@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.TestUtil
@@ -206,7 +205,7 @@ class DsPkTest extends AnyFlatSpec with Matchers
     actual shouldBe false
   }
 
-  "project" should "project dfComplex onto value only" in {
+  "project" should "project dsComplex onto value only" in {
     val actual = dsComplex.project(Array("value"))
     val rows_expected: List[List[(String, String, List[String])]] = List(
       List(("a", "A", List("a", "A"))),

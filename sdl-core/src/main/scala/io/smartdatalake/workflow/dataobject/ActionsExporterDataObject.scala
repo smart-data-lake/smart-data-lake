@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,12 +19,15 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ProductUtil._
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
+import io.smartdatalake.workflow.connection.SparkClassicConnection
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -57,12 +60,10 @@ case class ActionsExporterDataObject(id: DataObjectId,
   extends DataObject with CanCreateSparkDataFrame with ParsableFromConfig[ActionsExporterDataObject] {
 
   /**
-   *
-   * @param session SparkSession to use
-   * @return DataFrame including all Actions in the instanceRegistry, used for exporting the metadata
+   * Create a DataFrame including all Actions in the instanceRegistry, used for exporting the metadata
    */
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    val session: SparkSession = context.sparkSession
+    val session = SparkSubFeed.getSparkSession
     import session.implicits._
 
     val listElementsSeparator = ","
@@ -95,10 +96,10 @@ case class ActionsExporterDataObject(id: DataObjectId,
           // metadata tags
           metadata.map(_.tags).map(_.mkString(listElementsSeparator)),
           // inputId
-          getFieldData[Any](action, "inputId").map(getIdFromConfigObjectIdOrString) // dont know why this is a String and not a DataObjectId. Seems to be a speciality with value classes.
+          getFieldData[Any](action, "inputId").map(getIdFromConfigObjectIdOrString) // do not know why this is a String and not a DataObjectId. Seems to be a speciality with value classes.
             .orElse( getFieldData[Seq[Any]](action, "inputIds").map(_.map(getIdFromConfigObjectIdOrString).mkString(listElementsSeparator))),
           // outputId
-          getFieldData[Any](action, "outputId").map(getIdFromConfigObjectIdOrString) // dont know why this is a String and not a DataObjectId. Seems to be a speciality with value classes.
+          getFieldData[Any](action, "outputId").map(getIdFromConfigObjectIdOrString) // do not know why this is a String and not a DataObjectId. Seems to be a speciality with value classes.
             .orElse( getFieldData[Seq[Any]](action, "outputIds").map(_.map(getIdFromConfigObjectIdOrString).mkString(listElementsSeparator))),
           // transformer
           getEventuallyOptionalFieldData[Any](action, "transformer").map(_.toString),

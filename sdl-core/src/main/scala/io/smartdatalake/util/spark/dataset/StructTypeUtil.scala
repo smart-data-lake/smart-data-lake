@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.util.LogUtils
@@ -56,7 +55,7 @@ trait StructTypeUtil {
    * @param nullable  : is field nullable ?
    * @return StructType
    */
-  def createStruct(fieldName: String, fieldType: DataType, nullable: Boolean = true): StructType = createStruct(Array((fieldName, fieldType, nullable)))
+  def createStruct(fieldName: String, fieldType: DataType = StringType, nullable: Boolean = true): StructType = createStruct(Array((fieldName, fieldType, nullable)))
 
   implicit class StructSDLB(st: StructType) {
 
@@ -98,9 +97,9 @@ trait StructTypeUtil {
         logger.info(s"ignoreColumnOrder = $ignoreColumnOrder")
         logger.info(s"ignoreNullability = $ignoreNullability")
         logger.info(s"this = $niceString")
-        st.printTreeString
+        st.printTreeString()
         logger.info(s"that = ${that.niceString}")
-        that.printTreeString
+        that.printTreeString()
         logger.info(s"this minus that = ${st.diff(that).map(structField2String).mkString(", ")}")
         logger.info(s"that minus this = ${that.diff(st).map(structField2String).mkString(", ")}")
       }

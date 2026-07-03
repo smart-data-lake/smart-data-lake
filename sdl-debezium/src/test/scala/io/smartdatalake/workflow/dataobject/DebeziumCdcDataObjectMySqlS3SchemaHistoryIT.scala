@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,21 +16,23 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
-import io.smartdatalake.config.ConfigToolbox
+import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, lit}
 
 import java.nio.file.Files
@@ -47,10 +49,10 @@ object DebeziumCdcDataObjectMySqlS3SchemaHistoryIT extends App with SmartDataLak
    */
 
   val sdlb = DefaultSmartDataLakeBuilder
-  implicit val instanceRegistry = sdlb.instanceRegistry
-  implicit val sparkSession = TestUtil.session
+  implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+  implicit val sparkSession: SparkSession = TestUtil.session
   Environment._instanceRegistry = instanceRegistry
-  implicit val context = ConfigToolbox.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
 
   import sparkSession.implicits._
 
@@ -62,14 +64,14 @@ object DebeziumCdcDataObjectMySqlS3SchemaHistoryIT extends App with SmartDataLak
     dbEngine = "mysql",
     hostname = sys.env("MYSQL_HOSTNAME"),
     port = sys.env("MYSQL_PORT").toInt,
-    authMode = BasicAuthMode(Some(StringOrSecret(sys.env("MYSQL_USER"))), Some(StringOrSecret(sys.env("MYSQL_PASSWORD"))))
+    authMode = BasicAuthMode(user = StringOrSecret(sys.env("MYSQL_USER")), password = StringOrSecret(sys.env("MYSQL_PASSWORD")))
   )
 
   val jdbcConnection = JdbcTableConnection(
     id = "mysqlCon",
     url = s"jdbc:mysql://${sys.env("MYSQL_HOSTNAME")}:${sys.env("MYSQL_PORT").toInt}",
     driver = "com.mysql.cj.jdbc.Driver",
-    authMode = Some(BasicAuthMode(Some(StringOrSecret(sys.env("MYSQL_USER"))), Some(StringOrSecret(sys.env("MYSQL_PASSWORD"))))),
+    authMode = Some(BasicAuthMode(user = StringOrSecret(sys.env("MYSQL_USER")), password = StringOrSecret(sys.env("MYSQL_PASSWORD")))),
     db = Some("demo")
   )
 

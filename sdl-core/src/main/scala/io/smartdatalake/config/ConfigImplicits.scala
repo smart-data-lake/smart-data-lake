@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,9 +21,9 @@ package io.smartdatalake.config
 import configs.{ConfigError, ConfigKeyNaming, ConfigReader, Result}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions._
-import io.smartdatalake.util.hdfs.SparkRepartitionDef
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.secrets.{SecretProviderConfig, StringOrSecret}
+import io.smartdatalake.util.spark.SparkRepartitionDef
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
@@ -31,8 +31,8 @@ import io.smartdatalake.workflow.action.spark.customlogic._
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, HttpAuthMode}
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataobject.HousekeepingMode
 import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, Expectation}
+import io.smartdatalake.workflow.dataobject.generic.HousekeepingMode
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types.StructType
 
@@ -76,9 +76,6 @@ trait ConfigImplicits {
   // see: https://github.com/kxbmap/configs/issues/44
   // TODO: check periodically if still needed, should not be needed with scala 2.13+
   // --------------------------------------------------------------------------------
-  implicit val customDfCreatorConfigReader: ConfigReader[CustomDfCreatorConfig] = ConfigReader.derive[CustomDfCreatorConfig]
-  implicit val customDfTransformerConfigReader: ConfigReader[CustomDfTransformerConfig] = ConfigReader.derive[CustomDfTransformerConfig]
-  implicit val customDfsTransformerConfigReader: ConfigReader[CustomDfsTransformerConfig] = ConfigReader.derive[CustomDfsTransformerConfig]
   implicit val customFileTransformerConfigReader: ConfigReader[CustomFileTransformerConfig] = ConfigReader.derive[CustomFileTransformerConfig]
   implicit val sparkUdfCreatorConfigReader: ConfigReader[SparkUDFCreatorConfig] = ConfigReader.derive[SparkUDFCreatorConfig]
   implicit val sparkRepartitionDefReader: ConfigReader[SparkRepartitionDef] = ConfigReader.derive[SparkRepartitionDef]

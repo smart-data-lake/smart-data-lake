@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,7 +25,8 @@ import io.smartdatalake.definitions.Condition
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, HousekeepingMode, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, HousekeepingMode, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
 
 /**
@@ -46,7 +47,7 @@ case class TestAction(override val id: ActionId,
                       override val executionCondition: Option[Condition] = None,
                       override val metricsFailCondition: Option[String] = None,
                       override val metadata: Option[ActionMetadata] = None
-                     )(implicit instanceRegistry: InstanceRegistry)
+                     )(implicit val instanceRegistry: InstanceRegistry)
   extends Action {
 
   override def init(subFeed: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = { /*NOP*/ Seq() }

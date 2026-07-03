@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject.expectation
 
 import com.typesafe.config.Config
@@ -26,10 +25,9 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
-import io.smartdatalake.workflow.dataobject.ExpectationValidation
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.{ExpectationScope, Job}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.ExpectationSeverity
-import org.apache.spark.sql.Column
+import io.smartdatalake.workflow.dataobject.generic.ExpectationValidation
 
 
 /**
@@ -73,7 +71,8 @@ case class SQLFractionExpectation(
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL expression '$countConditionExpression'", Some(s"expectations.$name.expression"), e)
     }
   }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])
+                              (implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
     import ExpectationValidation.partitionDelimiter
     val totalMetric = if (globalConditionExpression.isDefined) totalName else "count"
     if (scope == ExpectationScope.JobPartition) {
@@ -86,13 +85,13 @@ case class SQLFractionExpectation(
           (col.map(SparkColumn), Map(n -> pct))
         }
       val cols = colsAndUpdatedMetrics.flatMap(_._1)
-      val updatedMetrics = metrics.filterKeys(!_.startsWith(totalName)).toMap ++ colsAndUpdatedMetrics.map(_._2).reduce(_ ++ _)
+      val updatedMetrics = metrics.view.filterKeys(!_.startsWith(totalName)).toMap ++ colsAndUpdatedMetrics.map(_._2).reduce(_ ++ _)
       (cols, updatedMetrics)
     } else {
       val countExpectation = getMetric[Long](dataObjectId,metrics,name)
       val countTotal = getMetric[Long](dataObjectId,metrics,totalMetric)
       val (col, pct) = getValidationErrorColumn(dataObjectId, countExpectation, countTotal)
-      val updatedMetrics = metrics.filterKeys(_ != totalName).toMap + (name -> pct)
+      val updatedMetrics = metrics.view.filterKeys(_ != totalName).toMap + (name -> pct)
       (col.map(SparkColumn).toSeq, updatedMetrics)
     }
   }

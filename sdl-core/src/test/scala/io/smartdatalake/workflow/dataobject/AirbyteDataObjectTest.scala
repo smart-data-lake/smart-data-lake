@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,15 +16,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.DataObjectTestSuite
-import io.smartdatalake.util.json.JsonUtils
 import io.smartdatalake.util.misc.CustomCodeUtil
+import io.smartdatalake.util.spark.json.JsonUtils
 import io.smartdatalake.workflow.action.script.CmdScript
-import org.apache.spark.sql.types.DataType
 import org.json4s.{Formats, JBool, JInt, JObject, JString}
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -40,12 +38,12 @@ class AirbyteDataObjectTest extends DataObjectTestSuite
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
   private def parseMessage(msg: String): AirbyteMessage = {
-    AirbyteMessage.parseOutput(Stream(msg), mutable.Buffer(), filterLog = false).head
+    AirbyteMessage.parseOutput(LazyList(msg), mutable.Buffer(), filterLog = false).head
   }
 
   import session.implicits._
 
-  // Note: this test needs WSL installed on windows
+  // Note: this test needs WSL installed on Windows
   test("cmd test") {
     val configStr = """
       my-config = "test"
@@ -88,7 +86,6 @@ class AirbyteDataObjectTest extends DataObjectTestSuite
     )
     val catalog = AirbyteCatalog(Seq(stream))
     assert(msg.toString == catalog.toString) // interestingly the objects are not equal, but the string representation is!
-    val schema = DataType.fromDDL("struct<produkttyp:string,flag:string,artikelID:string,artikelbezeichnung:string>")
     //assert(msg.asInstanceOf[AirbyteCatalog].streams.head.getSparkSchema == schema)
   }
 

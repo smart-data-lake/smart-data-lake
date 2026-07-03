@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,10 +19,12 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockSparkDataObject}
+import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
-import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils, Table}
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
+import io.smartdatalake.workflow.dataobject.generic.Table
+import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -38,8 +40,10 @@ class IcebergHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
 
+  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
+
   testsFor(historizeWithMergeMode(
-      (id, registry) => MockSparkDataObject(id),
+      (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => {
         val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
         IcebergTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
@@ -47,7 +51,7 @@ class IcebergHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with
     ))
 
   testsFor(historizeIncrementalPipeline(
-      (id, registry) => MockSparkDataObject(id),
+      (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => {
         val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
         IcebergTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)

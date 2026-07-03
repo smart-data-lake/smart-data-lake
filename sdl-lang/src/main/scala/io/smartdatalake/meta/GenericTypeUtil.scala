@@ -1,3 +1,21 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package io.smartdatalake.meta
 
 import io.smartdatalake.definitions.SaveModeOptions
@@ -8,12 +26,12 @@ import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransforme
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
-import io.smartdatalake.workflow.connection.authMode.AuthMode
-import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
-import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.agent.Agent
-import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
+import io.smartdatalake.workflow.connection.authMode.{AuthMode, HttpAuthMode}
+import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic.{HousekeepingMode, Table}
+import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
 import org.reflections.Reflections
 import scaladoc.Tag
 
@@ -49,11 +67,10 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
   typeOf[HttpAuthMode],
     typeOf[ValidationRule],
     typeOf[SaveModeOptions],
-    typeOf[CustomDfTransformerConfig],
     typeOf[Expectation]
   )
 
-  def getReflections = ReflectionUtil.getReflections("io.smartdatalake")
+  def getReflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake")
 
   /**
    * Finds all relevant types according to the config and generates GenericTypeDefs for them.
@@ -149,13 +166,14 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     val name = tpe.typeSymbol.name.toString
     val scaladoc = extractScalaDoc(tpe.typeSymbol.annotations)
     val description = scaladoc.map(formatScaladocWithTags(_, tag => !(tag.isInstanceOf[Tag.Param] || tag.isInstanceOf[Tag.OtherTag])))
-    val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.textParams.mapValues(formatScaladocString).toMap).getOrElse(Map())) else Seq()
+    val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.textParams.view.mapValues(formatScaladocString).toMap).getOrElse(Map())) else Seq()
     GenericTypeDef(name, baseType, tpe, description, tpe.typeSymbol.asClass.isCaseClass, parentTypes.toSet, attributes)
   }
 
   /**
    * Find all attributes for a given case class
    */
+  @annotation.nowarn("msg=abstract type pattern")
   def attributesForCaseClass(tpe: Type, paramDescriptions: Map[String,String]): Seq[GenericAttributeDef] = {
     // get case class constructor parameters
     val params = tpe.decls.collectFirst {

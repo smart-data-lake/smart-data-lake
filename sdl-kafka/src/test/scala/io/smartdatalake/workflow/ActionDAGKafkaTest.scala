@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@ import io.smartdatalake.testutil.KafkaTestUtil
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.CopyAction
+import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
@@ -51,10 +52,19 @@ class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeA
   val contextPrep: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Prepare)
   implicit val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
-  KafkaTestUtil.start()
+  private val kafkaConnection = KafkaConnection("kafkaCon1",
+    brokers = "localhost:"+KafkaTestUtil.embeddedKafkaConfig.kafkaPort,
+    schemaRegistry = Some("http://localhost:" + KafkaTestUtil.embeddedKafkaConfig.schemaRegistryPort)
+  )
+
+  override def beforeAll(): Unit = {
+    KafkaTestUtil.start()
+  }
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(kafkaConnection)
   }
 
   test("action dag with 2 actions in sequence where 2nd action reads different schema than produced by last action") {
@@ -63,8 +73,6 @@ class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeA
 
     // setup DataObjects
     val feed = "actionpipeline"
-    val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6001")
-    instanceRegistry.register(kafkaConnection)
     val srcDO = MockSparkDataObject("src1").register
     createCustomTopic("topic1", Map(), 1, 1)
     val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topic1", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"))
@@ -77,7 +85,7 @@ class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeA
     val l1 = Seq(("doe-john", 5)).toDF("key", "value")
     srcDO.writeSparkDataFrame(l1, Seq())
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id)
-    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformer = Some(CustomDfTransformerConfig(sqlCode = Some("select 'test' as key, value from kafka1"))))
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, transformers = Seq(SQLDfTransformer(code = Some("select 'test' as key, value from kafka1"))))
     val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2))
 
     // exec dag
@@ -103,8 +111,6 @@ class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeA
 
     // setup DataObjects
     val optionsGroupIdPrefix = Map("groupIdPrefix" -> "sdlb-testDagIncMode")
-    val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6001")
-    instanceRegistry.register(kafkaConnection)
     val schema = StructType.fromDDL("lastname string, firstname string, rating int")
     createCustomTopic("topicIncSrc", Map(), 1, 1)
     val srcDO = KafkaTopicDataObject("kafkaSrc", topicName = "topicIncSrc", connectionId = "kafkaCon1", valueType = KafkaColumnType.Json, valueSchema = Some(SparkSchema(schema)), options = optionsGroupIdPrefix)
@@ -173,8 +179,6 @@ class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeA
 
     // setup DataObjects
     val optionsGroupIdPrefix = Map("groupIdPrefix" -> "sdlb-testDagIncMode")
-    val kafkaConnection = KafkaConnection("kafkaCon1", "localhost:6001")
-    instanceRegistry.register(kafkaConnection)
     val schema = StructType.fromDDL("lastname string, firstname string, rating int")
     createCustomTopic("topicIncDelaySrc", Map(), 1, 1)
     val srcDO = KafkaTopicDataObject("kafkaSrc", topicName = "topicIncDelaySrc", connectionId = "kafkaCon1", valueType = KafkaColumnType.Json, valueSchema = Some(SparkSchema(schema)), options = optionsGroupIdPrefix)

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,7 +21,6 @@ package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.misc.AclDef
 
 /**
  * Connection information for DeltaLake tables
@@ -30,14 +29,12 @@ import io.smartdatalake.util.misc.AclDef
  * @param catalog optional catalog to be used for this connection
  * @param db hive db
  * @param pathPrefix schema, authority and base path for tables directory on hadoop
- * @param acl permissions for files created with this connection
  * @param metadata
  */
 case class DeltaLakeTableConnection(override val id: ConnectionId,
                                     catalog: Option[String] = None,
                                     db: String,
                                     pathPrefix: String,
-                                    acl: Option[AclDef] = None,
                                     checkDeltaLakeSparkOptions: Boolean = true,
                                     override val metadata: Option[ConnectionMetadata] = None
                                ) extends Connection {

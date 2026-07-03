@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,13 +19,16 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, TypeMismatchException}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
-import io.smartdatalake.workflow.dataobject.HadoopFileDataObject
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection, SparkClassicConnection}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.file.HadoopFileDataObject
+import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
 import org.apache.hadoop.fs.Path
 
@@ -33,7 +36,7 @@ import scala.util.Using
 
 /**
  * [[Action]] to transform files between two Hadoop Data Objects.
- * The transformation is executed in distributed mode on the Spark executors.
+ * The transformation is executed in distributed mode on Spark executors.
  * A custom file transformer must be given, which reads a file from Hadoop and writes it back to Hadoop.
  *
  * @param inputId inputs DataObject
@@ -50,16 +53,17 @@ case class CustomFileAction(override val id: ActionId,
                             override val executionMode: Option[ExecutionMode] = None,
                             override val executionCondition: Option[Condition] = None,
                             override val metricsFailCondition: Option[String] = None,
-                            override val metadata: Option[ActionMetadata] = None
-                           )(implicit instanceRegistry: InstanceRegistry)
+                            override val metadata: Option[ActionMetadata] = None,
+                            override val engineConnectionId: Option[ConnectionId] = None
+                           )(implicit val instanceRegistry: InstanceRegistry)
   extends FileOneToOneActionImpl with SmartDataLakeLogger {
 
   assert(filesPerPartition>0, s"($id) filesPerPartition must be greater than 0. Current value: $filesPerPartition")
 
   override val input: HadoopFileDataObject = getInputDataObject[HadoopFileDataObject](inputId)
-  override val output: HadoopFileDataObject = getOutputDataObject[HadoopFileDataObject](outputId)
+  override val output: SparkFileDataObject = getOutputDataObject[SparkFileDataObject](outputId)
   override val inputs: Seq[HadoopFileDataObject] = Seq(input)
-  override val outputs: Seq[HadoopFileDataObject] = Seq(output)
+  override val outputs: Seq[SparkFileDataObject] = Seq(output)
 
   override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
     assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for FileTransferAction.doTransform")
@@ -74,7 +78,7 @@ case class CustomFileAction(override val id: ActionId,
     val fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
     output.startWritingOutputStreams(subFeed.partitionValues)
     if (fileRefMapping.nonEmpty) {
-      val session = context.sparkSession
+      val session = SparkSubFeed.getSparkSession
       import session.implicits._
 
       // Create a Dataset of files to be processed

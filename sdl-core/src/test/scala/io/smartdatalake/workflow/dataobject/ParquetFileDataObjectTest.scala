@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -119,7 +119,8 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
     observation.asInstanceOf[SparkObservation].setOtherObservationsPrefix("test#")
     val metrics = observation.waitFor()
     assert(metrics("count") == 0) // this is the final count
-    assert(metrics("count#input") == 0) // input count 0 is expected (if it fails, filter push down through observation doesnt work anymore)
+    // input count 0 is expected (if it fails, filter push down through observation does not work anymore)
+    assert(metrics("count#input") == 0)
   }
 
   test("read parquet files mixed with other files in same directory") {
@@ -129,10 +130,10 @@ class ParquetFileDataObjectTest extends DataObjectTestSuite with SparkFileDataOb
     jsonDO.writeSparkDataFrame(testDf, Seq())
     val resultParquet = parquetDO.getSparkDataFrame()(contextExec)
     resultParquet.show(false)
-    assert(resultParquet.select($"_filename").as[String].collect.map(_.split('.').last).toSeq == Seq("parquet", "parquet", "parquet"))
+    assert(resultParquet.select($"_filename").as[String].collect().map(_.split('.').last).toSeq == Seq("parquet", "parquet", "parquet"))
     val resultJson = jsonDO.getSparkDataFrame()(contextExec)
     resultJson.show(false)
-    assert(resultJson.select($"_filename").as[String].collect.map(_.split('.').last).toSeq == Seq("json", "json", "json"))
+    assert(resultJson.select($"_filename").as[String].collect().map(_.split('.').last).toSeq == Seq("json", "json", "json"))
   }
 
   test("incremental output mode") {

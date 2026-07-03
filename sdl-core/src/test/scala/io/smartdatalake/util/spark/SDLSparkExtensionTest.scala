@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,78 +16,74 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.spark
 
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.util.hdfs.HdfsUtil
-import io.smartdatalake.util.hdfs.HdfsUtil.addHadoopDefaultSchemaAuthority
-import io.smartdatalake.util.hive.HiveUtil
-import io.smartdatalake.workflow.dataobject.Table
-import org.apache.commons.io.FileUtils
+import io.smartdatalake.testutils.spark.dataset.Collection.dsComplex
+import io.smartdatalake.util.spark.dataset.{StructTypeUtil, getEmptyDataFrame}
+import io.smartdatalake.util.spark.hive.HiveUtil
+import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 import org.scalatest.funsuite.AnyFunSuite
 
 import java.io.File
 
-class SDLSparkExtensionTest extends AnyFunSuite {
+class SDLSparkExtensionTest extends AnyFunSuite with StructTypeUtil {
 
   private implicit val session: SparkSession = TestUtil.session
+  private val emptyDf = getEmptyDataFrame(scheme = createStruct(fieldName = "value"))
+  import org.apache.spark.sql.classic.ClassicConversions._
 
   test("fail on assertNonEmpty with empty DataFrame") {
-    val df = TestUtil.dfEmptyWithSchema
-
     // fail after applying assertNonEmpty
-    val dfWithAssert = SDLSparkExtension.assertNotEmpty(df)
-    intercept[AssertNotEmptyFailure](dfWithAssert.count)
+    val dfWithAssert = SDLSparkExtension.assertNotEmpty(df = emptyDf)
+    intercept[AssertNotEmptyFailure](dfWithAssert.count())
   }
 
   test("succeed on assertNonEmpty with non-empty DataFrame") {
-    val df = TestUtil.dfComplex.repartition(10)
+    val df = dsComplex.repartition(10)
     val dfJoined = df.join(df, Seq("id"))
 
     // succeed when applying assertNonEmpty
     val dfWithAssert = SDLSparkExtension.assertNotEmpty(dfJoined)
-    dfWithAssert.count
+    dfWithAssert.count()
   }
 
   test("fail on check no-data rule with empty DataFrame") {
-    val df = TestUtil.dfEmptyWithSchema
-
     // fail when writing to table.
-    intercept[SparkPlanNoDataWarning](writeTable(df,"runtime_stats_no_data_check"))
+    intercept[SparkPlanNoDataWarning](writeTable(emptyDf, "runtime_stats_no_data_check"))
   }
 
   test("fail on check no-data rule with joined empty DataFrame") {
     import session.implicits._
-    val df = TestUtil.dfComplex.repartition(10)
-    val dfEmpty = Seq[(Int,String)]().toDF("id","value2")
+    val df = dsComplex.repartition(10)
+    val dfEmpty = Seq[(Int, String)]().toDF("id", "value2")
     val dfJoined = df.join(dfEmpty, Seq("id"))
 
     // fail when writing to table.
-    intercept[SparkPlanNoDataWarning](writeTable(dfJoined,"runtime_stats_joined_no_data_check"))
+    intercept[SparkPlanNoDataWarning](writeTable(dfJoined, "runtime_stats_joined_no_data_check"))
   }
 
   test("succeed on check no-data rule with non-empty DataFrame") {
-    val df = TestUtil.dfComplex.repartition(10)
+    val df = dsComplex.repartition(10)
 
     // Succeed when writing to table.
-    writeTable(df,"runtime_stats_data_check")
+    writeTable(df, "runtime_stats_data_check")
   }
 
   test("succeed on check no-data rule with joined non-empty DataFrame") {
-    val df = TestUtil.dfComplex.repartition(10)
+    val df = dsComplex.repartition(10)
     val dfJoined = df.join(df.withColumnRenamed("value", "value2"), Seq("id"))
 
     // Succeed when writing to table.
-    writeTable(dfJoined,"runtime_stats_joined_data_check")
+    writeTable(dfJoined, "runtime_stats_joined_data_check")
   }
 
-  def writeTable(df: DataFrame, name: String) = {
+  def writeTable[T](ds: Dataset[T], name: String): Unit = {
     val path = new Path(new File(s"target/$name").getAbsolutePath)
-    val table = Table(Some("default"),name)
+    val table = Table(Some("default"), name)
     HiveUtil.dropTable(table, path)
-    df.write.option("path", path.toString).saveAsTable(table.fullName)
+    ds.write.option("path", path.toString).saveAsTable(table.fullName)
   }
 }

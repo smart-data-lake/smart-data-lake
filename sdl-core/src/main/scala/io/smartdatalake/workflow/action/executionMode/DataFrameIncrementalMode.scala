@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.executionMode
 
 import com.typesafe.config.Config
@@ -26,7 +25,8 @@ import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionHelper.getOptionalDataFrame
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.CanCreateDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}
 
 /**
@@ -43,7 +43,7 @@ case class DataFrameIncrementalMode(compareCol: String
                                     , override val alternativeOutputId: Option[DataObjectId] = None
                                     , applyCondition: Option[Condition] = None
                                    ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
-  override val applyConditionsDef = applyCondition.toSeq
+  override val applyConditionsDef: Seq[Condition] = applyCondition.toSeq
 
   override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
 

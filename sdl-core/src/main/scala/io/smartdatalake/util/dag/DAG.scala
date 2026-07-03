@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,11 +18,11 @@
  */
 package io.smartdatalake.util.dag
 
-import org.scalameta.ascii.graph.Graph
 import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import monix.eval.Task
 import monix.execution.Scheduler
+import org.scalameta.ascii.graph.Graph
 
 import scala.annotation.tailrec
 import scala.reflect._
@@ -96,7 +96,7 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
    *
    * @see https://medium.com/@sderosiaux/are-scala-futures-the-past-69bd62b9c001
    *
-   * @param eventListener A instance of [[DAGEventListener]] to be notified about progress of DAG execution
+   * @param eventListener An instance of [[DAGEventListener]] to be notified about progress of DAG execution
    * @param operation A function that computes the result ([[DAGResult]]) for the current node,
    *                  given the result of its predecessors given.
    * @param scheduler The [[Scheduler]] to use for Tasks.
@@ -138,7 +138,7 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
     // prepare final task (Future) by combining all (independent) endNodes in the DAG
     val endTasks = endNodes.map(n => allTasksMap(n.nodeId))
     // wait for all end tasks to complete, then return a sequence
-    val flattenedResult = Task.gatherUnordered(endTasks).map(_.flatMap(trySeqToSeqTry))
+    val flattenedResult = Task.parSequenceUnordered(endTasks).map(_.flatMap(trySeqToSeqTry))
     flattenedResult
       .memoize
       .doOnCancel(Task {
@@ -210,7 +210,7 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
       getResultTask(tasksAcc, incomingEdge.nodeIdFrom, incomingEdge.resultId)
     }
     // Wait for results from incoming tasks to be computed and return their results
-    Task.gatherUnordered(incomingTasks)
+    Task.parSequenceUnordered(incomingTasks)
   }
 
   /**
@@ -286,7 +286,7 @@ object DAG extends SmartDataLakeLogger {
    * Create a lookup table to retrieve outgoing (target) node IDs for a node.
    */
   private def buildOutgoingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]): Map[DAGNode, Seq[NodeId]] = {
-    val targetIDsforIncomingIDsMap = edges.groupBy(_.nodeIdFrom).mapValues(_.map(_.nodeIdTo))
+    val targetIDsforIncomingIDsMap = edges.groupBy(_.nodeIdFrom).view.mapValues(_.map(_.nodeIdTo))
     nodes.map(n => (n, targetIDsforIncomingIDsMap.getOrElse(n.nodeId, Seq()))).toMap
   }
 
@@ -294,7 +294,7 @@ object DAG extends SmartDataLakeLogger {
    * Create a lookup table to retrieve incoming (source) node IDs for a node.
    */
   private def buildIncomingIdLookupTable(nodes: Seq[DAGNode], edges: Seq[DAGEdge]): Map[DAGNode, Seq[NodeId]] = {
-    val incomingIDsForTargetIDMap = edges.groupBy(_.nodeIdTo).mapValues(_.map(_.nodeIdFrom).distinct.sorted)
+    val incomingIDsForTargetIDMap = edges.groupBy(_.nodeIdTo).view.mapValues(_.map(_.nodeIdFrom).distinct.sorted)
     nodes.map(n => (n, incomingIDsForTargetIDMap.getOrElse(n.nodeId, Seq.empty))).toMap
   }
 
@@ -310,7 +310,8 @@ object DAG extends SmartDataLakeLogger {
       val (startNodeIds, nonStartNodeIds) = incomingIds.partition(_._2.isEmpty)
       assert(startNodeIds.nonEmpty, s"Loop detected in remaining nodes ${incomingIds.keys.mkString(", ")}")
       // remove start nodes from incoming node list of remaining nodes
-      val nonStartNodeIdsWithoutIncomingStartNodes: Map[NodeId, Seq[NodeId]] = nonStartNodeIds.mapValues(_.filterNot(startNodeIds.isDefinedAt)).toMap
+      val nonStartNodeIdsWithoutIncomingStartNodes: Map[NodeId, Seq[NodeId]] = nonStartNodeIds.view
+        .mapValues(_.filterNot(startNodeIds.isDefinedAt)).toMap
       val newSortedNotes = sortedNodes ++ startNodeIds.keys.toSeq.sorted
       if (nonStartNodeIdsWithoutIncomingStartNodes.isEmpty) newSortedNotes
       else go(newSortedNotes, nonStartNodeIdsWithoutIncomingStartNodes)

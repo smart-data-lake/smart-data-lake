@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -23,7 +23,9 @@ import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockSparkDataObject
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
-import io.smartdatalake.workflow.dataobject.{JdbcTableDataObject, Table}
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
+import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
+import io.smartdatalake.workflow.dataobject.generic.Table
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
@@ -32,8 +34,10 @@ class JdbcHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with Sm
 
   private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:HistorizeWithMergeActionTest", "org.hsqldb.jdbcDriver")
 
+  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
+
   testsFor(historizeWithMergeMode(
-    (id, registry) => MockSparkDataObject(id),
+    (id, registry) => MockSparkDataObject(id)(registry),
     (id, pks, registry) => {
       val tgtTable = Table(Some("public"), id.replaceAll("-", "_"), None, pks)
       val dataObject = JdbcTableDataObject(id, table = tgtTable, connectionId = jdbcConnection.id, allowSchemaEvolution = true)(registry)
@@ -44,7 +48,7 @@ class JdbcHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with Sm
   ))
 
   testsFor(historizeIncrementalPipeline(
-    (id, registry) => MockSparkDataObject(id),
+    (id, registry) => MockSparkDataObject(id)(registry),
     (id, pks, registry) => {
       val tgtTable = Table(Some("public"), id.replaceAll("-", "_"), None, pks)
       JdbcTableDataObject(id, table = tgtTable, connectionId = jdbcConnection.id, allowSchemaEvolution = true)(registry)

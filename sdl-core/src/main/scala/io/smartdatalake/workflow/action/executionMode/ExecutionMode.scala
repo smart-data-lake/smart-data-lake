@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,6 +30,7 @@ import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.file.FileRef
 
 import java.sql.Timestamp
 import scala.reflect.runtime.universe.TypeTag
@@ -131,7 +132,7 @@ object FailIfNoPartitionValuesMode extends FromConfigFactory[ExecutionMode] {
 }
 
 /**
- * An execution mode which forces processing all data from it's inputs.
+ * An execution mode which forces processing all data from its inputs.
  */
 case class ProcessAllMode() extends ExecutionMode {
   override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed

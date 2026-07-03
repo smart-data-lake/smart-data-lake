@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,18 +21,20 @@ package io.smartdatalake.config
 import com.typesafe.config.{Config, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.workflow.action
-import io.smartdatalake.workflow.action.spark.TestDfTransformer
 import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.script.CmdScript
+import io.smartdatalake.workflow.action.spark.TestCopyDfTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.time.Duration
 
-
 private[smartdatalake] class ActionImplTests extends AnyFlatSpec with Matchers {
+
+  private implicit lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
   val dataObjectConfig: Config = ConfigFactory.parseString(
     """
@@ -67,8 +69,8 @@ private[smartdatalake] class ActionImplTests extends AnyFlatSpec with Matchers {
 
   "CopyAction" should "be parsable" in {
 
-    val customTransformerConfig = ScalaClassSparkDfTransformer(
-      className = classOf[TestDfTransformer].getName
+    val customTransformerConfig = ScalaClassGenericDfTransformer(
+      className = classOf[TestCopyDfTransformer].getName
     )
 
     val config = ConfigFactory.parseString(
@@ -80,7 +82,7 @@ private[smartdatalake] class ActionImplTests extends AnyFlatSpec with Matchers {
         |   outputId = tdo2
         |   delete-data-after-read = false
         |   transformers = [
-        |     { type = ScalaClassSparkDfTransformer, class-name = io.smartdatalake.workflow.action.TestDfTransformer }
+        |     { type = ScalaClassGenericDfTransformer, class-name = io.smartdatalake.workflow.action.spark.TestCopyDfTransformer }
         |     { type = WhitelistTransformer, columnWhitelist = [col1, col2] }
         |     { type = FilterTransformer, filterClause = "1 = 1" }
         |     { type = DataValidationTransformer, rules = [{ type = RowLevelValidationRule, condition = "a is not null" }]}

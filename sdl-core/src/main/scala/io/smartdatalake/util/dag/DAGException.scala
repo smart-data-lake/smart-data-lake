@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.dag
 
 import io.smartdatalake.definitions.Environment
@@ -62,12 +61,12 @@ private[smartdatalake] case class TaskCancelledException(id: NodeId) extends DAG
 }
 
 // this is no case class as it should be extended by child classes
-private[smartdatalake] class TaskSkippedWarning(id: NodeId, msg: String) extends DAGException(msg) {
+private[smartdatalake] class TaskSkippedWarning(msg: String) extends DAGException(msg) {
   override val severity: ExceptionSeverity.ExceptionSeverity = ExceptionSeverity.SKIPPED
   override def getDAGRootExceptions: Seq[DAGException] = Seq(this)
 }
 
-private[smartdatalake] class TaskSkippedDontStopWarning[R <: DAGResult](id: NodeId, msg: String, results: Option[Seq[R]]) extends TaskSkippedWarning(id, msg) {
+private[smartdatalake] class TaskSkippedDontStopWarning[R <: DAGResult](id: NodeId, msg: String, results: Option[Seq[R]]) extends TaskSkippedWarning(msg) {
   override val severity: ExceptionSeverity.ExceptionSeverity = ExceptionSeverity.SKIPPED_DONT_STOP
   def getResults: Option[Seq[R]] = results
 }

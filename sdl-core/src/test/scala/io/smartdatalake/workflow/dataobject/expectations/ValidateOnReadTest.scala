@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject.expectations
 
 import io.smartdatalake.config.InstanceRegistry
@@ -44,13 +43,14 @@ class ValidateOnReadTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
-  test("Dont validate expectations with scope=Job on read if there is a DataFrame-Action having this DataObject as output") {
+  test("do not validate expectations with scope=Job on read if there is a DataFrame-Action having this DataObject as output") {
     testDontValidateExpectationOnReadIfThereIsADataFrameActionHavingThisDataObjectAsOutput(ExpectationScope.Job)
   }
 
-  test("Dont validate expectations with scope=All on read if there is a DataFrame-Action having this DataObject as output") {
+  test("do not validate expectations with scope=All on read if there is a DataFrame-Action having this DataObject as output") {
     testDontValidateExpectationOnReadIfThereIsADataFrameActionHavingThisDataObjectAsOutput(ExpectationScope.All)
   }
 

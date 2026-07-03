@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -18,23 +18,26 @@
  */
 package io.smartdatalake.workflow.action.scala
 
-import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockScalaDataObject}
+import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockScalaDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.scalatest.funsuite.AnyFunSuite
 
 class DeduplicateWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogger with DeduplicateActionBehaviour {
 
+  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultScalaConnection
+
   test("deduplicate load mergeModeEnable") {
     testDeduplicateWithMergeMode(
-      (id, registry) => MockScalaDataObject(id),
-      (id, pks, registry) => MockScalaDataObject(id, primaryKey = pks)
+      (id, _) => MockScalaDataObject(id),
+      (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
     )
   }
 
   test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
     testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
-      (id, registry) => MockScalaDataObject(id),
-      (id, pks, registry) => MockScalaDataObject(id, primaryKey = pks)
+      (id, _) => MockScalaDataObject(id),
+      (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
     )
 
   }
@@ -42,8 +45,8 @@ class DeduplicateWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogge
   // SQLDfTransformer does not yet work with ScalaSubFeed
   ignore("deduplicate 1st 2nd load with transformer changing schema") {
     testDeduplicateWithTransformerChangingSchema(
-      (id, registry) => MockScalaDataObject(id),
-      (id, pks, registry) => MockScalaDataObject(id, primaryKey = pks)
+      (id, _) => MockScalaDataObject(id),
+      (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
     )
   }
 }

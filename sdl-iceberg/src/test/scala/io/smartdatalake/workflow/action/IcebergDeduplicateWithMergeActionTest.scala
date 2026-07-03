@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,9 +18,11 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockSparkDataObject}
+import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils, Table}
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
+import io.smartdatalake.workflow.dataobject.generic.Table
+import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
@@ -33,12 +35,14 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
   // set additional spark options for iceberg
   protected implicit val session: SparkSession = IcebergTestUtils.session
 
+  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
+
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
 
   test("deduplicate load mergeModeEnable") {
     testDeduplicateWithMergeMode(
-      (id, registry) => MockSparkDataObject(id),
+      (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => {
         val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
         IcebergTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
@@ -48,7 +52,7 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
 
   test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
     testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
-      (id, registry) => MockSparkDataObject(id),
+      (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => {
         val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
         IcebergTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
@@ -58,7 +62,7 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
 
   test("deduplicate 1st 2nd load with transformer changing schema") {
     testDeduplicateWithTransformerChangingSchema(
-      (id, registry) => MockSparkDataObject(id),
+      (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => {
         val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
         IcebergTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)

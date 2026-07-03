@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.workflow.DataFrameSubFeed
@@ -237,7 +236,9 @@ abstract class ScalaAbstractColumn extends GenericColumn {
  *                      Note: this is a creator function, which is called lazy, because the datatype is not known at construction time
  * @param fixedDataType optional fixed datatype, if the result datatype is known in advance (e.g. for boolean operations)
  */
-case class ScalaManyExpr(cols: Seq[ScalaAbstractColumn], opName: String, funcCreator: ScalaDataType[Any] => (Seq[Option[Any]] => Option[Any]), fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
+case class ScalaManyExpr(cols: Seq[ScalaAbstractColumn], opName: String,
+                         funcCreator: ScalaDataType[Any] => Seq[Option[Any]] => Option[Any],
+                         fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
   lazy val dataType: ScalaDataType[_] = fixedDataType.getOrElse(
     cols.map(_.dataType).reduce((a, b) => a.getGreaterType(b))
   )
@@ -269,7 +270,9 @@ case class ScalaManyExpr(cols: Seq[ScalaAbstractColumn], opName: String, funcCre
  *                      Note: this is a creator function, which is called lazy, because the datatype is not known at construction time
  * @param fixedDataType optional fixed datatype, if the result datatype is known in advance (e.g. for boolean operations)
  */
-case class ScalaBinaryExpr(left: ScalaAbstractColumn, right: ScalaAbstractColumn, opName: String, funcCreator: ScalaDataType[Any] => ((Option[Any], Option[Any]) => Option[Any]), fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
+case class ScalaBinaryExpr(left: ScalaAbstractColumn, right: ScalaAbstractColumn, opName: String,
+                           funcCreator: ScalaDataType[Any] => (Option[Any], Option[Any]) => Option[Any],
+                           fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
   lazy val dataType: ScalaDataType[_] = fixedDataType.getOrElse(
     left.dataType.getGreaterType(right.dataType)
   )
@@ -390,7 +393,9 @@ case class ScalaNamedExpr(in: ScalaAbstractColumn, name: String) extends ScalaAb
  * @param aggFunc aggregation function
  * @param outputDataType  output datatype; this is a function, which is called lazy, because the datatype is not known at construction time, as it can depend on the datatype of the input expression
  */
-case class ScalaAggregateExpr(in: ScalaAbstractColumn, opName: String, aggFunc: Seq[Option[Any]] => Option[Any], outputDataType: () => ScalaDataType[_]) extends ScalaAbstractColumn {
+case class ScalaAggregateExpr(in: ScalaAbstractColumn, opName: String,
+                              aggFunc: Seq[Option[Any]] => Option[Any],
+                              outputDataType: () => ScalaDataType[_]) extends ScalaAbstractColumn {
   override def dataType: ScalaDataType[_] = outputDataType()
 
   override def data: Seq[Option[_]] = {
@@ -411,7 +416,8 @@ case class ScalaAggregateExpr(in: ScalaAbstractColumn, opName: String, aggFunc: 
  * @param func          function for the operation
  * @param fixedDataType optional fixed datatype, if the result datatype is different thant the dataType of the input column, and it is known in advance
  */
-case class ScalaWhenExpr(condition: ScalaAbstractColumn, in: ScalaAbstractColumn, prev: Option[ScalaAbstractColumn] = None) extends ScalaAbstractColumn with GenericWhen {
+case class ScalaWhenExpr(condition: ScalaAbstractColumn, in: ScalaAbstractColumn, prev: Option[ScalaAbstractColumn] = None)
+  extends ScalaAbstractColumn with GenericWhen {
   override def dataType: ScalaDataType[_] = prev.getOrElse(in).dataType
 
   override def data: Seq[Option[_]] = {
@@ -463,7 +469,9 @@ case class ScalaWhenExpr(condition: ScalaAbstractColumn, in: ScalaAbstractColumn
         new ScalaBinaryExpr(this, scalaValue, "otherwise", _ => (a,b) => a.orElse(b), Some(dataType)) {
           override def setInputData(inputData: Map[String, ScalaColumn[_]], size: Int): Unit = {
             super.setInputData(inputData, size)
-            assert(scalaValue.dataType == dataType, s"The data type of the value in an otherwise expression (${scalaValue.dataType} must be the same as the data type of the value in the previous when expression (${dataType})")
+            assert(scalaValue.dataType == this.dataType,
+              s"The data type of the value in an otherwise expression (${scalaValue.dataType} must be the same" +
+                s" as the data type of the value in the previous when expression (${this.dataType})")
           }
         }
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${value.subFeedType.typeSymbol.name} in method otherwise")

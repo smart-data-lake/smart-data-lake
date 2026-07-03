@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
@@ -25,9 +24,10 @@ import io.smartdatalake.workflow.action.CustomDataFrameAction
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
+import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 
-class DebugTransformerTest extends AnyFunSuite {
+class DebugTransformerTest extends AnyFunSuite with BeforeAndAfter {
   protected implicit val session: SparkSession = TestUtil.session
 
   import session.implicits._
@@ -35,6 +35,11 @@ class DebugTransformerTest extends AnyFunSuite {
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
+
+  before {
+    instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
+  }
 
   test("copy load with transformer, a regular and a skipped input, skipped input is reset after decision to execute Action was made") {
 
@@ -45,7 +50,8 @@ class DebugTransformerTest extends AnyFunSuite {
 
     // prepare
     val customTransformerConfig = SQLDfsTransformer(code = Map(tgtDO1.id.id -> "select * from src1 union all select * from src2"))
-    val debugDfTransformer = DebugTransformer(printSchema = true, show=true, showOptions = Map("vertical" -> "true"), explain=true, explainOptions=Map("mode" -> "extended"))
+    val debugDfTransformer = DebugTransformer(show = true, showOptions = Map("vertical" -> "true"), explain = true,
+      explainOptions = Map("mode" -> "extended"))
     val debugDfsTransformer = DfTransformerWrapperDfsTransformer(transformer = debugDfTransformer, subFeedsToApply = Seq("src1"))
     val l1 = Seq(("jonson", "rob", 5)).toDF("lastname", "firstname", "rating")
     srcDO1.writeSparkDataFrame(l1, Seq())
@@ -53,8 +59,8 @@ class DebugTransformerTest extends AnyFunSuite {
     srcDO2.writeSparkDataFrame(l2, Seq())
 
     // execute - we can just check that there are no exceptions, but looking for the logs is difficult
-    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id)
-      , transformers = Seq(customTransformerConfig,debugDfsTransformer))
+    val action1 = CustomDataFrameAction("ca", List(srcDO1.id, srcDO2.id), List(tgtDO1.id),
+      transformers = Seq(customTransformerConfig, debugDfsTransformer))
     instanceRegistry.register(action1)
     val srcSubFeed1 = SparkSubFeed(None, "src1", Seq())
     val srcSubFeed2 = SparkSubFeed(None, "src2", Seq())

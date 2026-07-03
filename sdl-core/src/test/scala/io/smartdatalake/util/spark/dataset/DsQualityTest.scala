@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.TestUtil
@@ -42,7 +41,7 @@ class DsQualityTest extends AnyFlatSpec with Matchers
 
   "countDistinctRows" should "count distinct rows" in {
     val argument = List((0, 0d), (0, 0d), (1, 1d), (1, 1d), (2, 2d), (2, 2d)).toDF("id", "x")
-    argument.createdLog("argument", debug = Some(true))
+    argument.createdLog("argument", debug = Some(true), showRows = true)
     argument.countDistinctRows should be(3)
   }
 
@@ -69,7 +68,7 @@ class DsQualityTest extends AnyFlatSpec with Matchers
   ///// tests treating gaps in axis (time or space) /////
 
   "fillGaps_next" should "fill the gaps taking value from next row" in {
-    val actual = dfSnapshotsWithGaps.fillGaps(Seq("id"), Seq("Wert"), "dt")
+    val actual = dfSnapshotsWithGaps.fillGaps(Seq("id"), Seq("val"), "dt")
     val expected = Seq(
       (Some(0), Some(20190101), Some(3.14),  Some(-2.37)),
       (Some(0), Some(20190102), Some(3.14),  Some(-2.37)),
@@ -87,7 +86,7 @@ class DsQualityTest extends AnyFlatSpec with Matchers
   }
 
   "fillGaps_next" should "fill the gaps taking value from previous row" in {
-    val actual = dfSnapshotsWithGaps.fillGaps(Seq("id"), Seq("Wert"), "dt", takeNextValueFirst = false)
+    val actual = dfSnapshotsWithGaps.fillGaps(Seq("id"), Seq("val"), "dt", takeNextValueFirst = false)
     val expected = Seq(
       (Some(0), Some(20190101), Some(3.14),  Some(-2.37)),
       (Some(0), Some(20190102), Some(3.14),  Some(-2.37)),

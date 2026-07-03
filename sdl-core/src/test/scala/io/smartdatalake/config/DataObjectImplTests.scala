@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,14 +21,12 @@ package io.smartdatalake.config
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
-import io.smartdatalake.testutils.custom.TestCustomDfCreator
-import io.smartdatalake.util.misc.{AclDef, AclElement}
 import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -45,20 +43,11 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   path = /path/to/foo
         |   partitions = []
         |   saveMode = Append
-        |   acl = {
-        |     permission="rwxr-x---"
-        |     acls = [
-        |       {
-        |         aclType="group"
-        |         name="test"
-        |         permission="r-x"
-        |       }
-        |     ]
-        |   }
         |   metadata = {name = test, description = "i am a test"}
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe AvroFileDataObject(
@@ -66,7 +55,6 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
       path = "/path/to/foo",
       partitions = Seq.empty,
       saveMode = SDLSaveMode.Append,
-      acl = Some(AclDef(permission = "rwxr-x---", acls = Seq(AclElement(aclType = "group", name = "test", permission = "r-x")))),
       metadata = Some(DataObjectMetadata(name = Some("test"), description = Some("i am a test")))
     )
   }
@@ -86,7 +74,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         | path = /path/to/foo
         | table = ${tableConf}
         |}}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe AccessTableDataObject(
@@ -127,19 +116,20 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   dateColumnType = string
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     val dos = registry.instances.values
-    dos should contain allOf(
+    dos should contain allOf (
       CsvFileDataObject(
         id = "123",
         path = "/path/to/foo",
         csvOptions = Map("header" -> "false"),
         schema = Some(SparkSchema(StructType(Array(
-          StructField("first", StringType, nullable = true),
-          StructField("last", StringType, nullable = true)
-        )))),
+            StructField("first", StringType, nullable = true),
+            StructField("last", StringType, nullable = true)
+          )))),
         partitions = Seq("dt", "type"),
         saveMode = SDLSaveMode.Append
       ),
@@ -164,7 +154,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   }
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe ExcelFileDataObject(
@@ -199,7 +190,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   jdbcFetchSize = 5
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     val registry2: InstanceRegistry = new InstanceRegistry()
@@ -235,7 +227,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   stringify = false
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe JsonFileDataObject(
@@ -257,7 +250,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   partitions = [one, two]
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe ParquetFileDataObject(
@@ -277,41 +271,14 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |   partitions = [one, two]
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe RawFileDataObject(
       id = "123",
       path = "/path/to/foo",
       partitions = Seq("one", "two")
-    )
-  }
-
-  "CustomDfDataObject" should "be parsable" in {
-    val testCreatorConfig = CustomDfCreatorConfig(
-      className = Some(classOf[TestCustomDfCreator].getName),
-      options = Some(Map("test" -> "foo"))
-    )
-
-    val config = ConfigFactory.parseString(
-      """
-        |dataObjects = {
-        | 123 = {
-        |   type = CustomDfDataObject
-        |   creator {
-        |     class-name = io.smartdatalake.testutils.custom.TestCustomDfCreator
-        |     options = {
-        |       test = foo
-        |     }
-        |   }
-        | }
-        |}
-        |""".stripMargin).resolve
-
-    implicit val registry: InstanceRegistry = ConfigParser.parse(config)
-    registry.instances.values.head shouldBe CustomDfDataObject(
-      id = "123",
-      creator = testCreatorConfig
     )
   }
 
@@ -329,13 +296,14 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |  }
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.instances.values.head shouldBe WebserviceFileDataObject(
       id = "123",
       url = "http://test",
-      authMode = Some(BasicAuthMode(user = Some(StringOrSecret("###CLEAR#test###")), password = Some(StringOrSecret("###CLEAR#test###"))))
+      authMode = Some(BasicAuthMode(user = StringOrSecret("###CLEAR#test###"), password = StringOrSecret("###CLEAR#test###")))
     )
   }
 
@@ -348,8 +316,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |    host = localhost
         |    authMode {
         |      type = BasicAuthMode
-        |      userVariable = "CLEAR#foo"
-        |      passwordVariable = "CLEAR#pwd"
+        |      user = "CLEAR#foo"
+        |      password = "CLEAR#pwd"
         |    }
         |    proxy {
         |      host = localhost
@@ -365,7 +333,8 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |  connectionId = sftp
         | }
         |}
-        |""".stripMargin).resolve
+        |""".stripMargin
+    ).resolve
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     registry.get[SFtpFileRefDataObject](DataObjectId("123")) shouldBe SFtpFileRefDataObject(
@@ -381,9 +350,9 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
       """
         |connections = {
         | con1 = {
-        |  type = HiveTableConnection
-        |   pathPrefix = "file://c:/temp"
-        |   db = default
+        |  type = JdbcTableConnection
+        |  url = "abc"
+        |  driver = "my.little.jdbcDriver"
         | }
         |}
         |dataObjects = {
@@ -396,10 +365,9 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
         |  }
         | }
         |}
-        |""".stripMargin).resolve
-
+        |""".stripMargin
+    ).resolve
     val thrown = the[ConfigurationException] thrownBy ConfigParser.parse(config)
-
     thrown.getMessage should include("123")
     thrown.getMessage should include("con1")
   }

@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.spark.dataset
 
 import org.apache.spark.sql._
@@ -36,7 +35,7 @@ trait ReadWrite extends Serializable {
 
   implicit class DataFrameWriterUtils[T](writer: DataFrameWriter[T]) {
     final def optionalPartitionBy(partitions: Seq[String]): DataFrameWriter[T] = {
-      if (partitions.nonEmpty) writer.partitionBy(partitions: _*) else writer
+      if (partitions.nonEmpty) writer.partitionBy(partitions.toIndexedSeq: _*) else writer
     }
 
     final def optionalOption(key: String, value: Option[String]): DataFrameWriter[T] = {

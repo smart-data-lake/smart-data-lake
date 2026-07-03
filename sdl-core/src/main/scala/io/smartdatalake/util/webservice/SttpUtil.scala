@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.webservice
 
 import io.smartdatalake.config.ConfigurationException
@@ -35,7 +34,7 @@ import scala.concurrent.duration.FiniteDuration
 object SttpUtil extends SmartDataLakeLogger {
 
   /**
-   * Validates if the a provided uri has the scheme/protocol 'http' or 'https'
+   * Validates if the provided uri has the scheme/protocol 'http' or 'https'
    */
   def canHandleScheme(uri: String): Boolean = uri.matches("https?:.*")
 
@@ -57,22 +56,23 @@ object SttpUtil extends SmartDataLakeLogger {
 
   def getContent[T](response: Response[Either[String, T]], context: String): T = {
     validateResponse(response, context)
-    response.body.right.get
+    response.body.toOption.get
   }
 
   private[smartdatalake] def validateResponse[T](response: Response[Either[String, T]], context: String): Unit = {
     if (response.body.isLeft) {
-      throw HttpRequestError(context, response.code.code, response.body.left.get)
+      throw HttpRequestError(context, response.code.code, response.body.swap.toOption.get)
     }
-    assert(response.isSuccess, throw HttpRequestError(context, response.code.code, "StatusCode is not successfull, but there is no error message!"))
+    assert(response.isSuccess,
+      throw HttpRequestError(context, response.code.code, "StatusCode is not successful, but there is no error message!"))
   }
 
   def guessMimeType(content: Array[Byte]): Option[String] = {
     Option(URLConnection.guessContentTypeFromStream(new ByteArrayInputStream(content)))
       .orElse {
-        // manually detect type as guessContentTypeFromStream doesnt work for Json and Text...
+        // manually detect type as guessContentTypeFromStream does not work for Json and Text...
         val str = new String(content)
-        if (str.take(100).matches("(?:\\P{Cntrl}|\\p{Space})+")) { // is text
+        if (str.take(100).matches("(?:\\P{Cntrl}|\\s)+")) { // is text
           if (str.matches("\\s*[{\\[]")) Some(MediaType.ApplicationJson.toString())
           else Some(MediaType.TextPlain.toString())
         } else None
@@ -132,7 +132,7 @@ object SttpUtil extends SmartDataLakeLogger {
   type SttpRequest[R] = RequestT[Empty, Either[String, R], Any]
 
   /**
-   * Extend functionality of the the RequestT class
+   * Extend functionality of the RequestT class
    */
   implicit class SttpRequestExtension[R](request: SttpRequest[R]) {
     def optionally[A](config: Option[A], func: (A, SttpRequest[R]) => SttpRequest[R]): SttpRequest[R] = {

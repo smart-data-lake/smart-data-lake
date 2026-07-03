@@ -1,3 +1,21 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package io.smartdatalake.meta.configexporter
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
@@ -6,7 +24,8 @@ import io.smartdatalake.config.exporter.ExportWriter.formatSchema
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException}
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.action.SDLExecutionId
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, SparkFileDataObject}
+import io.smartdatalake.workflow.dataobject.generic.CanCreateDataFrame
+import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.json4s.jackson.Serialization
 import org.json4s.{Formats, NoTypeHints}
@@ -35,7 +54,7 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     override def showUsageOnError: Option[Boolean] = Some(true)
     opt[String]('c', "config")
       .required()
-      .action((value, c) => c.copy(configPaths = value.split(',')))
+      .action((value, c) => c.copy(configPaths = value.split(',').toIndexedSeq))
       .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
     opt[String]('p', "exportPath")
       .action((value, c) => c.copy(targets = Seq(value)))
@@ -89,7 +108,7 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     // get DataObjects
     val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(config.configPaths)
     val hadoopConf = globalConfig.getHadoopConfiguration
-    implicit val context: ActionPipelineContext = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, registry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("DataObjectSchemaExporter", Some("DataObjectSchemaExporter"), master=Some(config.master)), phase = ExecutionPhase.Init, serializableHadoopConf = new SerializableHadoopConfiguration(hadoopConf), globalConfig = globalConfig)
+    implicit val context: ActionPipelineContext = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, registry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig("DataObjectSchemaExporter", Some("DataObjectSchemaExporter")), phase = ExecutionPhase.Init, globalConfig = globalConfig)
     val dataObjects = registry.getDataObjects
       .filter(d => d.id.id.matches(config.includeRegex) && (config.excludeRegex.isEmpty || !d.id.id.matches(config.excludeRegex.get)))
     logger.info(s"Writing ${dataObjects.size} DataObject schemas and stats to target ${config.targets.mkString(",")}")

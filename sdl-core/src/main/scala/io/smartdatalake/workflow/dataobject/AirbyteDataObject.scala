@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
@@ -26,17 +25,19 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.json.JsonUtils
-import io.smartdatalake.util.json.JsonUtils._
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
+import io.smartdatalake.util.spark.json.JsonUtils
+import io.smartdatalake.util.spark.json.JsonUtils._
 import io.smartdatalake.workflow.action.script.{CmdScript, DockerRunScript, ParsableScriptDef}
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, SchemaValidation}
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.confluent.json.JsonSchemaConverter
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, DatasetHelper}
+import org.apache.spark.sql.{DataFrame, DatasetHelper, SparkSession}
 import org.json4s.Formats
 import org.json4s.jackson.JsonMethods.compact
 
@@ -55,7 +56,7 @@ import scala.reflect.{ClassTag, classTag}
  * Limitations: Airbyte Connectors can not be distributed to executors. They run on the driver and have only access to locally mounted directories.
  * In order to avoid memory problems Spark BlockManager is used to create a new Spark partition after every maxRecordsPerPartition number of records.
  *
- * Also note that the getDataFrame method is not lazy in Exec-Phase. It will will query the Airbyte Connector before creating the DataFrame.
+ * Also note that the getDataFrame method is not lazy in Exec-Phase. It will query the Airbyte Connector before creating the DataFrame.
  *
  * @param id DataObject identifier
  * @param config Configuration for the source
@@ -72,7 +73,8 @@ case class AirbyteDataObject(override val id: DataObjectId,
                              incrementalCursorFields: Seq[String] = Seq(),
                              maxRecordsPerPartition: Int = 100000,
                              override val schemaMin: Option[GenericSchema] = None,
-                             override val metadata: Option[DataObjectMetadata] = None)
+                             override val metadata: Option[DataObjectMetadata] = None
+                            )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SchemaValidation with SmartDataLakeLogger {
 
   // these variables will be initialized in prepare phase
@@ -110,7 +112,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before getDataFrame")
-    implicit val session = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
 
     val df = context.phase match {
       // init phase -> return empty dataframe
@@ -138,16 +140,16 @@ case class AirbyteDataObject(override val id: DataObjectId,
 
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before setState")
-    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"${id} Connector does not support incremental output")
-    assert(configuredStream.exists(_.stream.supported_sync_modes.contains(SyncModeEnum.incremental)), s"${id} Stream '$streamName' does not support incremental output")
+    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"$id Connector does not support incremental output")
+    assert(configuredStream.exists(_.stream.supported_sync_modes.contains(SyncModeEnum.incremental)), s"$id Stream '$streamName' does not support incremental output")
     this.state = state
     configuredStream = configuredStream.map(_.copy(sync_mode = SyncModeEnum.incremental))
   }
 
   override def getState: Option[String] = {
     assert(configuredStream.nonEmpty, s"($id) prepare must be called before getState")
-    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"${id} Connector does not support incremental output")
-    assert(state.isEmpty || configuredStream.exists(_.sync_mode == SyncModeEnum.incremental), s"${id} Stream configuration must be set to SyncMode.Incremental by calling setState before")
+    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"$id Connector does not support incremental output")
+    assert(state.isEmpty || configuredStream.exists(_.sync_mode == SyncModeEnum.incremental), s"$id Stream configuration must be set to SyncMode.Incremental by calling setState before")
     state
   }
 
@@ -171,7 +173,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
       state.map(s => Files.write(tempPath.resolve(stateFilename), s.getBytes(StandardCharsets.UTF_8)))
 
       // prepare parameters
-      val (parameters) = cmd match {
+      val parameters = cmd match {
         case dockerCmd: DockerRunScript =>
           val dockerParams = Seq("run", "--rm", "-v", s"${dockerCmd.preparePath(tempPath.toString)}:$containerConfigDir")
           val runParams = Seq(
@@ -195,7 +197,7 @@ case class AirbyteDataObject(override val id: DataObjectId,
       val linesStream = cmd.execStdOutStream(id, Seq(), parameters.toMap, errors)
 
       // parse result
-      AirbyteMessage.parseOutput(linesStream, errors).toIterator
+      AirbyteMessage.parseOutput(linesStream, errors).iterator
 
     } catch {
       case ex: Exception => throw AirbyteConnectorException(s"($id) Could not launch connector: ${errors.mkString(", ")}, ${ex.getMessage}", ex)

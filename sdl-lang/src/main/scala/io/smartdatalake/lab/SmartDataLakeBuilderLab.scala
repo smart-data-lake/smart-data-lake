@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.lab
 
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
@@ -27,7 +26,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, NotFoundError, TransformDfsMethod, TransformInfo}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.prepareTolerantKey
-import io.smartdatalake.workflow.dataobject.CanCreateSparkDataFrame
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
 
 import scala.collection.mutable
@@ -53,7 +52,7 @@ case class SmartDataLakeBuilderLab[D,A](
                                        ) {
 
   @transient val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(configuration, userClassLoader, session.sparkContext.hadoopConfiguration)
-  @transient val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(session, registry)
+  @transient val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(registry)
   @transient val dataObjects: D = dataObjectCatalogFactory(registry, context)
   @transient val actions: A = actionCatalogFactory(registry, context)
   @transient private val dataObjectsTolerantKey = registry.getDataObjects.map{d => (prepareTolerantKey(d.id.id), d)}.toMap
@@ -117,11 +116,11 @@ case class SmartDataLakeBuilderLab[D,A](
     // filter
     dfs = filters.foldLeft(dfs) {
       case (dfs, (column, filterExpr)) =>
-        dfs.mapValues(df => if (df.schema.fieldNames.contains(column)) df.filter(filterExpr) else df).toMap
+        dfs.view.mapValues(df => if (df.schema.fieldNames.contains(column)) df.filter(filterExpr) else df).toMap
     }
 
     // transform
-    val optionsPrep = mutable.Map(options.toSeq: _*)
+    val optionsPrep = mutable.Map(options.toSeq.toIndexedSeq: _*)
     if (transformer.isSingleOutput) optionsPrep += (OPTION_OUTPUT_DATAOBJECT_ID -> DEFAULT_DATAOBJECT_ID)
     transformer.transform(session, optionsPrep.toMap, dfs)
   }

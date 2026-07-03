@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -81,52 +81,6 @@ object HdfsUtil extends SmartDataLakeLogger {
    */
   def desiredFileSize(implicit hadoopConf: Configuration): Long = {
     hadoopConf.getLong("dfs.blocksize", DefaultBlocksize)
-  }
-
-  /**
-   * Tries to find a reasonable amount of RDD partitions for a DataFrame.
-   *
-   * Only changes amount of partitions if files exist already.
-   * Amount of records i.e. is not calculated as operations like df.count are expensive.
-   * This method only makes sense on DataFrames that build on existing files,
-   * i.e. when using historize or deduplication.
-   *
-   * Uses repartition if the resulting partition count is higher than the current and coalesce if it's lower
-   *
-   * @param df [[DataFrame]] whose partitions should be optimized
-   * @param existingFilePath HDFS path of existing files
-   * @param reducePartitions If you use maxRecordsPerFile to handle the file boundaries, set this to true.
-   *                         It will effectively half the number of partitions so they are large enough for
-   *                         Spark to handle the splitting of files. Otherwise the resulting partitions could be too
-   *                         small and Spark can't use up the configured boundaries.
-   * @return repartitioned [[DataFrame]] (or Input [[DataFrame]] if partitioning is untouched)
-   */
-  def repartitionForHdfsFileSize(df: DataFrame, existingFilePath: Path, reducePartitions: Boolean = false): DataFrame = {
-
-    // Use the HDFS blocksize as target size or use the default if it can't be evaluated
-    val desiredSize = desiredFileSize(df.sparkSession.sparkContext.hadoopConfiguration)
-
-    implicit val fs: FileSystem = getHadoopFsFromSpark(existingFilePath)(df.sparkSession)
-    val (numFiles, sumSize, avgSize) = HdfsUtil.sizeInfo(existingFilePath)
-    val reduceBy = if(reducePartitions) 2 else 1
-    val numPartitionsRequired = Math.max(1,Math.ceil(sumSize.toDouble / desiredSize / reduceBy).toInt)
-    val currentPartitionNum = df.rdd.getNumPartitions
-
-    logger.debug(s"Current Parquet files: ${numFiles} with a size of ${sumSize}. Requiring ${numPartitionsRequired} partitions now.")
-
-    // Repartition is only done if files exist, otherwise you always end up with one partition
-    val dfRepartitioned = if (sumSize > 0 && numPartitionsRequired > currentPartitionNum) {
-      logger.debug(s"Executing repartition to ${numPartitionsRequired}")
-      df.repartition(numPartitionsRequired)
-    } else if(sumSize > 0 && numPartitionsRequired < currentPartitionNum) {
-      logger.debug(s"Executing coalesce to ${numPartitionsRequired}")
-      df.coalesce(numPartitionsRequired)
-    }
-    else df
-
-    val adjustedPartitionNum = dfRepartitioned.rdd.getNumPartitions
-    logger.debug(s"Repartitioning: Number of RDD partitions before=$currentPartitionNum after=$adjustedPartitionNum")
-    dfRepartitioned
   }
 
   def deletePath( path: Path, doWarn:Boolean )(implicit fs: FileSystem) : Unit = {
@@ -375,5 +329,15 @@ object HdfsUtil extends SmartDataLakeLogger {
   case class RemoteIteratorWrapper[T](underlying: RemoteIterator[T]) extends AbstractIterator[T] with Iterator[T] {
     def hasNext: Boolean = underlying.hasNext
     def next(): T = underlying.next()
+  }
+
+  /**
+   * Normalizes a HDFS path so they can be better compared.
+   * i.e. by replacing \ with /
+   */
+  def normalizePath(path: String) : String = {
+    new Path(path).toString
+      .replaceAll("file:/", "")
+      .replaceAll("/+$", "")
   }
 }

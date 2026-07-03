@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import com.typesafe.config.Config
@@ -33,10 +32,10 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
  * @param camelCaseToLower If selected, converts Camel case names to lower case  with underscores, i.e. TestString -> test_string, testABCtest -> test_ABCtest
- *                         Otherwise converts just to lower case.
- * @param normalizeToAscii If selected, converts UTF-8 special characters (e.g. diacritics, umlauts) to ASCII chars (best effort), i.e. Öffi_émily -> Oeffi_emily
- * @param removeNonStandardSQLNameChars Remove all chars from a string which don't belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc
- * @param replaceNonStandardSQLNameCharsWithUnderscores If selected, replaces all chars from a string which don't belong to lowercase SQL standard naming characters with underscores (_), i.e. "value of property!in$$" -> "value_of_property_in_". Note: removeNonStandardSQLNameChars needs to be disabled
+ *                         Otherwise converts just to lower case. Default=true
+ * @param normalizeToAscii If selected, converts UTF-8 special characters (e.g. diacritics, umlauts) to ASCII chars (best effort), i.e. Öffi_émily -> Oeffi_emily. Default: true
+ * @param removeNonStandardSQLNameChars Remove all chars from a string which don't belong to lowercase SQL standard naming characters, i.e abc$!-& -> abc. Default=true
+ * @param replaceNonStandardSQLNameCharsWithUnderscores If selected, replaces all chars from a string which don't belong to lowercase SQL standard naming characters with underscores (_), i.e. "value of property!in$$" -> "value_of_property_in_". Note: removeNonStandardSQLNameChars needs to be disabled. Default=false
  */
 case class StandardizeColNamesTransformer(override val name: String = "colNamesLowercase",
                                           override val description: Option[String] = None,

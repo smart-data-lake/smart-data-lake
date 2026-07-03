@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 Schweizerische Bundesbahnen SBB (<https://www.sbb.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 
 import com.snowflake.snowpark
@@ -27,9 +26,9 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObje
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode._
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
-import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SQLUtil, SchemaUtil}
+import io.smartdatalake.util.spark.SparkStageMetricsListener
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import io.smartdatalake.workflow.connection.SnowflakeConnection
@@ -37,6 +36,8 @@ import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, Snowpar
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic._
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame, SparkSaveMode}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import net.snowflake.spark.snowflake.Utils
 import net.snowflake.spark.snowflake.Utils.SNOWFLAKE_SOURCE_NAME
@@ -147,7 +148,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   }
 
   private def sparkLoad(queryOrTableOption: Map[String,String])(implicit context: ActionPipelineContext): spark.DataFrame = {
-    val df = context.sparkSession
+    val df = SparkSubFeed.getSparkSession
       .read
       .format(SNOWFLAKE_SOURCE_NAME)
       .options(connection.getJdbcAuthOptions(table.db.get))
@@ -165,7 +166,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       validateSchemaMin(SparkSchema(df.schema), role = "write") //needed for merging the schemas
       val sparkSchemaMin = schemaMin.get.asInstanceOf[SparkSchema] //writeSparkDataFrame is only done with SparkSubFeeds
       val targetSchemaWithMetadata = SchemaUtil.mergeSchemaMetadata(sparkSchemaMin.inner, df.schema)
-      context.sparkSession.createDataFrame(df.rdd, targetSchemaWithMetadata)//workaround to replace the schema in the DF
+      SparkSubFeed.getSparkSession.createDataFrame(df.rdd, targetSchemaWithMetadata)//workaround to replace the schema in the DF
     } else df
     columnComments = SchemaUtil.columnsComments(dfTarget.schema).map(kv => (kv._1.mkString("."), kv._2))
     var finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
@@ -415,7 +416,7 @@ object SnowflakeUtils {
       if (f.dataType != targetType) spark.functions.col(f.name).cast(targetType)
       else spark.functions.col(f.name)
     }
-    df.select(targetCols: _*)
+    df.select(targetCols.toIndexedSeq: _*)
   }
 }
 

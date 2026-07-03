@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.spark.transformer
 
 import com.typesafe.config.ConfigFactory
@@ -72,6 +71,7 @@ class CustomDfsTransformerTest extends AnyFunSuite
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
     val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
     val src = instanceRegistry.get[MockSparkDataObject](DataObjectId("src"))
     val tgt = instanceRegistry.get[MockSparkDataObject](DataObjectId("tgt"))
@@ -117,6 +117,7 @@ class CustomDfsTransformerTest extends AnyFunSuite
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
     val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
     val src = instanceRegistry.get[MockSparkDataObject](DataObjectId("src"))
     val tgt = instanceRegistry.get[MockSparkDataObject](DataObjectId("tgt"))

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 
 import com.jayway.jsonpath.PathNotFoundException
@@ -24,13 +23,15 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.json.JsonUtils
 import io.smartdatalake.util.misc.{ResourceUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
+import io.smartdatalake.util.spark.json.JsonUtils
 import io.smartdatalake.util.webservice.OpenApiUtil.{defaultApiDocsPath, defaultResponseContentType}
 import io.smartdatalake.util.webservice.SttpUtil.{SttpRequestExtension, createDefaultBackend}
 import io.smartdatalake.util.webservice._
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -105,9 +106,10 @@ case class OpenApiDataObject(override val id: DataObjectId,
                              schemaMatchJsonPath: Option[String] = None,
                              maxPagesPerPartition: Int = 10,
                              override val metadata: Option[DataObjectMetadata] = None
-                            )
+                            )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateSparkDataFrame with SmartDataLakeLogger {
-  private val mediaType = MediaType.parse(responseContentType).right.get
+
+  private val mediaType = MediaType.parse(responseContentType).toOption.get
   assert(pagingLinkJsonPath.isEmpty || mediaType.equalsIgnoreParameters(MediaType.ApplicationJson), "PagingLinkRegex can only be used when responseContentType=application/json")
   private val specUrl = {
     if (apiDocsUrl.startsWith("./")) apiDocsUrl
@@ -164,7 +166,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     assert(schema.nonEmpty, s"($id) prepare must be called before getDataFrame")
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     import org.json4s.jackson.JsonMethods.parse
     import session.implicits._
 
@@ -201,11 +203,11 @@ case class OpenApiDataObject(override val id: DataObjectId,
             case StringType =>
               val data = new String(getContent(targetUrl, responseContentTypeEvaluated.get))
               if (logger.isDebugEnabled) logger.debug(s"response: $data")
-              Seq(new String(data)).toDF(schema.get.fieldNames: _*)
+              Seq(new String(data)).toDF(schema.get.fieldNames.toIndexedSeq: _*)
             case BinaryType =>
               val data = getContent(targetUrl, responseContentTypeEvaluated.get)
               if (logger.isDebugEnabled) logger.debug(s"response: binary length=${data.length}")
-              Seq(data).toDF(schema.get.fieldNames: _*)
+              Seq(data).toDF(schema.get.fieldNames.toIndexedSeq: _*)
           }
         }
     }
@@ -217,7 +219,7 @@ case class OpenApiDataObject(override val id: DataObjectId,
     try {
       val result = JsonUtils.evaluateJsonPath(response, jsonPath)
       val link = result.values match {
-        case x: Seq[String] => x.headOption
+        case x: Seq[String @unchecked] => x.headOption
         case x: String => Some(x)
         case null => None
         case x => throw new IllegalStateException(s"($id) pagingLinkJsonPathExtractor expects a String or a list of Strings as result, but got $x")

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.app
 
 import com.fasterxml.jackson.annotation.JsonIgnore
@@ -48,10 +47,6 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
 
   def withStreaming(value: Boolean): R = ProductUtil.dynamicCopy(this, "streaming", value).asInstanceOf[R]
 
-  def withMaster(value: Option[String]): R = ProductUtil.dynamicCopy(this, "master", value).asInstanceOf[R]
-
-  def withDeployMode(value: Option[String]): R = ProductUtil.dynamicCopy(this, "deployMode", value).asInstanceOf[R]
-
   // abstract instance variables
   def feedSel: String
 
@@ -71,16 +66,11 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
 
   def streaming: Boolean
 
-  def master: Option[String]
-
-  def deployMode: Option[String]
-
   // helper methods
   def validate(): Unit = {
     assert(!applicationName.exists(_.contains(HadoopFileActionDAGRunStateStore.fileNamePartSeparator)),
       s"Application name must not contain character '${HadoopFileActionDAGRunStateStore.fileNamePartSeparator}' ($applicationName)")
     assert(!applicationName.exists(_.matches(".*\\s.*")), s"Application name must not contain spaces ($applicationName)")
-    assert(!master.contains("yarn") || deployMode.nonEmpty, "spark deploy-mode must be set if spark master=yarn")
     assert(configuration.nonEmpty, "Configuration files are empty")
     assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
     assert(!streaming || statePath.isDefined, "state path must be set if streaming is enabled")
@@ -100,7 +90,7 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
 
   @JsonIgnore
   def getStdAppConfig(): SmartDataLakeBuilderConfig = {
-    SmartDataLakeBuilderConfig(feedSel, applicationName, configuration, configurationValueOverwrite, master, deployMode, partitionValues, parallelism, statePath, test, streaming)
+    SmartDataLakeBuilderConfig(feedSel, applicationName, configuration, configurationValueOverwrite, partitionValues, parallelism, statePath, test, streaming)
   }
 }
 

@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.testutils
 
 import io.smartdatalake.config.InstanceRegistry
@@ -26,9 +25,12 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTransformer
 import io.smartdatalake.workflow.action.generic.transformer.ScalaClassGenericDfTransformer
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject, SparkFileDataObject, TableDataObject}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame, TableDataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.hadoop.fs.Path
 import org.slf4j.Logger
@@ -41,6 +43,8 @@ trait CopyActionBehaviour {
   implicit private val implicitLogger: Logger = logger
   import TestUtil.registerDataObject
 
+  def defaultEngineConnection: Connection with EngineConnection
+
   def testCopyActionOffline(
                               createSrcDataObject: ((String, InstanceRegistry) => DataObject with CanCreateDataFrame),
                               createTgtDataObject: ((String, Option[Seq[String]], InstanceRegistry) => DataObject with CanCreateDataFrame with CanWriteDataFrame)
@@ -48,6 +52,7 @@ trait CopyActionBehaviour {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))

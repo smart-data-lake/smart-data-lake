@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,11 +18,12 @@
  */
 package io.smartdatalake.util.historization
 
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.historization.HistorizationTestUtils._
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.DataFrameSubFeed
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 import io.smartdatalake.workflow.dataframe.DataFrameFunctions
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.sql.SparkSession
@@ -43,12 +44,11 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
 
   import session.implicits._
 
-  implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(SparkSubFeed.subFeedType)
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
+  implicit val functions: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(SparkSubFeed.subFeedType)
+  implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
   import functions._
 
-  // here fullHistorize and incrementalHistorize differ:
-  // - incrementalHistorize closes existing record and creates new record if schema changes (but only for current records).
-  // - fullHistorize leaves data unchanged
   test("History changed with new columns but unchanged data") {
     val dataOldHist = List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy"))
     val dfOldHist = toHistorizedDf(dataOldHist, HistorizationPhase.Existing, withHashCol = true)
@@ -62,11 +62,10 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
       .drop("dl_hash")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
+    // change for Egon, but no change for Erna, because the new column is null.
     val dataExpected = Seq(
       (123, "Egon", 23, "healthy", "Test", HistorizationRecordOperations.updateClose, erfasstTimestampOldHistTs, getReferenceTimestampOldTs()),
       (123, "Egon", 23, "healthy", "Test", HistorizationRecordOperations.insertNew, referenceTimestampNewTs, doomsdayTs),
-      (124, "Erna", 27, "healthy", null, HistorizationRecordOperations.updateClose, erfasstTimestampOldHistTs, getReferenceTimestampOldTs()),
-      (124, "Erna", 27, "healthy", null, HistorizationRecordOperations.insertNew, referenceTimestampNewTs, doomsdayTs)
     )
     val dfExpected = toDataDf(dataExpected, colNames ++ Seq("new_col1", Historization.historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName))
 

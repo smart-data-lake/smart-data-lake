@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,11 +16,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.app
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig
+import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.action.{Action, ActionMetadata, CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObjectMetadata}
 import org.scalatest.funsuite.AnyFunSuite
@@ -32,7 +31,7 @@ class AppUtilTest extends AnyFunSuite {
     assert(logTxt == "secret.key=...")
   }
 
-  test("dont mask normal values when logging spark conf") {
+  test("do not mask normal values when logging spark conf") {
     val logTxt = AppUtil.createMaskedSecretsKVLog("test", "abc")
     assert(logTxt == "test=abc")
   }
@@ -47,7 +46,7 @@ class AppUtilTest extends AnyFunSuite {
   instanceRegistry.register(Seq(do1, do2, do3, do4, do5, do6))
   private val actionA = CopyAction("a", "do1", "do2", metadata = Some(ActionMetadata(name = Some("actionA"), feed = Some("test1"))))
   private val actionB = CopyAction("b", "do1", "do3", metadata = Some(ActionMetadata(name = Some("actionB"), feed = Some("test2"))))
-  private val actionC = CustomDataFrameAction("c", Seq("do2", "do3", "do4"), Seq("do5"), transformer = Some(CustomDfsTransformerConfig(sqlCode = Some(Map(do5.id.id -> "select * from do2"))))
+  private val actionC = CustomDataFrameAction("c", Seq("do2", "do3", "do4"), Seq("do5"), transformers = Seq(SQLDfsTransformer(code = Map(do5.id.id -> "select * from do2")))
     , metadata = Some(ActionMetadata(name = Some("actionC"), feed = Some("test1")))
   )
   private val actionD = CopyAction("d", "do5", "do6", metadata = Some(ActionMetadata(name = Some("actionD"), feed = Some("test1"))))

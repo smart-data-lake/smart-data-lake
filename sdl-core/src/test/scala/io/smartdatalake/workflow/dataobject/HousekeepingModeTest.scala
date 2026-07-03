@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,15 +16,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.generic.{PartitionArchiveMode, PartitionRetentionMode}
+import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.lit
@@ -35,8 +36,8 @@ import org.slf4j.{Logger, LoggerFactory}
 import java.nio.file.Files
 
 class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter
-  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
-  with io.smartdatalake.util.spark.dataset.Equality {
+    with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+    with io.smartdatalake.util.spark.dataset.Equality {
 
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
@@ -49,17 +50,22 @@ class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
-  private val df1 = Seq(("doe", "john", 5, "20201101"), ("einstein", "albert", 2, "20201201"))
+  private val df1 = Seq(
+    ("doe",      "john",   5, "20201101"),
+    ("einstein", "albert", 2, "20201201")
+  )
     .toDF("lastname", "firstname", "rating", "dt")
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    FileUtils.deleteDirectory(tempDir.toFile)
   }
 
   test("PartitionRetentionMode") {
     val srcDO = CsvFileDataObject("srcDO", tempPath + s"/src0", partitions = Seq("dt"))
-    val tgtDO = CsvFileDataObject("tgtDO", tempPath + s"/tgt1", partitions = Seq("dt")
-      , housekeepingMode = Some(PartitionRetentionMode("elements.dt >= 20201201"))
+    val tgtDO = CsvFileDataObject("tgtDO", tempPath + s"/tgt1", partitions = Seq("dt"),
+      housekeepingMode = Some(PartitionRetentionMode("elements.dt >= 20201201"))
     )
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
@@ -75,13 +81,15 @@ class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter
     assert(tgtDO.listPartitions == Seq(PartitionValues(Map("dt" -> "20201201"))))
   }
 
-  test("PartitionArchiveCompactionMode with SparkFileDataObject") {
+  test("PartitionArchiveMode with SparkFileDataObject") {
     val srcDO = CsvFileDataObject("srcDO", tempPath + s"/src0", partitions = Seq("dt"))
-    val tgtDO = CsvFileDataObject("tgtDO", tempPath + s"/tgt1", partitions = Seq("dt")
-      , housekeepingMode = Some(PartitionArchiveCompactionMode(
-        archivePartitionExpression = Some("map('dt','20201101')"), // always archive to 20201101
-        compactPartitionExpression = Some("true") // compact all partitions...
-      ))
+    val tgtDO = CsvFileDataObject(
+      id = "tgtDO",
+      path = tempPath + s"/tgt1",
+      partitions = Seq("dt"),
+      housekeepingMode = Some(PartitionArchiveMode(
+          archivePartitionExpression = Some("map('dt','20201101')") // always archive to 20201101
+        ))
     )
     instanceRegistry.register(srcDO)
     instanceRegistry.register(tgtDO)
@@ -93,39 +101,14 @@ class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter
     assert(tgtDO.listPartitions.map(_.apply("dt").toString).sorted == Seq("20201101", "20201201"))
     action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed)) // exec housekeeping
 
-    // check partition dt=20201201 is archived and dt=20201101 is compacted
+    logger.debug(s"check partition dt=20201201 is archived: ${tgtDO.listPartitions.length} partitions found")
     assert(tgtDO.listPartitions == Seq(PartitionValues(Map("dt" -> "20201101"))))
-    assert(tgtDO.filesystem.exists(new Path(tgtDO.hadoopPath, "dt=20201101/_SDL_COMPACTED")))
+
     val actual = tgtDO.getSparkDataFrame()
     val expected = df1.withColumn("dt", lit("20201101"))
     val resultat = actual.equal(expected)
-    if (!resultat) printFailedTestResult("historize 1st load mergeModeEnable")(actual)(expected)
+    if (!resultat) printFailedTestResult("PartitionArchiveMode with SparkFileDataObject")(actual)(expected)
     assert(resultat)
-  }
-
-  test("PartitionArchiveCompactionMode with HiveTableDataObject") {
-    val srcDO = CsvFileDataObject("srcDO", tempPath + s"/src0", partitions = Seq("dt"))
-    val tgtDO = HiveTableDataObject("tgtDO", Some(tempPath + s"/tgt1"), partitions = Seq("dt"), table = Table(Some("default"), "tgtDO")
-      , housekeepingMode = Some(PartitionArchiveCompactionMode(
-        archivePartitionExpression = Some("map('dt','20201101')"), // always archive to 20201101
-        compactPartitionExpression = Some("true") // compact all partitions...
-      ))
-    )
-    tgtDO.dropTable
-    instanceRegistry.register(srcDO)
-    instanceRegistry.register(tgtDO)
-    tgtDO.writeSparkDataFrame(df1, Seq()) // prefill target as we only execute postExec...
-    val action1 = CopyAction("ca", srcDO.id, tgtDO.id)
-    val srcSubFeed = SparkSubFeed(None, "srcDO", Seq())
-    val tgtSubFeed = SparkSubFeed(None, "tgtDO", Seq())
-    action1.prepare
-    assert(tgtDO.listPartitions.map(_.apply("dt").toString).sorted == Seq("20201101", "20201201"))
-    action1.postExec(Seq(srcSubFeed), Seq(tgtSubFeed)) // exec housekeeping
-
-    // check partition dt=20201201 is archived and dt=20201101 is compacted
-    assert(tgtDO.listPartitions == Seq(PartitionValues(Map("dt" -> "20201101"))))
-    assert(tgtDO.filesystem.exists(new Path(tgtDO.hadoopPath, "dt=20201101/_SDL_COMPACTED")))
-    assert(tgtDO.getSparkDataFrame().equal(df1.withColumn("dt", lit("20201101"))))
   }
 
 }

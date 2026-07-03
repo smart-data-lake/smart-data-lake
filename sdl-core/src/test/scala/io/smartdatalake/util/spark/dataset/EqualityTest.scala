@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.spark.dataset.Collection._
@@ -111,12 +110,12 @@ class EqualityTest extends AnyFlatSpec with Matchers with ScalaCheckPropertyChec
   }
 
   "DataFrames almost equals" should "ignore column order by default" in {
-    val dfReversed = dsSimple1.select(dsSimple1.columns.reverse.map(col): _*)
+    val dfReversed = dsSimple1.select(dsSimple1.columns.reverse.map(col).toIndexedSeq: _*)
     dfSimple1.almostEqual(dfReversed) shouldBe true
   }
 
   "DataFrames almost equals" should "consider column order when asked" in {
-    dfSimple1.almostEqual(dsSimple1.select(dsSimple1.columns.reverse.map(col): _*), ignoreColumnOrder = false) shouldBe false
+    dfSimple1.almostEqual(dsSimple1.select(dsSimple1.columns.reverse.map(col).toIndexedSeq: _*), ignoreColumnOrder = false) shouldBe false
   }
 
   "DataFrames almost equals" should "fail when some cols are compared precisely" in {

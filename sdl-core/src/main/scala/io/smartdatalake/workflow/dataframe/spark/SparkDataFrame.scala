@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.spark
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -26,9 +25,11 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.dataset
 import io.smartdatalake.workflow.dataframe._
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.NamedExpression
+import org.apache.spark.sql.classic.{ClassicConversions, ColumnConversions}
 import org.apache.spark.sql.execution.ExplainMode
 import org.apache.spark.sql.types._
 import org.json4s.JString
@@ -59,19 +60,19 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
 
   override def select(columns: Seq[GenericColumn]): SparkDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
-    SparkDataFrame(inner.select(columns.map(_.asInstanceOf[SparkColumn].inner): _*))
+    SparkDataFrame(inner.select(columns.map(_.asInstanceOf[SparkColumn].inner).toIndexedSeq: _*))
   }
 
   override def groupBy(columns: Seq[GenericColumn]): SparkGroupedDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val sparkCols = columns.map(_.asInstanceOf[SparkColumn].inner)
-    SparkGroupedDataFrame(inner.groupBy(sparkCols: _*))
+    SparkGroupedDataFrame(inner.groupBy(sparkCols.toIndexedSeq: _*))
   }
 
   override def agg(columns: Seq[GenericColumn]): SparkDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val sparkCols = columns.map(_.asInstanceOf[SparkColumn].inner)
-    SparkDataFrame(inner.agg(sparkCols.head, sparkCols.tail: _*))
+    SparkDataFrame(inner.agg(sparkCols.head, sparkCols.tail.toIndexedSeq: _*))
   }
 
   override def unionByName(other: GenericDataFrame, allowMissingColumns: Boolean = false): SparkDataFrame = {
@@ -102,10 +103,10 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   override def orderBy(columns: Seq[GenericColumn]): SparkDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val sparkCols = columns.map(_.asInstanceOf[SparkColumn].inner)
-    SparkDataFrame(inner.orderBy(sparkCols: _*))
+    SparkDataFrame(inner.orderBy(sparkCols.toIndexedSeq: _*))
   }
 
-  override def collect: Seq[GenericRow] = inner.collect().map(SparkRow)
+  override def collect: Seq[GenericRow] = inner.collect().toList.map(SparkRow)
 
   override def distinct: SparkDataFrame = SparkDataFrame(inner.distinct())
 
@@ -155,6 +156,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
     val numRows = options.get("numRows").map(_.toInt).getOrElse(10)
     val truncate = options.get("truncate").map(_.toInt).getOrElse(20)
     val vertical = options.get("vertical").exists(_.toBoolean)
+    import ClassicConversions._
     DatasetHelper.showString(inner, numRows, truncate, vertical)
   }
 
@@ -165,15 +167,15 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
 
   override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, aggregateColumns)
-    // Some Spark data sources dont execute observations, e.g. jdbc. The generic observation can be forced for these cases.
+    // Some Spark data sources do not execute observations, e.g. jdbc. The generic observation can be forced for these cases.
     if (forceGenericObservation) {
-      val observation = GenericCalculatedObservation(this, aggregateColumns: _*)
+      val observation = GenericCalculatedObservation(this, aggregateColumns.toIndexedSeq: _*)
       // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
       (this.cache, observation)
     } else {
       val observation = new SparkObservation(name)
       val sparkAggregatedColumns = aggregateColumns.map(_.asInstanceOf[SparkColumn].inner)
-      val dfObserved = observation.on(inner, isExecPhase, sparkAggregatedColumns: _*)
+      val dfObserved = observation.on(inner, isExecPhase, sparkAggregatedColumns.toIndexedSeq: _*)
       (SparkDataFrame(dfObserved), observation)
     }
   }
@@ -181,7 +183,7 @@ case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
   def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, aggregateColumns)
     val sparkAggregatedColumns = aggregateColumns.map(_.asInstanceOf[SparkColumn].inner)
-    val dfObserved = inner.observe(name, sparkAggregatedColumns.head, sparkAggregatedColumns.tail: _*)
+    val dfObserved = inner.observe(name, sparkAggregatedColumns.head, sparkAggregatedColumns.tail.toIndexedSeq: _*)
     SparkDataFrame(dfObserved)
   }
 
@@ -196,7 +198,7 @@ case class SparkGroupedDataFrame(inner: RelationalGroupedDataset) extends Generi
   override def agg(columns: Seq[GenericColumn]): SparkDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val sparkCols = columns.map(_.asInstanceOf[SparkColumn].inner)
-    SparkDataFrame(inner.agg(sparkCols.head, sparkCols.tail: _*))
+    SparkDataFrame(inner.agg(sparkCols.head, sparkCols.tail.toIndexedSeq: _*))
   }
 }
 
@@ -215,9 +217,9 @@ case class SparkSchema(inner: StructType) extends GenericSchema {
     else None
   }
 
-  override def columns: Seq[String] = inner.fieldNames
+  override def columns: Seq[String] = inner.fieldNames.toList
 
-  override def fields: Seq[SparkField] = inner.fields.map(SparkField)
+  override def fields: Seq[SparkField] = inner.fields.toList.map(SparkField)
 
   override def sql: String = inner.toDDL
 
@@ -242,7 +244,7 @@ case class SparkSchema(inner: StructType) extends GenericSchema {
   }
 
   override def getEmptyDataFrame(dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SparkDataFrame = {
-    SparkDataFrame(dataset.getEmptyDataFrame(inner)(context.sparkSession))
+    SparkDataFrame(dataset.getEmptyDataFrame(inner)(getSparkSession))
   }
 
   override def getDataType(colName: String): SparkDataType = {
@@ -354,7 +356,7 @@ case class SparkColumn(inner: Column) extends GenericColumn {
     }
   }
 
-  override def isin(list: Any*): GenericColumn = SparkColumn(inner.isin(list: _*))
+  override def isin(list: Any*): GenericColumn = SparkColumn(inner.isin(list.toIndexedSeq: _*))
 
   override def isNull: GenericColumn = SparkColumn(inner.isNull)
 
@@ -369,15 +371,21 @@ case class SparkColumn(inner: Column) extends GenericColumn {
     }
   }
 
-  override def exprSql: String = inner.expr.sql
+  override def exprSql: String = {
+    import ColumnConversions._
+    inner.expr.sql
+  }
 
   override def desc: GenericColumn = SparkColumn(inner.desc)
 
   override def apply(extraction: Any): GenericColumn = SparkColumn(inner.apply(extraction))
 
-  override def getName: Option[String] = inner.expr match {
-    case c: NamedExpression => Some(c.name)
-    case _ => None
+  override def getName: Option[String] = {
+    import ColumnConversions._
+    inner.expr match {
+      case c: NamedExpression => Some(c.name)
+      case _ => None
+    }
   }
 }
 
@@ -458,12 +466,12 @@ case class SparkStructDataType(override val inner: StructType) extends SparkData
 
   override def withOtherFields[T](other: GenericStructDataType with GenericDataType, func: (Seq[GenericField], Seq[GenericField]) => T): T = {
     other match {
-      case sparkOther: SparkStructDataType => func(inner.fields.map(SparkField), sparkOther.inner.fields.map(SparkField))
+      case sparkOther: SparkStructDataType => func(inner.fields.toList.map(SparkField), sparkOther.inner.fields.toList.map(SparkField))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
-  override def fields: Seq[SparkField] = inner.fields.map(SparkField)
+  override def fields: Seq[SparkField] = inner.fields.toList.map(SparkField)
 
   override def fieldIndex(fieldName: String): Int = inner.fieldIndex(fieldName)
 }

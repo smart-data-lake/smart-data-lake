@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,15 +23,17 @@ import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ProductUtil._
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataobject.generic.Table
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
+import org.apache.spark.sql.DataFrame
 
 /**
- * Exports a util [[DataFrame]] that contains properties and metadata extracted from all [[DataObject]]s
- * that are registered in the current [[InstanceRegistry]].
+ * Exports a util [[DataFrame]] that contains properties and metadata extracted from all
+ * [[DataObject]]s that are registered in the current [[InstanceRegistry]].
  *
- * Alternatively, it can export the properties and metadata of all [[DataObject]]s defined in config files. For this, the
- * configuration "config" has to be set to the location of the config.
+ * Alternatively, it can export the properties and metadata of all [[DataObject]]s defined in config
+ * files. For this, the configuration "config" has to be set to the location of the config.
  *
  * Example:
  * {{{
@@ -47,21 +49,23 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  *
  * The config value can point to a configuration file or a directory containing configuration files.
  *
- * @see Refer to [[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading.
+ * @see
+ *   Refer to [[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration
+ *   loading.
  */
-case class DataObjectsExporterDataObject(id: DataObjectId,
-                                         config: Option[String] = None,
-                                         override val metadata: Option[DataObjectMetadata] = None)
-                                   (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateSparkDataFrame with ParsableFromConfig[DataObjectsExporterDataObject] {
+case class DataObjectsExporterDataObject(
+    id: DataObjectId,
+    config: Option[String] = None,
+    override val metadata: Option[DataObjectMetadata] = None
+)(@transient implicit val instanceRegistry: InstanceRegistry)
+    extends DataObject with CanCreateSparkDataFrame with ParsableFromConfig[DataObjectsExporterDataObject] {
 
   /**
-   *
-   * @param session SparkSession to use
-   * @return DataFrame including all Dataobjects in the instanceRegistry, used for exporting the metadata
+   * @return
+   *   DataFrame including all Dataobjects in the instanceRegistry, used for exporting the metadata
    */
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    val session: SparkSession = context.sparkSession
+    val session = SparkSubFeed.getSparkSession
     import session.implicits._
 
     val listElementsSeparator = ","
@@ -101,8 +105,6 @@ case class DataObjectsExporterDataObject(id: DataObjectId,
           getFieldData[Seq[String]](dataObject, "partitions").map(_.mkString(listElementsSeparator)),
           // table
           getFieldData[Table](dataObject, "table").map(_.toString),
-          // creator
-          getFieldData[CustomDfCreatorConfig](dataObject, "creator").map(_.toString),
           // connectionId
           getEventuallyOptionalFieldData[Any](dataObject, "connectionId").map(getIdFromConfigObjectIdOrString)
         )
@@ -120,7 +122,6 @@ case class DataObjectsExporterDataObject(id: DataObjectId,
       "path",
       "partitions",
       "table",
-      "creator",
       "connectionId"
     )
   }
@@ -129,7 +130,6 @@ case class DataObjectsExporterDataObject(id: DataObjectId,
 }
 
 object DataObjectsExporterDataObject extends FromConfigFactory[DataObjectsExporterDataObject] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): DataObjectsExporterDataObject = {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): DataObjectsExporterDataObject =
     extract[DataObjectsExporterDataObject](config)
-  }
 }

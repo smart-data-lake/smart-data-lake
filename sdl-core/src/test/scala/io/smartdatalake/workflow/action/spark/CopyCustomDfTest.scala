@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -19,13 +19,12 @@
 package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.testutils.spark.dataset.Collection
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
-import io.smartdatalake.testutils.custom.{TestCustomDfCreator, TestCustomDfManyTypes}
 import io.smartdatalake.workflow.action.CopyAction
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.action.spark.transformer.StandardizeSparkDatatypesTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{CustomDfDataObject, HiveTableDataObject, ParquetFileDataObject, Table}
+import io.smartdatalake.workflow.dataobject.{ParquetFileDataObject, TestData}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
@@ -51,6 +50,7 @@ class CopyCustomDfTest extends AnyFunSuite with BeforeAndAfter
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
     tempDir = Files.createTempDirectory("test")
     tempPath = tempDir.toAbsolutePath.toString
   }
@@ -63,9 +63,11 @@ class CopyCustomDfTest extends AnyFunSuite with BeforeAndAfter
 
     // setup DataObjects
     val feed = "customDf2Hive"
-    val sourceDO = CustomDfDataObject(id = "source", creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
+    val sourceDO = MockSparkDataObject(id = "source").register
+    sourceDO.writeSparkDataFrame(Collection.dfSimple1)
     val targetDO = MockSparkDataObject(id = "target").register
     instanceRegistry.register(sourceDO)
+
 
     // prepare & start load
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
@@ -84,7 +86,8 @@ class CopyCustomDfTest extends AnyFunSuite with BeforeAndAfter
 
     // setup DataObjects
     val feed = "customDf_dfManyTypes"
-    val sourceDO = CustomDfDataObject(id = "source", creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfManyTypes].getName)))
+    val sourceDO = MockSparkDataObject(id = "source").register
+    sourceDO.writeSparkDataFrame(Collection.dfManyTypes)
     val targetDO = ParquetFileDataObject(id = "target", tempPath + s"/customDfCopy")
     instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)

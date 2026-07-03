@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,11 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.spark
 
-import io.smartdatalake.testutils.{CopyActionBehaviour, MockSparkDataObject}
+import io.smartdatalake.testutils.{CopyActionBehaviour, MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataobject.ParquetFileDataObject
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -28,11 +28,13 @@ import java.nio.file.Files
 
 class OfflineCopyActionTest extends AnyFunSuite with SmartDataLakeLogger with CopyActionBehaviour {
 
+  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
+
   test("copy dry-run in offline environment, reading exported schemas") {
 
     testCopyActionOffline(
-      (id, registry) => MockSparkDataObject(id),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks),
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry),
     )
   }
 
@@ -41,7 +43,7 @@ class OfflineCopyActionTest extends AnyFunSuite with SmartDataLakeLogger with Co
 
     val tgtSubFeed = testCopyActionOffline(
       (id, registry) => ParquetFileDataObject(id, tempDir.resolve("test1/src1").toString, filenameColumn = Some("_filename"))(registry),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry),
     )
 
     // Verify that the filename column is included in the target schema

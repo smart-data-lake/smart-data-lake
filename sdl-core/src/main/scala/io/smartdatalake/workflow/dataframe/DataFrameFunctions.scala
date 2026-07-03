@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -44,6 +43,7 @@ trait DataFrameFunctions {
   def abs(column: GenericColumn): GenericColumn
   def least(columns: GenericColumn*): GenericColumn
   def greatest(columns: GenericColumn*): GenericColumn
+  def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn
 
   /**
    * Construct array from given columns and removing null values
@@ -81,16 +81,16 @@ trait DataFrameFunctions {
   /**
    * Create a column expression to compare a list of columns between rows.
    * If useHash is true, the expression will use a hash function to reduce the size of the value to compare, otherwise the columns are compared as is, normally as struct of the columns.
-   * The default implementation below can be overridden by implementations if needed, e.g. because they dont support struct or hash functions, but the default implementation should work for most cases.
+   * The default implementation below can be overridden by implementations if needed, e.g. because they do not support struct or hash functions, but the default implementation should work for most cases.
    */
-  def colsComparisionExpr(cols: Seq[GenericColumn], useHash: Boolean = false): GenericColumn = {
-    assert(cols.forall(_.getName.nonEmpty), "All columns must have a name for colsComparisionExpr, otherwise the generated expression is not deterministic. Please check that all columns used for comparison are named.")
+  def colscomparisonExpr(cols: Seq[GenericColumn], useHash: Boolean = false): GenericColumn = {
+    assert(cols.forall(_.getName.nonEmpty), "All columns must have a name for colscomparisonExpr, otherwise the generated expression is not deterministic. Please check that all columns used for comparison are named.")
     if (useHash) hash(struct(cols.sortBy(_.getName.get):_*))
     else struct(cols.sortBy(_.getName.get):_*)
   }
 
   /**
-   * Get a DataFrame with the result of the given sql statement.
+   * Get a DataFrame with the result of the given SQL statement.
    * @param dataObjectId Snowpark implementation needs to get the Snowpark-Session from the DataObject. This should not be used otherwise.
    */
   def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame

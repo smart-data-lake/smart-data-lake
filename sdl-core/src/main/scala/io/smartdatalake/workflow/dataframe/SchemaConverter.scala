@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe
 
 import io.smartdatalake.config.ConfigParser
@@ -29,7 +28,8 @@ import scala.reflect.runtime.universe.Type
 /**
  * An interface for to be implementated by schema converters.
  * A schema converter can convert schemas from a specific SubFeedType A to a specific SubFeedType B.
- * As SDLB doesnt define an own intermediary schema langauge, a schema conversion must be implemented for every pair of SubFeedType SDLB should be able to convert.
+ * As SDLB does not define an own intermediary schema langauge,
+ * a schema conversion must be implemented for every pair of SubFeedType SDLB should be able to convert.
  */
 private[smartdatalake] trait SchemaConverter {
   def fromSubFeedType: Type

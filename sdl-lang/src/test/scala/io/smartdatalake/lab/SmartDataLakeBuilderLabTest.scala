@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,13 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.lab
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.action.generic.transformer.SparkDfsTransformer
+import io.smartdatalake.testutils.spark.dataset.Collection.dsComplex
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.dataobject.ParquetFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -32,7 +31,6 @@ import org.scalatest.funsuite.AnyFunSuite
 class SmartDataLakeBuilderLabTest extends AnyFunSuite {
 
   protected implicit val session: SparkSession = TestUtil.session
-  import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
@@ -41,12 +39,9 @@ class SmartDataLakeBuilderLabTest extends AnyFunSuite {
   test("create one DataFrame using Transformer") {
     val lab = new SmartDataLakeBuilderLab(session, Seq("cp:/labConfigTest.conf"), new DataObjectCatalogTest(_,_), new ActionCatalogTest(_,_))
     SmartDataLakeBuilderLab.enableWritingDataObjects = true
-    lab.dataObjects.parquetTest.write(TestUtil.dfComplex)
+    lab.dataObjects.parquetTest.write(dsComplex)
     val dfs = lab.buildDataFrames.withTransformer(new MySingleDfTransformer).get
     assert(dfs.size == 1)
-    val dfOneSingleDefault = lab.buildDataFrames.withTransformer(new MySingleDfTransformer).getOne()
-    val dfOneDefault = lab.buildDataFrames.withTransformer(new MyDfsTransformer).getOne()
-    val dfOneParquetTest = lab.buildDataFrames.withTransformer(new MyDfsTransformer).getOne("dfParquetTest")
     intercept[IllegalArgumentException](lab.buildDataFrames.withTransformer(new MyDfsTransformer).getOne("dfUnknown"))
   }
 

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.snowflake
 
 import com.snowflake.snowpark.custom.SnowparkUtils
@@ -99,7 +98,7 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
     SnowparkDataFrame(inner.sort(snowparkCols))
   }
 
-  override def collect: Seq[GenericRow] = inner.collect().map(SnowparkRow)
+  override def collect: Seq[GenericRow] = inner.collect().toIndexedSeq.map(SnowparkRow)
   override def distinct: SnowparkDataFrame = SnowparkDataFrame(inner.distinct())
   override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {
     SnowparkSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
@@ -127,7 +126,7 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
   }
 
   override def dropDuplicates(cols: Seq[String]): SnowparkDataFrame = {
-    SnowparkDataFrame(inner.dropDuplicates(cols: _*))
+    SnowparkDataFrame(inner.dropDuplicates(cols.toIndexedSeq: _*))
   }
   override def isEmpty: Boolean = inner.count() == 0
   override def count: Long = inner.count()
@@ -176,7 +175,7 @@ case class SnowparkSchema(inner: StructType) extends GenericSchema {
     else None
   }
   override def columns: Seq[String] = inner.names
-  override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
+  override def fields: Seq[SnowparkField] = inner.fields.toIndexedSeq.map(SnowparkField)
   override def sql: String = fields.map(f => s"${f.name} ${f.dataType.sql}").mkString(", ")
   override def add(colName: String, dataType: GenericDataType): SnowparkSchema = {
     val snowparkDataType = SchemaConverter.convertDatatype(dataType, subFeedType).asInstanceOf[SnowparkDataType]
@@ -373,11 +372,11 @@ case class SnowparkStructDataType(override val inner: StructType) extends Snowpa
   override def toLowerCase: SnowparkDataType = SnowparkStructDataType(SnowparkSchema(inner).toLowerCase.inner)
   override def withOtherFields[T](other: GenericStructDataType with GenericDataType, func: (Seq[GenericField], Seq[GenericField]) => T): T = {
     other match {
-      case snowparkOther: SnowparkStructDataType => func(inner.fields.map(SnowparkField), snowparkOther.inner.fields.map(SnowparkField))
+      case snowparkOther: SnowparkStructDataType => func(inner.fields.toIndexedSeq.map(SnowparkField), snowparkOther.inner.fields.toIndexedSeq.map(SnowparkField))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
-  override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
+  override def fields: Seq[SnowparkField] = inner.fields.toIndexedSeq.map(SnowparkField)
 
   override def fieldIndex(fieldName: String): Int = inner.indexWhere(_.name == fieldName)
 }

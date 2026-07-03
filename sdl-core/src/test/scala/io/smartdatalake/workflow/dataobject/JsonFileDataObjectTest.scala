@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,22 +18,20 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import java.io._
-import java.nio.file.Files
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types._
 
+import java.io._
+import java.nio.file.Files
+
 class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior {
 
-  val hdfs = FileSystem.get(session.sparkContext.hadoopConfiguration)
-
-  private case class Data(name: String, age: Int)
-  private case class DataObj(id: String, seq: Seq[Data])
+  val hdfs: FileSystem = FileSystem.get(session.sparkContext.hadoopConfiguration)
 
   test("test stringify") {
 
@@ -60,7 +58,7 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
 
     val aj = JsonFileDataObject.fromConfig(config)
     val result = aj.getSparkDataFrame()
-    result.show
+    result.show()
     assert(result.count() == 3)
 
     val expectedSchema = StructType(List(
@@ -78,7 +76,6 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
     }
     assert(testResult)
   }
-
 
   test("testDefaultParsing") {
 

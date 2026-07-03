@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,7 +20,8 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
-import io.smartdatalake.workflow.dataobject.{CanReceiveScriptNotification, DataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.script.CanReceiveScriptNotification
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ScriptSubFeed, SubFeedConverter}
 
 /**
@@ -34,7 +35,7 @@ abstract class ScriptActionImpl extends ActionSubFeedsImpl[ScriptSubFeed] {
   override val executionMode: Option[ExecutionMode] = None // no use for execution mode with scripts so far
   override def metricsFailCondition: Option[String] = None // no metrics for script execution so far
 
-  private[smartdatalake] override def subFeedConverter(): SubFeedConverter[ScriptSubFeed] = ScriptSubFeed
+  private[smartdatalake] override def subFeedConverter: SubFeedConverter[ScriptSubFeed] = ScriptSubFeed
 
   /**
    * To be implemented by sub-classes

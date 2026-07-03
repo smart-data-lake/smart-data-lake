@@ -1,7 +1,7 @@
 <!--
   ~ Smart Data Lake - Build your data lake the smart way.
   ~
-  ~ Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+  ~ Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
   ~
   ~ This program is free software: you can redistribute it and/or modify
   ~ it under the terms of the GNU General Public License as published by
@@ -22,11 +22,11 @@
 	<parent>
 		<groupId>io.smartdatalake</groupId>
 		<artifactId>sdl-parent</artifactId>
-        <version>2.9.0-SNAPSHOT</version>
+        <version>3.0.0-SNAPSHOT</version>
 		<relativePath>../pom.xml</relativePath>
 	</parent>
 
-	<artifactId>sdl-deltalake_${scala.minor.version}</artifactId>
+	<artifactId>sdl-deltalake_2.13</artifactId>
 	<packaging>jar</packaging>
 
 	<name>sdl-deltalake</name>
@@ -56,12 +56,6 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<scope>${sdl-core.scope}</scope>
-		</dependency>
-
-		<dependency>
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-sql_${scala.minor.version}</artifactId>
 			<scope>${sdl-core.scope}</scope>
@@ -83,8 +77,23 @@
 
 		<dependency>
 			<groupId>io.delta</groupId>
-			<artifactId>delta-spark_${scala.minor.version}</artifactId>
+			<artifactId>delta-spark_${spark.minor.version}_${scala.minor.version}</artifactId>
 			<version>${delta.version}</version>
+			<exclusions>
+				<!--
+                  Exclude hadoop-client-runtime from spark-*, as this is a shaded version with relocation.
+                  We need the classes with original location for hadoop-azure otherwise there is ClassNotFoundException: org.apache.hadoop.util.WeakReferenceMap from hadoop-Azure AbfsClient.
+                  hadoop-client library is not shaded and included below.
+                -->
+				<exclusion>
+					<groupId>org.apache.hadoop</groupId>
+					<artifactId>hadoop-client-runtime</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.apache.hadoop</groupId>
+					<artifactId>hadoop-client-api</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<dependency>
@@ -192,12 +201,6 @@
 				<artifactId>scala-maven-plugin</artifactId>
 			</plugin>
 
-			<!-- rewrite pom for compiling with different scala version profiles -->
-			<plugin>
-				<groupId>org.spurint.maven.plugins</groupId>
-				<artifactId>scala-cross-maven-plugin</artifactId>
-			</plugin>
-
 			<!-- Copies files in resources folders to target folder. -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
@@ -232,6 +235,16 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
+				<configuration>
+					<ignoredUnusedDeclaredDependencies>
+						<!-- used in source but bytecode analyzer attributes it to delta-spark's transitive chain -->
+						<ignoredUnusedDeclaredDependency>org.apache.spark:spark-sql_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+						<!-- kept to prevent NoClassDefFoundError at runtime; see dependency comment above -->
+						<ignoredUnusedDeclaredDependency>org.apache.spark:spark-tags_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+						<!-- used in source (scala.util.Try, scala.language.*) but not detected by bytecode analyzer -->
+						<ignoredUnusedDeclaredDependency>org.scala-lang:scala-library</ignoredUnusedDeclaredDependency>
+					</ignoredUnusedDeclaredDependencies>
+				</configuration>
 			</plugin>
 
 			<!-- check for dependency version conflicts -->

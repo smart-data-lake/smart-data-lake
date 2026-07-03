@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.app
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
@@ -70,7 +69,6 @@ case class BackendClient(uploader: UploadService) extends ExportWriter with Smar
   }
 
   override def readLatestSchema(dataObjectId: DataObjectId): Option[String] = {
-    import scala.collection.compat._
     val tpe = "schema"
     val subPath = s"dataobject/$tpe/${dataObjectId.id}"
     val tstampsSubPath = s"$subPath/tstamps"
@@ -104,6 +102,7 @@ case class BackendClient(uploader: UploadService) extends ExportWriter with Smar
     uploader.send(subPath, body = Some(content), method = method, additionalParams = additionalParams)
   }
 
+  org.json4s.ext.JavaTimeSerializers.all
   implicit private val formats: Formats = DefaultFormats + Json4sCompat.getCustomSerializer[Timestamp](_ => ( {
     case json: JString => Timestamp.from(OffsetDateTime.parse(json.s).toInstant)
   }, {

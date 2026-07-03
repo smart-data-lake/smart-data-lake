@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@ import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, TableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe
@@ -80,20 +81,20 @@ case class PKViolatorsDataObject(id: DataObjectId,
     def optionalCastColToString(doCast: Boolean)(col: GenericColumn) = if (doCast) col.cast(functions.stringType) else col
 
     def getPKviolatorDf(dataObject: TableDataObject) = {
-      val pkColNames = dataObject.table.primaryKey.get.toArray
+      val pkColNames = dataObject.table.primaryKey.get.toList
       if (dataObject.isTableExisting) {
         val dfTable = dataObject.getDataFrame(Seq(), subFeedType)
         val dfPKViolators = dfTable.getPKviolators(pkColNames)
         val dataColumns = dfPKViolators.schema.columns.diff(pkColNames)
         val colSchema = lit(dfTable.schema.sql).as("schema")
         val keyCol = optionalCastColToString(flattenOutput) {
-          array(pkColNames.map(colName2colRepresentation): _*).as("key")
+          array(pkColNames.map(colName2colRepresentation).toIndexedSeq: _*).as("key")
         }
         val dataCol = optionalCastColToString(flattenOutput) {
           if (dataColumns.isEmpty) {
             lit(null).cast(arrayType(structType(Map(columnNameName -> stringType, columnValueName -> stringType))))
           } else {
-            array(dataColumns.map(colName2colRepresentation): _*)
+            array(dataColumns.map(colName2colRepresentation).toIndexedSeq: _*)
           }
         }.as("data")
         Some( dfPKViolators.select( Seq(

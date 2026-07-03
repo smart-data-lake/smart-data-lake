@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,7 +21,8 @@ package io.smartdatalake.config
 import io.smartdatalake.config.SdlConfigObject.{ConfigObjectId, DataObjectId}
 import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl}
 import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject, ExpectationValidation}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame, ExpectationValidation}
+import io.smartdatalake.workflow.dataobject.{DataObject}
 
 import scala.collection.mutable
 import scala.reflect.ClassTag

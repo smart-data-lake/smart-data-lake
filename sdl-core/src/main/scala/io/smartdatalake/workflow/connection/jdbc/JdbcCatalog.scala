@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,12 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.connection.jdbc
 
 import io.smartdatalake.util.misc.{JdbcExecution, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataobject.PrimaryKeyDefinition
+import io.smartdatalake.workflow.dataobject.generic.PrimaryKeyDefinition
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
@@ -117,8 +116,11 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
   }
 
   def getSchemaFromTable(table: String): StructType = {
-    val schemaQuery = jdbcDialect.getSchemaQuery(table)
-    connection.execJdbcQuery(schemaQuery, JdbcUtils.getSchema(_, jdbcDialect))
+    connection.execWithJdbcConnection { c =>
+      val schemaQuery = jdbcDialect.getSchemaQuery(table)
+      val rs = c.prepareStatement(schemaQuery).executeQuery()
+      JdbcUtils.getSchema(c, rs, jdbcDialect)
+    }
   }
 
   protected def evalRecordExists( rs:ResultSet ) : Boolean = {

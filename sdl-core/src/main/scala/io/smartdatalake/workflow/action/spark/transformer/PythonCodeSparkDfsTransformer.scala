@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,17 +16,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.spark.transformer
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.spark.{DefaultExpressionData, PythonSparkEntryPoint, PythonUtil}
+import io.smartdatalake.util.misc.DefaultExpressionData
+import io.smartdatalake.util.spark.{PythonSparkEntryPoint, PythonUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
 import io.smartdatalake.workflow.action.spark.transformer.PythonCodeDfTransformer.dedent
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -73,7 +74,7 @@ case class PythonCodeDfsTransformer(
   )(implicit context: ActionPipelineContext): Map[String, DataFrame] = {
     // python transformation is executed by passing options and input/output DataFrame through entry point
     try {
-      val entryPoint = new DfsTransformerPythonSparkEntryPoint(context.sparkSession, options, dfs)
+      val entryPoint = new DfsTransformerPythonSparkEntryPoint(getSparkSession, options, dfs)
       val additionalInitCode =
         """
           |# prepare input parameters

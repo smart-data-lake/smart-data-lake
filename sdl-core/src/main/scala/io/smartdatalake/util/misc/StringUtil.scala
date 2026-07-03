@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.misc
 
 import java.text.Normalizer
@@ -40,7 +39,7 @@ object StringUtil {
   }
 
   /**
-   * Transforms name with dashs and underscores to CamelCase.
+   * Transforms name with dashes and underscores to CamelCase.
    */
   def strToCamelCase(x: String): String = {
     val parts = x.split("[_\\- ]")
@@ -48,7 +47,7 @@ object StringUtil {
   }
 
   /**
-   * Transforms name with dashs and underscores to LowerCamelCase.
+   * Transforms name with dashes and underscores to LowerCamelCase.
    */
   def strToLowerCamelCase(x: String): String = {
     val camelCase = strToCamelCase(x)
@@ -82,7 +81,7 @@ object StringUtil {
   }
 
   /**
-   * Remove all chars from a string which dont belong to lowercase SQL standard naming characters
+   * Remove all chars from a string which do not belong to lowercase SQL standard naming characters
    */
   def removeNonStandardSQLNameChars(x: String): String = {
     x.toLowerCase.replaceAll("[^a-zA-Z0-9_]", "")

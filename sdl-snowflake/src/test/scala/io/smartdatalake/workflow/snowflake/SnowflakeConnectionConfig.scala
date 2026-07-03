@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.snowflake
 
 import io.smartdatalake.util.secrets.StringOrSecret
@@ -24,9 +23,9 @@ import io.smartdatalake.workflow.connection.SnowflakeConnection
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 
 /**
- * Configuration of Snowflake connection for integration tests
- * Please ensure that the environment Variables SNOWFLAKE_URL, SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE, SNOWFLAKE_ROLE,
- * SNOWFLAKE_USER and SNOWFLAKE_PASSWORD are set in order to connect to Snowflake.
+ * Configuration of Snowflake connection for integration tests Please ensure that the environment
+ * Variables SNOWFLAKE_URL, SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE, SNOWFLAKE_ROLE, SNOWFLAKE_USER
+ * and SNOWFLAKE_PASSWORD are set in order to connect to Snowflake.
  */
 object SnowflakeConnectionConfig {
   val sfConnection: SnowflakeConnection = SnowflakeConnection(
@@ -35,10 +34,11 @@ object SnowflakeConnectionConfig {
     warehouse = sys.env("SNOWFLAKE_WAREHOUSE"),
     database = sys.env("SNOWFLAKE_DATABASE"),
     role = sys.env("SNOWFLAKE_ROLE"),
-    authMode = BasicAuthMode(Some(StringOrSecret(sys.env("SNOWFLAKE_USER"))), Some(StringOrSecret(sys.env("SNOWFLAKE_PASSWORD")))),
-    //authMode = OAuthMode(oauthUrl=StringOrSecret(sys.env("SNOWFLAKE_OAUTH_URL")),
+    authMode = BasicAuthMode(user = StringOrSecret(sys.env("SNOWFLAKE_USER")),
+      password = StringOrSecret(sys.env("SNOWFLAKE_PASSWORD")))
+    // authMode = OAuthMode(oauthUrl=StringOrSecret(sys.env("SNOWFLAKE_OAUTH_URL")),
     //  clientId=StringOrSecret(sys.env("SNOWFLAKE_CLIENTID")), clientSecret=StringOrSecret(sys.env("SNOWFLAKE_SECRET")),
     //  oauthScope=StringOrSecret(sys.env("SNOWFLAKE_OAUTH_SCOPE")))
-    //proxy = Some(HttpProxyConfig(host = "<host>", port = <port>))
+    // proxy = Some(HttpProxyConfig(host = "<host>", port = <port>))
   )
 }

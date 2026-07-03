@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,25 +23,27 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
-import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{ProductUtil, SQLUtil, SchemaUtil}
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc._
+import io.smartdatalake.util.spark.{SparkExpressionUtil, SparkStageMetricsListener}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkField, SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkField, SparkSchema}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic._
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.sql.custom.ExpressionEvaluator
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, StructType}
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.{DataFrame, SaveMode}
 
 import java.sql.{ResultSet, ResultSetMetaData, SQLException}
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
  * [[DataObject]] of type JDBC.
@@ -75,7 +77,7 @@ import scala.util.Try
  * @param jdbcFetchSize Number of rows to be fetched together by the Jdbc driver
  * @param connectionId Id of JdbcConnection configuration
  * @param jdbcOptions Any jdbc options according to [[https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html]].
- *                    Note that some options above set and override some of this options explicitly.
+ *                    Note that some options above set and override some of these options explicitly.
  *                    Use "createTableOptions" and "createTableColumnTypes" to control automatic creating of database tables.
  * @param virtualPartitions Virtual partition columns. Note that this doesn't need to be the same as the database partition
  *                   columns for this table. But it is important that there is an index on these columns to efficiently
@@ -119,7 +121,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   @DeveloperApi
   val connection: JdbcTableConnection = getConnection[JdbcTableConnection](connectionId)
 
-  override val options = jdbcOptions ++ Map(
+  override val options: Map[String, String] = jdbcOptions ++ Map(
     "url" -> connection.url,
     "driver" -> connection.driver,
     "fetchSize" -> jdbcFetchSize.toString
@@ -164,7 +166,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
 
     //If enabled, create or replace the primary Key of the table
-    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint;
+    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint
 
     // test partition columns exist
     if (virtualPartitions.nonEmpty && isTableExisting) {
@@ -177,7 +179,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
     val queryOrTable = Map(table.query.map(q => ("query",q)).getOrElse("dbtable"->table.fullName))
-    var df = context.sparkSession.read.format("jdbc")
+    logger.debug(s"getSparkDataFrame: queryOrTable = $queryOrTable")
+    var df = getSparkSession.read.format("jdbc")
       .options(options)
       .options(connection.getAuthModeSparkOptions)
       .options(queryOrTable)
@@ -197,7 +200,9 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         val newHighWatermarkValue = Option(df.agg(max(expr(incrementalOutputExpr.get))).head().get(0))
           .getOrElse(throw NoDataToProcessWarning(id.id, s"No data to process found for $id by DataObjectStateIncrementalMode."))
         incrementalOutputState = Some((incrementalOutputExpr.get, Some((newHighWatermarkValue.toString, newDataType))))
-        logger.info(s"($id) incremental output selected records with '${incrementalOutputExpr.get} > '${lastHighWatermark.map(_._1).getOrElse("none")}' and <= '${newHighWatermarkValue}'")
+        logger.info(s"getSparkDataFrame: ($id) incremental output selected records with" +
+          s" '${incrementalOutputExpr.get} > '${lastHighWatermark.map(_._1).getOrElse("none")}'" +
+          s" and <= '$newHighWatermarkValue'")
         df = df.where(expr(incrementalOutputExpr.get) <= lit(newHighWatermarkValue).cast(newDataType))
         lastHighWatermark.foreach { case (value, dataType) =>
           if (value == newHighWatermarkValue.toString) {
@@ -238,7 +243,6 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
-    implicit val session: SparkSession = context.sparkSession
     val genericDf = SparkDataFrame(df)
     validateSchemaMin(genericDf.schema, "write")
     validateSchemaHasPartitionCols(df, "write")
@@ -258,7 +262,6 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    * Deleted columns will remain in the table and are made nullable.
    */
   private def evolveTableSchema(newSchemaRaw: StructType)(implicit context: ActionPipelineContext): Unit = {
-    implicit val session: SparkSession = context.sparkSession
     val existingSchema = SparkSchema(getExistingSchema.get)
     val newSchema = if (Environment.caseSensitive) SparkSchema(newSchemaRaw) else SparkSchema(StructType(SchemaUtil.prepareSchemaForDiff(SparkSchema(newSchemaRaw).fields, ignoreNullable = false, caseSensitive = false).map(_.asInstanceOf[SparkField].inner)))
     // prepare changes
@@ -276,12 +279,12 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       logger.info(s"($id) schema evolution needed: newColumns=${newColumns.mkString(",")} missingNotNullColumns=${missingNotNullColumns.mkString(",")} changedDatatypeColumns=${changedDatatypeColumns.map(f => s"${f.name}:${f.dataType.sql}").mkString(",")}")
     newColumns.foreach{ col =>
       val field = newSchema.inner(col)
-      val sqlType = connection.catalog.getSqlType(field.dataType, isNullable = true) // new columns must be nullable because of existing data
+      val sqlType = connection.catalog.getSqlType(field.dataType) // new columns must be nullable because of existing data
       val sql = connection.catalog.getAddColumnSql(table.fullName, quoteCaseSensitiveColumn(col), sqlType)
       connection.execJdbcStatement(sql)
     }
     missingNotNullColumns.foreach{ col =>
-      // as Spark doesn't now if a field is nullable in the database, but we can check jdbc metadata
+      // as Spark doesn't know if a field is nullable in the database, but we can check jdbc metadata
       val jdbcColumn = getJdbcColumn(col)
       if (!jdbcColumn.flatMap(_.isNullable).getOrElse(false)) {
         val sql = connection.catalog.getAlterColumnNullableSql(table.fullName, quoteCaseSensitiveColumn(col))
@@ -300,10 +303,12 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): MetricsMap = {
-    implicit val session: SparkSession = context.sparkSession
-    require(table.query.isEmpty, s"($id) Cannot write to jdbc DataObject defined by a query.")
+  override def writeSparkDataFrame(df: DataFrame,
+                                   partitionValues: Seq[PartitionValues] = Seq(),
+                                   isRecursiveInput: Boolean = false,
+                                   saveModeOptions: Option[SaveModeOptions] = None)
+                                  (implicit context: ActionPipelineContext): MetricsMap = {
+    require(table.query.isEmpty, s"writeSparkDataFrame ($id): Cannot write to jdbc DataObject defined by a query.")
     val genericDf = SparkDataFrame(df)
     val targetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
     val targetSchema = targetDf.schema
@@ -315,7 +320,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
     // write
-    finalSaveMode match {
+    val metMap: MetricsMap = Try (finalSaveMode match {
 
       case SDLSaveMode.Overwrite =>
         val metrics = overwriteTableWithDataframe(df, partitionValues)
@@ -331,15 +336,26 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         // write target table with SaveMode.Append
         val metrics = writeDataFrameInternal(df, table.fullName, SaveMode.Append)
         metrics ++ metrics.get("records_written").map("rows_inserted" -> _) // standardize inserted metric
+    }) match {
+        case Success(m) => logger.debug(s"writeSparkDataFrame ($id):" +
+          s" successfully written dataframe to jdbc table with metrics: $m")
+          m
+        case Failure(e) =>
+          logger.error(s"writeSparkDataFrame ($id) failed. error message: ${e.getMessage}", e)
+          logger.error(s"writeSparkDataFrame ($id) schema of dataFrame:")
+          df.printSchema()
+          throw e
     }
+
+    metMap
   }
 
   private def overwriteTableWithDataframe(df: DataFrame, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): MetricsMap = {
-    if (connection.directTableOverwrite) {
+    if (connection.directTableOverwrite || !isTableExisting) {
       writeDataFrameInternal(df, table.fullName, SaveMode.Overwrite)
     } else try {
       // create & write to temp-table
-      val tableSchema = getExistingSchema.get
+      val tableSchema = getExistingSchema.getOrElse(df.schema)
       val metrics = writeToTempTable(df, tableSchema)
       overwriteTableWithTempTableInTransaction(partitionValues)
       // return
@@ -355,7 +371,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     try {
       // cleanup existing data
       if (partitionValues.nonEmpty) transaction.execJdbcStatement(deletePartitionsStatement(partitionValues))
-      else transaction.execJdbcStatement(deleteAllDataStatement)
+      else transaction.execJdbcStatement(deleteAllDataStatement())
       // append into final table in one step, then commit
       transaction.execJdbcStatement(s"insert into ${table.fullName} select * from ${tmpTable.fullName}")
       transaction.commit()
@@ -367,7 +383,6 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 
   private def writeToTempTable(df: DataFrame, tempTableSchema: StructType)(implicit context: ActionPipelineContext): MetricsMap = {
-    implicit val session: SparkSession = context.sparkSession
     // cleanup temp table if existing
     if(connection.catalog.isTableExisting(tmpTable.fullName)) {
       logger.error(s"($id) Temporary table ${tmpTable.fullName} already exists! There might be a potential conflict with another job. It will be dropped and recreated.")
@@ -383,25 +398,28 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    * Table.primaryKey is used as condition to check if a record is matched or not. If it is matched it gets updated (or deleted), otherwise it is inserted.
    * This all is done in one transaction.
    */
-  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): MetricsMap = {
-    implicit val session: SparkSession = context.sparkSession
-    assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
+  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)
+                                (implicit context: ActionPipelineContext): MetricsMap = {
+    assert(table.primaryKey.exists(_.nonEmpty),
+      s"mergeDataFrameByPrimaryKey: ($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
 
     try {
       // write data to temp table
-      val metrics = writeToTempTable(df, df.schema)
+      val metrics: MetricsMap = writeToTempTable(df, df.schema)
 
       val updateExistingStatement = SQLUtil.createUpdateExistingStatement(table, df.columns.toSeq, tmpTable.fullName, saveModeOptions, quoteCaseSensitiveColumn(_))
       updateExistingStatement.foreach{stmt =>
-        logger.info(s"($id) executing update existing statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1 + "=" + e._2).mkString(" ")}")
+        logger.info(s"mergeDataFrameByPrimaryKey: ($id) executing update existing statement with options:" +
+          s" ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1 + "=" + e._2).mkString(" ")}")
         connection.execJdbcDmlStatement(stmt)
       }
 
       // prepare SQL merge statement
       val mergeStmt = SQLUtil.createMergeStatement(table, df.columns.toSeq, tmpTable.fullName, saveModeOptions, quoteCaseSensitiveColumn(_))
       // execute
-      logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
-      logger.debug(s"($id) merge statement: $mergeStmt")
+      logger.info(s"mergeDataFrameByPrimaryKey: ($id) executing merge statement with options:" +
+        s" ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1+"="+e._2).mkString(" ")}")
+      logger.debug(s"mergeDataFrameByPrimaryKey: ($id) merge statement: $mergeStmt")
       val rowAffected = connection.execJdbcDmlStatement(mergeStmt)
       metrics + ("rows_affected" -> rowAffected)
     } finally {
@@ -425,8 +443,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     sqlOpt.foreach { sql =>
       val data = DefaultExpressionData.from(context, partitionValues)
-      val preparedSql = SparkExpressionUtil.substitute(id, configName, sql, data)
-      logger.info(s"($id) ${configName.getOrElse("SQL")} is being executed: $preparedSql")
+      val preparedSql = ExpressionUtil.substitute(id, configName, sql, data)
+      logger.info(s"prepareAndExecSql: ($id) ${configName.getOrElse("SQL")} is being executed: $preparedSql")
       connection.execJdbcStatement(preparedSql, logging = false)
     }
   }
@@ -434,7 +452,6 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   // cache response to avoid jdbc query.
   private var cachedIsDbExisting: Option[Boolean] = None
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
-    implicit val session: SparkSession = context.sparkSession
     cachedIsDbExisting.getOrElse {
       cachedIsDbExisting = Option(connection.catalog.isDbExisting(table.db.get))
       cachedIsDbExisting.get
@@ -443,7 +460,6 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   // cache if table is existing to avoid jdbc query.
   private var cachedIsTableExisting: Option[Boolean] = None
   override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {
-    implicit val session: SparkSession = context.sparkSession
     cachedIsTableExisting.getOrElse {
       val existing = connection.catalog.isTableExisting(table.fullName)
       if (existing) cachedIsTableExisting = Some(existing) // only cache if existing, otherwise query again later
@@ -455,7 +471,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   private def getExistingSchema(implicit context: ActionPipelineContext): Option[StructType] = {
     if (isTableExisting && cachedExistingSchema.isEmpty) {
       cachedExistingSchema = Some(getSparkDataFrame().schema)
-      // convert to lowercase when Spark is in non-casesensitive mode
+      // convert to lowercase when Spark is in non case sensitive mode
       if (!Environment.caseSensitive) cachedExistingSchema = Some(StructType(SchemaUtil.prepareSchemaForDiff(SparkSchema(cachedExistingSchema.get).fields, ignoreNullable = false, caseSensitive = false).map(_.asInstanceOf[SparkField].inner)))
     }
     cachedExistingSchema
@@ -465,12 +481,12 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     getExistingSchema.foreach(schema => validateSchema(SparkSchema(df.schema), SparkSchema(schema), "write"))
   }
 
-  private def deleteAllDataStatement: String = {
+  private def deleteAllDataStatement(): String = {
      s"delete from ${table.fullName}"
   }
 
   def deleteAllData(): Unit = {
-    connection.execJdbcStatement(deleteAllDataStatement)
+    connection.execJdbcStatement(deleteAllDataStatement())
   }
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
@@ -516,7 +532,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
               def hasNext: Boolean = rs.next()
               def next(): ResultSet = rs
             }
-            logger.info(s"($id) get jdbc column metadata from database")
+            logger.info(s"jdbcColumnMetadata: ($id) get jdbc column metadata from database")
             new RsIterator(rs).map(JdbcColumn.from).toSeq
           } finally {
             if (rs != null) rs.close()
@@ -526,10 +542,10 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       // otherwise make empty query and use resultset metadata
       if (_cachedJdbcColumnMetadata.isEmpty) {
         val metadataQuery = table.query.getOrElse(s"select * from ${table.fullName}") + " where 1=0"
+        logger.info(s"jdbcColumnMetadata: ($id) get jdbc column metadata from metadataQuery: $metadataQuery")
         def evalColumnNames(rs: ResultSet): Seq[JdbcColumn] = {
           (1 to rs.getMetaData.getColumnCount).map(i => JdbcColumn.from(rs.getMetaData, i))
         }
-        logger.info(s"($id) get jdbc column metadata from query")
         _cachedJdbcColumnMetadata = Some(connection.execJdbcQuery(metadataQuery, evalColumnNames))
       }
     }

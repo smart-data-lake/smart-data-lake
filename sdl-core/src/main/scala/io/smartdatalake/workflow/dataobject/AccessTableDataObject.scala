@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,12 +20,16 @@ package io.smartdatalake.workflow.dataobject
 
 import com.healthmarketscience.jackcess.DatabaseBuilder
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.connection.SparkClassicConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
+import io.smartdatalake.workflow.dataobject.generic.{Table, TableDataObject}
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.types._
@@ -50,7 +54,7 @@ case class AccessTableDataObject(override val id: DataObjectId,
   extends TableDataObject with CanCreateSparkDataFrame {
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame = {
-    val session = context.sparkSession
+    val session = getSparkSession
 
     val db = openDb(session)
     val accessTable = db.getTable(table.name)
@@ -90,14 +94,14 @@ case class AccessTableDataObject(override val id: DataObjectId,
 
   override def isDbExisting(implicit context: ActionPipelineContext): Boolean = {
     // if we can open the db, it is existing
-    val db = openDb(context.sparkSession)
+    val db = openDb(getSparkSession)
     db.close()
     //return
     true
   }
 
   override def isTableExisting(implicit context: ActionPipelineContext): Boolean = {
-    val db = openDb(context.sparkSession)
+    val db = openDb(getSparkSession)
     val tableExisting = db.getTableNames.contains(table.name)
     db.close()
     //return

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.snowflake
 
 import com.snowflake.snowpark.{types => snowpark}
@@ -52,9 +51,9 @@ private[smartdatalake] object SparkSnowparkSchemaConverter extends SchemaConvert
 
   private def simpleDataTypeMapping(dataType: spark.DataType): snowpark.DataType = {
     dataType match {
-      case _: spark.StringType => snowpark.StringType
       case _: spark.VarcharType => snowpark.StringType
       case _: spark.CharType => snowpark.StringType
+      case _: spark.StringType => snowpark.StringType
       case _: spark.BooleanType => snowpark.BooleanType
       case _: spark.ByteType => snowpark.ByteType
       case _: spark.ShortType => snowpark.ShortType

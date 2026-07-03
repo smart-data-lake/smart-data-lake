@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.app
 
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
@@ -51,6 +50,7 @@ class SmartDataLakeBuilderAgentTest extends AnyFunSuite with BeforeAndAfter with
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("Test Config Parsing") {
@@ -62,7 +62,10 @@ class SmartDataLakeBuilderAgentTest extends AnyFunSuite with BeforeAndAfter with
 
     val actionToSend = sdlb.instanceRegistry.getActions.filter(_.id.id == "remote-to-cloud-jetty-agent").head.asInstanceOf[ProxyAction].wrappedAction
 
-    val sdlMessage = AgentClient.prepareHoconInstructions(actionToSend, Nil, JettyAgent(AgentId("dummyId"), "dummyUrl", sdlb.instanceRegistry.getConnections.map(connection => connection.id.id -> connection).toMap), ExecutionPhase.Exec)
+    val sdlMessage = AgentClient.prepareHoconInstructions(actionToSend, Nil,
+      JettyAgent(AgentId("dummyId"), "dummyUrl", sdlb.instanceRegistry.getConnections.map(connection => connection.id.id -> connection).toMap),
+      ExecutionPhase.Exec
+    )
     val configFromString = ConfigFactory.parseString(sdlMessage.agentInstruction.get.hoconConfig, ConfigParseOptions.defaults().setSyntax(ConfigSyntax.CONF))
 
     val dataObjects: Map[DataObjectId, DataObject] = getDataObjectConfigMap(configFromString)

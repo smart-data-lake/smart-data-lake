@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,9 +28,10 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.util.PortUtils
 import org.eclipse.jetty.server._
 import org.eclipse.jetty.server.handler.{ContextHandler, ContextHandlerCollection}
+import org.eclipse.jetty.servlet.ServletContextHandler
 import org.eclipse.jetty.util.thread.QueuedThreadPool
-import org.eclipse.jetty.websocket.server.WebSocketHandler
-import org.eclipse.jetty.websocket.servlet.{ServletUpgradeRequest, ServletUpgradeResponse, WebSocketCreator, WebSocketServletFactory}
+import org.eclipse.jetty.websocket.server.{JettyServerUpgradeRequest, JettyServerUpgradeResponse, JettyWebSocketCreator}
+import org.eclipse.jetty.websocket.server.config.JettyWebSocketServletContainerInitializer
 
 /**
  * Methods for starting and stopping the JettyAgentServer
@@ -66,17 +67,15 @@ case class JettyAgentServer(sdlb: SmartDataLakeBuilder, config: LocalJettyAgentS
   }
 
   private def createWebsocketHandler(config: LocalJettyAgentSmartDataLakeBuilderConfig, serverController: AgentServerController): ContextHandler = {
-    val contextHandler = new ContextHandler("/ws")
-    val webSocketcreator: WebSocketCreator = new WebSocketCreator() {
-      override def createWebSocket(request: ServletUpgradeRequest, response: ServletUpgradeResponse) = new JettyAgentServerSocket(config, serverController)
+    val contextHandler = new ServletContextHandler(ServletContextHandler.NO_SESSIONS)
+    contextHandler.setContextPath("/ws")
+    val webSocketCreator: JettyWebSocketCreator = new JettyWebSocketCreator {
+      override def createWebSocket(request: JettyServerUpgradeRequest, response: JettyServerUpgradeResponse): Object =
+        new JettyAgentServerSocket(config, serverController)
     }
-    val webSocketHandler = new WebSocketHandler() {
-      override def configure(factory: WebSocketServletFactory): Unit = {
-        factory.setCreator(webSocketcreator)
-      }
-    }
-
-    contextHandler.setHandler(webSocketHandler)
+    JettyWebSocketServletContainerInitializer.configure(contextHandler, (_, container) => {
+      container.addMapping("/", webSocketCreator)
+    })
     contextHandler.getMaxFormContentSize
     contextHandler
   }

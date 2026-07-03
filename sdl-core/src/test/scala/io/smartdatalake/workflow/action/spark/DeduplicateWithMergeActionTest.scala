@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -18,31 +18,35 @@
  */
 package io.smartdatalake.workflow.action.spark
 
-import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockSparkDataObject}
+import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.scalatest.funsuite.AnyFunSuite
 
 class DeduplicateWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogger with DeduplicateActionBehaviour {
 
+  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
+
   test("deduplicate load mergeModeEnable") {
     testDeduplicateWithMergeMode(
-      (id, registry) => MockSparkDataObject(id),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
     )
   }
 
   test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
     testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
-      (id, registry) => MockSparkDataObject(id),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
     )
 
   }
 
   test("deduplicate 1st 2nd load with transformer changing schema") {
     testDeduplicateWithTransformerChangingSchema(
-      (id, registry) => MockSparkDataObject(id),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
     )
   }
 }

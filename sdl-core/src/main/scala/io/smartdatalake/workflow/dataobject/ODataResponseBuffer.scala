@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,13 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.hadoop.fs.FileSystem
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import java.time.{Instant, ZoneId}
 import java.time.format.DateTimeFormatter
@@ -84,7 +83,7 @@ abstract class ODataResponseBuffer(context: ActionPipelineContext) {
    * Creates and returns a DataFrame referencing the stored responses. Each response is one record.
    * @return : The Dataframe referencing the stored responses
    */
-  def getDataFrame: DataFrame
+  def getDataFrame(session: SparkSession): DataFrame
 
   /**
    * Deletes all buffered responses and leaves the buffer empty.
@@ -129,8 +128,7 @@ class ODataResponseMemoryBuffer(setup: Option[ODataResponseBufferSetup], context
    * Creates a DataFrame based on the buffered responses
    *  @return : The Dataframe referencing the stored responses
    */
-  override def getDataFrame: DataFrame = {
-    val session = context.sparkSession
+  override def getDataFrame(session: SparkSession): DataFrame = {
     import session.implicits._
     val dataFrame = responses.toSeq.toDF("responseString")
     dataFrame
@@ -235,8 +233,7 @@ class ODataResponseFileBuffer(tableName: String, setup:ODataResponseBufferSetup,
    *
    * @return : The Dataframe referencing the stored responses
    */
-  override def getDataFrame: DataFrame = {
-    val session = context.sparkSession
+  override def getDataFrame(session: SparkSession): DataFrame = {
     val dataFrame = session.read.option("wholetext", value = true).text(this.temporaryTargetDirectoryPath.toString).withColumnRenamed("value", "responseString")
     dataFrame
   }

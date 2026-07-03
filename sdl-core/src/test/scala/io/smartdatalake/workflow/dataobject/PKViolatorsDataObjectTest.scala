@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,12 +19,10 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil._
-import io.smartdatalake.testutils.custom.TestCustomDfNonUniqueWithNullCreator
+import io.smartdatalake.testutils.spark.dataset.Collection
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
@@ -47,11 +45,12 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
-  test("normal pk violations") {
+   test("normal pk violations") {
     val src = MockSparkDataObject("source_tableDO", tableName = "source_table", primaryKey = Some(Seq("id"))).register
-    src.writeSparkDataFrame(dfNonUniqueWithNull)
+    src.writeSparkDataFrame(Collection.dsNonUniqueWithNull.toDF())
 
     // actual: reading the table containing the PK violators
     val actual = PKViolatorsDataObject("pkViol").getDataFrame(Seq(), typeOf[SparkSubFeed]).asInstanceOf[SparkDataFrame]
@@ -69,7 +68,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
       TestData("source_tableDO", "mock", "source_table", "id STRING,value STRING", Seq(TestKV("id", "4let")), Seq(TestKV("value", "quatriplet"))),
       TestData("source_tableDO", "mock", "source_table", "id STRING,value STRING", Seq(TestKV("id", "4let")), Seq(TestKV("value", "quatriplet")))
     )
-    val expected = SparkDataFrame(rows_expected.toDF)
+    val expected = SparkDataFrame(rows_expected.toDF())
 
     // Comparing actual with expected
     val resultat: Boolean = actual.isEqual(expected)
@@ -80,14 +79,13 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
   test("pk violations with null values") {
     // creating and registering data object //
     val src = MockSparkDataObject("hive_table_pk_id_ValueDO", tableName = "hive_table_pk_id_Value", primaryKey = Some(Seq("id", "value"))).register
-    src.writeSparkDataFrame(dfNonUniqueWithNull)
+    src.writeSparkDataFrame(Collection.dsNonUniqueWithNull.toDF())
 
     // actual: reading the table containing the PK violators
     val actual = PKViolatorsDataObject("pkViol").getDataFrame(Seq(), typeOf[SparkSubFeed]).asInstanceOf[SparkDataFrame]
 
     // creating expected
     val rows_expected = Seq(
-      TestData("hive_table_pk_id_ValueDO", "mock", "hive_table_pk_id_Value", "id STRING,value STRING", Seq(TestKV("id", "0let"), TestKV("value", null))),
       TestData("hive_table_pk_id_ValueDO", "mock", "hive_table_pk_id_Value", "id STRING,value STRING", Seq(TestKV("id", "2let"), TestKV("value", "doublet"))),
       TestData("hive_table_pk_id_ValueDO", "mock", "hive_table_pk_id_Value", "id STRING,value STRING", Seq(TestKV("id", "2let"), TestKV("value", "doublet"))),
       TestData("hive_table_pk_id_ValueDO", "mock", "hive_table_pk_id_Value", "id STRING,value STRING", Seq(TestKV("id", "3let"), TestKV("value", "triplet"))),
@@ -98,7 +96,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
       TestData("hive_table_pk_id_ValueDO", "mock", "hive_table_pk_id_Value", "id STRING,value STRING", Seq(TestKV("id", "4let"), TestKV("value", "quatriplet"))),
       TestData("hive_table_pk_id_ValueDO", "mock", "hive_table_pk_id_Value", "id STRING,value STRING", Seq(TestKV("id", "4let"), TestKV("value", "quatriplet")))
     )
-    val expected = SparkDataFrame(rows_expected.toDF)
+    val expected = SparkDataFrame(rows_expected.toDF())
 
     val resultat: Boolean = actual.isEqual(expected)
     if (!resultat) printFailedTestResult("pk violations with null values",
@@ -111,18 +109,17 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
     // creating and registering data objects //
 
     // a custom data object
-    val customDO = CustomDfDataObject(id = "custom_do",
-      creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfNonUniqueWithNullCreator].getName)))
-    instanceRegistry.register(customDO)
+    val customDO = MockSparkDataObject(id = "custom_do").register
+    customDO.writeSparkDataFrame(Collection.dsNonUniqueWithNull.toDF())
 
     val hiveTablePKidDO = MockSparkDataObject("hive_table_pk_idDO", tableName = "hive_table_pk_id", primaryKey = Some(Seq("id"))).register
-    hiveTablePKidDO.writeSparkDataFrame(dfNonUniqueWithNull)
+    hiveTablePKidDO.writeSparkDataFrame(Collection.dsNonUniqueWithNull.toDF())
 
     val hiveTableNoPKDO = MockSparkDataObject("hive_table_no_pkDO", tableName = "hive_table_no_pk").register
-    hiveTableNoPKDO.writeSparkDataFrame(dfTwoCandidateKeys)
+    hiveTableNoPKDO.writeSparkDataFrame(Collection.dsTwoCandidateKeys.toDF())
 
     val hiveTablePKidValueDO = MockSparkDataObject("hive_table_pk_id_valueDO", tableName = "hive_table_pk_id_value", primaryKey = Some(Seq("id", "value"))).register
-    hiveTablePKidValueDO.writeSparkDataFrame(dfNonUniqueWithNull)
+    hiveTablePKidValueDO.writeSparkDataFrame(Collection.dsNonUniqueWithNull.toDF())
 
     // actual: reading the table containing the PK violators
     val actual = PKViolatorsDataObject("pkViol").getDataFrame(Seq(), typeOf[SparkSubFeed]).asInstanceOf[SparkDataFrame]
@@ -143,7 +140,6 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
 
     // PKviolators of hiveTablePKidValueDO
     val rows_expectedWithOutData = Seq(
-      TestData("hive_table_pk_id_valueDO", "mock", "hive_table_pk_id_value", "id STRING,value STRING", Seq(TestKV("id", "0let"), TestKV("value", null))),
       TestData("hive_table_pk_id_valueDO", "mock", "hive_table_pk_id_value", "id STRING,value STRING", Seq(TestKV("id", "2let"), TestKV("value", "doublet"))),
       TestData("hive_table_pk_id_valueDO", "mock", "hive_table_pk_id_value", "id STRING,value STRING", Seq(TestKV("id", "2let"), TestKV("value", "doublet"))),
       TestData("hive_table_pk_id_valueDO", "mock", "hive_table_pk_id_value", "id STRING,value STRING", Seq(TestKV("id", "3let"), TestKV("value", "triplet"))),
@@ -156,7 +152,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
     )
 
     val expected = SparkDataFrame(
-      rows_expectedWithData.toDF.union(rows_expectedWithOutData.toDF)
+      rows_expectedWithData.toDF().union(rows_expectedWithOutData.toDF())
     )
 
     val resultat: Boolean = actual.isEqual(expected)
@@ -165,10 +161,8 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
     assert(resultat)
   }
 
-
 }
 
 case class TestKV(column_name: String, column_value: String)
 
 case class TestData(data_object_id: String, db: String, table: String, schema: String, key: Seq[TestKV], data: Seq[TestKV] = null)
-

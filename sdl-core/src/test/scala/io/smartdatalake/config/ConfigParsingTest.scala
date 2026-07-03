@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -455,7 +455,6 @@ class ConfigParsingTest extends AnyFlatSpec with Matchers {
   }
 
   "TestDataObject" should "throw ConfigurationException on wrong connection type" in {
-    implicit val registry: InstanceRegistry = new InstanceRegistry()
     val config = ConfigFactory.parseString(
       """
         | connections {
@@ -554,7 +553,7 @@ class ConfigParsingTest extends AnyFlatSpec with Matchers {
         |  partitionColNb = 2
         | }
         | metadata {
-        |  test = test // doesnt exist
+        |  test = test // doesn't exist
         | }
         |}
         |
@@ -589,7 +588,7 @@ class ConfigParsingTest extends AnyFlatSpec with Matchers {
         | executionMode = {
         |  type = PartitionDiffMode
         |  partitionColNb = 2
-        |  test = test // doesnt exist
+        |  test = test // doesn't exist
         | }
         |}
         |
@@ -667,6 +666,175 @@ class ConfigParsingTest extends AnyFlatSpec with Matchers {
     refinedConfig.getString("pre-read-sql") shouldEqual "test10/abc"
     refinedConfig.getString("postWriteSql") shouldEqual "test10/abc"
     refinedConfig.getString("table.name") shouldEqual "test10/abc"
+  }
+
+  "local substitution with snake modifier" should "replace dashes with underscores" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "int-airports"
+        | table {
+        |  name = "~{id|snake}"
+        | }
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "table.name")
+    configSubstituted.getString("table.name") shouldEqual "int_airports"
+  }
+
+  it should "convert camelCase to snake_case" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "intAirports"
+        | name = "~{id|snake}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "int_airports"
+  }
+
+  it should "handle acronyms and mixed camelCase with dashes" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "my-HTTPServerData"
+        | name = "~{id|snake}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "my_http_server_data"
+  }
+
+  it should "leave a value without dashes unchanged" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = abc
+        | name = "~{id|snake}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "abc"
+  }
+
+  it should "support mixing modified and plain tokens in the same value" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "int-airports"
+        | name = "schema.~{id|snake}_~{id}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "schema.int_airports_int-airports"
+  }
+
+  "local substitution with noPrefix modifier" should "remove a dash separated prefix" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "int-airports"
+        | name = "~{id|noPrefix}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "airports"
+  }
+
+  it should "remove an underscore separated prefix" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "int_airports"
+        | name = "~{id|noPrefix}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "airports"
+  }
+
+  it should "remove a camelCase prefix and keep the remainder" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "intAirports"
+        | name = "~{id|noPrefix}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "Airports"
+  }
+
+  it should "remove only the first part at the earliest separator" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "int-airPorts"
+        | name = "~{id|noPrefix}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "airPorts"
+  }
+
+  it should "leave a value without a separator unchanged" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = airports
+        | name = "~{id|noPrefix}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "airports"
+  }
+
+  "local substitution with chained modifiers" should "apply modifiers left-to-right" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "intAirports"
+        | name = "~{id|noPrefix|snake}"
+        |}""".stripMargin
+    )
+
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "airports"
+  }
+
+  it should "apply chained modifiers in the given order" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "stage-intAirports"
+        | name = "~{id|snake|noPrefix}"
+        |}""".stripMargin
+    )
+
+    // snake first: "stage_int_airports", then noPrefix removes the first underscore separated part
+    val configSubstituted = ConfigParser.localSubstitution(config, "name")
+    configSubstituted.getString("name") shouldEqual "int_airports"
+  }
+
+  "local substitution with an unknown modifier" should "throw a ConfigurationException" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "int-airports"
+        | name = "~{id|kebab}"
+        |}""".stripMargin
+    )
+
+    intercept[ConfigurationException](ConfigParser.localSubstitution(config, "name"))
+  }
+
+  it should "throw a ConfigurationException for an unknown modifier in a chain" in {
+    val config = ConfigFactory.parseString(
+      """{
+        | id = "int-airports"
+        | name = "~{id|snake|kebab}"
+        |}""".stripMargin
+    )
+
+    intercept[ConfigurationException](ConfigParser.localSubstitution(config, "name"))
   }
 }
 

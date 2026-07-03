@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,11 +23,13 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.util.hdfs.SparkRepartitionDef
-import io.smartdatalake.util.misc.{AclDef,StringUtil}
+import io.smartdatalake.util.misc.StringUtil
+import io.smartdatalake.util.spark.SparkRepartitionDef
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic.{Constraint, HousekeepingMode}
+import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
 import org.apache.spark.sql.DataFrame
 
 /**
@@ -61,7 +63,6 @@ case class ExcelFileDataObject(override val id: DataObjectId,
                                override val schemaMin: Option[GenericSchema] = None,
                                override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val sparkRepartition: Option[SparkRepartitionDef] = Some(SparkRepartitionDef(numberOfTasksPerPartition = 1)),
-                               override val acl: Option[AclDef] = None,
                                override val connectionId: Option[ConnectionId] = None,
                                override val filenameColumn: Option[String] = None,
                                override val expectedPartitionsCondition: Option[String] = None,
@@ -72,23 +73,23 @@ case class ExcelFileDataObject(override val id: DataObjectId,
                               )(@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject {
 
-  override val format = "com.crealytics.spark.excel"
+  override val format = "dev.mauch.spark.excel"
 
   override val fileName: String = "*.xls*"
 
-  // spark excel data source doesnt support reading all files in a directory. Each file must be read one by one.
+  // spark excel data source does not support reading all files in a directory. Each file must be read one by one.
   override val handleFilesOneByOne: Boolean = true
 
   override val options: Map[String, String] = Map("pathGlobFilter" -> fileName) ++ excelOptions.toMap(schema).filter {
       case (_, v) => v.isDefined
-  }.mapValues(_.get.toString).toMap.map(identity) // make serializable
+  }.view.mapValues(_.get.toString).toMap.map(identity) // make serializable
 
   override def afterRead(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     val dfSuper = super.afterRead(df)
 
     // cleanup header names
     val newNames = dfSuper.columns.map(name => StringUtil.strCamelCase2LowerCaseWithUnderscores(cleanHeaderName(name)))
-    dfSuper.toDF(newNames: _ *)
+    dfSuper.toDF(newNames.toIndexedSeq: _ *)
   }
 
   /**

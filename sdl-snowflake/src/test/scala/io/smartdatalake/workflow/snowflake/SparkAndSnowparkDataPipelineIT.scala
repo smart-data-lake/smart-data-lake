@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,21 +16,22 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.snowflake
 
 import com.snowflake.snowpark.{DataFrame, Session}
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
-import io.smartdatalake.config.ConfigToolbox
-import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.DataFrameSubFeed
+import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTransformer
 import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.snowflake.customlogic.CustomSnowparkDfTransformer
 import io.smartdatalake.workflow.action.snowflake.transformer.ScalaClassSnowparkDfTransformer
 import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
-import io.smartdatalake.workflow.dataobject.{HiveTableDataObject, SnowflakeTableDataObject, Table}
+import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
+import io.smartdatalake.workflow.dataobject.generic.Table
+import org.apache.spark.sql.SparkSession
 
 import java.nio.file.Files
 
@@ -38,7 +39,7 @@ import java.nio.file.Files
  * This is an integration test with data pipeline combining Spark and Snowpark
  * The first Action will write with Spark to Snowflake, creating a new table in Snowflake.
  * The second Action will read the new Snowflake table with Snowpark and create another Snowflake table.
- * The SubFeed between Action1 and Action2 will apply schema conversion which is needed in init phase, as the tables in Snowflake dont exist yet.
+ * The SubFeed between Action1 and Action2 will apply schema conversion which is needed in init phase, as the tables in Snowflake do not exist yet.
  * Action2 will also apply two generic transformation, e.g. filter and add runId column.
  * It needs to be run manually because you need to provide a Snowflake environment.
  * Please configure this in SnowflakeConnectionConfig.
@@ -48,9 +49,9 @@ import java.nio.file.Files
 object SparkAndSnowparkDataPipelineIT extends App {
 
   val sdlb = DefaultSmartDataLakeBuilder
-  implicit val instanceRegistry = sdlb.instanceRegistry
-  implicit val sparkSession = TestUtil.session
-  implicit val context =  ConfigToolbox.getDefaultActionPipelineContext
+  implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+  implicit val sparkSession: SparkSession = TestUtil.session
+  implicit val context: ActionPipelineContext =  ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
 
   val tempDir = Files.createTempDirectory("test")
   val tempPath = tempDir.toAbsolutePath.toString
@@ -59,10 +60,7 @@ object SparkAndSnowparkDataPipelineIT extends App {
 
   // setup DataObjects
   val feed = "copy"
-  val srcTable = Table(Some("default"), "copy_input")
-  val srcDO = HiveTableDataObject( "src1", Some(tempPath+s"/${srcTable.fullName}"), table = srcTable, numInitialHdfsPartitions = 1)
-  srcDO.dropTable
-  instanceRegistry.register(srcDO)
+  val srcDO = MockSparkDataObject( "src1").register
   val tgt1Table = Table(Some(System.getenv("SNOWFLAKE_SCHEMA")), "tgt1", None, Some(Seq("lastname")))
   val tgt1DO = SnowflakeTableDataObject("tgt1", tgt1Table, connectionId = "sfCon")
   tgt1DO.dropTable
@@ -75,7 +73,6 @@ object SparkAndSnowparkDataPipelineIT extends App {
   val tgt3DO = SnowflakeTableDataObject("tgt3", tgt3Table, connectionId = "sfCon")
   tgt3DO.dropTable
   instanceRegistry.register(tgt3DO)
-
 
   // first action copy with Spark from Hive to Snowflake
   val action1 = CopyAction("copySpark", srcDO.id, tgt1DO.id)

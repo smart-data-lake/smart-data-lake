@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
@@ -30,8 +29,8 @@ import org.apache.commons.io.FileUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StructType
+import org.scalatest.Assertion
 
-import java.nio.file
 import java.nio.file.{Files, Paths, StandardOpenOption}
 
 class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogger {
@@ -49,7 +48,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     dataObject.writeSparkDataFrame(df1, partitionValuesCreated1 )
 
     // test 1
-    dataObject.getSparkDataFrame().count shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
+    dataObject.getSparkDataFrame().count() shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
     partitionValuesCreated1.toSet shouldEqual dataObject.listPartitions.toSet
 
     // write test data 2 - overwrite partition B
@@ -58,7 +57,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     dataObject.writeSparkDataFrame(df2, partitionValuesCreated2 )
 
     // test 2
-    dataObject.getSparkDataFrame().count shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
+    dataObject.getSparkDataFrame().count() shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
     partitionValuesCreated1.toSet shouldEqual dataObject.listPartitions.toSet
 
     FileUtils.deleteQuietly(tempDir.toFile)
@@ -128,9 +127,9 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     dataObject.writeSparkDataFrame(df1, partitionValuesCreated )
 
     // test reading data
-    dataObject.getSparkDataFrame().count shouldEqual 4 // four records in total, 2 from partition A and 2 from partition B
-    dataObject.getSparkDataFrame(Seq(PartitionValues(Map("p"->"B")))).count shouldEqual 2 // two records in partition B
-    dataObject.getSparkDataFrame(Seq(PartitionValues(Map("p"->"A")),PartitionValues(Map("p"->"A","p"->"B")))).count shouldEqual 4
+    dataObject.getSparkDataFrame().count() shouldEqual 4 // four records in total, 2 from partition A and 2 from partition B
+    dataObject.getSparkDataFrame(Seq(PartitionValues(Map("p"->"B")))).count() shouldEqual 2 // two records in partition B
+    dataObject.getSparkDataFrame(Seq(PartitionValues(Map("p"->"A")),PartitionValues(Map("p"->"A","p"->"B")))).count() shouldEqual 4
 
     // test expected partitions
     assert( dataObject.filterExpectedPartitionValues(partitionValuesCreated) == Seq(PartitionValues(Map("p"->"B"))))
@@ -157,7 +156,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // test reading data
     val result = dataObject.getSparkDataFrame()
       .select($"p",$"value".cast("int"))
-      .as[(String,Int)].collect.toSeq.sorted
+      .as[(String,Int)].collect().toSeq.sorted
     assert( result == Seq(("A",1),("A",2),("B",7),("B",8)))
     assert( dataObject.listPartitions.map(pv => pv("p").toString).sorted == Seq("A","B","C"))
 
@@ -181,7 +180,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // test reading data
     val result = dataObject.getSparkDataFrame()
       .select($"p",$"value".cast("int"))
-      .as[(String,Int)].collect.toSeq.sorted
+      .as[(String,Int)].collect().toSeq.sorted
     assert( result == Seq(("B",3),("B",4)))
 
     FileUtils.deleteQuietly(tempDir.toFile)
@@ -228,7 +227,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // test reading data
     val result = dataObject.getSparkDataFrame()
       .select($"p",$"value".cast("int"))
-      .as[(String,Int)].collect.toSeq.sorted
+      .as[(String,Int)].collect().toSeq.sorted
     assert( result == Seq(("B",3),("B",4)))
 
     FileUtils.deleteQuietly(tempDir.toFile)
@@ -302,9 +301,8 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     assert(getFullPaths(PartitionValues(Map("c" -> 1))) == Set("a=1/b=1/c=1","a=1/b=2/c=1","a=2/b=1/c=1","a=2/b=2/c=1","a=1/b=3/c=1","a=2/b=3/c=1"))
     assert(getFullPaths(PartitionValues(Map("b" -> 1, "c" -> 1))) == Set("a=1/b=1/c=1","a=2/b=1/c=1"))
     // files
-    assert(getFullPaths(PartitionValues(Map("b" -> 1)), true) == Set("a=1/b=1/c=1/abc.test"))
+    assert(getFullPaths(pv = PartitionValues(elements = Map("b" -> 1)), returnFiles = true) == Set("a=1/b=1/c=1/abc.test"))
   }
-
 
   test("delete files only") {
 
@@ -319,19 +317,19 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // delete partition files
     val partitionValues = PartitionValues(Map("p"->"A"))
     val partitionPath = new Path(dataObject.hadoopPath, dataObject.getPartitionString(partitionValues).get)
-    assert(dataObject.filesystem.isDirectory(partitionPath))
+    assert(dataObject.filesystem.getFileStatus(partitionPath).isDirectory)
     assert(dataObject.filesystem.listStatus(partitionPath).nonEmpty)
     dataObject.deletePartitionsFiles(Seq(partitionValues))
     assert(dataObject.filesystem.listStatus(partitionPath).isEmpty)
-    assert(dataObject.filesystem.isDirectory(partitionPath))
+    assert(dataObject.filesystem.getFileStatus(partitionPath).isDirectory)
 
     // delete files in base dir
     dataObject.filesystem.createNewFile(new Path(dataObject.hadoopPath, "testFile"))
     assert(dataObject.filesystem.listStatus(dataObject.hadoopPath).exists(_.isFile))
     dataObject.deleteAllFiles(dataObject.hadoopPath)
     assert(!dataObject.filesystem.listStatus(dataObject.hadoopPath).exists(_.isFile))
-    assert(dataObject.filesystem.isDirectory(dataObject.hadoopPath))
-    assert(dataObject.filesystem.isDirectory(new Path(dataObject.hadoopPath,"p=A")))
+    assert(dataObject.filesystem.getFileStatus(dataObject.hadoopPath).isDirectory)
+    assert(dataObject.filesystem.getFileStatus(new Path(dataObject.hadoopPath,"p=A")).isDirectory)
 
     FileUtils.deleteQuietly(tempDir.toFile)
   }
@@ -344,7 +342,9 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     a [ProcessingLogicException] should be thrownBy dataObject.writeSparkDataFrame(df, partitionValues = Seq())
   }
 
-  private def createJsonFiles(path: file.Path, nbOfFile: Int = 100, filenamePrefix: String = "test") = {
+  private def createJsonFiles(path: java.nio.file.Path,
+                              filenamePrefix: String = "test",
+                              nbOfFile: Int = 10): Assertion = {
     Files.createDirectory(path)
     logger.info(s"creating test files in $path")
     (1 to nbOfFile).foreach { i =>
@@ -352,7 +352,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
       writer.write(s"""{"value": $i}""")
       writer.close()
     }
-    assert(file.Files.list(path).count == nbOfFile)
+    assert(Files.list(path).count == nbOfFile)
   }
 
   // create data for 2 partitions and compact one of them
@@ -363,62 +363,18 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // create 100 json files for partition p=A and p=B
     val partitionPathA = Paths.get(tempDir.toString, "p=A")
     val partitionPathB = Paths.get(tempDir.toString, "p=B")
-    createJsonFiles(partitionPathA, 10, "testA")
-    createJsonFiles(partitionPathB, 10, "testB")
+    createJsonFiles(path = partitionPathA, filenamePrefix = "testA")
+    createJsonFiles(path = partitionPathB, filenamePrefix = "testB")
 
     // move partition p=A to p=B
     val pvsToMove = Seq((PartitionValues(Map("p" -> "A")), PartitionValues(Map("p" -> "B"))))
     dataObject.movePartitions(pvsToMove)
 
     //check
-    assert(!file.Files.exists(partitionPathA)) // p=A is deleted
-    assert(file.Files.list(partitionPathB).count == 20) // check p=A moved to p=B
-    assert(dataObject.getSparkDataFrame(pvsToMove.map(_._2)).select(sum($"value")).as[Long].head == 110) // check completeness of p=A + p=B
+    assert(!Files.exists(partitionPathA)) // p=A is deleted
+    assert(Files.list(partitionPathB).count() == 20) // check p=A moved to p=B
+    assert(dataObject.getSparkDataFrame(pvsToMove.map(_._2)).select(sum($"value")).as[Long].head() == 110) // check completeness of p=A + p=B
   }
-
-  // create data for 2 partitions and compact one of them
-  test("compact partition function") {
-    val tempDir = Files.createTempDirectory("tempHadoopDO")
-    val dataObject = JsonFileDataObject(id = "compactionTestJson", partitions = Seq("p"), path = tempDir.toString, jsonOptions = Some(Map("multiLine"->"false")))
-
-    // create 100 json files for partition p=A and p=B
-    val partitionPathA = Paths.get(tempDir.toString, "p=A")
-    val partitionPathB = Paths.get(tempDir.toString, "p=B")
-    def createFiles(path: file.Path) = {
-      Files.createDirectory(path)
-      logger.info(s"creating test files in $path")
-      (1 to 100).foreach { i =>
-        val writer = Files.newBufferedWriter(path.resolve(s"$i.json"), StandardOpenOption.CREATE, StandardOpenOption.WRITE)
-        writer.write(s"""{"value": $i}""")
-        writer.close()
-      }
-      assert(file.Files.list(path).count == 100)
-    }
-    createFiles(partitionPathA)
-    createFiles(partitionPathB)
-
-    // compact
-    logger.info("compacting partition p=A")
-    val pvsToCompact = Seq(PartitionValues(Map("p" -> "A")))
-    dataObject.compactPartitions(pvsToCompact)
-
-    //check
-    assert(file.Files.list(partitionPathA).count < 100) // check less files in p=A
-    assert(dataObject.getSparkDataFrame(pvsToCompact).select(sum($"value")).as[Long].head == 5050) // check completeness of p=A
-    assert(file.Files.list(partitionPathB).count == 100) // check p=B not changed
-    val specialFiles = dataObject.filesystem.globStatus(new Path(tempDir.toString, s"*/_SDL*"))
-    assert(specialFiles.count(_.getPath.getName.endsWith("COMPACTED")) == 1) // one partition marked as compacted
-    assert(specialFiles.count(!_.getPath.getName.endsWith("COMPACTED")) == 0) // no other special files left
-
-    // compact 2 - dont compact p=A again
-    logger.info("compacting partition p=A 2nd time")
-    val compactedTstmp = specialFiles.find(_.getPath.getName.endsWith("COMPACTED")).get.getModificationTime
-    dataObject.compactPartitions(pvsToCompact)
-    val specialFiles2 = dataObject.filesystem.globStatus(new Path(tempDir.toString, s"*/_SDL*"))
-    val compactedTstmp2 = specialFiles.find(_.getPath.getName.endsWith("COMPACTED")).get.getModificationTime
-    assert(compactedTstmp == compactedTstmp2)
-  }
-
 
   test("incremental output mode") {
 
@@ -433,7 +389,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
 
     // test 1
     dataObject.setState(None) // initialize incremental output with empty state
-    dataObject.getSparkDataFrame()(contextExec).count shouldEqual 4
+    dataObject.getSparkDataFrame()(contextExec).count() shouldEqual 4
     val newState1 = dataObject.getState
 
     // append test data 2
@@ -444,11 +400,11 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     // test 2
     dataObject.setState(newState1)
     val df2result = dataObject.getSparkDataFrame()(contextExec)
-    df2result.count shouldEqual 1
+    df2result.count() shouldEqual 1
     val newState2 = dataObject.getState
     assert(newState1.get < newState2.get)
 
-    dataObject.getSparkDataFrame()(contextInit).count shouldEqual 5
+    dataObject.getSparkDataFrame()(contextInit).count() shouldEqual 5
 
     FileUtils.deleteQuietly(tempDir.toFile)
   }

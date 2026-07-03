@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.config.SdlConfigObject
@@ -25,7 +24,6 @@ import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.DataFrameSubFeed.assertCorrectSubFeedType
 import io.smartdatalake.workflow.dataframe._
-import io.smartdatalake.workflow.dataframe.plainScala.ScalaDataFrameImplicits.OrderingOps
 
 import scala.collection.immutable.Queue
 import scala.reflect.ClassTag
@@ -55,7 +53,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
       case Array(_, "*") => ScalaColumnReference(columnName)
       case Array("*") => throw new IllegalArgumentException(s"Star expand without alias to get Columns from DataFrame is not supported. Use select(*) instead.")
       case _ => cols.find(_.definition.name == columnName)
-        .getOrElse(throw new IllegalArgumentException(s"column name ${columnName} does not exist in the dataframe"))
+        .getOrElse(throw new IllegalArgumentException(s"column name $columnName does not exist in the dataframe"))
 
     }
   }
@@ -87,7 +85,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
   override def schema: ScalaSchema = ScalaSchema(cols.map(_.definition))
 
   override def join(other: GenericDataFrame, joinCols: Seq[String], joinType: String = "inner"): ScalaDataFrame = other match {
-    case otherScala: ScalaDataFrame => {
+    case otherScala: ScalaDataFrame =>
       checkColumnsExist(this, joinCols)
       checkColumnsExist(otherScala, joinCols)
 
@@ -97,6 +95,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
       val indicesThatJoinCol = joinColumnIndices(otherScala)
       val indicesThisNonJoinCol = (this.cols.indices.toSet -- indicesThisJoinCol.toSet).toSeq
       val indicesThatNonJoinCol = (otherScala.cols.indices.toSet -- indicesThatJoinCol.toSet).toSeq
+
       def filterRow(row: ScalaRow, indices: Iterable[Int]) = indices.map(row.values)
 
       val newSchema = ScalaSchema(indicesThisJoinCol.map(this.schema.fields) ++ indicesThisNonJoinCol.map(this.schema.fields) ++ indicesThatNonJoinCol.map(otherScala.schema.fields))
@@ -144,7 +143,6 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
         case _ => throw new IllegalArgumentException(s"Join type $joinType is not supported. Supported join types are: inner, left, right, full")
       }
       ScalaDataFrame.fromRows(rows = rows, schemaIn = Some(newSchema))
-    }
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
 
@@ -210,14 +208,13 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
   //override in order to avoid Spark col() expression
   override def symmetricDifference(other: GenericDataFrame, diffColName: String): GenericDataFrame = {
     other match {
-      case otherScala: ScalaDataFrame => {
+      case otherScala: ScalaDataFrame =>
         require(schema.columns.map(_.toLowerCase).toSet == other.schema.columns.map(_.toLowerCase).toSet, "DataFrames must have the same columns for symmetricDifference calculation")
         val otherReordered: ScalaDataFrame = otherScala.select(this.schema.columns.toList)
         val df1 = this.except(otherReordered)
         val df2 = otherReordered.except(this)
-        val newCol: Seq[Boolean] = (0 until(df1.count.toInt)).map(_ => true).toSeq ++ (0 until(df1.count.toInt)).map(_ => false).toSeq
+        val newCol: Seq[Boolean] = (0 until df1.count.toInt).map(_ => true) ++ (0 until df1.count.toInt).map(_ => false)
         df1.unionByName(df2).withColumn(diffColName, ScalaColumn(diffColName, newCol))
-      }
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
 
     }
@@ -273,19 +270,21 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
 
   override def unionByName(other: GenericDataFrame, allowMissingColumns: Boolean = false): ScalaDataFrame = other match {
     case otherScala: ScalaDataFrame =>
-      def getDuplicatedCols(cols: Seq[ScalaColumn[_]]): Seq[String] = cols.groupBy(_.definition.name.toLowerCase).mapValues(_.size).filter(_._2 > 1).keys.toSeq.sorted
-      assert(getDuplicatedCols(this.cols).isEmpty, s"Duplicate column names '${getDuplicatedCols(this.cols).mkString(", ")}' found in this dataframe, cannot perform unionByName. Make sure all column names are unique for this operation.")
-      assert(getDuplicatedCols(otherScala.cols).isEmpty, s"Duplicate column names '${getDuplicatedCols(otherScala.cols).mkString(", ")}' found in other dataframe, cannot perform unionByName. Make sure all column names are unique for this operation.")
+      def getDuplicatedCols(cols: Seq[ScalaColumn[_]]): Seq[String] = cols.groupBy(_.definition.name.toLowerCase).view
+        .mapValues(_.size).filter(_._2 > 1).keys.toSeq.sorted
+      assert(getDuplicatedCols(this.cols).isEmpty, s"Duplicate column names" +
+        s" '${getDuplicatedCols(this.cols).mkString(", ")}' found in this dataframe," +
+        s" cannot perform unionByName. Make sure all column names are unique for this operation.")
+      assert(getDuplicatedCols(otherScala.cols).isEmpty, s"Duplicate column names" +
+        s" '${getDuplicatedCols(otherScala.cols).mkString(", ")}' found in other dataframe," +
+        s" cannot perform unionByName. Make sure all column names are unique for this operation.")
       if (!allowMissingColumns) checkColumnsExist(otherScala, this.columns)
-      val thisCols = this.cols.map(c =>
-        c.definition.name -> c.asInstanceOf[ScalaColumn[Any]] //TODO: can be removed when we switch to Scala 2.13, because of improved type inference
-      ).toMap
-      val otherCols = otherScala.cols.map(c =>
-        c.definition.name -> c.asInstanceOf[ScalaColumn[Any]] //TODO: can be removed when we switch to Scala 2.13, because of improved type inference
-      ).toMap
+      val thisCols: Map[String, ScalaColumn[_]] = this.cols.map(c => c.definition.name -> c).toMap
+      val otherCols: Map[String, ScalaColumn[_]] = otherScala.cols.map(c => c.definition.name -> c).toMap
       val finalColNames = if (allowMissingColumns) columns ++ otherScala.columns.diff(columns)
       else columns
-      assert(finalColNames.nonEmpty, "No common columns found between the two dataframes for unionByName. Make sure to have at least one column with the same name in both dataframes or set allowMissingColumns=true.")
+      assert(finalColNames.nonEmpty, "No common columns found between the two dataframes for unionByName." +
+        " Make sure to have at least one column with the same name in both dataframes or set allowMissingColumns=true.")
       val unionData = finalColNames.map { colName =>
         val thisCol = thisCols.getOrElse(colName, otherCols(colName).definition.createColumn(IndexedSeq.fill(this.nrRows)(None)))
         val otherCol = otherCols.getOrElse(colName, thisCols(colName).definition.createColumn(IndexedSeq.fill(otherScala.nrRows)(None)))
@@ -312,10 +311,9 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
   }
 
   override def except(other: GenericDataFrame): ScalaDataFrame = other match {
-    case otherScala: ScalaDataFrame => {
+    case otherScala: ScalaDataFrame =>
       require(schema.columns == otherScala.columns, "The except operation can only be carried out with two dataframes with the same columns")
       ScalaDataFrame.fromRows(rows = (rows.toSet -- otherScala.rows.toSet).toSeq, schemaIn = Some(schema))
-    }
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
   }
 
@@ -376,7 +374,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
 
   override def drop(col: GenericColumn): ScalaDataFrame = col match {
     case sc: ScalaColumn[_] => drop(sc.definition.getFullName())
-    case sc: ScalaAbstractColumn => drop(sc.getName.getOrElse(throw new IllegalArgumentException(s"Cannot drop column ${sc}, because it does not have a name. Make sure to use a column reference with a name.")))
+    case sc: ScalaAbstractColumn => drop(sc.getName.getOrElse(throw new IllegalArgumentException(s"Cannot drop column $sc, because it does not have a name. Make sure to use a column reference with a name.")))
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(col)
   }
 
@@ -420,7 +418,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
    * @return an Observation object which can return observed metrics after execution
    */
   override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean): (GenericDataFrame, DataFrameObservation) = {
-    val observation = GenericCalculatedObservation(this, aggregateColumns: _*)
+    val observation = GenericCalculatedObservation(this, aggregateColumns.toIndexedSeq: _*)
     // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
     (this, observation)
   }

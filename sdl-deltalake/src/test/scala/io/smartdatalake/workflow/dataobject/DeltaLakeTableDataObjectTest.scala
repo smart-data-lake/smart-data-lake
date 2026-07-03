@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,17 +21,16 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{ColumnStatsType, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
-import io.smartdatalake.testutils.custom.TestCustomDfCreator
 import io.smartdatalake.testutils.spark.dataset.TestToolDataset
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfCreatorConfig
 import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.dataobject.expectation.SQLExpectation
+import io.smartdatalake.workflow.dataobject.generic.Table
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ProcessingLogicException}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.{AnalysisException, SparkSession}
@@ -40,6 +39,7 @@ import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.nio.file
 import java.nio.file.Files
 
 class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAfterAll
@@ -50,7 +50,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
   protected implicit val session : SparkSession = DeltaLakeTestUtils.session
   import session.implicits._
 
-  val tempDir = Files.createTempDirectory("tempHadoopDO")
+  val tempDir: file.Path = Files.createTempDirectory("tempHadoopDO")
   val tempPath: String = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -61,22 +61,25 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
   override def beforeAll(): Unit = {
     val warehousePath = new Path("spark-warehouse/delta.db")
     implicit val fs: FileSystem = HdfsUtil.getHadoopFsFromSpark(warehousePath)(session)
-    HdfsUtil.deletePath(warehousePath, false)
+    HdfsUtil.deletePath(path = warehousePath, doWarn = false)
   }
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
   }
 
   test("CustomDf2DeltaTable") {
 
     // setup DataObjects
     val feed = "customDf2Delta"
-    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
+    val sourceDO = MockSparkDataObject(id="source").register
+    sourceDO.writeSparkDataFrame(
+      Seq((Some(0),"Foo!"),(Some(1),"Bar!")).toDF("num","text")
+    )
     val targetTable = Table(db = Some(deltaDb), name = "custom_df_copy", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", path=Some(targetTablePath), table=targetTable)
-    instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
 
     // prepare & start load
@@ -101,11 +104,13 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
 
     // setup DataObjects
     val feed = "customDf2Delta_partitioned"
-    val sourceDO = CustomDfDataObject(id="source",creator = CustomDfCreatorConfig(className = Some(classOf[TestCustomDfCreator].getName)))
+    val sourceDO = MockSparkDataObject(id="source").register
+    sourceDO.writeSparkDataFrame(
+      Seq((Some(0),"Foo!"),(Some(1),"Bar!")).toDF("num","text")
+    )
     val targetTable = Table(db = Some(deltaDb), name = "custom_df_copy_partitioned", query = None)
     val targetTablePath = tempPath+s"/${targetTable.fullName}"
     val targetDO = DeltaLakeTableDataObject(id="target", partitions=Seq("num"), path=Some(targetTablePath), table=targetTable)
-    instanceRegistry.register(sourceDO)
     instanceRegistry.register(targetDO)
 
     // prepare & start load
@@ -447,7 +452,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
     // - column 'rating2' added -> existing records will get new column rating2 set to null
     val df2 = Seq(("ext","doe","john",10),("int","emma","brown",7))
       .toDF("type", "lastname", "firstname", "rating2")
-    // this doesnt work for now, see also https://github.com/delta-io/delta/issues/2300
+    // this does not work for now, see also https://github.com/delta-io/delta/issues/2300
     intercept[AnalysisException](targetDO.writeSparkDataFrame(df2, saveModeOptions = Some(SaveModeMergeOptions(updateColumns = Seq("lastname", "firstname", "rating", "rating2")))))
   }
 
@@ -613,7 +618,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
 
   test("copy load expectations test") {
     val sdlb = DefaultSmartDataLakeBuilder
-    implicit val instanceRegistry = sdlb.instanceRegistry
+    implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+    instanceRegistry.register(TestUtil.defaultSparkConnection)
 
     // setup DataObjects
     val src1Table = Table(db = Some(deltaDb), name = "test_expectations_src1")

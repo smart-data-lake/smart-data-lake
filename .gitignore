@@ -60,3 +60,6 @@ spark-warehouse
 # JIRA plugin
 atlassian-ide-plugin.xml
 
+/*/*.crc
+/*/_SUCCESS
+/*/*.parquet

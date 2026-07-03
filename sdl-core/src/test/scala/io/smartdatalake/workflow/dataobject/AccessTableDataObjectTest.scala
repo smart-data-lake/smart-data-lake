@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -45,10 +45,10 @@ class AccessTableDataObjectTest extends DataObjectTestSuite {
     val dataObj = AccessTableDataObject.fromConfig(access2016SampleConfig)
 
     // run
-    val df: DataFrame = dataObj.getSparkDataFrame()
+    val df = dataObj.getSparkDataFrame()
 
     // check
-    val result: Array[Row] = df.collect()
+    val result = df.collect()
 
     result.length shouldEqual 1
     val firstRow = result.head

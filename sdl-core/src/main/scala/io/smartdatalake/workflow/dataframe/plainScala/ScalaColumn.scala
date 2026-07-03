@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -54,9 +53,11 @@ case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], var da
   private var needsDataReset: Boolean = false
 
   override def setInputData(inputData: Map[String, ScalaColumn[_]], size: Int): Unit = {
-    // reset input data if we get new data for this column - this might be needed in joins where we have to update the input data for the resolved columns after left/right data have been combined.
+    // reset input data if we get new data for this column -
+    // this might be needed in joins where we have to update
+    // the input data for the resolved columns after left/right data have been combined.
     // note that data delivery is triggered through markForDataReset() and inputColumns method.
-    // if we get no data, we dont need to update.
+    // if we get no data, we do not need to update.
     inputData.get(definition.getFullName())
       .foreach(col => data = col.data.asInstanceOf[IndexedSeq[Option[A]]])
   }
@@ -89,7 +90,7 @@ object ScalaColumn {
 
   def nextColName = s"col${colCounter.incrementAndGet()}"
 
-  def optionalizeUnaryFunc[T](func: (Any) => T): (Option[Any] => Option[T]) = {
+  def optionalizeUnaryFunc[T](func: Any => T): Option[Any] => Option[T] = {
     a => if (a.isEmpty) None else Some(func(a.get))
   }
 

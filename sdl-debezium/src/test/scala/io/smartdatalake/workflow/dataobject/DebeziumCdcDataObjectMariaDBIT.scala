@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,21 +16,23 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
-import io.smartdatalake.config.ConfigToolbox
+import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, lit}
 
 import java.nio.file.Files
@@ -41,16 +43,15 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
    * Integration test to test basic debezium source db operations (initial read, insert, update, delete, no changes).
    */
 
-
   /**
    * Init tests
    */
 
   val sdlb = DefaultSmartDataLakeBuilder
-  implicit val instanceRegistry = sdlb.instanceRegistry
-  implicit val sparkSession = TestUtil.session
+  implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+  implicit val sparkSession: SparkSession = TestUtil.session
   Environment._instanceRegistry = instanceRegistry
-  implicit val context = ConfigToolbox.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
 
   import sparkSession.implicits._
 
@@ -61,16 +62,16 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
     id = "dbzCon",
     dbEngine = "mariadb",
     hostname = sys.env("MARIADB_HOSTNAME"),
-    //db = Some("test"),
+    // db = Some("test"),
     port = sys.env("MARIADB_PORT").toInt,
-    authMode = BasicAuthMode(Some(StringOrSecret(sys.env("MARIADB_USER"))), Some(StringOrSecret(sys.env("MARIADB_PASSWORD"))))
+    authMode = BasicAuthMode(user = StringOrSecret(sys.env("MARIADB_USER")), password = StringOrSecret(sys.env("MARIADB_PASSWORD")))
   )
 
   val jdbcConnection = JdbcTableConnection(
     id = "psqlCon",
     url = s"jdbc:mariadb://${sys.env("MARIADB_HOSTNAME")}:${sys.env("MARIADB_PORT")}",
     driver = "org.mariadb.jdbc.Driver",
-    authMode = Some(BasicAuthMode(Some(StringOrSecret(sys.env("MARIADB_USER"))), Some(StringOrSecret(sys.env("MARIADB_PASSWORD"))))),
+    authMode = Some(BasicAuthMode(user = StringOrSecret(sys.env("MARIADB_USER")), password = StringOrSecret(sys.env("MARIADB_PASSWORD"))))
   )
 
   val appName = "sdlb-debezium-sequential-integration-test"
@@ -88,7 +89,17 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
 
   // Setup data objects
 
-  val srcDO1 = DebeziumCdcDataObject("src1", connectionId = "dbzCon", Table(Some("demo"), "test"), debeziumProperties = Some(Map("database.server.id" -> "1234345345", "plugin.name" -> "pgoutput", "schema.history.internal" -> "io.debezium.storage.file.history.FileSchemaHistory", "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat")))
+  val srcDO1 = DebeziumCdcDataObject(
+    "src1",
+    connectionId = "dbzCon",
+    Table(Some("demo"), "test"),
+    debeziumProperties = Some(Map(
+        "database.server.id"                    -> "1234345345",
+        "plugin.name"                           -> "pgoutput",
+        "schema.history.internal"               -> "io.debezium.storage.file.history.FileSchemaHistory",
+        "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat"
+      ))
+  )
   instanceRegistry.register(srcDO1)
 
   val tgtDO1 = ParquetFileDataObject("tgt1", tempDir.resolve("testTgt1").toString.replace('\\', '/'))
@@ -99,7 +110,8 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
   val action1 = CopyAction("copyAction1", srcDO1.id, tgtDO1.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
   instanceRegistry.register(action1)
 
-  val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+  val sdlConfig =
+    SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
 
   // 1. Initial READ test
 
@@ -108,7 +120,7 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
   var df = tgtDO1.getSparkDataFrame()
 
   assert(df.columns.toSet == Set("value", "timestampCol", "decimalCol", COMMIT_TYPE_COLUMN_NAME, COMMIT_TIMESTAMP_COLUMN_NAME))
-  assert(df.select(col(COMMIT_TYPE_COLUMN_NAME)).as[String].collect.forall(_ == "read"))
+  assert(df.select(col(COMMIT_TYPE_COLUMN_NAME)).as[String].collect().forall(_ == "read"))
 
   // 2. Insert test
   jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value, timestampCol, decimalCol) VALUES ('INSERT TEST', '1994-07-30 07:07:07', 30.0)")
@@ -166,7 +178,6 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
   sdlb.run(sdlConfig)
 
   df = srcDO1.getSparkDataFrame() // check src because copyAction will be skipped and target will contain the data from previous test step
-
 
   assert(df.columns.contains("id") &&
     df.columns.contains("value") &&

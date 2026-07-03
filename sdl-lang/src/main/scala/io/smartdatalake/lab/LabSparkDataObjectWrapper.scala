@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.lab
 
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
@@ -24,8 +23,11 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.file.{FileRefDataObject, HadoopFileDataObject}
+import io.smartdatalake.workflow.dataobject.generic.{CanHandlePartitions, TableDataObject}
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{Column, DataFrame}
+import org.apache.spark.sql.{Column, DataFrame, Dataset}
 
 import java.time.{Instant, LocalDateTime, ZoneId}
 import java.util.TimeZone
@@ -57,15 +59,20 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
   def where(condition: Column): DataFrame = get().where(condition)
   def select(cols: Column*): DataFrame = get().select(cols:_*)
 
-  def write(dataFrame: DataFrame, topLevelPartitions: Seq[String] = Seq()): Unit = {
-    writeWithPartitions(dataFrame, topLevelPartitions.map(p => Map(partitionColumns.head -> p)))
+  def write[T](ds: Dataset[T], topLevelPartitions: Seq[String] = Seq()): Unit = {
+    writeWithPartitions(ds, topLevelPartitions.map(p => Map(partitionColumns.head -> p)))
   }
-  def writeWithPartitions(dataFrame: DataFrame, partitions: Seq[Map[String,String]]): Unit = {
-    if(!SmartDataLakeBuilderLab.enableWritingDataObjects) throw new IllegalAccessException("Writing into DataObjects using SmartDataLakeBuilderLab is disabled by default because it is not seen as best practice. Set SmartDataLakeBuilderLab.enableWritingDataObjects=true to remove this limitation if you know what you do.")
-    if(partitions.nonEmpty && partitionColumns.isEmpty) throw NotSupportedException(dataObject.id, s"DataObject is not partitioned but called getWithPartitions(...) with partitions ${partitions.mkString(",")}")
+  def writeWithPartitions[T](ds: Dataset[T], partitions: Seq[Map[String,String]]): Unit = {
+    if(!SmartDataLakeBuilderLab.enableWritingDataObjects)
+      throw new IllegalAccessException("Writing into DataObjects using SmartDataLakeBuilderLab is disabled by default" +
+        " because it is not seen as best practice. Set SmartDataLakeBuilderLab.enableWritingDataObjects=true" +
+        " to remove this limitation if you know what you do.")
+    if(partitions.nonEmpty && partitionColumns.isEmpty)
+      throw NotSupportedException(dataObject.id, s"DataObject is not partitioned" +
+        s" but called getWithPartitions(...) with partitions ${partitions.mkString(",")}")
     dataObject match {
       case o: CanWriteSparkDataFrame =>
-        o.writeSparkDataFrame(dataFrame, partitions.map(pv => PartitionValues(pv)))(context)
+        o.writeSparkDataFrame(ds.toDF(), partitions.map(pv => PartitionValues(pv)))(context)
       case _ => throw NotSupportedException(dataObject.id, "can not write Spark DataFrames")
     }
   }
@@ -91,7 +98,7 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
    */
   def infos(updateStats: Boolean = false): Map[String,String] = {
     Seq(tableName().map("table" -> _), path().map("path" -> _)).flatten.toMap ++
-      dataObject.getStats(updateStats)(context).mapValues(_.toString)
+      dataObject.getStats(updateStats)(context).view.mapValues(_.toString).toMap
   }
 
   def partitionColumns: Seq[String] = dataObject match {
@@ -99,7 +106,7 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
     case _ => Seq()
   }
   def partitions: Seq[Map[String,String]] = dataObject match {
-    case o: CanHandlePartitions => o.listPartitions(context).map(_.elements.mapValues(_.toString).toMap)
+    case o: CanHandlePartitions => o.listPartitions(context).map(_.elements.view.mapValues(_.toString).toMap)
     case _ => throw NotSupportedException(dataObject.id, "is not partitioned")
   }
   def topLevelPartitions: Seq[String] = partitions.map(_(partitionColumns.head)).distinct
@@ -126,7 +133,7 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
   def refresh(): Unit = {
     dataObject match {
       case o: TableDataObject =>
-        context.sparkSession.catalog.refreshTable(o.table.fullName)
+        SparkSubFeed.getSparkSession(context).catalog.refreshTable(o.table.fullName)
       case _ => throw NotSupportedException(dataObject.id, "is not a TableDataObject")
     }
   }

@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
@@ -293,7 +292,7 @@ object ExpressionParser {
       val resolved = candidates.view.flatMap(method => buildInvocationArguments(method, args).map(method -> _)).headOption
       resolved match {
         case Some((method, invocationArgs)) =>
-          val result = method.invoke(functions, invocationArgs: _*)
+          val result = method.invoke(functions, invocationArgs.toIndexedSeq: _*)
           result match {
             case col: GenericColumn => col
             case _ => throw ExpressionParserException(s"Function '$functionName' does not return a column", position)

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,13 +16,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.misc
 
 import com.github.takezoe.scaladoc.{Scaladoc => ScaladocAnnotation}
-import scaladoc.Markup._ // https://github.com/andyglow/scaladoc
+import scaladoc.Markup._
 import scaladoc.{Markup, Scaladoc, Tag}
 
+import scala.annotation.tailrec
 import scala.reflect.runtime.universe.Annotation
 
 private[smartdatalake] object ScaladocUtil {
@@ -75,12 +75,13 @@ private[smartdatalake] object ScaladocUtil {
     })
   }
 
+  @tailrec
   def removeSpacesAndTabs(line: String, spacesTabs: (Int, Int)): String = {
     require(spacesTabs._1 >= 0 && spacesTabs._2 >= 0, "Indentation error. The line has either too many spaces or too many tabs")
     if (line.isEmpty) ""
     else if (List("{{{","}}}").contains(line.trim)) line.trim
     else line.head match {
-      case c if ((0, 0) == spacesTabs) => line
+      case _ if (0, 0) == spacesTabs => line
       case ' ' => removeSpacesAndTabs(line.tail, (spacesTabs._1 - 1, spacesTabs._2))
       case '\t' => removeSpacesAndTabs(line.tail, (spacesTabs._1, spacesTabs._2 - 1))
       case _ => throw new Exception("The line doesn't have enough indentation characters to remove the entire common indentation")
@@ -100,16 +101,16 @@ private[smartdatalake] object ScaladocUtil {
         parsedLink = captureGroup1
       }
     } else {
-      parsedLink = s"`${captureGroup1}`"
+      parsedLink = s"`$captureGroup1`"
     }
 
-    s"${parsedLink}${if (captureGroup2 != null) captureGroup2 else " "}"
+    s"$parsedLink${if (captureGroup2 != null) captureGroup2 else " "}"
   }
 
   def formatScaladocString(str: String): String = {
     // Remove link square brackets (including plural s handling)
     // If the link is followed by a single s, remove the space
-    val bracketRemovalPattern = raw"\[\[(.+?)\]\] (\.|s|,)?".r
+    val bracketRemovalPattern = raw"\[\[(.+?)]] ([.s,])?".r
     bracketRemovalPattern.replaceAllIn(str, m =>
       formatScaladocLinkTag(m.group(1), m.group(2))
     )
@@ -140,7 +141,7 @@ private[smartdatalake] object ScaladocUtil {
     val rawScalaDoc = annotation.flatMap(_.tree.children.last.children.collectFirst{case Literal(Constant(name: String)) => name}) // In scala 2.12 this is an AssignOrNamedArg, in Scala 2.13 a NamedArg... we need to be dynamic...
     rawScalaDoc.map { d =>
       val s = scaladoc.Scaladoc.fromString(d)
-      s.right.getOrElse(throw new IllegalStateException(s"Could not extract Scaladoc from '$d': ${s.left.e}"))
+      s.toOption.getOrElse(throw new IllegalStateException(s"Could not extract Scaladoc from '$d': ${s.left.e}"))
     }
   }
 

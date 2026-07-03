@@ -1,7 +1,7 @@
 <!--
   ~ Smart Data Lake - Build your data lake the smart way.
   ~
-  ~ Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+  ~ Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
   ~
   ~ This program is free software: you can redistribute it and/or modify
   ~ it under the terms of the GNU General Public License as published by
@@ -22,11 +22,11 @@
     <parent>
         <groupId>io.smartdatalake</groupId>
         <artifactId>sdl-parent</artifactId>
-        <version>2.9.0-SNAPSHOT</version>
+        <version>3.0.0-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>sdl-gcp_${scala.minor.version}</artifactId>
+    <artifactId>sdl-gcp_2.13</artifactId>
     <packaging>jar</packaging>
 
     <name>sdl-gcp</name>
@@ -62,42 +62,6 @@
             <version>${scaladoc.reader.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-client</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>javax.servlet.jsp</groupId>
-                    <artifactId>jsp-api</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <scope>${sdl-core.scope}</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-sql_${scala.minor.version}</artifactId>
-            <scope>${sdl-core.scope}</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-catalyst_${scala.minor.version}</artifactId>
-            <scope>${sdl-core.scope}</scope>
-        </dependency>
-        <!--
-             prevent hitting missing dependency exception
-             see https://stackoverflow.com/questions/42327777/spark-sql-errors
-         -->
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-tags_${scala.minor.version}</artifactId>
-            <scope>compile</scope>
-        </dependency>
 
         <dependency>
             <groupId>com.google.cloud.spark</groupId>
@@ -105,21 +69,6 @@
             <version>${bigquery.version}</version>
         </dependency>
 
-        <!--
-        Needed for writing to BigQuery, see https://github.com/GoogleCloudDataproc/spark-bigquery-connector/issues/599
-        -->
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-mllib_${scala.minor.version}</artifactId>
-            <version>${spark.version}</version>
-        </dependency>
-
-
-        <dependency>
-            <groupId>org.scala-lang</groupId>
-            <artifactId>scala-library</artifactId>
-            <scope>${sdl-core.scope}</scope>
-        </dependency>
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-reflect</artifactId>
@@ -218,12 +167,6 @@
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
                 <artifactId>scala-maven-plugin</artifactId>
-            </plugin>
-
-            <!-- rewrite pom for compiling with different scala version profiles -->
-            <plugin>
-                <groupId>org.spurint.maven.plugins</groupId>
-                <artifactId>scala-cross-maven-plugin</artifactId>
             </plugin>
 
             <!-- Copies files in resources folders to target folder. -->

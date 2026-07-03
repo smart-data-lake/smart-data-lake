@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,14 +16,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{ProductUtil, ReflectionUtil, ScalaUtil}
 import io.smartdatalake.workflow.dataframe._
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject, SchemaValidation, UserDefinedSchema}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, SchemaValidation, UserDefinedSchema}
+import io.smartdatalake.workflow.dataobject.DataObject
 import org.reflections.Reflections
 
 import scala.reflect.ClassTag
@@ -163,8 +163,8 @@ trait DataFrameSubFeedCompanion extends SubFeedConverter[DataFrameSubFeed] with 
       def toDF(implicit context: ActionPipelineContext): GenericDataFrame = {
         createDataFrame(rows)
       }
-      def toDF(colNames: String*)(implicit context: ActionPipelineContext): GenericDataFrame = {
-        createDataFrame(rows, colNames)
+      def toDF(colName: String, colNames: String*)(implicit context: ActionPipelineContext): GenericDataFrame = {
+        createDataFrame(rows, colName +: colNames)
       }
     }
   }

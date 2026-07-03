@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.spark
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -50,7 +49,7 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
     if (ds.isStreaming) throw new IllegalArgumentException("SparkObservation does not yet support streaming Datasets")
     sparkSession = Some(ds.sparkSession)
     if (registerListener) ds.sparkSession.listenerManager.register(listener)
-    ds.observe(name, exprs.head, exprs.tail: _*)
+    ds.observe(name, exprs.head, exprs.tail.toIndexedSeq: _*)
   }
 
   /**
@@ -96,12 +95,12 @@ private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().t
   private[spark] def extractMetrics(): Map[String, _] = {
     // also extract other observations according to otherObservationsPrefix and otherObservationNames.
     val filteredMetrics = metrics.getOrElse(Map())
-      .filterKeys(k => k == name || otherObservationsPrefix.exists(k.startsWith) || otherObservationNames.contains(k)).toMap
+      .view.filterKeys(k => k == name || otherObservationsPrefix.exists(k.startsWith) || otherObservationNames.contains(k)).toMap
     filteredMetrics.flatMap { case (metricName, r) =>
       val namePostfix = if (metricName != name) {
         Some(otherObservationsPrefix.map(metricName.stripPrefix).getOrElse(metricName).stripSuffix(pushDownTolerantMetricsMarker).takeWhile(_ != '#'))
       } else None
-      val metricEntries = r.getValuesMap[Any](r.schema.fieldNames).map(e => createMetric(namePostfix, e))
+      val metricEntries = r.getValuesMap[Any](r.schema.fieldNames.toList).map(e => createMetric(namePostfix, e))
       logger.debug(s"($name) extractMetrics for $metricName got ${metricEntries.map { case (k, v) => s"$k=$v" }.mkString(" ")}")
       metricEntries
     }

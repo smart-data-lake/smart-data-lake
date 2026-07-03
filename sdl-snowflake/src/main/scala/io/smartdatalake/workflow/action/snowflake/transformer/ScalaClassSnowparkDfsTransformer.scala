@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,15 +16,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.snowflake.transformer
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.CustomCodeUtil
-import io.smartdatalake.util.spark.DefaultExpressionData
+import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsGenericDfsTransformer}
@@ -62,9 +60,9 @@ case class ScalaClassSnowparkDfsTransformer(name: String = "snowparkScalaTransfo
     assert(dfs.values.forall(_.isInstanceOf[SnowparkDataFrame]), s"($actionId) Unsupported subFeedType(s) ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method transform")
     val action = context.instanceRegistry.get[Action](actionId)
     val snowparkSession = action.inputs.head.asInstanceOf[SnowflakeTableDataObject].snowparkSession
-    val snowparkDfs = dfs.mapValues(_.asInstanceOf[SnowparkDataFrame].inner).toMap
+    val snowparkDfs = dfs.view.mapValues(_.asInstanceOf[SnowparkDataFrame].inner).toMap
     customTransformer.transform(snowparkSession, options, snowparkDfs)
-      .mapValues(SnowparkDataFrame).toMap
+      .view.mapValues(SnowparkDataFrame).toMap
   }
 
   override def getSubFeedSupportedType: Type = typeOf[SnowparkSubFeed]

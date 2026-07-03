@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,22 +19,16 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{GraphUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.secrets.StringOrSecret
-import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
 import org.apache.hadoop.security.UserGroupInformation
-import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.util.ChildFirstURLClassLoader
-import org.apache.spark.{SparkEnv, SparkException}
 import org.slf4j.MDC
 
 import java.net.{InetAddress, URL, URLClassLoader}
 import java.time.LocalDateTime
 import scala.annotation.tailrec
-import scala.util.Try
 
 /**
  * Utilities and conventions to name and validate command line parameters
@@ -46,47 +40,6 @@ object AppUtil extends SmartDataLakeLogger {
     val hadoopConf = new org.apache.hadoop.conf.Configuration()
     UserGroupInformation.setConfiguration(hadoopConf)
     UserGroupInformation.loginUserFromKeytab(userAtRealm, keytab)
-  }
-
-  def createSparkSession(name:String, masterOpt: Option[String] = None,
-                         deployModeOpt: Option[String] = None,
-                         kryoClassNamesOpt: Option[Seq[String]] = None,
-                         sparkOptionsOpt: Map[String,StringOrSecret] = Map(),
-                         enableHive: Boolean = true
-                        ): SparkSession = {
-    if (masterOpt.isDefined) logger.info(s"Get or create spark session with parameters: name=$name master=$masterOpt deployMode=$deployModeOpt enableHive=$enableHive kryoClassNamesOpt=$kryoClassNamesOpt sparkOptionsOpt=$sparkOptionsOpt")
-    else logger.info(s"Trying to get spark session from environment (master=None)")
-
-    // prepare extensions
-    val noDataExtension = if (Environment.enableSparkPlanNoDataCheck) Some(new SDLSparkExtension) else None
-
-    // create configObject
-    val sessionBuilder = SparkSession.builder()
-      .optionalMaster(masterOpt)
-      .appName(name)
-      .config("hive.exec.dynamic.partition", value = true) // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
-      .config("hive.exec.dynamic.partition.mode", "nonstrict") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
-      .config("spark.sql.sources.partitionOverwriteMode", "dynamic") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
-      .optionalConfig( "deploy-mode", deployModeOpt)
-      .optionalConfig( "spark.kryo.classesToRegister", kryoClassNamesOpt.map(_.mkString(",")))
-      .optionalConfigs( sparkOptionsOpt )
-      .optionalEnableHive(enableHive)
-      .optionalExtension(noDataExtension)
-
-    // create session
-    val session = try {
-      sessionBuilder.getOrCreate()
-    } catch {
-      case e: SparkException if masterOpt.isEmpty && e.getMessage.startsWith("A master URL must be set in your configuration") =>
-        throw new IllegalArgumentException(s"This is not an environment with an existing Spark Session. Use SparkSmartDataLakeBuilder instead of e.g. DefaultSmartDataLakeBuilder to configure and create a new Spark session and '--master' and '--deploy-mode' parameter to customize the Spark session.")
-    }
-
-    // check partitionOverwriteMode
-    if (!Try(session.conf.get("spark.sql.sources.partitionOverwriteMode")).toOption.contains("dynamic"))
-      logger.warn("Spark property 'spark.sql.sources.partitionOverwriteMode' is not set to 'dynamic'. Overwriting Hadoop/Hive partitions will always overwrite the whole path/table and you might experience data loss!")
-
-    // return
-    session
   }
 
   /**
@@ -107,11 +60,11 @@ object AppUtil extends SmartDataLakeLogger {
         // add urls on this level to accumulator
         clazz.asInstanceOf[URLClassLoader].getURLs
         .map( url => (url.getFile.split('/').last, url))
-        .filter{ case (name, url) => jars.contains(name)}
+        .filter{ case (name, _) => jars.contains(name)}
         .toMap
 
       // check if any jars without URL are left
-      val jarMissing = jars.exists(jar => urlsAcc.get(jar).isEmpty)
+      val jarMissing = jars.exists(jar => !urlsAcc.contains(jar))
       // return accumulated if there is no parent left or no jars are missing anymore
       if (clazz.getParent == null || !jarMissing) urlsAcc else collectUrls(clazz.getParent, urlsAcc)
     }
@@ -120,44 +73,13 @@ object AppUtil extends SmartDataLakeLogger {
     val urlsMap = collectUrls(initialLoader, Map())
 
     // check if everything found
-    val jarsNotFound = jars.filter( jar => urlsMap.get(jar).isEmpty)
+    val jarsNotFound = jars.filter( jar => !urlsMap.contains(jar))
     if (jarsNotFound.nonEmpty) {
       logger.info(s"""available jars are ${initialLoader.getURLs.mkString(", ")} (not including parent classpaths)""")
       throw ConfigurationException(s"""jars ${jarsNotFound.mkString(", ")} not found in parent class loaders classpath. Cannot initialize ChildFirstURLClassLoader.""")
     }
     // create child-first classloader
     new ChildFirstURLClassLoader(urlsMap.values.toArray, initialLoader)
-  }
-
-  /**
-   * pimpMyLibrary pattern to add SparkSession.Builder utility functions
-   */
-  private implicit class SparkSessionBuilderUtils( builder: SparkSession.Builder ) {
-    def optionalMaster( value: Option[String] ): SparkSession.Builder = {
-      if (value.isDefined) builder.master(value.get)
-      else builder
-    }
-    def optionalConfig( key: String, value: Option[String] ): SparkSession.Builder = {
-      if (value.isDefined) {
-        logger.info(s"Additional sparkOption: ${createMaskedSecretsKVLog(key,value.get)}")
-        builder.config(key, value.get)
-      } else builder
-    }
-    def optionalConfigs( options: Map[String,StringOrSecret] ): SparkSession.Builder = {
-      if (options.nonEmpty) {
-        logger.info("Additional sparkOptions: " + options.map{ case (k,v) => createMaskedSecretsKVLog(k,v.toString) }.mkString(", "))
-        options.foldLeft( builder ){
-          case (sb,(key,value)) => sb.config(key,value.resolve())
-        }
-      } else builder
-    }
-    def optionalEnableHive(enable: Boolean ): SparkSession.Builder = {
-      if (enable) builder.enableHiveSupport()
-      else builder
-    }
-    def optionalExtension(extension: Option[(SparkSessionExtensions => Unit)]): SparkSession.Builder = {
-      extension.map(e => builder.withExtensions(e)).getOrElse(builder)
-    }
   }
 
   /**
@@ -243,7 +165,7 @@ object AppUtil extends SmartDataLakeLogger {
     executionId.foreach(executionId => MDC.put(MDC_SDLB_RUN_ID, executionId.runId.toString))
     executionId.foreach(executionId => MDC.put(MDC_SDLB_ATTEMPT_ID, executionId.attemptId.toString))
     runStartTime.foreach(runStartTime => MDC.put(MDC_SDLB_START_TIME, runStartTime.toString))
-    getMachineContext.foreach{ case (k,v) => MDC.put(k,v)}
+    MDC.put(MDC_HOSTNAME, hostname)
   }
   def setSdlbRunLoggerContext(context: ActionPipelineContext): Unit = {
     setSdlbRunLoggerContext(context.appConfig, Some(context.executionId), Some(context.runStartTime))
@@ -253,20 +175,7 @@ object AppUtil extends SmartDataLakeLogger {
   private final val MDC_SDLB_ATTEMPT_ID = "attemptId"
   private final val MDC_SDLB_START_TIME = "startTime"
   final val MDC_SDLB_PROPERTIES = Seq(MDC_SDLB_APP, MDC_SDLB_RUN_ID, MDC_SDLB_ATTEMPT_ID, MDC_SDLB_START_TIME)
-  def applySdlbRunLoggerContext(session: SparkSession): Unit = {
-    MDC_SDLB_PROPERTIES.foreach(k => session.sparkContext.setLocalProperty(k,MDC.get(k)))
-  }
 
-  /**
-   * get machine information for logger context.
-   */
-  def getMachineContext: Map[String,String] = {
-    Seq(
-      Option(SparkEnv.get).map(se => (MDC_EXECUTOR_ID, se.executorId)),
-      Some((MDC_HOSTNAME, hostname))
-    ).flatten.toMap
-  }
-  private final val MDC_EXECUTOR_ID = "executorId"
   private final val MDC_HOSTNAME = "hostname"
   @transient private lazy val hostname = InetAddress.getLocalHost.getHostName
 }

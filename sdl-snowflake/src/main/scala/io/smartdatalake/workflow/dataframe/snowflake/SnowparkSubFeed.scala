@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.snowflake
 
 import com.snowflake.snowpark._
@@ -254,6 +253,12 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, exprs.toSeq)
     SnowparkColumn(functions.concat(exprs.map(_.asInstanceOf[SnowparkColumn].inner):_*))
   }
+  override def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn = {
+    column match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.substring(snowparkColumn.inner, pos, len))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
   override def regexp_extract(column: GenericColumn, pattern: String, groupIdx: Int): GenericColumn = {
     column match {
       // must be implemented as sql expression, as function regexp_substr doesn't yet exist in snowpark
@@ -305,7 +310,7 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
     aggFunction.apply() match {
       case snowparkAggFunctionColumn: SnowparkColumn => SnowparkColumn(snowparkAggFunctionColumn
         .inner.over(
-          Window.partitionBy(partitionBy.map(_.asInstanceOf[SnowparkColumn].inner): _*)
+          Window.partitionBy(partitionBy.map(_.asInstanceOf[SnowparkColumn].inner).toIndexedSeq: _*)
             .orderBy(orderBy.asInstanceOf[SnowparkColumn].inner))
       )
       case generic => DataFrameSubFeed.throwIllegalSubFeedTypeException(generic)
@@ -327,7 +332,7 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
   }
 
   override def rowFromSeq(values: Seq[Any]): GenericRow = {
-    SnowparkRow(Row(values: _*))
+    SnowparkRow(Row(values.toIndexedSeq: _*))
   }
 
   override def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf = {

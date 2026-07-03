@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,17 +16,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.config
 
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.workflow.dataobject.CustomDfDataObject
+import io.smartdatalake.workflow.dataobject.CsvFileDataObject
 
 /**
  * Configs macro expansion can be debugged in Intellij by creating a run configuration as follows:
- * - Main class: scala.tools.nsc.Main
- * - VM options: -Dscala.usejavacp=true
- * - program arguments: -cp io.smartdatalake.config.ConfigsMacroDebug C:\Entwicklung\smart-data-lake\sdl-core\src\test\scala\io\smartdatalake\config\ConfigsMacroDebug.scala
+ *   - Main class: scala.tools.nsc.Main
+ *   - VM options: -Dscala.usejavacp=true
+ *   - program arguments: -cp io.smartdatalake.config.ConfigsMacroDebug
+ *     C:\Entwicklung\smart-data-lake\sdl-core\src\test\scala\io\smartdatalake\config\ConfigsMacroDebug.scala
  */
 object ConfigsMacroDebug extends App with ConfigImplicits {
 
@@ -34,18 +34,14 @@ object ConfigsMacroDebug extends App with ConfigImplicits {
     """
       | {
       |   id = 123
-      |   creator {
-      |     class-name = io.smartdatalake.config.TestCustomDfCreator
-      |     options = {
-      |       test = foo
-      |     }
-      |   }
+      |   path = /tmp/test.csv
       | }
-      |""".stripMargin).resolve
+      |""".stripMargin
+  ).resolve
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   import configs.syntax.RichConfig
-  config.extract[CustomDfDataObject].value
-  //CustomDfDataObject.fromConfig(config)(new InstanceRegistry)
+  config.extract[CsvFileDataObject].value
+  // CsvFileDataObject.fromConfig(config)(new InstanceRegistry)
 
 }

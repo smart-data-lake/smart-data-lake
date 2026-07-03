@@ -1,3 +1,21 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
@@ -7,12 +25,14 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
-import io.smartdatalake.util.hdfs.SparkRepartitionDef
-import io.smartdatalake.util.misc.{AclDef, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.SparkRepartitionDef
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic.{Constraint, HousekeepingMode}
+import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.csv.{CSVExprUtils, CSVOptions, UnivocityParser}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
@@ -30,7 +50,7 @@ import scala.reflect.runtime.universe.typeOf
 
 /**
  * A [[DataObject]] which allows for more flexible CSV parsing.
- * The standard CsvFileDataObject doesnt support reading multiple CSV-Files with different column order, missing columns
+ * The standard CsvFileDataObject does not support reading multiple CSV-Files with different column order, missing columns
  * or additional columns.
  * RelaxCsvFileDataObject works more like reading JSON-Files. You need to define a schema, then it tries to read every file
  * with that schema independently of the column order, adding missing columns and removing superfluous ones.
@@ -64,7 +84,6 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
                                     treatSuperfluousColumnsAsCorrupt: Boolean = false,
                                     override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     override val sparkRepartition: Option[SparkRepartitionDef] = None,
-                                    override val acl: Option[AclDef] = None,
                                     override val connectionId: Option[ConnectionId] = None,
                                     override val filenameColumn: Option[String] = None,
                                     override val expectedPartitionsCondition: Option[String] = None,
@@ -120,7 +139,7 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
    * parse CSV from DataFrame prepared by Sparks "text" DataSource
    */
   override def customizeContent(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
     // parse csv files content
     assert(df.columns.head == "value") // reading format=text should give schema "value: string" (+ partition columns)
     df
@@ -130,13 +149,11 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
           val content = csvContentRow.getAs[String]("value")
           val filename = filenameColumn.map(csvContentRow.getAs[String])
           if (filename.isDefined) logger.debug(s"($id) Parsing file $filename, size=${content.length}")
-          try {
-            parseCsvContent(content, parserOptions, filename)
-              .map { parsedRow =>
-                val values = parsedRow.toSeq ++ csvContentRow.toSeq.drop(1) // value column is at pos 0, partition columns (if any) and filename column are after that
-                Row(values: _*)
-              }
-          }
+          parseCsvContent(content, parserOptions, filename)
+            .map { parsedRow =>
+              val values = parsedRow.toSeq ++ csvContentRow.toSeq.drop(1) // value column is at pos 0, partition columns (if any) and filename column are after that
+              Row(values.toIndexedSeq: _*)
+            }
         }
       }(ExpressionEncoder.apply(StructType(sparkParserSchema ++ df.schema.drop(1)))) // value column is at pos 0, partition columns (if any) and filename column are after that
   }
@@ -245,7 +262,7 @@ class RelaxedParser( fileSchema:StructType, tgtSchema: StructType, parserOptions
    * Combine parsed row and badRecord into result row
    */
   private def createResultRow(fileRow: Option[Row], badRecord: Option[String], errorMsg: Option[String]): Row = {
-    val values = tgtSchema.fieldNames.map { name =>
+    val values = tgtSchema.fieldNames.toList.map { name =>
       if (name == parserOptions.columnNameOfCorruptRecord) badRecord.orNull
       else if (name == columnNameOfCorruptRecordMsg) errorMsg.orNull
       else if (missingFieldNames.contains(name)) null

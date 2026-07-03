@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.app
 
 import io.smartdatalake.app.BuildVersionInfo.getFilename
@@ -109,7 +108,7 @@ object VersionInfoWriter extends SmartDataLakeLogger {
     val config = VersionInfoWriterConfig()
 
     // Parse command line
-    parser.parse(args, config) match {
+    parser.parse(args.toList, config) match {
       case Some(config) => BuildVersionInfo(config.version).writeBuildVersionInfo(config.outputDir, config.app)
       case None => logAndThrowException(s"Error parsing command line parameters", new ConfigurationException("Couldn't set command line parameters correctly."))
     }
@@ -171,7 +170,7 @@ object BuildVersionInfo extends SmartDataLakeLogger {
       }
     }
   }
-  lazy val sdlbVersionInfo: Option[BuildVersionInfo] = readBuildVersionInfo(app=false)
+  lazy val sdlbVersionInfo: Option[BuildVersionInfo] = readBuildVersionInfo()
   lazy val appVersionInfo: Option[BuildVersionInfo] = readBuildVersionInfo(app=true)
 
   def getRevision: String = {

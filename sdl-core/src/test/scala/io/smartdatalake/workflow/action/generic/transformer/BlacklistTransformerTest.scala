@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
@@ -34,7 +33,7 @@ class BlacklistTransformerTest extends AnyFunSuite {
   protected implicit val session: SparkSession = TestUtil.session
   import session.implicits._
 
-  implicit val instanceRegistry = new InstanceRegistry()
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   test("only columns where the names match are removed") {
@@ -64,7 +63,7 @@ class BlacklistTransformerTest extends AnyFunSuite {
   test("column blacklisting is case sensitive if Environment.caseSensitive=true") {
     // prepare
     val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, true)
+    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
     Environment._caseSensitive = Some(true)
     val blacklistTransformer = BlacklistTransformer(columnBlacklist = Seq("ColumN1"))
     val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "ColumN1"))

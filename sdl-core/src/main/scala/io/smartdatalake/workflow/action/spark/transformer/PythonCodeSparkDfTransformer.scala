@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,17 +16,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.spark.transformer
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
-import io.smartdatalake.util.spark.{DefaultExpressionData, PythonSparkEntryPoint, PythonUtil}
+import io.smartdatalake.util.misc.DefaultExpressionData
+import io.smartdatalake.util.spark.{PythonSparkEntryPoint, PythonUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionHelper
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, OptionsSparkDfTransformer}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -59,7 +60,7 @@ case class PythonCodeDfTransformer(override val name: String = "pythonSparkTrans
     // python transformation is executed by passing options and input/output DataFrame through entry point
     val objectId = ActionHelper.replaceSpecialCharactersWithUnderscore(dataObjectId.id)
     try {
-      val entryPoint = new DfTransformerPythonSparkEntryPoint(context.sparkSession, options, df, objectId)
+      val entryPoint = new DfTransformerPythonSparkEntryPoint(SparkSubFeed.getSparkSession, options, df, objectId)
       val additionalInitCode =
         """
           |# prepare input parameters
@@ -87,7 +88,7 @@ object PythonCodeDfTransformer extends FromConfigFactory[GenericDfTransformer] {
   def dedent(code: String): String = {
     val lines = code.stripMargin.linesIterator.toList
     val nonEmptyLines = lines.filter(line => line.trim.nonEmpty)
-    val minIndentLength = if (nonEmptyLines.isEmpty) 0 else nonEmptyLines.map(_.prefixLength(c => c == ' ' || c == '\t')).min
+    val minIndentLength = if (nonEmptyLines.isEmpty) 0 else nonEmptyLines.map(_.segmentLength(c => c == ' ' || c == '\t')).min
     val dedentedLines = lines.map(_.drop(minIndentLength))
     dedentedLines.mkString(System.lineSeparator())
   }

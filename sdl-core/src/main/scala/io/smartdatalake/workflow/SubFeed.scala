@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -76,7 +76,7 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
 }
 object SubFeed {
   def filterPartitionValues(partitionValues: Seq[PartitionValues], partitions: Seq[String]): Seq[PartitionValues] = {
-    partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains).toMap)).filter(_.nonEmpty)
+    partitionValues.map( pvs => PartitionValues(pvs.elements.view.filterKeys(partitions.contains).toMap)).filter(_.nonEmpty)
   }
 }
 

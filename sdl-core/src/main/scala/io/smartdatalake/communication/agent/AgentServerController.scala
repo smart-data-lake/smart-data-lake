@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.communication.agent
 
 import com.typesafe.config.{ConfigFactory, ConfigParseOptions, ConfigSyntax}
@@ -77,9 +76,15 @@ case class AgentServerController(
 
             Some(SDLMessage(SDLMessageType.AgentResult, agentResult = Some(AgentResult(instructionId = agentInstruction.instructionId, phase = agentInstruction.phase, dataObjectIdToSchema = resultingDataObjectIdToSchema))))
           } catch {
-            case e: Exception => logger.error("Run failed, sending error message to AgentClient.")
-              Some(SDLMessage(SDLMessageType.AgentResult, agentResult = Some(AgentResult(instructionId = agentInstruction.instructionId, phase = agentInstruction.phase, dataObjectIdToSchema = Map(), exception = Some(e)))))
-          }
+            case e: Exception =>
+              logger.error("Run failed, sending error message to AgentClient.")
+              Some(SDLMessage(msgType = SDLMessageType.AgentResult, agentResult = Some(
+                AgentResult(instructionId = agentInstruction.instructionId,
+                  phase = agentInstruction.phase,
+                  dataObjectIdToSchema = Map(),
+                  errorMsg = Some(e.getMessage)))))
+           }
+        case _ => throw new IllegalStateException("AgentInstruction is None in message but was expected to be present")
       }
       case _ =>
         logger.warn(s"Cannot process message of type ${message.msgType}")

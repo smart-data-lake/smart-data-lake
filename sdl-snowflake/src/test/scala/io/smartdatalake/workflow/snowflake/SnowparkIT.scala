@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,13 +16,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.snowflake
 
 import com.snowflake.snowpark.types._
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.workflow.dataobject.{SnowflakeTableDataObject, Table}
+import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
+import io.smartdatalake.workflow.dataobject.generic.Table
+import org.apache.spark.sql.SparkSession
 import org.scalatest.matchers.should.Matchers.intercept
 
 
@@ -31,9 +33,9 @@ import org.scalatest.matchers.should.Matchers.intercept
  */
 object SnowparkIT extends App {
 
-  implicit val sparkSession = TestUtil.session
-  implicit val instanceRegistry = new InstanceRegistry()
-  implicit val context =  ConfigToolbox.getDefaultActionPipelineContext
+  implicit val sparkSession: SparkSession = TestUtil.session
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
+  implicit val context: InstanceRegistry => ActionPipelineContext =  ConfigToolbox.getDefaultActionPipelineContext
 
   instanceRegistry.register(SnowflakeConnectionConfig.sfConnection)
   val testDO = SnowflakeTableDataObject("test1", Table(Some("test"), "abc"), connectionId = "sfCon")
