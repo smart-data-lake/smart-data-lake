@@ -37,7 +37,9 @@ import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation._
 import io.smartdatalake.workflow.dataobject.generic.Constraint
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import org.apache.commons.io.FileUtils
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -74,7 +76,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     val tgtDO = MockSparkDataObject("tgt1").register
 
     // prepare & start load
-    val customTransformerConfig = ScalaClassGenericDfTransformer(className = classOf[TestDfTransformer].getName)
+    val customTransformerConfig = ScalaClassGenericDfTransformer(className = classOf[TestCopyDfTransformer].getName)
     val action1 = CopyAction("ca", srcDO.id, tgtDO.id, transformers = Seq(customTransformerConfig), executionMode = Some(FileIncrementalMoveMode()))
     val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())
@@ -616,12 +618,11 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
   }
 }
 
-class TestDfTransformer extends CustomGenericDfTransformer {
+class TestCopyDfTransformer extends CustomGenericDfTransformer {
   override def transform(helper: DataFrameFunctions, options: Map[String, String], df: GenericDataFrame, dataObjectId: String): GenericDataFrame = {
     import helper._
     df.withColumn("rating", col("rating") + lit(1))
   }
-
 }
 
 class TestOptionsDfTransformer extends CustomGenericDfTransformer {

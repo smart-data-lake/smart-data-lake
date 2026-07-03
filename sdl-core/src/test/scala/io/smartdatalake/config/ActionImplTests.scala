@@ -21,9 +21,9 @@ package io.smartdatalake.config
 import com.typesafe.config.{Config, ConfigFactory}
 import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.workflow.action
-import io.smartdatalake.workflow.action.spark.TestDfTransformer
 import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.script.CmdScript
+import io.smartdatalake.workflow.action.spark.TestCopyDfTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import org.scalatest.flatspec.AnyFlatSpec
@@ -69,8 +69,8 @@ private[smartdatalake] class ActionImplTests extends AnyFlatSpec with Matchers {
 
   "CopyAction" should "be parsable" in {
 
-    val customTransformerConfig = ScalaClassSparkDfTransformer(
-      className = classOf[TestDfTransformer].getName
+    val customTransformerConfig = ScalaClassGenericDfTransformer(
+      className = classOf[TestCopyDfTransformer].getName
     )
 
     val config = ConfigFactory.parseString(
@@ -82,7 +82,7 @@ private[smartdatalake] class ActionImplTests extends AnyFlatSpec with Matchers {
         |   outputId = tdo2
         |   delete-data-after-read = false
         |   transformers = [
-        |     { type = ScalaClassSparkDfTransformer, class-name = io.smartdatalake.workflow.action.TestDfTransformer }
+        |     { type = ScalaClassGenericDfTransformer, class-name = io.smartdatalake.workflow.action.spark.TestCopyDfTransformer }
         |     { type = WhitelistTransformer, columnWhitelist = [col1, col2] }
         |     { type = FilterTransformer, filterClause = "1 = 1" }
         |     { type = DataValidationTransformer, rules = [{ type = RowLevelValidationRule, condition = "a is not null" }]}
