@@ -22,7 +22,7 @@ import io.smartdatalake.config.ConfigToolbox
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.exporter.ExportWriter.formatSchema
 import io.smartdatalake.config.exporter.FileExportWriter
-import io.smartdatalake.meta.configexporter.DataObjectSchemaExporter.getCurrentVersion
+import io.smartdatalake.meta.configexporter.DataObjectSchemaExporter.{exportSchemaAndStats, getCurrentVersion}
 import io.smartdatalake.testutils.DataFrameTestHelper.ComplexTypeTest
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -143,10 +143,12 @@ class DataObjectSchemaExporterTest extends AnyFunSuite with BeforeAndAfter {
         "--stopOnError",
         "false"
       ))
-    assert(exportPath.toFile.listFiles().filter(_.getName.endsWith(".json")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1",
-      "dataObjectCsv2", "dataObjectCsv3", "dataObjectCsv4", "dataObjectHive14"))
-    assert(exportPath.toFile.listFiles().filter(_.getName.endsWith(".index")).map(_.getName.split('.').head).toSet == Set("dataObjectCsv1",
-      "dataObjectCsv2", "dataObjectCsv3", "dataObjectCsv4", "dataObjectHive14"))
+    val actual1 = exportPath.toFile.listFiles().filter(_.getName.endsWith(".json")).map(_.getName.split('.').head).toSet
+    val expected1 = Set("dataObjectCsv1", "dataObjectCsv2", "dataObjectCsv3", "dataObjectCsv4")
+    assert(actual1 == expected1)
+    val actual2 = exportPath.toFile.listFiles().filter(_.getName.endsWith(".index")).map(_.getName.split('.').head).toSet
+    val expected2 = Set("dataObjectCsv1", "dataObjectCsv2", "dataObjectCsv3", "dataObjectCsv4")
+    assert(actual2 == expected2)
   }
 
   test("schema file is not updated if unchanged") {
