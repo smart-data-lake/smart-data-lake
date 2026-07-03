@@ -192,26 +192,6 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
       }.toSeq
   }
 
-  /**
-   * Returns the primary key constraint for the given table.
-   * Override in database-specific subclasses if INFORMATION_SCHEMA is not available.
-   */
-  def getPrimaryKey(catalog: Option[String], schema: Option[String], tableName: String): Option[PrimaryKeyDefinition] =
-    throw new UnsupportedOperationException(s"getPrimaryKey is not implemented for ${getClass.getSimpleName}. Override this method for database-specific support.")
-
-  /**
-   * Returns all foreign key constraints defined on the given table.
-   * Override in database-specific subclasses if INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE is not available.
-   */
-  def getForeignKeys(catalog: Option[String], schema: Option[String], tableName: String): Seq[ForeignKeyDefinition] =
-    throw new UnsupportedOperationException(s"getForeignKeys is not implemented for ${getClass.getSimpleName}. Override this method for database-specific support.")
-
-  /**
-   * Returns a map of column name → is-nullable for all columns of the given table.
-   * Override in database-specific subclasses if INFORMATION_SCHEMA.COLUMNS is not available.
-   */
-  def getColumnNullability(catalog: Option[String], schema: Option[String], tableName: String): Map[String, Boolean] =
-    throw new UnsupportedOperationException(s"getColumnNullability is not implemented for ${getClass.getSimpleName}. Override this method for database-specific support.")
 }
 private[smartdatalake] object JdbcCatalog {
   def fromJdbcDriver(driver: String, connection: JdbcTableConnection): JdbcCatalog = {
@@ -237,14 +217,14 @@ private[smartdatalake] class DefaultJdbcCatalog(connection: Connection with Jdbc
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists )
   }
 
-  override def getPrimaryKey(catalog: Option[String], schema: Option[String], tableName: String): Option[PrimaryKeyDefinition] = {
+  def getPrimaryKey(catalog: Option[String], schema: Option[String], tableName: String): Option[PrimaryKeyDefinition] = {
     val schemaFilter  = schema.map(s => s" AND UPPER(TABLE_SCHEMA) = UPPER('$s')").getOrElse("")
     val catalogFilter = catalog.map(c => s" AND UPPER(TABLE_CATALOG) = UPPER('$c')").getOrElse("")
     val query = s"SELECT COLUMN_NAME, CONSTRAINT_NAME AS PK_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE UPPER(TABLE_NAME) = UPPER('$tableName')$schemaFilter$catalogFilter"
     connection.execJdbcQuery(query, handlePrimaryKeyResultSet)
   }
 
-  override def getForeignKeys(catalog: Option[String], schema: Option[String], tableName: String): Seq[ForeignKeyDefinition] = {
+  def getForeignKeys(catalog: Option[String], schema: Option[String], tableName: String): Seq[ForeignKeyDefinition] = {
     val schemaFilter  = schema.map(s => s" AND UPPER(tc.TABLE_SCHEMA) = UPPER('$s')").getOrElse("")
     val catalogFilter = catalog.map(c => s" AND UPPER(tc.TABLE_CATALOG) = UPPER('$c')").getOrElse("")
     val query =
@@ -289,7 +269,7 @@ private[smartdatalake] class DefaultJdbcCatalog(connection: Connection with Jdbc
     }.toSeq
   }
 
-  override def getColumnNullability(catalog: Option[String], schema: Option[String], tableName: String): Map[String, Boolean] = {
+  def getColumnNullability(catalog: Option[String], schema: Option[String], tableName: String): Map[String, Boolean] = {
     val schemaFilter  = schema.map(s => s" AND UPPER(TABLE_SCHEMA) = UPPER('$s')").getOrElse("")
     val catalogFilter = catalog.map(c => s" AND UPPER(TABLE_CATALOG) = UPPER('$c')").getOrElse("")
     val query = s"SELECT COLUMN_NAME, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE UPPER(TABLE_NAME) = UPPER('$tableName')$schemaFilter$catalogFilter"

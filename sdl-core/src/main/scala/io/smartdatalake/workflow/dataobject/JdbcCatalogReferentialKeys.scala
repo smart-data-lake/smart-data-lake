@@ -20,33 +20,30 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.connection.jdbc.{JdbcCatalog}
+import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcCatalog}
 
 /**
  * Concrete implementation of [[CanHandleReferentialKeys]] for JDBC-backed DataObjects.
  *
- * All seven abstract methods are implemented here; subclasses only need to provide four
- * protected hooks that point at the connection's catalog and metadata access:
+ * `jCatalog` is the single abstract hook — it provides the JDBC DDL operations
+ * (create / drop constraints, set NOT NULL).  Query operations (read existing PKs / FKs /
+ * column nullability) are dispatched to [[DefaultJdbcCatalog]] when available; custom
+ * catalog types can extend [[DefaultJdbcCatalog]] and override those methods.
  *
+ * Other catalog technologies (REST, Hive, …) implement [[CanHandleReferentialKeys]] directly
+ * and are independent of this trait.
+ *
+ * Used by [[JdbcTableDataObject]] and [[SnowflakeTableDataObject]]:
  * {{{
- *   override protected def jCatalog: JdbcCatalog = connection.catalog
- *   override protected def fetchPrimaryKey(c, s, t) = connection.getJdbcPrimaryKey(c, s, t)
- *   override protected def fetchForeignKeys(c, s, t) = connection.getJdbcForeignKeys(c, s, t)
- *   override protected def fetchColumnNullability(c, s, t) = connection.getColumnNullability(c, s, t)
+ *   override protected def jCatalog = connection.catalog
  * }}}
- *
- * Used by [[JdbcTableDataObject]] and [[SnowflakeTableDataObject]].
  */
 trait JdbcCatalogReferentialKeys extends CanHandleReferentialKeys { self: TransactionalTableDataObject =>
 
-  /** The catalog instance to delegate all operations to. */
+  /** JDBC catalog used for DDL operations (create / drop constraints, set NOT NULL). */
   protected def jCatalog: JdbcCatalog
 
-  // ── CanHandleReferentialKeys — concrete implementations ───────────────
-
-  override def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)
-      (implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] =
-    jCatalog.getPrimaryKey(catalog, schema, tableName)
+  // ── CanHandleReferentialKeys — DDL operations via jCatalog ────────────
 
   override def dropPrimaryKeyConstraint(tableName: String, constraintName: String)
       (implicit context: ActionPipelineContext): Unit =
@@ -58,15 +55,11 @@ trait JdbcCatalogReferentialKeys extends CanHandleReferentialKeys { self: Transa
 
   override def ensureColumnsNotNull(tableName: String, columns: Seq[String])
       (implicit context: ActionPipelineContext): Unit = {
-    val nullability = jCatalog.getColumnNullability(table.catalog, table.db, table.name)
+    val nullability = requireDefaultCatalog("getColumnNullability").getColumnNullability(table.catalog, table.db, table.name)
     columns.filter(col => nullability.getOrElse(col, true)).foreach { col =>
       jCatalog.ensureColumnNotNull(tableName, col)
     }
   }
-
-  override def getExistingFKConstraints(catalog: Option[String], schema: Option[String], tableName: String)
-      (implicit context: ActionPipelineContext): Seq[ForeignKeyDefinition] =
-    jCatalog.getForeignKeys(catalog, schema, tableName)
 
   override def dropForeignKeyConstraint(tableName: String, constraintName: String)
       (implicit context: ActionPipelineContext): Unit =
@@ -76,4 +69,23 @@ trait JdbcCatalogReferentialKeys extends CanHandleReferentialKeys { self: Transa
       localColumns: Seq[String], refFullTableName: String, refColumns: Seq[String])
       (implicit context: ActionPipelineContext): Unit =
     jCatalog.createForeignKeyConstraint(tableName, constraintName, localColumns, refFullTableName, refColumns)
+
+  // ── CanHandleReferentialKeys — query operations via DefaultJdbcCatalog ─
+
+  override def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)
+      (implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] =
+    requireDefaultCatalog("getPrimaryKey").getPrimaryKey(catalog, schema, tableName)
+
+  override def getExistingFKConstraints(catalog: Option[String], schema: Option[String], tableName: String)
+      (implicit context: ActionPipelineContext): Seq[ForeignKeyDefinition] =
+    requireDefaultCatalog("getForeignKeys").getForeignKeys(catalog, schema, tableName)
+
+  // ── Private helper ────────────────────────────────────────────────────
+
+  private def requireDefaultCatalog(op: String): DefaultJdbcCatalog = jCatalog match {
+    case dc: DefaultJdbcCatalog => dc
+    case other => throw new UnsupportedOperationException(
+      s"$id: $op requires a DefaultJdbcCatalog (INFORMATION_SCHEMA) but catalog is ${other.getClass.getSimpleName}. " +
+      s"Override $op in a custom JdbcCatalog subclass to add support.")
+  }
 }
