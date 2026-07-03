@@ -64,11 +64,6 @@
 			<artifactId>config</artifactId>
 			<scope>${sdl-core.scope}</scope>
 		</dependency>
-		<dependency>
-			<groupId>com.github.kxbmap</groupId>
-			<artifactId>configs_${scala.minor.version}</artifactId>
-			<scope>${sdl-core.scope}</scope>
-		</dependency>
 
 		<!-- Snowflake dependencies -->
 		<!-- Note that there might be a version conflict in the transitive dependency snowflake-jdbc between snowpark and spark-snowflake -->
@@ -127,18 +122,6 @@
 			<version>${project.parent.version}</version>
 			<classifier>test-jar</classifier>
 			<type>test-jar</type>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.sshd</groupId>
-			<artifactId>sshd-core</artifactId>
-			<version>${sshd.test.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.github.tomakehurst</groupId>
-			<artifactId>wiremock-standalone</artifactId>
-			<version>2.25.1</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

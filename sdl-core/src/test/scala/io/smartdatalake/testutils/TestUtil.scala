@@ -62,20 +62,9 @@ import scala.jdk.CollectionConverters._
  */
 object TestUtil extends SmartDataLakeLogger with Equality {
 
-  // extract keystore file from resource jar for wiremock server
-  private lazy val wiremockKeyStoreFile = {
-    val resource = "test_keystore.pkcs12"
-    val keyStorePath = Files.createTempDirectory("test").resolve(resource)
-    val inputStream = Option(getClass.getResourceAsStream("/" + resource))
-      .getOrElse(throw new RuntimeException(s"Could not find resource $resource in classpath"))
-    Files.copy(inputStream, keyStorePath)
-    inputStream.close()
-    keyStorePath.toString
-  }
-
-// TODO: merge with io.smartdatalake.util.spark.GetSession, to avoid code duplication.
-//  Note that GetSession is in main sources, so it cannot depend on test sources,
-//  but maybe we can move the common code to a separate object in main sources.
+  // TODO: merge with io.smartdatalake.util.spark.GetSession, to avoid code duplication.
+  //  Note that GetSession is in main sources, so it cannot depend on test sources,
+  //  but maybe we can move the common code to a separate object in main sources.
   def sparkSessionBuilder(additionalSparkProperties: Map[String, StringOrSecret] = Map()): SparkSession.Builder = {
     // create builder
     val builder = additionalSparkProperties.foldLeft(SparkSession.builder()) {
@@ -146,80 +135,6 @@ object TestUtil extends SmartDataLakeLogger with Equality {
     val inputStream = this.getClass.getClassLoader.getResourceAsStream(resource)
     assert(inputStream != null, s"resource file $resource not found")
     FileUtils.copyInputStreamToFile(inputStream, tgtFile)
-  }
-
-  def setupSSHServer(port: Int, usr: String, pwd: String): SshServer = {
-    val sshd = SshServer.setUpDefaultServer()
-    sshd.setFileSystemFactory(new NativeFileSystemFactory())
-    sshd.setPort(port)
-    sshd.setKeyPairProvider(new SimpleGeneratorHostKeyProvider(Files.createTempDirectory("sshd").resolve("hostkey.ser")))
-    sshd.setSubsystemFactories(List(new SftpSubsystemFactory().asInstanceOf[SubsystemFactory]).asJava)
-    sshd.setPasswordAuthenticator(new PasswordAuthenticator() {
-      override def authenticate(user: String, password: String, session: ServerSession): Boolean = user == usr && password == pwd
-    })
-    sshd.start()
-    // Thread.sleep(1000000)
-    // return
-    sshd
-  }
-
-  /**
-   * Setup simple webserver with given ports Different stubs are generated automatically to answer
-   * different URLs with predefined return codes
-   *
-   * @param host
-   *   bind address, usually localhost / 127.0.0.1
-   * @param port
-   *   port for http calls
-   * @param httpsPort
-   *   port for https calls
-   * @return
-   *   instance of [[WireMockServer]]
-   */
-  def startWebservice(host: String, port: Int, httpsPort: Int): WireMockServer = {
-    configureFor(host, port)
-    val wireMockServer =
-      new WireMockServer(
-        wireMockConfig()
-          .port(port)
-          .httpsPort(httpsPort)
-          .bindAddress(host)
-          .keystorePath(wiremockKeyStoreFile)
-          .keystorePassword("mytruststorepassword")
-          .asynchronousResponseEnabled(false)
-      )
-    wireMockServer
-      .start()
-    wireMockServer
-  }
-
-  def setupWebserviceStubs(): Unit = {
-    stubFor(post(urlEqualTo("/good/post/no_auth"))
-        .willReturn(aResponse().withBody("{{request.path.[0]}}"))
-    )
-
-    stubFor(get(urlEqualTo("/good/no_auth/"))
-        .willReturn(aResponse().withStatus(200))
-    )
-
-    stubFor(get(urlMatching("/good/basic_auth/"))
-        .withHeader("Authorization", equalTo("Basic ZnMxOmZyZWl0YWcyMDE3x"))
-        .willReturn(ok("request looks good"))
-    )
-
-    stubFor(get(urlMatching("/good/client_id/"))
-        .withHeader("Authorization", equalTo("Basic ZnMxOmZyZWl0YWcyMDE3x"))
-        .willReturn(ok("request looks good"))
-    )
-
-    stubFor(get(urlMatching("/good/token/"))
-        .withHeader("Authorization", equalTo("Bearer ZnMxOmZyZWl0YWcyMDE3x"))
-        .willReturn(ok("request looks good"))
-    )
-
-    stubFor(get(urlMatching("/bad/*/"))
-        .willReturn(aResponse.withStatus(404))
-    )
   }
 
   // a few data frames

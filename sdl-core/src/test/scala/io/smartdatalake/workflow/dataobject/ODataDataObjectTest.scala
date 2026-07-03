@@ -22,7 +22,7 @@ import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.{WireMock => w}
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
+import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil, WebserviceTestUtil}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.webservice.{HttpRequestError, HttpTimeoutConfig}
 import io.smartdatalake.workflow.ExecutionPhase
@@ -267,7 +267,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
   var server: WireMockServer = _
 
   override def additionalBefore(): Unit = {
-    server = TestUtil.startWebservice(host, port, httpsPort)
+    server = WebserviceTestUtil.startWebservice(host, port, httpsPort)
   }
 
   after {

@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{SshTestUtil, TestUtil, WebserviceTestUtil}
 import io.smartdatalake.util.filetransfer.StreamFileTransfer
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.secrets.StringOrSecret
@@ -50,7 +50,7 @@ class SFtpFileRefDataObjectTest extends AnyFunSuite with Matchers with BeforeAnd
   var tempDir: Path = _
 
   override protected def beforeAll(): Unit = {
-    sshd = TestUtil.setupSSHServer(sshPort, sshUser, sshPwd)
+    sshd = SshTestUtil.setupSSHServer(sshPort, sshUser, sshPwd)
     con = SFtpFileRefConnection("con1", "localhost", sshPort,
       BasicAuthMode(user = StringOrSecret(sshUser), password = StringOrSecret(sshPwd)),
       ignoreHostKeyVerification = true, maxParallelConnections = 10)

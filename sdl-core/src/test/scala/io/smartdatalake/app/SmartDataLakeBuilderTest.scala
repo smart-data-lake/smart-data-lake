@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId, stringTo
 import io.smartdatalake.config.{ConfigParser, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.custom.TestCustomDfsTransformer
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil, WebserviceTestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.StateUploader
@@ -859,8 +859,8 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
     val port = 8888
     val httpsPort = 8889
     val host = "127.0.0.1"
-    val wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
-    TestUtil.setupWebserviceStubs()
+    val wireMockServer = WebserviceTestUtil.startWebservice(host, port, httpsPort)
+    WebserviceTestUtil.setupWebserviceStubs()
 
     val feedName = "test"
     implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)

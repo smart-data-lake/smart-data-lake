@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{TestUtil, WebserviceTestUtil}
 import io.smartdatalake.util.misc.ResourceUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.fs.Path
@@ -54,7 +54,7 @@ class OpenApiDataObjectTest extends AnyFunSuite {
 
   test("read openapi webservice") {
     import session.implicits._
-    val wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
+    val wireMockServer = WebserviceTestUtil.startWebservice(host, port, httpsPort)
     stubFor(get(urlEqualTo("/sampleApiDoc.json"))
       .willReturn(aResponse().withBody(ResourceUtil.readResourceAsString(new Path("cp:/openApiSpec/sampleApiDoc.json"))))
     )
@@ -77,7 +77,7 @@ class OpenApiDataObjectTest extends AnyFunSuite {
 
   test("read openapi webservice with paging") {
     import session.implicits._
-    val wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
+    val wireMockServer = WebserviceTestUtil.startWebservice(host, port, httpsPort)
     stubFor(get(urlEqualTo("/sampleApiDocPaging.json"))
       .willReturn(aResponse().withBody(ResourceUtil.readResourceAsString(new Path("cp:/openApiSpec/sampleApiDocPaging.json"))))
     )

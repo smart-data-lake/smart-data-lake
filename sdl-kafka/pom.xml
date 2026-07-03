@@ -127,11 +127,6 @@
 			<artifactId>config</artifactId>
 			<scope>${sdl-core.scope}</scope>
 		</dependency>
-		<dependency>
-			<groupId>com.github.kxbmap</groupId>
-			<artifactId>configs_${scala.minor.version}</artifactId>
-			<scope>${sdl-core.scope}</scope>
-		</dependency>
 
 		<dependency>
 			<groupId>org.scala-lang</groupId>
@@ -168,24 +163,6 @@
 			<version>${project.parent.version}</version>
 			<classifier>test-jar</classifier>
 			<type>test-jar</type>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.sshd</groupId>
-			<artifactId>sshd-sftp</artifactId>
-			<version>${sshd.test.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.sshd</groupId>
-			<artifactId>sshd-common</artifactId>
-			<version>${sshd.test.version}</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.sshd</groupId>
-			<artifactId>sshd-core</artifactId>
-			<version>${sshd.test.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
