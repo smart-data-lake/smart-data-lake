@@ -88,7 +88,7 @@ object ActionHelper extends SmartDataLakeLogger {
   catch {
     case e: IllegalArgumentException if e.getMessage.contains("DataObject schema is undefined") => None
     case e
-        if e.getClass.getSimpleName == "AnalysisException" && e.getMessage.contains("[TABLE_OR_VIEW_NOT_FOUND]") ||
+        if e.getClass.getSimpleName.endsWith("AnalysisException") && e.getMessage.contains("[TABLE_OR_VIEW_NOT_FOUND]") ||
           e.getMessage.contains("[UNABLE_TO_INFER_SCHEMA]") || e.getMessage.contains("[DELTA_MISSING_DELTA_TABLE]") => None
     case _: NoDataToProcessWarning => None
   }
