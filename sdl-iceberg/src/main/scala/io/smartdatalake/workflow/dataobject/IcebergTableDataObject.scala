@@ -375,15 +375,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       if (!allowSchemaEvolution) validateSchema(SparkSchema(targetSchema), SparkSchema(session.table(table.fullName).schema), "write")
       // apply
       if (finalSaveMode == SDLSaveMode.Merge) {
-        // handle schema evolution on merge because this is not yet supported in Spark <=3.5
-        val existingSchema = SparkSchema(getSparkDataFrame().schema)
-        if (allowSchemaEvolution && !existingSchema.equalsSchema(SparkSchema(targetSchema))) evolveTableSchema(targetSchema)
-        // make sure SPARK_WRITE_ACCEPT_ANY_SCHEMA=false with SQL merge, because this is not supported in Spark 3.5. See also https://github.com/apache/iceberg/issues/9827.
-        // TODO: This might be solved with Spark 4.0, as there will be a Spark API for merge.
-        updateTableProperty(TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA, "false", TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA_DEFAULT.toString)
-        // merge operations still need all columns for potential insert/updateConditions.
         // Therefore, dfPrepared instead of saveModeTargetDf is passed on.
-        mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()))
+        mergeDataFrameByPrimaryKey(df, saveModeOptions.map(SaveModeMergeOptions.fromSaveModeOptions).getOrElse(SaveModeMergeOptions()), targetSchema)
       } else SparkStageMetricsListener.execWithMetrics(this.id, {
         // Make sure SPARK_WRITE_ACCEPT_ANY_SCHEMA=true for schema evolution
         updateTableProperty(TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA, allowSchemaEvolution.toString, TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA_DEFAULT.toString)
@@ -433,11 +426,12 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     sparkMetrics ++ icebergMetrics
   }
 
-  private def writeToTempTable(df: DataFrame)(implicit context: ActionPipelineContext): Unit = {
+  private def writeToTempTable(df: DataFrame, identifier: TableIdentifier)(implicit context: ActionPipelineContext): Unit = {
     logger.debug(s"check if temp-table ${tmpTable.fullName} exists")
     if (getIcebergCatalog.tableExists(getTableIdentifier)) {
       logger.error(s"($id) Temporary table ${tmpTable.fullName} for merge already exists!" +
         s" There might be a potential conflict with another job. It will be replaced.")
+      getIcebergCatalog.dropTable(identifier)
     }
     val icebergPath = hadoopPath.toString + "_sdltmp"
     logger.debug(s"writeToTempTable: write to temp-table ${tmpTable.fullName}. Option icebergPath = $icebergPath")
@@ -455,15 +449,22 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    * Table.primaryKey is used as condition to check if a record is matched or not. If it is matched it gets updated (or deleted), otherwise it is inserted.
    * This all is done in one transaction.
    */
-  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): MetricsMap = {
+  def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions, targetSchema: StructType)(implicit context: ActionPipelineContext): MetricsMap = {
     implicit val session: SparkSession = SparkSubFeed.getSparkSession
     assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
+    val tmpTableIdentifier = TableIdentifier.of(getIdentifier.namespace :+ tmpTable.name :_*)
 
     try {
       // write data to temp table
       val metrics = SparkStageMetricsListener.execWithMetrics(this.id,
-        writeToTempTable(df)
+        writeToTempTable(df, tmpTableIdentifier)
       )
+
+      // handle schema evolution on merge because this is not yet supported in Spark <=3.5
+      val existingSchema = SparkSchema(getSparkDataFrame().schema)
+      if (allowSchemaEvolution && !existingSchema.equalsSchema(SparkSchema(targetSchema))) evolveTableSchema(targetSchema)
+      // make sure SPARK_WRITE_ACCEPT_ANY_SCHEMA=false with SQL merge, because this is not supported in Spark 3.5. See also https://github.com/apache/iceberg/issues/9827.
+      updateTableProperty(TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA, "false", TableProperties.SPARK_WRITE_ACCEPT_ANY_SCHEMA_DEFAULT.toString)
 
       // update existing does not work with SQL merge stmt
       val updateExistingStatement = SQLUtil.createUpdateExistingStatement(table, df.columns.toSeq, tmpTable.fullName, saveModeOptions, SQLUtil.sparkQuoteCaseSensitiveColumn(_))
@@ -490,7 +491,6 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       metrics
     } finally {
       // cleanup temp table
-      val tmpTableIdentifier = TableIdentifier.of(getIdentifier.namespace :+ tmpTable.name:_*)
       getIcebergCatalog.dropTable(tmpTableIdentifier)
     }
   }
