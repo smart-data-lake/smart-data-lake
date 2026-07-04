@@ -19,7 +19,7 @@
 package io.smartdatalake.util.webservice
 
 import com.github.tomakehurst.wiremock.client.{WireMock => w}
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.WebserviceTestUtil
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.json4s.jackson.JsonMethods.parse
@@ -213,7 +213,7 @@ class OpenApiUtilTest extends AnyFunSuite {
     val port = 8080
     val httpsPort = 8443
     val host = "127.0.0.1"
-    val server = TestUtil.startWebservice(host, port, httpsPort)
+    val server = WebserviceTestUtil.startWebservice(host, port, httpsPort)
 
     val specJson =
       """

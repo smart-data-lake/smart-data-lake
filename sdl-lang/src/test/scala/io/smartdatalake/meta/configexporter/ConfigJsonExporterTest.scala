@@ -19,7 +19,7 @@
 package io.smartdatalake.meta.configexporter
 
 import com.github.tomakehurst.wiremock.client.WireMock._
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.WebserviceTestUtil
 import org.apache.hadoop.conf.Configuration
 import org.json4s._
 import org.json4s.jackson.JsonMethods
@@ -65,7 +65,7 @@ class ConfigJsonExporterTest extends AnyFunSuite {
     val port = 8080 // for some reason, only the default port seems to work
     val httpsPort = 8443
     val host = "127.0.0.1"
-    val wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
+    val wireMockServer = WebserviceTestUtil.startWebservice(host, port, httpsPort)
     stubFor(put(urlPathMatching("/api/v1/.*"))
         .willReturn(aResponse().withStatus(200))
     )

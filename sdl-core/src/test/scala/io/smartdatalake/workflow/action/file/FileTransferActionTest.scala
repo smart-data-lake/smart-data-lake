@@ -22,7 +22,7 @@ import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, get, stubFor, urlEqualTo}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.SDLSaveMode
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{SshTestUtil, TestUtil, WebserviceTestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.FileTransferAction
@@ -56,8 +56,8 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
   val host = "127.0.0.1"
 
   override protected def beforeAll(): Unit = {
-    sshd = TestUtil.setupSSHServer(sshPort, sshUser, sshPwd)
-    wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
+    sshd = SshTestUtil.setupSSHServer(sshPort, sshUser, sshPwd)
+    wireMockServer = WebserviceTestUtil.startWebservice(host, port, httpsPort)
   }
 
   override protected def afterAll(): Unit = {
@@ -75,7 +75,7 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
         ignoreHostKeyVerification = true
       ))
     wireMockServer.resetAll()
-    TestUtil.setupWebserviceStubs()
+    WebserviceTestUtil.setupWebserviceStubs()
   }
 
   test("copy file from sftp to hadoop without partitions") {

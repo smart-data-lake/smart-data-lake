@@ -20,7 +20,7 @@ package io.smartdatalake.util.webservice
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.{TestUtil, WebserviceTestUtil}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.authMode.{AuthHeaderMode, BasicAuthMode, CustomHttpAuthModeLogic}
@@ -44,14 +44,14 @@ class WebserviceClientTest extends AnyFunSuite with BeforeAndAfter with BeforeAn
   implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
 
   override protected def beforeAll(): Unit =
-    wireMockServer = TestUtil.startWebservice(host, port, httpsPort)
+    wireMockServer = WebserviceTestUtil.startWebservice(host, port, httpsPort)
 
   override protected def afterAll(): Unit =
     wireMockServer.stop()
 
   before {
     wireMockServer.resetAll()
-    TestUtil.setupWebserviceStubs()
+    WebserviceTestUtil.setupWebserviceStubs()
   }
 
   test("Call webservice with wrong Url") {
