@@ -28,7 +28,7 @@ import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactor
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc._
 import io.smartdatalake.util.spark.hive.HiveUtil
-import io.smartdatalake.util.spark.{SparkQueryUtil, SparkStageMetricsListener}
+import io.smartdatalake.util.spark.{SparkQueryUtil, SparkSchemaUtil, SparkStageMetricsListener}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
@@ -40,6 +40,7 @@ import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame, SparkSaveMode}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.delta.DeltaLog
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -228,7 +229,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       }
     }
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
-    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame().columns, role = "prepare", obj = "Existing table")
   }
 
   /**
@@ -292,14 +293,14 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     if(!propertyExists(enableCdcFeedProperty) && incrementalOutputExpr.isDefined) activateCdc()
 
     validateSchemaMin(SparkSchema(df.schema), "read")
-    validateSchemaHasPartitionCols(df, "read")
+    validateSchemaHasPartitionCols(df.columns, "read")
     df
   }
 
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     validateSchemaMin(SparkSchema(df.schema), "write")
-    validateSchemaHasPartitionCols(df, "write")
-    validateSchemaHasPrimaryKeyCols(df, "write")
+    validateSchemaHasPartitionCols(df.columns, "write")
+    validateSchemaHasPrimaryKeyCols(df.columns, "write")
   }
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
@@ -328,12 +329,12 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     val targetDf = if (schemaMin.isDefined) {
       validateSchemaMin(SparkSchema(targetSchema), "write") //needed for merging the schemas
       val sparkSchemaMin = schemaMin.get.asInstanceOf[SparkSchema] //writeSparkDataFrame is only done with SparkSubFeeds
-      val targetSchemaWithMetadata: StructType = SchemaUtil.mergeSchemaMetadata(sparkSchemaMin.inner, targetSchema)
+      val targetSchemaWithMetadata: StructType = SparkSchemaUtil.mergeSchemaMetadata(sparkSchemaMin.inner, targetSchema)
       targetDfIncoming.to(targetSchemaWithMetadata)
     } else targetDfIncoming
 
-    validateSchemaHasPartitionCols(targetDf, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf, "write")
+    validateSchemaHasPartitionCols(targetDf.columns, "write")
+    validateSchemaHasPrimaryKeyCols(targetDf.columns, "write")
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
@@ -386,7 +387,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     //if the flag is set, update comments of existing columns (one by one)
     if (updateColumnComments) {
-      val columnsToUpdate = SchemaUtil.identifyMissingComments(targetDf.schema, session.table(table.fullName).schema).map(kv => (kv._1.mkString("."), kv._2))
+      val columnsToUpdate = SparkSchemaUtil.identifyMissingComments(targetDf.schema, session.table(table.fullName).schema).map(kv => (kv._1.mkString("."), kv._2))
       updateExistingColumnComments(columnsToUpdate)
     }
 
@@ -598,7 +599,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def getColumnStats(update: Boolean, lastModifiedAt: Option[Long])(implicit context: ActionPipelineContext): Map[String, Map[String,Any]] = {
     try {
       val session = SparkSubFeed.getSparkSession
-      val deltaLog = DeltaLog.forTable(session, table.tableIdentifier)
+      val deltaLog = DeltaLog.forTable(session, TableIdentifier(table.name, table.db, table.catalog))
       val snapshot = deltaLog.unsafeVolatileSnapshot
       val columns = snapshot.schema.fieldNames
       import session.implicits._

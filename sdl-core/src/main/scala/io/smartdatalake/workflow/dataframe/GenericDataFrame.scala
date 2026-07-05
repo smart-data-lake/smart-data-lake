@@ -459,6 +459,38 @@ trait GenericColumn extends GenericTypedObject {
 }
 
 /**
+ * A GenericColumn that wraps a SQL expression string.
+ * Only exprSql is supported; all other operations throw UnsupportedOperationException.
+ * Used internally for expectation validation where only the SQL string is needed.
+ */
+private[smartdatalake] case class SqlExpressionColumn(sql: String) extends GenericColumn {
+  override def exprSql: String = sql
+  override def getName: Option[String] = None
+  private def unsupported(op: String) = throw new UnsupportedOperationException(s"SqlExpressionColumn does not support '$op'")
+  override def ===(other: GenericColumn): GenericColumn = unsupported("===")
+  override def =!=(other: GenericColumn): GenericColumn = unsupported("=!=")
+  override def <=>(other: GenericColumn): GenericColumn = unsupported("<=>")
+  override def >(other: GenericColumn): GenericColumn = unsupported(">")
+  override def <(other: GenericColumn): GenericColumn = unsupported("<")
+  override def >=(other: GenericColumn): GenericColumn = unsupported(">=")
+  override def <=(other: GenericColumn): GenericColumn = unsupported("<=")
+  override def +(other: GenericColumn): GenericColumn = unsupported("+")
+  override def -(other: GenericColumn): GenericColumn = unsupported("-")
+  override def /(other: GenericColumn): GenericColumn = unsupported("/")
+  override def *(other: GenericColumn): GenericColumn = unsupported("*")
+  override def and(other: GenericColumn): GenericColumn = unsupported("and")
+  override def or(other: GenericColumn): GenericColumn = unsupported("or")
+  override def isin(list: Any*): GenericColumn = unsupported("isin")
+  override def isNull: GenericColumn = unsupported("isNull")
+  override def isNotNull: GenericColumn = unsupported("isNotNull")
+  override def as(name: String): GenericColumn = unsupported("as")
+  override def cast(dataType: GenericDataType): GenericColumn = unsupported("cast")
+  override def desc: GenericColumn = unsupported("desc")
+  override def apply(extraction: Any): GenericColumn = unsupported("apply")
+  override def subFeedType: scala.reflect.runtime.universe.Type = throw new UnsupportedOperationException("SqlExpressionColumn.subFeedType")
+}
+
+/**
  * Interface for the fields of a GenericSchema or struct type
  */
 trait GenericField extends GenericTypedObject {

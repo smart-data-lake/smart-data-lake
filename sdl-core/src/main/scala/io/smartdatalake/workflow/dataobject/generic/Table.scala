@@ -18,8 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject.generic
 
-import org.apache.spark.sql.catalyst.TableIdentifier
-
 /**
  * Table attributes
  *
@@ -78,9 +76,6 @@ case class Table(
 
   def nameParts: Seq[String] = Seq(catalog, db, Some(name)).flatten
 
-  private[smartdatalake] def tableIdentifier: TableIdentifier = {
-    TableIdentifier(name, db, catalog)
-  }
 }
 
 /**

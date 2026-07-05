@@ -22,7 +22,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.definitions._
+import io.smartdatalake.definitions.{SparkSaveModeUtil, _}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc._
 import io.smartdatalake.util.spark.{SparkQueryUtil, SparkStageMetricsListener}
@@ -240,7 +240,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       logger.info(s"($id) Dropped existing Iceberg table ${table.fullName} because path was missing")
     }
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
-    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame().columns, role = "prepare", obj = "Existing table")
   }
 
   /**
@@ -321,7 +321,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     }
 
     validateSchemaMin(SparkSchema(df.schema), "read")
-    validateSchemaHasPartitionCols(df, "read")
+    validateSchemaHasPartitionCols(df.columns, "read")
 
     df
   }
@@ -332,8 +332,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     val targetSchema = targetDf.schema
 
     validateSchemaMin(SparkSchema(targetSchema), "write")
-    validateSchemaHasPartitionCols(targetDf, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf, "write")
+    validateSchemaHasPartitionCols(targetDf.columns, "write")
+    validateSchemaHasPrimaryKeyCols(targetDf.columns, "write")
     if (isTableExisting) {
       val existingSchema = SparkSchema(getSparkDataFrame().schema)
       if (!allowSchemaEvolution) validateSchema(SparkSchema(targetSchema), existingSchema, "write")
@@ -356,8 +356,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     val targetSchema = targetDf.schema
 
     validateSchemaMin(SparkSchema(targetSchema), "write")
-    validateSchemaHasPartitionCols(targetDf, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf, "write")
+    validateSchemaHasPartitionCols(targetDf.columns, "write")
+    validateSchemaHasPrimaryKeyCols(targetDf.columns, "write")
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
@@ -384,13 +384,13 @@ case class IcebergTableDataObject(override val id: DataObjectId,
           .writeTo(table.fullName)
           .option(SparkWriteOptions.MERGE_SCHEMA, allowSchemaEvolution.toString)
         if (partitions.isEmpty) {
-          SDLSaveMode.execV2(finalSaveMode, dfWriterV2, partitionValues)
+          SparkSaveModeUtil.execV2(finalSaveMode, dfWriterV2, partitionValues)
         } else {
           val overwriteModeIsDynamic = options.get("partitionOverwriteMode").orElse(session.conf.getOption("spark.sql.sources.partitionOverwriteMode")).contains("dynamic")
           if (finalSaveMode == SDLSaveMode.Overwrite && partitionValues.isEmpty && !overwriteModeIsDynamic) {
             throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data. Set option.partitionOverwriteMode=dynamic on this IcebergTableDataObject to enable dynamic partitioning and get around this exception.")
           }
-          SDLSaveMode.execV2(finalSaveMode, dfWriterV2, partitionValues, overwriteModeIsDynamic)
+          SparkSaveModeUtil.execV2(finalSaveMode, dfWriterV2, partitionValues, overwriteModeIsDynamic)
         }
       })
     } else SparkStageMetricsListener.execWithMetrics(this.id, {

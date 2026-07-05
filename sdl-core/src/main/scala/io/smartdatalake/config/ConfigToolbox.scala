@@ -24,7 +24,6 @@ import io.smartdatalake.util.misc.SerializableHadoopConfiguration
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.sql.SparkSession
 
 import java.time.LocalDateTime
 

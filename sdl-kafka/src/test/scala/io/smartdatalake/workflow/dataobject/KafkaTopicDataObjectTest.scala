@@ -23,6 +23,7 @@ import io.github.embeddedkafka.schemaregistry.{EmbeddedKafka => EmbeddedKafkaWit
 import io.smartdatalake.testutil.KafkaTestUtil
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.spark.SparkSchemaUtil
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
@@ -192,7 +193,7 @@ class KafkaTopicDataObjectTest extends AnyFunSuite with BeforeAndAfterAll with B
 
     // parse json record with spark
     instanceRegistry.register(kafkaConnection)
-    val userSchema = SchemaUtil.getSchemaFromJavaBean(classOf[User])
+    val userSchema = SparkSchemaUtil.getSchemaFromJavaBean(classOf[User])
     val dataObject = KafkaTopicDataObject("kafkaReadWriteJson1", topicName = topic, connectionId = "kafkaCon1", valueType = KafkaColumnType.Json, valueSchema = Some(SparkSchema(userSchema)))
     val df = dataObject.getSparkDataFrame()
       .select($"value.*")

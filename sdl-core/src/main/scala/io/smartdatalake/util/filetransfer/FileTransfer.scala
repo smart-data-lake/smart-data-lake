@@ -21,7 +21,6 @@ package io.smartdatalake.util.filetransfer
 import io.smartdatalake.workflow.{ActionPipelineContext, FileRefMapping}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.file.{FileRef, FileRefDataObject}
-import org.apache.spark.sql.SparkSession
 
 import scala.util.matching.Regex
 

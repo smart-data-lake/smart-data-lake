@@ -23,6 +23,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SchemaUtil
+import io.smartdatalake.util.spark.SparkSchemaUtil
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.generic.Table
@@ -60,7 +61,7 @@ class IcebergCustomDataFrameTest extends AnyFunSuite with BeforeAndAfter {
     val srcDO1 = MockSparkDataObject("src1")
     instanceRegistry.register(srcDO1)
     val recTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "recursive1", primaryKey = Some(Seq("lastname", "cnt")))
-    val recDO = IcebergTableDataObject("rec1", Some(tempPath + s"/${recTable.fullName}"), table = recTable, schemaMin = Some(SparkSchema(SchemaUtil.getSchemaFromDdl("lastname string, cnt long"))))
+    val recDO = IcebergTableDataObject("rec1", Some(tempPath + s"/${recTable.fullName}"), table = recTable, schemaMin = Some(SparkSchema(SparkSchemaUtil.getSchemaFromDdl("lastname string, cnt long"))))
     recDO.dropTable
     instanceRegistry.register(recDO)
     val tgt1DO = MockSparkDataObject("tgt1")

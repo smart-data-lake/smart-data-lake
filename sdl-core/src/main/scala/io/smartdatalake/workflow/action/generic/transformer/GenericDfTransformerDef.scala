@@ -25,11 +25,8 @@ import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil}
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfTransformer.PREVIOUS_TRANSFORMER_NAME
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.IS_EXEC
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
-import org.apache.spark.sql.DataFrame
 
-import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 trait Transformer
@@ -98,20 +95,6 @@ trait GenericDfTransformerDef extends PartitionValueTransformer {
 trait GenericDfTransformer extends GenericDfTransformerDef with ParsableFromConfig[GenericDfTransformer] with ConfigHolder
 
 /**
- * Interface to implement Spark-DataFrame transformers working with one input and one output (1:1)
- */
-trait SparkDfTransformer extends GenericDfTransformer {
-  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame
-  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    df match {
-      case sparkDf: SparkDataFrame => SparkDataFrame(transform(actionId, partitionValues, sparkDf.inner, dataObjectId))
-      case _ => throw new IllegalStateException(s"($actionId) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method transform")
-    }
-  }
-  override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
-}
-
-/**
  * Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.
  * This trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.
  * This is mainly used by custom transformers.
@@ -163,35 +146,6 @@ object OptionsGenericDfTransformer {
   private[smartdatalake] val PREVIOUS_TRANSFORMER_NAME = "previousTransformerName"
 }
 
-/**
- * Interface to implement Spark-DataFrame transformers working with one input and one output (1:1) and options.
- * This trait extends OptionsGenericDfTransformer and passes a map of options as parameter to the transform function.
- * This is mainly used by custom transformers.
- */
-trait OptionsSparkDfTransformer extends OptionsGenericDfTransformer {
-  def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String,String])(implicit context: ActionPipelineContext): DataFrame
-  final override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, options: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    df match {
-      case sparkDf: SparkDataFrame => SparkDataFrame(transformWithOptions(actionId, partitionValues, sparkDf.inner, dataObjectId, options))
-      case _ => throw new IllegalStateException(s"($actionId) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method transformWithOptions")
-    }
-  }
-  override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
-}
-
-/**
- * Legacy wrapper for pure Spark-DataFrame transformation function
- */
-case class SparkDfTransformerFunctionWrapper(override val name: String, fn: DataFrame => DataFrame) extends GenericDfTransformerDef {
-  override val description: Option[String] = None
-  override def transform(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: SdlConfigObject.DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    df match {
-      case sparkDf: SparkDataFrame => SparkDataFrame(fn(sparkDf.inner))
-      case _ => throw new IllegalStateException(s"($actionId) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method transform")
-    }
-  }
-  override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
-}
 
 
 

@@ -23,12 +23,10 @@ import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkColumn
-import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame}
+import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame, SqlExpressionColumn}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.{ExpectationScope, Job}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.ExpectationSeverity
 import io.smartdatalake.workflow.dataobject.generic.ExpectationValidation
-import org.apache.spark.sql.Column
 
 import scala.reflect.{ClassTag, classTag}
 
@@ -74,7 +72,7 @@ trait BaseExpectation {
    * Create columns to validate the expectation and return error message if failed.
    * Can cleanup metrics and return them if artifical metrics have been introduced, like for SQLFractionExpectation.
    */
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_])
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[GenericColumn],Map[String,_])
 
   /**
    * Control if metrics are calculated as DataFrame observation for Spark.
@@ -157,8 +155,8 @@ object ExpectationSeverity extends Enumeration {
  */
 trait ExpectationOneMetricDefaultImpl { this: Expectation =>
   def expectation: Option[String]
-  def getValidationColumn(dataObjectId: DataObjectId, value: Any): Option[Column] = {
-    import org.apache.spark.sql.functions._
+
+  def getValidationConditionSql(dataObjectId: DataObjectId, value: Any): Option[String] = {
     expectation.map { expectationStr =>
       val valueStr = value match {
         case None => "null"
@@ -166,73 +164,59 @@ trait ExpectationOneMetricDefaultImpl { this: Expectation =>
         case null => "null"
         case x => x.toString
       }
-      val validationExpr = s"$valueStr $expectationStr"
-      try {
-        expr(validationExpr)
-      } catch {
-        case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse validation expression '$validationExpr'", Some(s"expectations.$name"), e)
-      }
+      s"$valueStr $expectationStr"
     }
   }
 
-  def getValidationErrorColumn(dataObjectId: DataObjectId, value: Any, metricName: String = name)(implicit context: ActionPipelineContext): Option[Column] = {
-    import org.apache.spark.sql.functions._
-    getValidationColumn(dataObjectId, value).map { validationCol =>
+  def getValidationErrorColumnSql(dataObjectId: DataObjectId, value: Any, metricName: String = name): Option[SqlExpressionColumn] = {
+    getValidationConditionSql(dataObjectId, value).map { conditionSql =>
       try {
-        when(not(validationCol), lit(s"Expectation '$metricName' failed with value:$value expectation:${expectation.get}"))
+        val escapedMsg = s"Expectation '${metricName.replace("'", "''")}' failed with value:$value expectation:${expectation.get.replace("'", "''")}'"
+        SqlExpressionColumn(s"CASE WHEN NOT ($conditionSql) THEN '$escapedMsg' END")
       } catch {
         case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot create validation error column", Some(s"expectations.$name"), e)
       }
     }
   }
 
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String, _], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn], Map[String, _]) = {
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String, _], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[GenericColumn], Map[String, _]) = {
     if (scope == ExpectationScope.JobPartition) {
       val cols = metrics.keys.filter(_.startsWith(name + ExpectationValidation.partitionDelimiter))
         .flatMap { n =>
           val value = getMetric[Any](dataObjectId, metrics, name)
-          getValidationErrorColumn(dataObjectId, value, n).map(SparkColumn)
+          getValidationErrorColumnSql(dataObjectId, value, n)
         }.toSeq
       (cols, metrics)
     } else {
       val value = getMetric[Any](dataObjectId, metrics, name)
-      val col = getValidationErrorColumn(dataObjectId, value).map(SparkColumn)
+      val col = getValidationErrorColumnSql(dataObjectId, value)
       (col.toSeq, metrics)
     }
   }
 }
 
 /**
- * Default implementation for getValidationErrorColumn for metric of type `any`.
+ * Default implementation for getValidationErrorColumn for fraction metrics.
  */
 trait ExpectationFractionMetricDefaultImpl { this: BaseExpectation =>
   def expectation: Option[String]
   def precision: Short = 4
   protected def roundFunc(v: Double): Double = math.round(v).toDouble
-  def getValidationColumn(dataObjectId: DataObjectId, fraction: Any): Option[SparkColumn] = {
-    import org.apache.spark.sql.functions._
-    expectation.map { expectationStr =>
-      val validationExpr = s"$fraction $expectationStr"
-      try {
-        SparkColumn(expr(validationExpr))
-      } catch {
-        case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse validation expression '$validationExpr'", Some(s"expectations.$name"), e)
-      }
-    }
-  }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, countMetric: Long, countBase: Long, metricName: String = name)(implicit context: ActionPipelineContext): (Option[Column],Any) = {
+
+  def getValidationErrorColumnSql(dataObjectId: DataObjectId, countMetric: Long, countBase: Long, metricName: String = name): (Option[SqlExpressionColumn], Any) = {
     val pct = if (countBase == 0) "null" else round(countMetric.toDouble / countBase, precision)
-    val col = getValidationColumn(dataObjectId, pct).map { validationCol =>
+    val col = expectation.map { expectationStr =>
+      val conditionSql = s"$pct $expectationStr"
       try {
-        import org.apache.spark.sql.functions._
-        when(not(validationCol.inner), lit(s"Expectation '$metricName' failed with pct:$pct expectation:${expectation.get}"))
+        val escapedMsg = s"Expectation '${metricName.replace("'", "''")}' failed with pct:$pct expectation:${expectationStr.replace("'", "''")}'"
+        SqlExpressionColumn(s"CASE WHEN NOT ($conditionSql) THEN '$escapedMsg' END")
       } catch {
         case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot create validation error column", Some(s"expectations.$name"), e)
       }
     }
-    // return
-    (col,pct)
+    (col, pct)
   }
+
   def round(value: Double, precision: Short): Double = {
     val roundExp = math.pow(10,precision)
     roundFunc(value * roundExp) / roundExp

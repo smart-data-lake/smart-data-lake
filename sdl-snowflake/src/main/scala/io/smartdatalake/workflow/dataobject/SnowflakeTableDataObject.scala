@@ -28,7 +28,7 @@ import io.smartdatalake.definitions.SDLSaveMode._
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SQLUtil, SchemaUtil}
-import io.smartdatalake.util.spark.SparkStageMetricsListener
+import io.smartdatalake.util.spark.{SparkSchemaUtil, SparkStageMetricsListener}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import io.smartdatalake.workflow.connection.SnowflakeConnection
@@ -132,7 +132,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
-    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame().columns, role = "prepare", obj = "Existing table")
   }
 
   // Get a Spark DataFrame with the table contents for Spark transformations
@@ -165,10 +165,10 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     val dfTarget = if (schemaMin.isDefined) {
       validateSchemaMin(SparkSchema(df.schema), role = "write") //needed for merging the schemas
       val sparkSchemaMin = schemaMin.get.asInstanceOf[SparkSchema] //writeSparkDataFrame is only done with SparkSubFeeds
-      val targetSchemaWithMetadata = SchemaUtil.mergeSchemaMetadata(sparkSchemaMin.inner, df.schema)
+      val targetSchemaWithMetadata = SparkSchemaUtil.mergeSchemaMetadata(sparkSchemaMin.inner, df.schema)
       SparkSubFeed.getSparkSession.createDataFrame(df.rdd, targetSchemaWithMetadata)//workaround to replace the schema in the DF
     } else df
-    columnComments = SchemaUtil.columnsComments(dfTarget.schema).map(kv => (kv._1.mkString("."), kv._2))
+    columnComments = SparkSchemaUtil.columnsComments(dfTarget.schema).map(kv => (kv._1.mkString("."), kv._2))
     var finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
     // TODO: merge mode not yet implemented

@@ -25,7 +25,6 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 
 import scala.reflect.runtime.universe.Type
 
@@ -57,18 +56,5 @@ trait CanWriteDataFrame {
    * Note: this is optional to implement.
    */
   private[smartdatalake] def writeDataFrameToPath(df: GenericDataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException("writeDataFrameToPath not implemented")
-
-  /**
-   * Write Spark structured streaming DataFrame
-   * The default implementation uses foreachBatch and this traits writeDataFrame method to write the DataFrame.
-   * Some DataObjects will override this with specific implementations (Kafka).
-   *
-   * @param df      The Streaming DataFrame to write
-   * @param trigger Trigger frequency for stream
-   * @param checkpointLocation location for checkpoints of streaming query
-   */
-  // TODO: this interface is still very spark specific!
-  def writeStreamingDataFrame(df: GenericDataFrame, trigger: Trigger, options: Map[String,String], checkpointLocation: String, queryName: String, outputMode: OutputMode = OutputMode.Append, saveModeOptions: Option[SaveModeOptions] = None)
-                             (implicit context: ActionPipelineContext): StreamingQuery = throw new RuntimeException("writeDataFrameToPath not implemented")
 
 }

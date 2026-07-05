@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObje
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, SparkStreamingMode}
+import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, GenericDfsTransformerDef, SQLDfsTransformer}
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.expectation.ActionExpectation
@@ -72,7 +72,7 @@ case class CustomDataFrameAction(override val id: ActionId,
   override val inputs: Seq[DataObject with CanCreateDataFrame] = inputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
   override val outputs: Seq[DataObject with CanWriteDataFrame] = outputIds.map(getOutputDataObject[DataObject with CanWriteDataFrame])
 
-  if (executionMode.exists(_.isInstanceOf[SparkStreamingMode]) && transformers.exists(_.isInstanceOf[SQLDfsTransformer]))
+  if (executionMode.exists(_.isStreamingMode) && transformers.exists(_.isInstanceOf[SQLDfsTransformer]))
     logger.warn("Defining custom stateful streaming operations with sqlCode is not well supported by Spark and can create strange errors or effects. Use scalaCode to be safe.")
 
   validateConfig()

@@ -22,8 +22,6 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
-import io.smartdatalake.workflow.dataframe.spark.NoMetricsReceivedException
-
 /**
  * An Observation can observe metrics during evaluation of DataFrames.
  * In case the engine or implementation does not support observing metrics, they can also be calculated when calling waitFor method.
@@ -38,6 +36,20 @@ trait DataFrameObservation extends SmartDataLakeLogger {
    */
   @throws[NoMetricsReceivedException]
   def waitFor(timeoutSec: Int = 1): Map[String, _]
+
+  /**
+   * Link this output observation with sibling input observations so it can extract their metrics.
+   * Overridden by SparkObservation to call setOtherObservationNames / setOtherObservationsPrefix.
+   * Default is a no-op (non-Spark observations do not need cross-linking).
+   */
+  def linkWithInputObservations(inputObservations: Seq[DataFrameObservation], prefix: String): Unit = ()
+
+  /**
+   * Whether this observation should be included in the combined input-observation that is passed along
+   * with the SubFeed.  SparkObservation returns false because it is already handled by the output
+   * observation's cross-linking (see linkWithInputObservations).
+   */
+  def includeInInputObservationCombine: Boolean = true
 
   /**
    * Get the observed metrics, and throws NoDataToProcessWarning if no metrics are observed.
@@ -98,4 +110,4 @@ object CombinedObservation {
   }
 }
 
-
+case class NoMetricsReceivedException(msg: String) extends Exception(msg)

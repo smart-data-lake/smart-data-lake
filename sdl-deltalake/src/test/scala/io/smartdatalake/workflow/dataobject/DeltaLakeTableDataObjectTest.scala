@@ -23,7 +23,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{ColumnStatsType, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
 import io.smartdatalake.testutils.spark.dataset.TestToolDataset
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkHdfsUtil}
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
@@ -60,7 +60,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
 
   override def beforeAll(): Unit = {
     val warehousePath = new Path("spark-warehouse/delta.db")
-    implicit val fs: FileSystem = HdfsUtil.getHadoopFsFromSpark(warehousePath)(session)
+    implicit val fs: FileSystem = SparkHdfsUtil.getHadoopFsFromSpark(warehousePath)(session)
     HdfsUtil.deletePath(path = warehousePath, doWarn = false)
   }
 

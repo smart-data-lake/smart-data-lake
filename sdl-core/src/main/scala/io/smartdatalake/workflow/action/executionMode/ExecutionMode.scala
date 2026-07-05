@@ -99,6 +99,28 @@ trait ExecutionMode extends ParsableFromConfig[ExecutionMode] with ConfigHolder 
    * If this execution mode should be run as asynchronous streaming process
    */
   def isAsynchronous: Boolean = false
+
+  /**
+   * If this execution mode is a streaming mode (e.g. Spark Structured Streaming).
+   * Overridden by DataFrameStreamingExecutionMode.
+   */
+  def isStreamingMode: Boolean = false
+
+  /**
+   * Returns true if an asynchronous streaming query has been started.
+   * Used by DataFrameActionImpl.isAsynchronousProcessStarted.
+   */
+  def isStreamingStarted: Boolean = false
+
+  /**
+   * Called when the streaming query terminates (e.g. via SparkStreamingQueryListener).
+   */
+  def notifyStreamingQueryTerminated(): Unit = ()
+
+  /**
+   * Reset streaming state between DAG runs (e.g. clears a stored StreamingQuery reference).
+   */
+  def resetStreamingState(): Unit = ()
 }
 
 trait ExecutionModeWithMainInputOutput {

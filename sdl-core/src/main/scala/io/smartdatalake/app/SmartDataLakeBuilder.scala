@@ -33,9 +33,8 @@ import io.smartdatalake.workflow.ExecutionPhase.{Exec, ExecutionPhase, Init, Pre
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl, RuntimeInfo, SDLExecutionId}
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.DataFrameSubFeed
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.sql.SparkSession
 import org.slf4j.Logger
 import scopt.{OParser, OParserBuilder}
 
@@ -361,7 +360,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    */
   def startSimulation(
       appConfig: SmartDataLakeBuilderConfig,
-      initialSubFeeds: Seq[SparkSubFeed],
+      initialSubFeeds: Seq[DataFrameSubFeed],
       dataObjectsState: Seq[DataObjectState] = Seq(),
       failOnMissingInputSubFeeds: Boolean = true
   )(implicit instanceRegistry: InstanceRegistry): (Seq[DataFrameSubFeed], Map[RuntimeEventState, Int]) = {
@@ -379,7 +378,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       simulation = true,
       globalConfig = GlobalConfig()
     )
-    (subFeeds.map(_.asInstanceOf[SparkSubFeed]), stats)
+    (subFeeds.map(_.asInstanceOf[DataFrameSubFeed]), stats)
   }
 
   /**
@@ -388,10 +387,10 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    */
   def startSimulationWithConfigFile(
       appConfig: SmartDataLakeBuilderConfig,
-      initialSubFeeds: Seq[SparkSubFeed],
+      initialSubFeeds: Seq[DataFrameSubFeed],
       dataObjectsState: Seq[DataObjectState] = Seq()
-  )(session: SparkSession): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
-    loadConfigIntoInstanceRegistry(appConfig, session.sparkContext.hadoopConfiguration)
+  )(hadoopConf: Configuration): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
+    loadConfigIntoInstanceRegistry(appConfig, hadoopConf)
     startSimulation(appConfig, initialSubFeeds, dataObjectsState)(this.instanceRegistry)
   }
 
@@ -673,13 +672,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           debugLog(s"execActionDAG: actionsSelected.exists(!_.isAsynchronous) = ${actionsSelected.exists(!_.isAsynchronous)}")
           if (actionsSelected.exists(!_.isAsynchronous)) {
             if (Environment.stopStreamingGracefully) {
-              if (actionsSelected.exists(_.isAsynchronous)) {
-                // re-throw exception if any async streaming query terminated with exception
-                // awaitAnyTermination returns immediately since onQueryTerminated already fired (which set stopStreamingGracefully=true)
-                SparkSubFeed.getSparkSession(context).streams.awaitAnyTermination(1)
-                // stop remaining active streaming queries gracefully
-                SparkSubFeed.getSparkSession(context).streams.active.foreach(_.stop())
-              }
+              stopSyncStreamingQueriesGracefully(actionsSelected.exists(_.isAsynchronous))(context)
               logger.info("Stopped streaming gracefully")
               None
             } else {
@@ -696,7 +689,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
               // remove spark caches so that new data is read in next iteration
               // TODO: in the future it might be interesting to keep some DataFrames cached for performance reason...
               // TODO: add additional method actionDAGRun.finalizeIteration or similar, which can be used to do some finalization tasks at the end of an iteration, for all connections
-              // if (context.hasSparkSession) SparkSubFeed.getSparkSession.sqlContext.clearCache()
               // iterate execution
               // note that this re-executes also asynchronous actions - they have to handle by themself that they are already started
               Some(actionDAGRun.copy(executionId = newContext.executionId), newContext, Some(startTime))
@@ -708,14 +700,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
               " (if we don't wait, the main process will end and kill the streaming query threads...)")
 
             if (Environment.stopStreamingGracefully) {
-              SparkSubFeed.getSparkSession(context).streams.active.foreach(_.stop())
+              stopAsyncStreamingQueriesGracefully()(context)
               logger.info("Stopped streaming gracefully")
             } else {
               actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(
                 context
               ) // notify about this asynchronous iteration
-              SparkSubFeed.getSparkSession(context).streams.awaitAnyTermination()
-              SparkSubFeed.getSparkSession(context).streams.active.foreach(_.stop()) // stopping other streaming queries gracefully
+              awaitAndStopAsyncStreamingQueries(actionDAGRun)(context)
             }
             None
           }
@@ -725,4 +716,25 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     if (nextExec.isDefined) execActionDAG(nextExec.get._1, actionsSelected, nextExec.get._2, nextExec.get._3)
     else Seq()
   }
+
+  /**
+   * Called when synchronous streaming actions stop gracefully.
+   * If hasAsyncActions is true, the implementation should wait for any async streaming query
+   * termination (re-throwing exceptions) and then stop remaining queries.
+   * Default: no-op (non-Spark or non-streaming runtimes).
+   */
+  protected def stopSyncStreamingQueriesGracefully(hasAsyncActions: Boolean)(implicit context: ActionPipelineContext): Unit = ()
+
+  /**
+   * Called when only async streaming actions exist and the stop signal fires.
+   * Default: no-op.
+   */
+  protected def stopAsyncStreamingQueriesGracefully()(implicit context: ActionPipelineContext): Unit = ()
+
+  /**
+   * Called when only async streaming actions exist and we have to wait for their termination
+   * before the process exits.
+   * Default: no-op.
+   */
+  protected def awaitAndStopAsyncStreamingQueries(actionDAGRun: ActionDAGRun)(implicit context: ActionPipelineContext): Unit = ()
 }

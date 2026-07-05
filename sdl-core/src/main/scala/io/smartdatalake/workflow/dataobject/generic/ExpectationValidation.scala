@@ -22,10 +22,8 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.MetricsUtil.orderMetrics
 import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.PushPredicateThroughTolerantCollectMetricsRuleObject.pushDownTolerantMetricsMarker
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe._
-import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.ExpectationScope
 import io.smartdatalake.workflow.dataobject.expectation._
@@ -167,7 +165,7 @@ private[smartdatalake] trait ExpectationValidation {
     // evaluate expectations using dummy ExpressionData
     if (logger.isDebugEnabled) logger.debug(s"($id) initial metrics before validation: ${metrics.map { case (k, v) => s"$k=$v" }.mkString(" ")}")
     val defaultExpressionData = DefaultExpressionData.from(context, Seq())
-    val (expectationValidationCols, updatedMetrics) = expectationsToValidate.foldLeft(Seq[(BaseExpectation, SparkColumn)](), metrics) {
+    val (expectationValidationCols, updatedMetrics) = expectationsToValidate.foldLeft(Seq[(BaseExpectation, GenericColumn)](), metrics) {
       case ((cols, metrics), expectation) =>
         val (newCols, updatedMetrics) = expectation.getValidationErrorColumn(this.id, metrics, partitionValues)
         (cols ++ newCols.map(c => (expectation, c)), updatedMetrics)
@@ -215,7 +213,7 @@ private[smartdatalake] trait ExpectationValidation {
   protected def forceGenericObservation = false // can be overridden by subclass
 
   private def setupObservation(df: GenericDataFrame, expectationColumns: Seq[GenericColumn], isExecPhase: Boolean, pushDownTolerant: Boolean = false, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
-    val observationName = this.id.id + "#" + UUID.randomUUID() + (if (pushDownTolerant) pushDownTolerantMetricsMarker else "")
+    val observationName = this.id.id + "#" + UUID.randomUUID() + (if (pushDownTolerant) "!pushDownTolerant" else "")
     val (dfObserved, observation) = df.setupObservation(observationName, expectationColumns, isExecPhase, this.forceGenericObservation || forceGenericObservation)
     (dfObserved, observation)
   }

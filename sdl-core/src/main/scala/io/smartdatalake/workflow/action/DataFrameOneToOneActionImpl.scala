@@ -19,7 +19,6 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformerDef, SQLDfTransformer}
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}

@@ -145,6 +145,8 @@ trait DataFrameSubFeedCompanion extends SubFeedConverter[DataFrameSubFeed] with 
   def getSubFeed(dataFrame: GenericDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrameSubFeed
   def createSchema(fields: Seq[GenericField]): GenericSchema
 
+  def createSchemaFromDdl(ddl: String): GenericSchema = throw new UnsupportedOperationException(s"createSchemaFromDdl is not supported for ${subFeedType.typeSymbol.name}")
+
   def createField(name: String, dataType: GenericDataType, nullable: Boolean, comment: Option[String]): GenericField
 
   def createSimpleDataType(tpe: String): GenericDataType with GenericSimpleDataType

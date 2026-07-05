@@ -22,7 +22,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkHdfsUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.action.{CopyAction, NoDataToProcessWarning}
@@ -675,7 +675,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
 
     // create hadoop catalog 'test' database
     val warehouseDir = new Path(session.conf.get(s"spark.sql.catalog.${targetTable.catalog.get}.warehouse"))
-    val fs = HdfsUtil.getHadoopFsFromSpark(warehouseDir)
+    val fs = SparkHdfsUtil.getHadoopFsFromSpark(warehouseDir)
     fs.mkdirs(new Path(warehouseDir, targetTable.db.get))
 
     // prepare DataObject

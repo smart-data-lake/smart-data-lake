@@ -27,6 +27,7 @@
 
     <modules>
         <module>sdl-core</module>
+        <module>sdl-spark</module>
         <module>sdl-kafka</module>
         <module>sdl-kafka/embedded-kafka-schema-registry-shaded</module>
         <module>sdl-deltalake</module>

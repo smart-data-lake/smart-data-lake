@@ -22,8 +22,6 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SchemaViolationException}
-import org.apache.spark.sql.DataFrame
-
 import scala.reflect.runtime.universe.Type
 
 trait TableDataObject extends DataObject with CanCreateDataFrame with SchemaValidation {
@@ -83,10 +81,10 @@ trait TableDataObject extends DataObject with CanCreateDataFrame with SchemaVali
    * @param obj  object used in exception message..
    * @throws SchemaViolationException if the partitions columns are not included.
    */
-  def validateSchemaHasPrimaryKeyCols(df: DataFrame, role: String, obj: String = "DataFrame"): Unit = {
+  def validateSchemaHasPrimaryKeyCols(columns: Seq[String], role: String, obj: String = "DataFrame"): Unit = {
     table.primaryKey.foreach { pk =>
-      val missingCols = if (Environment.caseSensitive) pk.diff(df.columns)
-      else pk.map(_.toLowerCase).diff(df.columns.map(_.toLowerCase))
+      val missingCols = if (Environment.caseSensitive) pk.diff(columns)
+      else pk.map(_.toLowerCase).diff(columns.map(_.toLowerCase))
       if (missingCols.nonEmpty) throw new SchemaViolationException(s"($id) $obj is missing primary key cols ${missingCols.mkString(", ")} on $role")
     }
   }

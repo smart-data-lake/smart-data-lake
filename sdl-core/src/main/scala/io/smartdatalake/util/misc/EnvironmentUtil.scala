@@ -19,7 +19,6 @@
 package io.smartdatalake.util.misc
 
 import io.smartdatalake.definitions.Environment
-import org.apache.spark.sql.SparkSession
 
 object EnvironmentUtil {
 
@@ -28,13 +27,6 @@ object EnvironmentUtil {
    */
   def isWindowsOS: Boolean = {
     sys.env.get("OS").exists(_.toLowerCase.startsWith("windows"))
-  }
-
-  /**
-   * check if Spark AQE (Spark 3.0) is enabled
-   */
-  def isSparkAdaptiveQueryExecEnabled(implicit session: SparkSession): Boolean = {
-    session.version.takeWhile(_ != '.').toInt >= 3 && session.conf.get("spark.sql.adaptive.enabled").toBoolean
   }
 
   /**

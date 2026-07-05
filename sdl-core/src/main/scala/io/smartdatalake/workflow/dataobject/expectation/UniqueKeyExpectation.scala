@@ -23,7 +23,6 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.{ExpectationScope, Job}
@@ -79,12 +78,12 @@ case class UniqueKeyExpectation(
     val countCol = if (scope == ExpectationScope.All) Some(functions.count(functions.col("*")).as(countName)) else None
     Seq(Some(countDistinctCol), countCol).flatten
   }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[GenericColumn],Map[String,_]) = {
     val countDistinct = getMetric[Long](dataObjectId,metrics,countDistinctName)
     val count = getMetric[Long](dataObjectId,metrics,countName)
-    val (col, pct) = getValidationErrorColumn(dataObjectId, countDistinct, count)
+    val (col, pct) = getValidationErrorColumnSql(dataObjectId, countDistinct, count)
     val updatedMetrics = metrics.view.filterKeys(_ != countDistinctName).toMap + (name -> pct)
-    (col.map(SparkColumn).toSeq, updatedMetrics)
+    (col.toSeq, updatedMetrics)
   }
   override def calculateAsJobDataFrameObservation: Boolean = {
     // only calculate metrics as DataFrame observation for approximate_count_distinct function, as count_distinct is not supported as aggregate function for Spark observations.

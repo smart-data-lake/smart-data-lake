@@ -23,10 +23,8 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 
-import scala.reflect.runtime.universe.typeOf
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -38,7 +36,7 @@ import scala.util.{Failure, Success, Try}
  * @param subFeedTypeForValidation When parsing the configuration the runtime subFeedType for validating the filter expression is not yet known.
  *                                 By default SparkSubFeed langauge is used, but you can configure a different one if needed.
  */
-case class FilterTransformer(override val name: String = "filter", override val description: Option[String] = None, filterClause: String, subFeedTypeForValidation: String = typeOf[SparkSubFeed].typeSymbol.fullName) extends GenericDfTransformer {
+case class FilterTransformer(override val name: String = "filter", override val description: Option[String] = None, filterClause: String, subFeedTypeForValidation: String = "io.smartdatalake.workflow.dataframe.spark.SparkSubFeed") extends GenericDfTransformer {
   private val validationHelper: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(subFeedTypeForValidation)
   import validationHelper._
   private val filterClauseExpr = Try(expr(filterClause)) match {

@@ -24,11 +24,8 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil}
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.IS_EXEC
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
-import org.apache.spark.sql.DataFrame
 
-import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 
@@ -74,26 +71,6 @@ trait GenericDfsTransformerDef extends PartitionValueTransformer {
  * Interface to implement GenericDataFrame transformers working with many inputs and many outputs (n:m)
  */
 trait GenericDfsTransformer extends GenericDfsTransformerDef with ParsableFromConfig[GenericDfsTransformer] with ConfigHolder
-
-trait SparkDfsTransformer extends GenericDfsTransformer {
-  // Note: must have a different name as transform because signature is different only in subtypes of parameters.
-  def transformSpark(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame])(implicit context: ActionPipelineContext): Map[String, DataFrame]
-
-  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues],
-                               dfs: Map[String, GenericDataFrame],
-                               executionModeResultOptions: Map[String, String],
-                               outputDataObjectIds: Seq[String])
-                              (implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
-    assert(dfs.values.forall(_.isInstanceOf[SparkDataFrame]), s"($actionId) Unsupported subFeedType(s)" +
-      s" ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")}" +
-      s" in method transform")
-    val sparkDfs = dfs.view.mapValues(_.asInstanceOf[SparkDataFrame].inner).toMap
-    transformSpark(actionId, partitionValues, sparkDfs)
-      .view.mapValues(SparkDataFrame).toMap
-  }
-
-  override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
-}
 
 /**
  * Interface to implement GenericDataFrame transformers working with many inputs and many outputs (n:m)
@@ -152,28 +129,6 @@ object OptionsGenericDfsTransformer {
   final val IS_EXEC = "isExec"
   final val OPTION_OUTPUT_DATAOBJECT_ID = "outputDataObjectId"
 }
-
-/**
- * Interface to implement Spark-DataFrame transformers working with multiple inputs and outputs (n:m) and options.
- * This trait extends OptionsGenericDfsTransformer and passes a map of options as parameter to the transform function.
- * This is mainly used by custom transformers.
- */
-trait OptionsSparkDfsTransformer extends OptionsGenericDfsTransformer {
-  // Note: must have a different name as transform because signature is different only in subtypes of parameters.
-  def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame], options: Map[String, String])
-                               (implicit context: ActionPipelineContext): Map[String, DataFrame]
-
-  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], options: Map[String, String])
-                                   (implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
-    assert(dfs.values.forall(_.isInstanceOf[SparkDataFrame]), s"($actionId) Unsupported subFeedType(s) ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method transform")
-    val sparkDfs = dfs.view.mapValues(_.asInstanceOf[SparkDataFrame].inner).toMap
-    transformSparkWithOptions(actionId, partitionValues, sparkDfs, options)
-      .view.mapValues(SparkDataFrame).toMap
-  }
-
-  override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
-}
-
 
 /**
  * Interface for transformers that can recompile their code from source files.

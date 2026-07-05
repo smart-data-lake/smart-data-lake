@@ -25,7 +25,6 @@ import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.Connection
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.util.PortUtils
 import org.eclipse.jetty.server._
 import org.eclipse.jetty.server.handler.{ContextHandler, ContextHandlerCollection}
 import org.eclipse.jetty.servlet.ServletContextHandler
@@ -52,7 +51,7 @@ case class JettyAgentServer(sdlb: SmartDataLakeBuilder, config: LocalJettyAgentS
 
   def start(): Unit = {
     val contextHandler = getServletContextHandler(config, agentController)
-    PortUtils.startOnPort(startServer(contextHandler), "AgentServer", config.port, config.maxPortRetries, logger)
+    startOnPort(startServer(contextHandler), "AgentServer", config.port, config.maxPortRetries)
   }
 
   def stop(): Unit = {
@@ -81,13 +80,25 @@ case class JettyAgentServer(sdlb: SmartDataLakeBuilder, config: LocalJettyAgentS
   }
 
   private def startServer(handlers: ContextHandlerCollection)(port: Int): Int = {
-
     val connector = new ServerConnector(server)
     connector.setPort(port)
     server.setConnectors(Array(connector))
     server.setHandler(handlers)
     server.start()
     port
+  }
+
+  private def startOnPort(startService: Int => Int, serviceName: String, startPort: Int, maxRetries: Int): Int = {
+    for (offset <- 0 to maxRetries) {
+      val tryPort = startPort + offset
+      try {
+        return startService(tryPort)
+      } catch {
+        case e: Exception if offset < maxRetries =>
+          logger.warn(s"$serviceName: Failed to start on port $tryPort, trying ${tryPort + 1}")
+      }
+    }
+    throw new RuntimeException(s"$serviceName: Failed to bind on any port from $startPort to ${startPort + maxRetries}")
   }
 
 }

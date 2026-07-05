@@ -20,7 +20,6 @@ package io.smartdatalake.workflow.dataframe
 import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 
 import scala.reflect.runtime.universe
 

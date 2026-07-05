@@ -26,10 +26,8 @@ import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.agent.Agent
-import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, SubFeed}
-import org.apache.spark.sql.types.StructType
 
 import scala.reflect.runtime.universe.Type
 
@@ -90,8 +88,7 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
 
   def convertToEmptySubFeed(dataObjectId: DataObjectId, schemaDdl: String, subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     val companion = DataFrameSubFeed.getCompanion(subFeedType)
-    // TODO: generic create schema from string without using StructType.fromDDL
-    val schema = SparkSchema(StructType.fromDDL(schemaDdl))
+    val schema = companion.createSchemaFromDdl(schemaDdl)
     val emptyDF = companion.getEmptyDataFrame(schema, dataObjectId)
     companion.getSubFeed(dataFrame = emptyDF, dataObjectId = dataObjectId, Seq())
       .asDummy()

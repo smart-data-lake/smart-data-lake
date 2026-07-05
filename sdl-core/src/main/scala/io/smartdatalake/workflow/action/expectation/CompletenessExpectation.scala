@@ -23,7 +23,6 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.ExpectationScope
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.ExpectationSeverity
@@ -57,12 +56,12 @@ case class CompletenessExpectation(
     import functions._
     Seq(count(col("*")).as("countAll"))
   }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[GenericColumn],Map[String,_]) = {
     val countOutput = getMetric[Long](dataObjectId,metrics,"countAll")
     val countInput = getMetric[Long](dataObjectId,metrics,"countAll#mainInput")
-    val (col, pct) = getValidationErrorColumn(dataObjectId, countOutput, countInput)
+    val (col, pct) = getValidationErrorColumnSql(dataObjectId, countOutput, countInput)
     val updatedMetrics = metrics + (name -> pct)
-    (col.map(SparkColumn).toSeq, updatedMetrics)
+    (col.toSeq, updatedMetrics)
   }
 
   override def factory: FromConfigFactory[ActionExpectation] = CompletenessExpectation
