@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.connection.jdbc
 
 import io.smartdatalake.util.misc.{JdbcExecution, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataobject.PrimaryKeyDefinition
+import io.smartdatalake.workflow.dataobject.{ForeignKeyDefinition, PrimaryKeyDefinition}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
@@ -104,6 +104,28 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
     }
   }
 
+  def createForeignKeyConstraint(tableName: String, constraintName: String, localCols: Seq[String],
+      refTableFullName: String, refCols: Seq[String], logging: Boolean = true): Unit = {
+    if (isTableExisting(tableName)) {
+      val stmt = s"ALTER TABLE $tableName ADD CONSTRAINT $constraintName FOREIGN KEY (${localCols.mkString(",")}) REFERENCES $refTableFullName (${refCols.mkString(",")})"
+      connection.execJdbcStatement(stmt, logging = logging)
+    }
+  }
+
+  def dropForeignKeyConstraint(tableName: String, constraintName: String, logging: Boolean = true): Unit = {
+    if (isTableExisting(tableName)) {
+      val stmt = s"ALTER TABLE $tableName DROP CONSTRAINT $constraintName"
+      connection.execJdbcStatement(stmt, logging = logging)
+    }
+  }
+
+  def ensureColumnNotNull(tableName: String, colName: String, logging: Boolean = true): Unit = {
+    if (isTableExisting(tableName)) {
+      val stmt = getAlterColumnNullableSql(tableName, colName, isNullable = false)
+      connection.execJdbcStatement(stmt, logging = logging)
+    }
+  }
+
   def isTableExisting(tableName: String): Boolean = {
     val tableExistsQuery = jdbcDialect.getTableExistsQuery(tableName)
     try {
@@ -140,6 +162,36 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
       case (cols, pk) => Some(PrimaryKeyDefinition(cols, Some(pk.head)))
     }
   }
+
+  def handleForeignKeyResultSet(resultSet: ResultSet): Seq[ForeignKeyDefinition] = {
+    case class FKRow(fkName: String, localCol: String, keySeq: Short, refCatalog: Option[String], refSchema: Option[String], refTable: String, refCol: String)
+    val rows = scala.collection.mutable.Buffer[FKRow]()
+    while (resultSet.next()) {
+      rows += FKRow(
+        fkName    = resultSet.getString("FK_NAME"),
+        localCol  = resultSet.getString("FKCOLUMN_NAME"),
+        keySeq    = resultSet.getShort("KEY_SEQ"),
+        refCatalog = Option(resultSet.getString("PKTABLE_CAT")).filter(_.nonEmpty),
+        refSchema  = Option(resultSet.getString("PKTABLE_SCHEM")).filter(_.nonEmpty),
+        refTable   = resultSet.getString("PKTABLE_NAME"),
+        refCol     = resultSet.getString("PKCOLUMN_NAME")
+      )
+    }
+    rows.groupBy(_.fkName)
+      .filter(_._1 != null)
+      .map { case (fkName, fkRows) =>
+        val ordered = fkRows.sortBy(_.keySeq)
+        ForeignKeyDefinition(
+          constraintName = fkName,
+          localColumns   = ordered.map(_.localCol).toSeq,
+          refCatalog     = ordered.head.refCatalog,
+          refSchema      = ordered.head.refSchema,
+          refTable       = ordered.head.refTable,
+          refColumns     = ordered.map(_.refCol).toSeq
+        )
+      }.toSeq
+  }
+
 }
 private[smartdatalake] object JdbcCatalog {
   def fromJdbcDriver(driver: String, connection: JdbcTableConnection): JdbcCatalog = {
@@ -165,14 +217,67 @@ private[smartdatalake] class DefaultJdbcCatalog(connection: Connection with Jdbc
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists )
   }
 
-  //This method is not used in JdbcTableDataObject, but in other DataObjects.
-  // For this reason, it is not implemented in Oracle and SAP-HANA.
-  def getPrimaryKey(catalog: Option[String], schema: Option[String], tableName: String) = {
-    val catalogConstraint = if (catalog.isEmpty) "" else f" and TABLE_CATALOG = '${catalog.get}'"
-    val schemaConstraint =  if (schema.isEmpty) "" else f" and TABLE_SCHEMA = '${schema.get}'"
-    val baseQuery = f"select COLUMN_NAME, CONSTRAINT_NAME as PK_NAME from INFORMATION_SCHEMA.KEY_COLUMN_USAGE where TABLE_NAME = '$tableName'"
-    val query = Seq(baseQuery, schemaConstraint, catalogConstraint).mkString
+  def getPrimaryKey(catalog: Option[String], schema: Option[String], tableName: String): Option[PrimaryKeyDefinition] = {
+    val schemaFilter  = schema.map(s => s" AND UPPER(TABLE_SCHEMA) = UPPER('$s')").getOrElse("")
+    val catalogFilter = catalog.map(c => s" AND UPPER(TABLE_CATALOG) = UPPER('$c')").getOrElse("")
+    val query = s"SELECT COLUMN_NAME, CONSTRAINT_NAME AS PK_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE UPPER(TABLE_NAME) = UPPER('$tableName')$schemaFilter$catalogFilter"
     connection.execJdbcQuery(query, handlePrimaryKeyResultSet)
+  }
+
+  def getForeignKeys(catalog: Option[String], schema: Option[String], tableName: String): Seq[ForeignKeyDefinition] = {
+    val schemaFilter  = schema.map(s => s" AND UPPER(tc.TABLE_SCHEMA) = UPPER('$s')").getOrElse("")
+    val catalogFilter = catalog.map(c => s" AND UPPER(tc.TABLE_CATALOG) = UPPER('$c')").getOrElse("")
+    val query =
+      s"""SELECT tc.CONSTRAINT_NAME, kcu.COLUMN_NAME AS LOCAL_COLUMN, kcu.ORDINAL_POSITION,
+         |       ccu.TABLE_CATALOG AS REF_CATALOG, ccu.TABLE_SCHEMA AS REF_SCHEMA,
+         |       ccu.TABLE_NAME AS REF_TABLE, ccu.COLUMN_NAME AS REF_COLUMN
+         |FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+         |JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+         |  ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
+         |  AND tc.TABLE_SCHEMA = kcu.TABLE_SCHEMA AND tc.TABLE_NAME = kcu.TABLE_NAME
+         |JOIN INFORMATION_SCHEMA.CONSTRAINT_COLUMN_USAGE ccu
+         |  ON tc.CONSTRAINT_NAME = ccu.CONSTRAINT_NAME
+         |WHERE tc.CONSTRAINT_TYPE = 'FOREIGN KEY'
+         |  AND UPPER(tc.TABLE_NAME) = UPPER('$tableName')$schemaFilter$catalogFilter""".stripMargin
+    connection.execJdbcQuery(query, evalFKResultSet)
+  }
+
+  private def evalFKResultSet(rs: ResultSet): Seq[ForeignKeyDefinition] = {
+    case class Row(name: String, localCol: String, pos: Int, refCatalog: Option[String], refSchema: Option[String], refTable: String, refCol: String)
+    val rows = scala.collection.mutable.Buffer[Row]()
+    while (rs.next()) {
+      rows += Row(
+        name      = rs.getString("CONSTRAINT_NAME"),
+        localCol  = rs.getString("LOCAL_COLUMN"),
+        pos       = rs.getInt("ORDINAL_POSITION"),
+        refCatalog = Option(rs.getString("REF_CATALOG")).filter(_.nonEmpty),
+        refSchema  = Option(rs.getString("REF_SCHEMA")).filter(_.nonEmpty),
+        refTable   = rs.getString("REF_TABLE"),
+        refCol     = rs.getString("REF_COLUMN")
+      )
+    }
+    rows.groupBy(_.name).map { case (constraintName, grp) =>
+      val ordered = grp.sortBy(_.pos)
+      ForeignKeyDefinition(
+        constraintName = constraintName,
+        localColumns   = ordered.map(_.localCol).toSeq,
+        refCatalog     = ordered.head.refCatalog,
+        refSchema      = ordered.head.refSchema,
+        refTable       = ordered.head.refTable,
+        refColumns     = ordered.map(_.refCol).toSeq
+      )
+    }.toSeq
+  }
+
+  def getColumnNullability(catalog: Option[String], schema: Option[String], tableName: String): Map[String, Boolean] = {
+    val schemaFilter  = schema.map(s => s" AND UPPER(TABLE_SCHEMA) = UPPER('$s')").getOrElse("")
+    val catalogFilter = catalog.map(c => s" AND UPPER(TABLE_CATALOG) = UPPER('$c')").getOrElse("")
+    val query = s"SELECT COLUMN_NAME, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE UPPER(TABLE_NAME) = UPPER('$tableName')$schemaFilter$catalogFilter"
+    connection.execJdbcQuery(query, rs => {
+      val buf = scala.collection.mutable.Map[String, Boolean]()
+      while (rs.next()) buf += (rs.getString("COLUMN_NAME") -> (rs.getString("IS_NULLABLE") == "YES"))
+      buf.toMap
+    })
   }
 }
 

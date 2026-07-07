@@ -24,7 +24,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
 import io.smartdatalake.metrics.SparkStageMetricsListener
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactory}
 import io.smartdatalake.util.hive.HiveUtil
 import io.smartdatalake.util.misc._
 import io.smartdatalake.util.spark.SparkQueryUtil
@@ -121,7 +121,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                  (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
     with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
-    with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput
+    with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput with SparkCatalogReferentialKeys
     with io.smartdatalake.util.spark.dataset.ReadWrite {
 
   /**
@@ -714,6 +714,14 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     sqlOpt.foreach(stmt => SparkQueryUtil.executeSqlStatementBasedOnTable(session, stmt, table))
+  }
+
+  override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    super.postWrite(partitionValues)
+    if (table.createAndReplaceReferentialKeys) {
+      if (UCFileSystemFactory.isDatabricksEnv) createOrReplaceReferentialKeys
+      else logger.warn(s"($id) createAndReplaceReferentialKeys=true but referential key provisioning for Iceberg is only supported on Databricks Unity Catalog — skipping")
+    }
   }
 
 }

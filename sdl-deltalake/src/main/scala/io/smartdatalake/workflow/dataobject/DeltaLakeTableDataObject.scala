@@ -44,7 +44,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame, DataFrameWriterV2, Row, SparkSession}
 
-import java.sql.{SQLException, Timestamp}
+import java.sql.Timestamp
 import java.time.{Duration, LocalDateTime}
 import scala.language.implicitConversions
 import scala.util.Try
@@ -132,7 +132,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
     with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
-    with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput with CanHandleConstraints
+    with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput with SparkCatalogReferentialKeys
     with io.smartdatalake.util.spark.dataset.ReadWrite {
 
   /**
@@ -314,7 +314,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
-    if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint
+    if (table.createAndReplaceReferentialKeys && UCFileSystemFactory.isDatabricksEnv) createOrReplaceReferentialKeys
     metadata.flatMap(_.description).foreach {addTableComment}
   }
 
@@ -705,31 +705,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = context.sparkSession
     sqlOpt.foreach( stmt => SparkQueryUtil.executeSqlStatementBasedOnTable(session, stmt, table))
-  }
-
-  def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] = {
-    val catalogConstraint = if (catalog.isEmpty) "" else f" and TABLE_CATALOG = '${catalog.get}'"
-    val schemaConstraint = if (schema.isEmpty) "" else f" and TABLE_SCHEMA = '${schema.get}'"
-    val baseQuery = f"select COLUMN_NAME, CONSTRAINT_NAME as PK_NAME from INFORMATION_SCHEMA.KEY_COLUMN_USAGE where TABLE_NAME = '$tableName'"
-    val query = Seq(baseQuery, schemaConstraint, catalogConstraint).mkString.toLowerCase
-    val df = context.sparkSession.sql(query)
-    val (primaryKeyCols, primaryKeyName) = df.collect().foldLeft(Set[String](), Set[String]())((sets, rowArr) => (sets._1 + rowArr.getString(0), sets._2 + rowArr.getString(1)))
-    (primaryKeyCols.toList, primaryKeyName.toList) match {
-      case (List(), _) => None
-      case (cols, List()) => Some(PrimaryKeyDefinition(cols))
-      case (_, pk) if pk.size > 1 => throw new SQLException(f"The $tableName returns more than one Primary Key: ${pk.mkString}")
-      case (cols, pk) => Some(PrimaryKeyDefinition(cols, Some(pk.head)))
-    }
-  }
-
-  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit = {
-    val query = f"ALTER TABLE $tableName DROP CONSTRAINT $constraintName".toLowerCase
-    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
-  }
-
-  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
-    val query = f"ALTER TABLE $tableName ADD CONSTRAINT $constraintName PRIMARY KEY (${cols.mkString(",")}) RELY"
-    SparkQueryUtil.executeSqlStatementBasedOnTable(context.sparkSession, query, table)
   }
 
   def addTableComment(comment: String)(implicit context: ActionPipelineContext): Unit = {

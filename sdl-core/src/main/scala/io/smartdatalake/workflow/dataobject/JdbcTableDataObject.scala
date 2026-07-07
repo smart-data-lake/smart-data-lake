@@ -111,7 +111,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
     with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame
-    with CanCreateIncrementalOutput with ExpectationValidation with CanHandleConstraints {
+    with CanCreateIncrementalOutput with ExpectationValidation with JdbcCatalogReferentialKeys {
 
   /**
    * Connection defines driver, url and db in central location
@@ -162,9 +162,6 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         connection.execJdbcStatement(sql)
       }
     }
-
-    //If enabled, create or replace the primary Key of the table
-    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint
 
     // test partition columns exist
     if (virtualPartitions.nonEmpty && isTableExisting) {
@@ -561,18 +558,14 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
   }
 
-  def getExistingPKConstraint(catalog: Option[String],
-                                       schema: Option[String],
-                                       tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] = {
-    connection.getJdbcPrimaryKey(catalog, schema, tableName)
+  override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+    super.postWrite(partitionValues)
+    if (table.createAndReplaceReferentialKeys) createOrReplaceReferentialKeys
   }
 
-  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit =
-    connection.catalog.dropPrimaryKeyConstraint(tableName, constraintName)
+  // ── JdbcCatalogReferentialKeys hook ──────────────────────────────────
 
-  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
-    connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
-  }
+  override protected def jCatalog = connection.catalog
 }
 
 private[smartdatalake] case class JdbcColumn(name: String, isNameCaseSensitiv: Boolean, jdbcType: Option[Int] = None, dbTypeName: Option[String] = None, precision: Option[Int] = None, scale: Option[Int] = None, isNullable: Option[Boolean] = None) {
