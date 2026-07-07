@@ -291,6 +291,8 @@ trait SparkFileDataObject extends HadoopFileDataObject
 
   /**
    * Update incremental output state and prepare options for filtering DataSource.
+   * Timestamps are passed in UTC to Spark together with timeZone=UTC, avoiding incorrect double-offset
+   * comparison in Spark's ModifiedDateFilter when the JVM timezone is non-UTC.
    */
   protected def getIncrementalOutputOptions: Map[String,String] = {
     incrementalOutputState.map { previousOutputState =>
@@ -299,10 +301,15 @@ trait SparkFileDataObject extends HadoopFileDataObject
       // Current timestamp is also at millisecond level. If we subtract one microsecond from current timestamp we can avoid the problems because of exclusive comparison.
       nextIncrementalOutputState = Some(LocalDateTime.now.minusNanos(1000))
       val dateFormatter = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSSSSS")
+      // Convert LocalDateTime (local tz) to UTC for Spark's ModifiedDateFilter
+      val toUtc = (ldt: LocalDateTime) => LocalDateTime.ofInstant(ldt.atZone(ZoneId.systemDefault).toInstant, ZoneOffset.UTC)
+      val afterUtc = toUtc(previousOutputState)
+      val beforeUtc = toUtc(nextIncrementalOutputState.get)
       logger.info(s"($id) incremental output selected files with modification date greater than ${dateFormatter.format(previousOutputState)} and smaller than ${dateFormatter.format(nextIncrementalOutputState.get)}")
       Map(
-        "modifiedAfter" -> dateFormatter.format(fixWindowsTimezone(previousOutputState)),
-        "modifiedBefore" -> dateFormatter.format(fixWindowsTimezone(nextIncrementalOutputState.get))
+        "modifiedAfter" -> dateFormatter.format(afterUtc),
+        "modifiedBefore" -> dateFormatter.format(beforeUtc),
+        "timeZone" -> "UTC"
       )
     }.getOrElse(Map[String, String]())
   }

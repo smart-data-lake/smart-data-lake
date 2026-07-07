@@ -36,54 +36,62 @@ import org.apache.spark.sql.types.{DateType, StringType}
 /**
  * A [[DataObject]] backed by a comma-separated value (CSV) data source.
  *
- * It manages read and write access and configurations required for [[io.smartdatalake.workflow.action.Action]]s to
- * work on CSV formatted files.
+ * It manages read and write access and configurations required for
+ * [[io.smartdatalake.workflow.action.Action]]s to work on CSV formatted files.
  *
- * CSV reading and writing details are delegated to Apache Spark [[org.apache.spark.sql.DataFrameReader]]
- * and [[org.apache.spark.sql.DataFrameWriter]] respectively.
+ * CSV reading and writing details are delegated to Apache Spark
+ * [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]]
+ * respectively.
  *
  * Read Schema specifications:
  *
- * If a data object schema is not defined via the `schema` attribute (default) and `inferSchema` option is
- * disabled (default) in `csvOptions`, then all column types are set to String and the first row of the CSV file is read
- * to determine the column names and the number of fields.
+ * If a data object schema is not defined via the `schema` attribute (default) and `inferSchema`
+ * option is disabled (default) in `csvOptions`, then all column types are set to String and the
+ * first row of the CSV file is read to determine the column names and the number of fields.
  *
- * If the `header` option is disabled (default) in `csvOptions`, then the header is defined as "_c#" for each column
- * where "#" is the column index.
- * Otherwise the first row of the CSV file is not included in the DataFrame content and its entries
- * are used as the column names for the schema.
+ * If the `header` option is disabled (default) in `csvOptions`, then the header is defined as "_c#"
+ * for each column where "#" is the column index. Otherwise the first row of the CSV file is not
+ * included in the DataFrame content and its entries are used as the column names for the schema.
  *
- * If a data object schema is not defined via the `schema` attribute and `inferSchema` is enabled in `csvOptions`, then
- * the `samplingRatio` (default: 1.0) option in `csvOptions` is used to extract a sample from the CSV file in order to
- * determine the input schema automatically.
+ * If a data object schema is not defined via the `schema` attribute and `inferSchema` is enabled in
+ * `csvOptions`, then the `samplingRatio` (default: 1.0) option in `csvOptions` is used to extract a
+ * sample from the CSV file in order to determine the input schema automatically.
  *
- * @note This data object sets the following default values for `csvOptions`: delimiter = "|", quote = null, header = false, and inferSchema = false.
- *       All other `csvOption` default to the values defined by Apache Spark.
+ * @note
+ *   This data object sets the following default values for `csvOptions`: delimiter = "|", quote =
+ *   null, header = false, and inferSchema = false. All other `csvOption` default to the values
+ *   defined by Apache Spark.
  *
- * @see [[org.apache.spark.sql.DataFrameReader]]
- * @see [[org.apache.spark.sql.DataFrameWriter]]
+ * @see
+ *   [[org.apache.spark.sql.DataFrameReader]]
+ * @see
+ *   [[org.apache.spark.sql.DataFrameWriter]]
  *
- * @param csvOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
- * @param dateColumnType Specifies the string format used for writing date typed data.
- **/
-case class CsvFileDataObject( override val id: DataObjectId,
-                              override val path: String,
-                              csvOptions: Map[String, String] = Map(),
-                              override val partitions: Seq[String] = Seq(),
-                              override val schema: Option[GenericSchema] = None,
-                              override val schemaMin: Option[GenericSchema] = None,
-                              dateColumnType: DateColumnType = DateColumnType.Date,
-                              override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
-                              override val sparkRepartition: Option[SparkRepartitionDef] = None,
-                              override val connectionId: Option[ConnectionId] = None,
-                              override val filenameColumn: Option[String] = None,
-                              override val expectedPartitionsCondition: Option[String] = None,
-                              override val housekeepingMode: Option[HousekeepingMode] = None,
-                              override val constraints: Seq[Constraint] = Seq(),
-                              override val expectations: Seq[Expectation] = Seq(),
-                              override val metadata: Option[DataObjectMetadata] = None
-                            )(@transient implicit override val instanceRegistry: InstanceRegistry)
-  extends SparkFileDataObject with io.smartdatalake.util.spark.dataset.Transform {
+ * @param csvOptions
+ *   Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
+ *   [[org.apache.spark.sql.DataFrameWriter]].
+ * @param dateColumnType
+ *   Specifies the string format used for writing date typed data.
+ */
+case class CsvFileDataObject(
+    override val id: DataObjectId,
+    override val path: String,
+    csvOptions: Map[String, String] = Map(),
+    override val partitions: Seq[String] = Seq(),
+    override val schema: Option[GenericSchema] = None,
+    override val schemaMin: Option[GenericSchema] = None,
+    dateColumnType: DateColumnType = DateColumnType.Date,
+    override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
+    override val sparkRepartition: Option[SparkRepartitionDef] = None,
+    override val connectionId: Option[ConnectionId] = None,
+    override val filenameColumn: Option[String] = None,
+    override val expectedPartitionsCondition: Option[String] = None,
+    override val housekeepingMode: Option[HousekeepingMode] = None,
+    override val constraints: Seq[Constraint] = Seq(),
+    override val expectations: Seq[Expectation] = Seq(),
+    override val metadata: Option[DataObjectMetadata] = None
+)(@transient implicit override val instanceRegistry: InstanceRegistry)
+    extends SparkFileDataObject with io.smartdatalake.util.spark.dataset.Transform {
 
   override val format = "com.databricks.spark.csv"
 
@@ -91,10 +99,10 @@ case class CsvFileDataObject( override val id: DataObjectId,
   override val fileName: String = "*.csv*"
 
   private val formatOptionsDefault = Map(
-    "header" -> "true",
-    "inferSchema" -> "false",
-    "delimiter" -> ",",
-    "quote" -> null,
+    "header"         -> "true",
+    "inferSchema"    -> "false",
+    "delimiter"      -> ",",
+    "quote"          -> null,
     "pathGlobFilter" -> fileName
   )
 
@@ -103,10 +111,14 @@ case class CsvFileDataObject( override val id: DataObjectId,
    */
   override val options: Map[String, String] = formatOptionsDefault ++ csvOptions
 
-  require(options("header").toBoolean || options("inferSchema").toBoolean || schema.isDefined, s"($id) Custom schema must be set or either csvOptions { header = true } or csvOptions { inferSchema = true } must be set.")
+  require(
+    options("header").toBoolean || options("inferSchema").toBoolean || schema.isDefined,
+    s"($id) Custom schema must be set or either csvOptions { header = true } or csvOptions { inferSchema = true } must be set."
+  )
 
   /**
-   * Formats date type column values according to the specified `dateColumnType` before writing to CSV file.
+   * Formats date type column values according to the specified `dateColumnType` before writing to
+   * CSV file.
    */
   override def beforeWrite(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
     val dfSuper = super.beforeWrite(df)
@@ -122,7 +134,6 @@ case class CsvFileDataObject( override val id: DataObjectId,
 }
 
 object CsvFileDataObject extends FromConfigFactory[DataObject] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CsvFileDataObject = {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CsvFileDataObject =
     extract[CsvFileDataObject](config)
-  }
 }

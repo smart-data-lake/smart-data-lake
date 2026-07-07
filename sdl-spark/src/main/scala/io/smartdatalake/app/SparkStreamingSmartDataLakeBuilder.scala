@@ -19,6 +19,7 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.ActionDAGRun
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -28,7 +29,7 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
  * Overrides the streaming lifecycle hooks introduced in SmartDataLakeBuilder with
  * Spark-specific stream management logic.
  */
-trait SparkStreamingSupport { this: SmartDataLakeBuilder =>
+trait SparkStreamingSupport extends SmartDataLakeLogger { this: SmartDataLakeBuilder =>
 
   override protected def stopSyncStreamingQueriesGracefully(hasAsyncActions: Boolean)(implicit context: ActionPipelineContext): Unit = {
     if (hasAsyncActions) {
@@ -41,11 +42,14 @@ trait SparkStreamingSupport { this: SmartDataLakeBuilder =>
   }
 
   override protected def stopAsyncStreamingQueriesGracefully()(implicit context: ActionPipelineContext): Unit = {
+    logger.info(s"stopAsyncStreamingQueriesGracefully: stopStreamingGracefully=${Environment.stopStreamingGracefully}, stopping ${SparkSubFeed.getSparkSession(context).streams.active.size} active streams")
     SparkSubFeed.getSparkSession(context).streams.active.foreach(_.stop())
   }
 
   override protected def awaitAndStopAsyncStreamingQueries(actionDAGRun: ActionDAGRun)(implicit context: ActionPipelineContext): Unit = {
+    logger.info(s"awaitAndStopAsyncStreamingQueries: waiting for any streaming query to terminate")
     SparkSubFeed.getSparkSession(context).streams.awaitAnyTermination()
+    logger.info(s"awaitAndStopAsyncStreamingQueries: awaitAnyTermination returned, active=${SparkSubFeed.getSparkSession(context).streams.active.map(_.name).mkString(",")}")
     SparkSubFeed.getSparkSession(context).streams.active.foreach(_.stop())
   }
 }

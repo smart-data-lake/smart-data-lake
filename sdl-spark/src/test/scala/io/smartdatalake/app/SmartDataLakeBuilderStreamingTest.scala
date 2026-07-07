@@ -94,8 +94,12 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
   }
 
   after {
-    // ensure cleanup
+    // Remove listeners FIRST so that stopping lingering queries below does not cause
+    // SparkStreamingQueryListener.onQueryTerminated to set stopStreamingGracefully=true
+    // asynchronously (after we already reset it), which would corrupt the next test.
     session.streams.listListeners().foreach(session.streams.removeListener)
+    // Now stop any lingering streaming queries with no listener left to set stopStreamingGracefully
+    session.streams.active.foreach(q => try { q.stop() } catch { case _: Exception => () })
     session.streams.resetTerminated() // reset terminated streaming query list
     Environment.stopStreamingGracefully = false // reset stopping gracefully
   }

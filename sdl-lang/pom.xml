@@ -142,9 +142,17 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>io.smartdatalake</groupId>
+            <artifactId>sdl-spark_${scala.minor.version}</artifactId>
+            <version>${project.parent.version}</version>
+            <classifier>test-jar</classifier>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.github.tomakehurst</groupId>
             <artifactId>wiremock-standalone</artifactId>
-            <version>2.25.1</version>
+            <version>3.0.1</version>
             <scope>test</scope>
         </dependency>
 

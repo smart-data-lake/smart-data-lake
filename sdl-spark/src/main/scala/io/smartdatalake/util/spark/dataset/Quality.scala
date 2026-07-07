@@ -156,9 +156,9 @@ trait Quality extends Transform {
       val cntDistinctRows = Try(countDistinctRows) match {
         case Success(n) => n
         case Failure(e) =>
-          logger.warn(s"createdLog: could not count distinct rows of $dsName")
+          logger.warn(s"debLog($dsName): could not count distinct rows of $dsName")
           logger.warn(e.getMessage)
-          logger.warn("createdLog: ignoring this problem and returning -1")
+          logger.warn("debLog($dsName): ignoring this problem and returning -1")
           -1L
       }
       if (0 < cntDistinctRows && cntRows != cntDistinctRows) {
@@ -172,7 +172,7 @@ trait Quality extends Transform {
     }
 
     /**
-     * createdLog shows a success message the your dataset has been created
+     * createdLog shows a success message that your dataset has been created
      * @param dsName
      *   Name of dataset
      * @param debug

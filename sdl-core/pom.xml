@@ -310,7 +310,7 @@
         <dependency>
             <groupId>com.github.tomakehurst</groupId>
             <artifactId>wiremock-standalone</artifactId>
-            <version>2.25.1</version>
+            <version>3.0.1</version>
             <scope>test</scope>
         </dependency>
 
@@ -451,6 +451,13 @@
                             <classifier>test-jar</classifier>
                             <includes>
                                 <include>**/testutils/**</include>
+                                <include>**/config/objects/**</include>
+                                <include>**/util/historization/HistorizationTestUtils*</include>
+                                <include>**/util/historization/NameAgeHealth*</include>
+                                <include>**/util/spark/dataset/TestCaseClass*</include>
+                                <include>**/util/spark/dataset/TestInnerClass*</include>
+                                <include>application.conf</include>
+                                <include>config/**</include>
                                 <include>log4j2.yml</include> <!-- Add logging configuration for testing. -->
                                 <include>test_keystore.pkcs12
                                 </include> <!-- Add key store for wiremock server for testing. -->

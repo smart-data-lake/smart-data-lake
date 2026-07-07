@@ -21,7 +21,7 @@ package io.smartdatalake.app
 import io.smartdatalake.communication.agent._
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.CsvFileDataObject
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 
@@ -30,9 +30,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 /**
- * Tests communication with AzureRelayAgent.
- * Because it only works with a connection to Azure Relay Service it is considered as an Integration Test.
- * Note that you need to specify the Environment Variable SharedAccessKey for it to work
+ * Tests communication with AzureRelayAgent. Because it only works with a connection to Azure Relay
+ * Service it is considered as an Integration Test. Note that you need to specify the Environment
+ * Variable SharedAccessKey for it to work
  */
 object SmartDataLakeBuilderAzureRelayAgentIT extends App {
 
@@ -50,36 +50,38 @@ object SmartDataLakeBuilderAzureRelayAgentIT extends App {
   val dfSrc1 = Seq("testData").toDF("testColumn")
   srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
-  val azureRelayUrl = "Endpoint=sb://relay-tbb-test2.servicebus.windows.net/;SharedAccessKeyName=tbb-test-policy;EntityPath=tbb-test-connection;SharedAccessKey="
-  val agentConfig = LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq(), azureRelayURL = Some(azureRelayUrl))
+  val azureRelayUrl = "Endpoint=sb://relay-tbb-test2.servicebus.windows.net/;SharedAccessKeyName=tbb-test-policy;" +
+    "EntityPath=tbb-test-connection;SharedAccessKey="
+  val agentConfig =
+    LocalAzureRelayAgentSmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq(), azureRelayURL = Some(azureRelayUrl))
   val remoteSDLB = DefaultSmartDataLakeBuilder
-  //Make sure this string matches the config from the file application-azureRelayAgent.conf
+  // Make sure this string matches the config from the file application-azureRelayAgent.conf
   val server = AzureRelayAgentServer(remoteSDLB, agentConfig)
   val agentServerThread = Future {
     server.start()
   }
 
   val configFileResource = getClass.getResource("/configAgents/application-azureRelayAgent.conf")
-  require(configFileResource != null, "Please make sure the file application-azureRelayAgent.conf is included in the resources when running this test." +
-    "In IntelliJ, you can do this with the option Modify Classpath")
+  require(
+    configFileResource != null,
+    "Please make sure the file application-azureRelayAgent.conf is included in the resources when running this test." +
+      "In IntelliJ, you can do this with the option Modify Classpath"
+  )
   Thread.sleep(5000)
   val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName, configuration = Seq(configFileResource.getPath)
   )
-  //Run SDLB Main Instance
+  // Run SDLB Main Instance
   sdlb.run(sdlConfig)
 
-  //remoteSDLB should have executed exactly one action: the remoteAction
+  // remoteSDLB should have executed exactly one action: the remoteAction
   assert(remoteSDLB.instanceRegistry.getActions.size == 1)
   val remoteAction = remoteSDLB.instanceRegistry.getActions.head
   assert(remoteAction.id.id == "remote-to-cloud")
   assert(remoteAction.outputs.head.id.id == "cloud-file1")
 
-  //Main Instance of SDLB was not using remoteFile connection from connection list
+  // Main Instance of SDLB was not using remoteFile connection from connection list
   assert(!Paths.get(System.getProperty("user.dir"), "target", "relay_dummy_connection").toFile.exists())
 
-  //Main Instance of SDLB was able to execute action cloud-to-cloud by using data provided from the Agent
+  // Main Instance of SDLB was able to execute action cloud-to-cloud by using data provided from the Agent
   assert(Paths.get(System.getProperty("user.dir"), "target", "relay_dummy_cloud_connection", "cloud-file2").toFile.exists())
 }
-
-
-

@@ -171,8 +171,8 @@ trait ExpectationOneMetricDefaultImpl { this: Expectation =>
   def getValidationErrorColumnSql(dataObjectId: DataObjectId, value: Any, metricName: String = name): Option[SqlExpressionColumn] = {
     getValidationConditionSql(dataObjectId, value).map { conditionSql =>
       try {
-        val escapedMsg = s"Expectation '${metricName.replace("'", "''")}' failed with value:$value expectation:${expectation.get.replace("'", "''")}'"
-        SqlExpressionColumn(s"CASE WHEN NOT ($conditionSql) THEN '$escapedMsg' END")
+        val escapedMsg = s"Expectation '$metricName' failed with value:$value expectation:${expectation.get}".replace("'", "''")
+        SqlExpressionColumn(s"CASE WHEN ($conditionSql) IS FALSE THEN '$escapedMsg' END")
       } catch {
         case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot create validation error column", Some(s"expectations.$name"), e)
       }
@@ -208,8 +208,8 @@ trait ExpectationFractionMetricDefaultImpl { this: BaseExpectation =>
     val col = expectation.map { expectationStr =>
       val conditionSql = s"$pct $expectationStr"
       try {
-        val escapedMsg = s"Expectation '${metricName.replace("'", "''")}' failed with pct:$pct expectation:${expectationStr.replace("'", "''")}'"
-        SqlExpressionColumn(s"CASE WHEN NOT ($conditionSql) THEN '$escapedMsg' END")
+        val escapedMsg = s"Expectation '$metricName' failed with pct:$pct expectation:$expectationStr".replace("'", "''")
+        SqlExpressionColumn(s"CASE WHEN ($conditionSql) IS FALSE THEN '$escapedMsg' END")
       } catch {
         case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot create validation error column", Some(s"expectations.$name"), e)
       }

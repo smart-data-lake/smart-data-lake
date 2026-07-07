@@ -25,7 +25,6 @@ import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
@@ -39,7 +38,8 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
  * Note about EmbeddedKafka compatibility:
  * The currently used version 2.4.1 (in sync with the kafka version of sparks parent pom) is not compatible with JDK14+
  * because of a change of InetSocketAddress::toString. Zookeeper doesn't start because of
- * "java.nio.channels.UnresolvedAddressException: Session 0x0 for server localhost/<unresolved>:6001, unexpected error, closing socket connection and attempting reconnect"
+ * "java.nio.channels.UnresolvedAddressException: Session 0x0 for server localhost/<unresolved>:6001, unexpected error,
+ * closing socket connection and attempting to reconnect"
  * see also https://www.oracle.com/java/technologies/javase/14all-relnotes.html#JDK-8225499
  */
 class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafka with SmartDataLakeLogger {
@@ -69,10 +69,8 @@ class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeA
 
   test("action dag with 2 actions in sequence where 2nd action reads different schema than produced by last action") {
     // Note: Some DataObjects remove & add columns on read (e.g. KafkaTopicDataObject, SparkFileDataObject)
-    // In this cases we have to break the lineage und create a dummy DataFrame in init phase.
+    // In these cases we have to break the lineage und create a dummy DataFrame in init phase.
 
-    // setup DataObjects
-    val feed = "actionpipeline"
     val srcDO = MockSparkDataObject("src1").register
     createCustomTopic("topic1", Map(), 1, 1)
     val tgt1DO = KafkaTopicDataObject("kafka1", topicName = "topic1", connectionId = "kafkaCon1", valueType = KafkaColumnType.String, selectCols = Seq("value", "timestamp"))

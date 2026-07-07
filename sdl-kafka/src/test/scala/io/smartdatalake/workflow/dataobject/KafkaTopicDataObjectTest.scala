@@ -22,14 +22,13 @@ import io.confluent.kafka.serializers.{KafkaJsonDeserializer, KafkaJsonDeseriali
 import io.github.embeddedkafka.schemaregistry.{EmbeddedKafka => EmbeddedKafkaWithSchemaRegistry}
 import io.smartdatalake.testutil.KafkaTestUtil
 import io.smartdatalake.testutils.DataObjectTestSuite
-import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.SparkSchemaUtil
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.connection.KafkaConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.spark.sql.confluent.IncompatibleSchemaException
-import org.apache.spark.sql.avro.{IncompatibleSchemaException => AvroIncompatibleSchemaException}
 import org.apache.spark.sql.functions.{lit, struct}
 import org.apache.spark.sql.streaming.Trigger
 import org.scalatest.funsuite.AnyFunSuite
