@@ -47,7 +47,8 @@ import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 import org.slf4j.Logger
 
-import java.nio.file.Files
+import java.nio.file
+import _root_.scala.util.{Failure, Success, Try}
 
 class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with SmartDataLakeLogger with BeforeAndAfter {
   @transient implicit private lazy val loggImpl: Logger = logger
@@ -55,7 +56,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
 
   import session.implicits._
 
-  private val tempDir = Files.createTempDirectory("test")
+  private val tempDir = file.Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
 
   val statePath = "target/streamingStateTest/"
@@ -88,6 +89,9 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
   loggEnv
   debugLog(s"SmartDataLakeBuilderStreamingTest: tempPath = $tempPath")
 
+  private val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
+    .toDF("dt", "type", "lastname", "firstname", "rating")
+
   before {
     instanceRegistry.clear()
     instanceRegistry.register(sparkClassicConnection)
@@ -117,7 +121,8 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     // source table has partitions columns dt and type
     val srcDO = MockSparkDataObject("src1", partitions = Seq("dt", "type")).register
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = MockSparkDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname"))).register
+    val tgt1DO = MockSparkDataObject(id = "tgt1", partitions = Seq("dt", "type"),
+      primaryKey = Some(Seq("lastname", "firstname"))).register
 
     // fill src table with first partition
     val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
@@ -126,8 +131,11 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
 
     // start streaming dag run
     // use only first partition col (dt) for partition diff mode
-    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from src1"))))
+    val action1 = CopyAction(id = "a", inputId = srcDO.id, outputId = tgt1DO.id,
+      executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))),
+      metadata = Some(ActionMetadata(feed = Some(feedName))),
+      transformers = Seq(SQLDfTransformer(code = Some("select dt, type, lastname, firstname, udfAddX(rating) rating from src1")))
+    )
     instanceRegistry.register(action1)
 
     // create state listener to control execution
@@ -159,14 +167,15 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
       }
     }
 
-    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath), streaming = true)
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"),
+      feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath), streaming = true)
     Environment._additionalStateListeners = Seq(stateListener)
     Environment.stopStreamingGracefully = false
     sdlb.run(sdlConfig)
     Environment.stopStreamingGracefully = false
     Environment._additionalStateListeners = Seq()
 
-    // check data after streaming is terminated
+    debugLog("check data after streaming is terminated")
     assert(tgt1DO.listPartitions.map(_.apply("dt")) == Seq("20180101", "20180102"))
     assert(tgt1DO.getSparkDataFrame().select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
 
@@ -197,11 +206,12 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
 
     // setup DataObjects
     // source has partitions columns dt and type
-    val srcDO = CsvFileDataObject("src1", tempPath + "/src1", partitions = Seq("dt", "type")
-      , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
+    val srcDOPath = s"$tempPath/src1"
+    val srcDO = CsvFileDataObject(id = "src1", path = srcDOPath, partitions = Seq("dt", "type"),
+      schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(srcDO)
     // first table has partitions columns dt and type (same as source)
-    val tgt1DO = CsvFileDataObject("tgt1", tempPath + "/tgt1", partitions = Seq("dt", "type"), saveMode = SDLSaveMode.Overwrite
+    val tgt1DO = CsvFileDataObject(id = "tgt1", path = tempPath + "/tgt1", partitions = Seq("dt", "type"), saveMode = SDLSaveMode.Overwrite
       , schema = Some(SparkSchema(StructType.fromDDL("dt string, type string, lastname string, firstname string, rating int"))))
     instanceRegistry.register(tgt1DO)
 
@@ -229,7 +239,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
         // In Spark 3.5+, idle fires when no new data available instead of onQueryProgress
         // Only stop after the batch that processes the newly written data has completed
         if (batchAfterWriteProcessed) {
-          logger.info("stopping streaming query after idle")
+          logger.info("onQueryIdle: stopping streaming query after idle")
           session.streams.active.find(_.runId == event.runId).get.stop()
         }
         // else: data was recently written, wait for next trigger to pick it up
@@ -238,21 +248,21 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
 
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
-        logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
-        event.progress.name match {
+        val prog = event.progress
+        logger.info(s"onQueryProgress: progress ${prog.batchId} ${prog.name}." +
+          s" batchAfterWriteProcessed=$batchAfterWriteProcessed , dfWritten=$dfWritten , numInputRows=${prog.numInputRows}")
+        prog.name match {
           case actionRegex(_) =>
-            event.progress.batchId match {
+            prog.batchId match {
               case 0 if !dfWritten =>
                 dfWritten = true
                 debugLog("onQueryProgress: adding some more data")
-                val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
-                  .toDF("dt", "type", "lastname", "firstname", "rating")
-                srcDO.writeSparkDataFrame(dfSrc2)
-                srcDO.getSparkDataFrame().createdLog("srcDO", showRows = true)
-              case 2 =>
-                debugLog("onQueryProgress: stopping streaming query")
-                session.streams.active.find(_.name == event.progress.name).get.stop()
-              case x if x > 0 && dfWritten && !batchAfterWriteProcessed =>
+                srcDO.writeSparkDataFrame(dfSrc2)(contextExec)
+                srcDO.getSparkDataFrame()(contextExec).createdLog("srcDO", showRows = true)
+              case x if x > 1 && batchAfterWriteProcessed =>
+                debugLog(s"onQueryProgress: x=$x stopping streaming query")
+                session.streams.active.find(_.name == prog.name).get.stop()
+              case x if x > 0 && dfWritten && !batchAfterWriteProcessed && prog.numInputRows > 0 =>
                 batchAfterWriteProcessed = true
               case _ => ()
             }
@@ -273,11 +283,21 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
 
     debugLog("check data after streaming is terminated")
     val tgt1DOdf = tgt1DO.getSparkDataFrame()
-    tgt1DOdf.createdLog("tgt1DOdf", showRows = true)
-    assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20190101"))
-    assert(tgt1DOdf.select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
-
-    debugLog(s"action1: $action1")
+    Try {
+      assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20190101"))
+      assert(tgt1DOdf.select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
+    } match {
+      case Success(_) =>
+      case Failure(e) => println()
+        logger.error("!!! ASSERTION FAILED !!!")
+        logger.error(s"sdlConfig: ${sdlConfig.toDebugString}")
+        logger.error(s"action1  : ${action1.toDebugString}")
+        logger.error(s"srcDO    : ${srcDO.toDebugString}")
+        logger.error(s"content of $srcDOPath: ${new java.io.File(srcDOPath).list.mkString(", ")}")
+        srcDO.getSparkDataFrame().debLog(dsName = "src1", showRows = true)
+        tgt1DOdf.debLog(dsName = "tgt1DOdf", showRows = true)
+      throw e
+    }
     debugLog(s"action1.runtimeData: ${action1.runtimeData}")
     debugLog(s"${action1.runtimeData.executions.length} action1.runtimeData.executions: " +
       s"${action1.runtimeData.executions.mkString(",")}")
@@ -370,7 +390,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
       override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
 
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
-        logger.info(s"progress ${event.progress.batchId} ${event.progress.name}")
+        logger.info(s"onQueryProgress: progress ${event.progress.batchId} ${event.progress.name}")
         event.progress.name match {
           case actionRegex(_) =>
             event.progress.batchId match {
@@ -462,8 +482,6 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
                 dfWritten = true
                 // add some more data
                 logger.info("adding more data")
-                val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
-                  .toDF("dt", "type", "lastname", "firstname", "rating")
                 srcDO.writeSparkDataFrame(dfSrc2, Seq())
               case x if x > 0 && event.progress.numInputRows > 0 =>
                 // stop streaming gracefully when second data partition was processed
@@ -719,8 +737,6 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
                 dfSrc2Written = true
                 // add some more data
                 logger.info("adding more data")
-                val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101
-                  .toDF("dt", "type", "lastname", "firstname", "rating")
                 srcDO.writeSparkDataFrame(dfSrc2, Seq())
               case x if x > 0 && event.progress.numInputRows > 0 =>
                 // stop streaming gracefully when second data partition was processed

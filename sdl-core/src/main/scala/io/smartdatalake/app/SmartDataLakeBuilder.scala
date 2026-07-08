@@ -234,10 +234,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    *   Application configuration (parsed from command line).
    */
   def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState, Int] = {
+    debugLog(s"START SmartDataLakeBuilder.run: appConfig = ${appConfig.toDebugString}")
     require(!EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME") != null,
       "Env variable HADOOP_HOME needs to be set in local mode on Windows!")
     AppUtil.setSdlbRunLoggerContext(appConfig)
-    val stats = try {
+    val stats: Map[RuntimeEventState, Int] = try {
       // invoke SDLPlugins if configured
       Environment.sdlPlugins.foreach(_.startup())
       // create default hadoop configuration, as we did not yet load custom spark/hadoop properties
@@ -277,7 +278,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         throw e
     }
     shutdown()
-    // return
+    debugLog(s"SmartDataLakeBuilder.run: stats = $stats")
     stats
   }
 

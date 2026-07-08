@@ -20,8 +20,7 @@ package io.smartdatalake.app
 
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.ActionDAGRun
+import io.smartdatalake.workflow.{ActionDAGRun, ActionPipelineContext}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 
 /**
@@ -42,7 +41,8 @@ trait SparkStreamingSupport extends SmartDataLakeLogger { this: SmartDataLakeBui
   }
 
   override protected def stopAsyncStreamingQueriesGracefully()(implicit context: ActionPipelineContext): Unit = {
-    logger.info(s"stopAsyncStreamingQueriesGracefully: stopStreamingGracefully=${Environment.stopStreamingGracefully}, stopping ${SparkSubFeed.getSparkSession(context).streams.active.size} active streams")
+    logger.info(s"stopAsyncStreamingQueriesGracefully: stopStreamingGracefully=${Environment.stopStreamingGracefully}," +
+      s" stopping ${SparkSubFeed.getSparkSession(context).streams.active.length} active streams")
     SparkSubFeed.getSparkSession(context).streams.active.foreach(_.stop())
   }
 
