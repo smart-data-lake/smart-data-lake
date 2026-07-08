@@ -2919,6 +2919,15 @@
                 <version>${scalatest.plus.version}</version>
                 <scope>test</scope>
             </dependency>
+            <dependency>
+                <!-- TODO: Using version > 2.26.3 fails with java.security.UnrecoverableKeyException:
+                    Get Key failed: Given final block not properly padded.
+                    Note also that this package has been moved to org.wiremock -->
+                <groupId>com.github.tomakehurst</groupId>
+                <artifactId>wiremock-standalone</artifactId>
+                <version>2.26.3</version>
+                <scope>test</scope>
+            </dependency>
 
         </dependencies>
     </dependencyManagement>

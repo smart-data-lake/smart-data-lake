@@ -310,10 +310,8 @@
         <dependency>
             <groupId>com.github.tomakehurst</groupId>
             <artifactId>wiremock-standalone</artifactId>
-            <version>3.0.1</version>
             <scope>test</scope>
         </dependency>
-
         <dependency>
             <groupId>io.circe</groupId>
             <artifactId>circe-yaml_${scala.minor.version}</artifactId>

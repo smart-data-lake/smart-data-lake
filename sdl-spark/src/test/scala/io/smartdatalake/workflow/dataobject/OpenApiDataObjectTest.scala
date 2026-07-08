@@ -22,13 +22,16 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.{TestUtil, WebserviceTestUtil}
 import io.smartdatalake.util.misc.ResourceUtil
+import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.scalatest.funsuite.AnyFunSuite
+import org.slf4j.{Logger, LoggerFactory}
 
 class OpenApiDataObjectTest extends AnyFunSuite {
+  @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit lazy val session: SparkSession = TestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
@@ -38,6 +41,8 @@ class OpenApiDataObjectTest extends AnyFunSuite {
   val httpsPort = 8443
   val host = "127.0.0.1"
 
+  loggEnv
+
   test("read openapi spec from classpath") {
     val do1 = OpenApiDataObject(
       id = "do1",
@@ -45,6 +50,7 @@ class OpenApiDataObjectTest extends AnyFunSuite {
       apiDocsUrl = "cp:/openApiSpec/sampleApiDoc.json",
       operationId = "getPing",
     )
+    logger.debug(s"do1 = $do1")
     do1.prepare
     val df = do1.getSparkDataFrame()(contextInit)
 
@@ -67,6 +73,7 @@ class OpenApiDataObjectTest extends AnyFunSuite {
       apiDocsUrl = "sampleApiDoc.json",
       operationId = "getPing",
     )
+    logger.debug(s"do1 = $do1")
     do1.prepare
     val df = do1.getSparkDataFrame()(contextExec)
     val result = df.as[(Long, String)].collect().toSeq
@@ -94,9 +101,9 @@ class OpenApiDataObjectTest extends AnyFunSuite {
       operationId = "getPaging",
       pagingLinkJsonPath = Some("$.nextLink")
     )
+    logger.debug(s"do1 = $do1")
     do1.prepare
-    val df = do1.getSparkDataFrame()(contextExec)
-      .drop("nextLink")
+    val df = do1.getSparkDataFrame()(contextExec)      .drop("nextLink")
     val result = df.as[(Long, String)].collect().toSeq
     assert(result == Seq((123L, "john"), (456L, "peter")))
 

@@ -27,17 +27,32 @@ object GetSession {
 
   var _loggEnvDone: Boolean = false
 
-  def loggEnv(implicit session: SparkSession, logger: Logger): Unit = {
+  def loggEnv(implicit session: SparkSession, logger: Logger): Unit =
     if (!_loggEnvDone) {
-      val sparkConfSettings = List("spark.driver.host", "spark.driver.port", "spark.driver.cores",
-        "spark.driver.maxResultSize", "spark.driver.memory",
-        "spark.dynamicAllocation.enabled", "spark.dynamicAllocation.executorAllocationRatio",
-        "spark.dynamicAllocation.executorIdleTimeout", "spark.dynamicAllocation.maxExecutors",
-        "spark.dynamicAllocation.minExecutors", "spark.executor.cores", "spark.executor.memory",
-        "spark.executor.memoryOverhead", "spark.sql.maxPlanStringLength")
-      val runtimeConfigSettings = List("spark.shuffle.file.buffer", "spark.sql.mapKeyDedupPolicy",
-        "spark.sql.maxPlanStringLength", "spark.sql.optimizer.maxIterations", "spark.sql.shuffle.partitions",
-        "spark.sql.warehouse.dir")
+      val sparkConfSettings = List(
+        "spark.driver.host",
+        "spark.driver.port",
+        "spark.driver.cores",
+        "spark.driver.maxResultSize",
+        "spark.driver.memory",
+        "spark.dynamicAllocation.enabled",
+        "spark.dynamicAllocation.executorAllocationRatio",
+        "spark.dynamicAllocation.executorIdleTimeout",
+        "spark.dynamicAllocation.maxExecutors",
+        "spark.dynamicAllocation.minExecutors",
+        "spark.executor.cores",
+        "spark.executor.memory",
+        "spark.executor.memoryOverhead",
+        "spark.sql.maxPlanStringLength"
+      )
+      val runtimeConfigSettings = List(
+        "spark.shuffle.file.buffer",
+        "spark.sql.mapKeyDedupPolicy",
+        "spark.sql.maxPlanStringLength",
+        "spark.sql.optimizer.maxIterations",
+        "spark.sql.shuffle.partitions",
+        "spark.sql.warehouse.dir"
+      )
 
       import session.implicits._
       val os: String = System.getProperty("os.name")
@@ -57,7 +72,8 @@ object GetSession {
            |   Java TimeZone : ${java.util.TimeZone.getDefault.getDisplayName()}
            |   Scala Version : $scalaVersion
            |   Spark Version : ${sparkContext.version}
-           |   Spark AppId   : ${sparkContext.getConf.getAppId}""".stripMargin)
+           |   Spark AppId   : ${sparkContext.getConf.getAppId}""".stripMargin
+      )
 
       logger.info("Spark Conf Settings :")
       sparkConfSettings
@@ -72,14 +88,13 @@ object GetSession {
       logger.info(s"Documentation: https://spark.apache.org/docs/${sparkContext.version}/configuration.html")
       _loggEnvDone = true
     }
-  }
 
   /**
-   * only return SessionBuilder, this allows to modify config
-   * Even if IntelliJ recommends so, do not make it private so that we can play with ith.
+   * only return SessionBuilder, this allows to modify config Even if IntelliJ recommends so, do not
+   * make it private so that we can play with ith.
    *
-   * @param nCores how many cores do you want
-   *
+   * @param nCores
+   *   how many cores do you want
    */
   def sessionBuilder(nCores: Int = 1): SparkSession.Builder = SparkSession.builder()
     .appName("UnitTest")

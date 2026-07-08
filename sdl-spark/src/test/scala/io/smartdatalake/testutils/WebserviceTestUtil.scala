@@ -25,6 +25,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
 
 import java.nio.file.Files
+import scala.util.{Failure, Success, Try}
 
 /**
  * Utility methods for testing.
@@ -47,13 +48,13 @@ object WebserviceTestUtil extends SmartDataLakeLogger with Equality {
    * different URLs with predefined return codes
    *
    * @param host
-   * bind address, usually localhost / 127.0.0.1
+   *   bind address, usually localhost / 127.0.0.1
    * @param port
-   * port for http calls
+   *   port for http calls
    * @param httpsPort
-   * port for https calls
+   *   port for https calls
    * @return
-   * instance of [[WireMockServer]]
+   *   instance of [[WireMockServer]]
    */
   def startWebservice(host: String, port: Int, httpsPort: Int): WireMockServer = {
     configureFor(host, port)
@@ -67,37 +68,41 @@ object WebserviceTestUtil extends SmartDataLakeLogger with Equality {
           .keystorePassword("mytruststorepassword")
           .asynchronousResponseEnabled(false)
       )
-    wireMockServer
-      .start()
-    wireMockServer
+    Try(wireMockServer.start()) match {
+      case Success(_) => wireMockServer
+      case Failure(e) =>
+        logger.error(s"startWebservice:" +
+          s"Could not start WireMockServer for host=$host, port=$port, httpsPort=$httpsPort !")
+        throw e
+    }
   }
 
   def setupWebserviceStubs(): Unit = {
     stubFor(post(urlEqualTo("/good/post/no_auth"))
-      .willReturn(aResponse().withBody("{{request.path.[0]}}"))
+        .willReturn(aResponse().withBody("{{request.path.[0]}}"))
     )
 
     stubFor(get(urlEqualTo("/good/no_auth/"))
-      .willReturn(aResponse().withStatus(200))
+        .willReturn(aResponse().withStatus(200))
     )
 
     stubFor(get(urlMatching("/good/basic_auth/"))
-      .withHeader("Authorization", equalTo("Basic ZnMxOmZyZWl0YWcyMDE3x"))
-      .willReturn(ok("request looks good"))
+        .withHeader("Authorization", equalTo("Basic ZnMxOmZyZWl0YWcyMDE3x"))
+        .willReturn(ok("request looks good"))
     )
 
     stubFor(get(urlMatching("/good/client_id/"))
-      .withHeader("Authorization", equalTo("Basic ZnMxOmZyZWl0YWcyMDE3x"))
-      .willReturn(ok("request looks good"))
+        .withHeader("Authorization", equalTo("Basic ZnMxOmZyZWl0YWcyMDE3x"))
+        .willReturn(ok("request looks good"))
     )
 
     stubFor(get(urlMatching("/good/token/"))
-      .withHeader("Authorization", equalTo("Bearer ZnMxOmZyZWl0YWcyMDE3x"))
-      .willReturn(ok("request looks good"))
+        .withHeader("Authorization", equalTo("Bearer ZnMxOmZyZWl0YWcyMDE3x"))
+        .willReturn(ok("request looks good"))
     )
 
     stubFor(get(urlMatching("/bad/*/"))
-      .willReturn(aResponse.withStatus(404))
+        .willReturn(aResponse.withStatus(404))
     )
   }
 

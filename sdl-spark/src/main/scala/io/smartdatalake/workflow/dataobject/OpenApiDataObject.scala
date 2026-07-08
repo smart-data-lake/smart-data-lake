@@ -43,28 +43,33 @@ import sttp.model.{MediaType, Uri}
 
 /**
  * Reads data from an OpenApi compliant WebService operation.
- * The operation must return Json and have its schema defined in the OpenApi specification.
+ * The operation must return JSON and have its schema defined in the OpenApi specification.
  *
  * Limitations:
  *   - Only GET method implemented for now
  *   - No dynamic URL parameters supported for now
- *   - Only responseContentType=application/json will be parsed into schema. Otherwise schema will be a single column with name 'content' of type String or Binary.
+ *   - Only responseContentType=application/json will be parsed into schema.
+ *     Otherwise schema will be a single column with name 'content' of type String or Binary.
  *   - Only token based pagination is supported. Use pagingLinkJsonPath to extract Url for the next page.
  *   - OpenApi Webservice requests can not be parallelized and distributed to executors. They run on the driver.
- *     In order to avoid memory problems Spark BlockManager is used to create a new Spark partition after every maxRecordsPerPartition number of records.
+ *     In order to avoid memory problems Spark BlockManager is used to create
+ *     a new Spark partition after every maxRecordsPerPartition number of records.
  *
- * Also note that the getDataFrame method is not lazy in Exec-Phase. It will query the WebService before creating the DataFrame.
+ * Also note that the getDataFrame method is not lazy in Exec-Phase.
+ * It will query the WebService before creating the DataFrame.
  *
  * @param id                        DataObject identifier
  * @param baseUrl                   the server url to use for querying the OpenApi specification and content
  * @param operationId               the operationId from the OpenApi specification to use to get data for this DataObject
- *                                  If OpenApi specification has no operationId defined, `<sub-path>:<operation>` is used, e.g. `/test/abc:get`.
+ *                                  If OpenApi specification has no operationId defined,
+ *                                  `<sub-path>:<operation>` is used, e.g. `/test/abc:get`.
  * @param apiDocsUrl                The url to load the OpenApi specification from.
  *                                  If it is a relative Url it is appended to baseUrl.
  *                                  Default is "v3/api-docs", which will be concatenated to `<baseUrl>/v3/api-docs`.
  *                                  Alternatively this can also be a hadoop file or classpath resource.
  *                                  An url starting with protocol "cp:" will be resolved as classpath resource.
- *                                  All protocols different from http/https/cp will be resolved as Hadoop path. To use a relative Hadoop path start with "./".
+ *                                  All protocols different from http/https/cp will be resolved as Hadoop path.
+ *                                  To use a relative Hadoop path start with "./".
  * @param useFirstOpenApiSpecServer if true content is queried using first server definition from OpenApi specification, instead of using baseUrl.
  *                                  Default is false.
  * @param responseContentType       Content-type of OpenApi response to use. Default is application/json.
