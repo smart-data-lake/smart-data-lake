@@ -17,6 +17,7 @@ spark-warehouse
 
 # User-specific stuff
 .bloop
+.claude
 .idea/**/dictionaries
 .idea/**/shelf
 .idea/**/tasks.xml
