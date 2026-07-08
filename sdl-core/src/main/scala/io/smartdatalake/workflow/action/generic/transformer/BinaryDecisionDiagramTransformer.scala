@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import org.scalameta.ascii.graph.Graph
@@ -25,14 +24,12 @@ class BinaryDecisionDiagramTransformer {
 
 }
 
-
-
 object BinaryDecisionDiagram extends Serializable {
 
 
-  type NodeId = String
-  type NodeLabel = Any
-  type NodeDescription = String
+  private type NodeId = String
+  private type NodeLabel = Any
+  private type NodeDescription = String
 
 
   /**

@@ -19,13 +19,14 @@
 package io.smartdatalake.testutils
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.ProductUtil
+import io.smartdatalake.util.misc.SeqUtil._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -33,12 +34,11 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataframe.spark._
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
-import io.smartdatalake.workflow.dataobject.generic.{CanHandlePartitions, CanMergeDataFrame, Constraint, ExpectationValidation, Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
-import io.smartdatalake.util.misc.SeqUtil._
 
 import scala.jdk.CollectionConverters._
 
@@ -85,8 +85,8 @@ case class MockSparkDataObject(override val id: DataObjectId,
   override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     val genericDf = SparkDataFrame(df)
     validateSchemaMin(genericDf.schema, "write")
-    validateSchemaHasPartitionCols(df.columns, "write")
-    validateSchemaHasPrimaryKeyCols(df.columns, "write")
+    validateSchemaHasPartitionCols(df.columns.toIndexedSeq, "write")
+    validateSchemaHasPrimaryKeyCols(df.columns.toIndexedSeq, "write")
     val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
     if (!isTableExisting) {
       // Note: it's possible that dataFrameMock is initialized with an empty DataFrame, if no partitionValues are provided for a partitioned MockDataObject
@@ -100,14 +100,14 @@ case class MockSparkDataObject(override val id: DataObjectId,
     assert(partitions.caseSensitiveDiff(df.columns.toList).isEmpty, s"($id) partition columns are missing in DataFrame")
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
-    // recreate DataFrame to truncate logical plan to avoid side-effects in tests
+    // recreate DataFrame to truncate logical plan to avoid side effects in tests
     // this also force evaluates constraints and triggers RuntimeFailTransformer
     val (newDf, insertCnt) = materialize(df)
 
     if (partitions.nonEmpty) {
       finalSaveMode match {
         case SDLSaveMode.Overwrite =>
-          // mimick partition overwrite
+          // mimic partition overwrite
           val inferredPartitionValues = PartitionValues.fromDataFrame(SparkDataFrame(newDf.select(partitions.map(col).toIndexedSeq: _*)))
           val newDataFrames = inferredPartitionValues.map(pv => (pv, newDf.where(getPartitionValueFilter(pv)))).toMap
           if (newDataFrames.nonEmpty) {

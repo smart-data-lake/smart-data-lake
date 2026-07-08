@@ -23,7 +23,7 @@ import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.SparkSchemaUtil
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
@@ -46,6 +46,7 @@ object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
   implicit val sparkSession: SparkSession = TestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
+  io.smartdatalake.util.spark.GetSession.loggEnv(sparkSession, logger)
 
   instanceRegistry.register(SnowflakeConnectionConfig.sfConnection)
 

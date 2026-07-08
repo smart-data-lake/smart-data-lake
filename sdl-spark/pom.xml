@@ -121,10 +121,34 @@
         </dependency>
 
         <dependency>
-            <groupId>com.hierynomus</groupId>
-            <artifactId>sshj</artifactId>
-            <version>${sshj.version}</version>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>1.0.42</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>${fasterxml.jackson.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.jayway.jsonpath</groupId>
+            <artifactId>json-path</artifactId>
+            <version>2.9.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>net.minidev</groupId>
+                    <artifactId>json-smart</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
         <dependency>
             <groupId>net.i2p.crypto</groupId>
             <artifactId>eddsa</artifactId>
@@ -289,6 +313,49 @@
             <plugin>
                 <groupId>org.scalatest</groupId>
                 <artifactId>scalatest-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- Checks for declared but unused and undeclared but used dependencies in the verify stage -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <configuration>
+                    <ignoredUnusedDeclaredDependencies>
+                        <!-- Scala trait/implicit usage is invisible to Java bytecode analyzer (ASM) -->
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-core_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-sql_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-catalyst_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- spark-extensions: custom Spark extensions registered via SPI/reflection -->
+                        <ignoredUnusedDeclaredDependency>io.smartdatalake:spark-extensions_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- spark-excel: DataSource registered via string format name -->
+                        <ignoredUnusedDeclaredDependency>dev.mauch:spark-excel_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- jackcess: loaded via reflection for Access file format -->
+                        <ignoredUnusedDeclaredDependency>com.healthmarketscience.jackcess:jackcess</ignoredUnusedDeclaredDependency>
+                        <!-- spark-tags: scope override for fat-jar exclusion -->
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-tags_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- Hadoop classes accessed through SparkContext; bytecode analyzer misses Scala usages -->
+                        <ignoredUnusedDeclaredDependency>org.apache.hadoop:hadoop-client</ignoredUnusedDeclaredDependency>
+                        <!-- Cloud FS providers registered via SPI; scope controlled by spark.deps.scope profile -->
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-hadoop-cloud_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- Hive classes loaded via enableHiveSupport() reflection; scope controlled by spark.deps.scope profile -->
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-hive_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- Avro DataSource registered via SPI string format; scope controlled by spark.deps.scope profile -->
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-avro_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- scala-library is used implicitly by all Scala code; not detectable by bytecode analysis -->
+                        <ignoredUnusedDeclaredDependency>org.scala-lang:scala-library</ignoredUnusedDeclaredDependency>
+                    </ignoredUnusedDeclaredDependencies>
+                    <ignoredNonTestScopedDependencies>
+                        <!-- spark-sql-api is a transitive dep of spark-sql; its public-API interfaces are
+                             only directly referenced in test code while main code uses spark-sql's higher-level APIs -->
+                        <ignoredNonTestScopedDependency>org.apache.spark:spark-sql-api_${scala.minor.version}</ignoredNonTestScopedDependency>
+                    </ignoredNonTestScopedDependencies>
+                </configuration>
+            </plugin>
+
+            <!-- check for dependency version conflicts -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
             </plugin>
         </plugins>
     </build>

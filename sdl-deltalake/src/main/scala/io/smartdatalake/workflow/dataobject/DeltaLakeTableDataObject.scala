@@ -145,7 +145,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   // prepare final path and table
   @transient private var hadoopPathHolder: Path = _
 
-  val filetype: String = ".parquet"
+  private val filetype: String = ".parquet"
 
   def hadoopPath(implicit context: ActionPipelineContext): Path = {
     implicit val session: SparkSession = SparkSubFeed.getSparkSession
@@ -229,7 +229,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       }
     }
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
-    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame().columns, role = "prepare", obj = "Existing table")
+    if (isTableExisting)
+      validateSchemaHasPrimaryKeyCols(getSparkDataFrame().columns.toIndexedSeq, role = "prepare", obj = "Existing table")
   }
 
   /**
@@ -293,14 +294,15 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     if(!propertyExists(enableCdcFeedProperty) && incrementalOutputExpr.isDefined) activateCdc()
 
     validateSchemaMin(SparkSchema(df.schema), "read")
-    validateSchemaHasPartitionCols(df.columns, "read")
+    validateSchemaHasPartitionCols(df.columns.toIndexedSeq, "read")
     df
   }
 
-  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)
+                                 (implicit context: ActionPipelineContext): Unit = {
     validateSchemaMin(SparkSchema(df.schema), "write")
-    validateSchemaHasPartitionCols(df.columns, "write")
-    validateSchemaHasPrimaryKeyCols(df.columns, "write")
+    validateSchemaHasPartitionCols(df.columns.toIndexedSeq, "write")
+    validateSchemaHasPrimaryKeyCols(df.columns.toIndexedSeq, "write")
   }
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
@@ -333,8 +335,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       targetDfIncoming.to(targetSchemaWithMetadata)
     } else targetDfIncoming
 
-    validateSchemaHasPartitionCols(targetDf.columns, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf.columns, "write")
+    validateSchemaHasPartitionCols(targetDf.columns.toIndexedSeq, "write")
+    validateSchemaHasPrimaryKeyCols(targetDf.columns.toIndexedSeq, "write")
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
@@ -445,9 +447,9 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     // enable schema evolution
     if (allowSchemaEvolution) {
-      mergeStmt = mergeStmt.withSchemaEvolution() // doesnt work in Spark 4.1
+      mergeStmt = mergeStmt.withSchemaEvolution() // does not work in Spark 4.1
       // workaround: set this globally and check same schema before (in writeSparkDataFrame)
-      session.conf.set("spark.databricks.delta.schema.autoMerge.enabled", true)
+      session.conf.set(key = "spark.databricks.delta.schema.autoMerge.enabled", value = true)
     }
     // delete clause if configured
     saveModeExpr.deleteConditionExpr.map(toSpark).foreach(c => mergeStmt = mergeStmt.whenMatched(c).delete())

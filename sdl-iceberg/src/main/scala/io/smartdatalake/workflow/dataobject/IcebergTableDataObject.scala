@@ -241,7 +241,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
       logger.info(s"($id) Dropped existing Iceberg table ${table.fullName} because path was missing")
     }
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
-    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame().columns, role = "prepare", obj = "Existing table")
+    if (isTableExisting)
+      validateSchemaHasPrimaryKeyCols(getSparkDataFrame().columns.toIndexedSeq, role = "prepare", obj = "Existing table")
   }
 
   /**
@@ -322,19 +323,20 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     }
 
     validateSchemaMin(SparkSchema(df.schema), "read")
-    validateSchemaHasPartitionCols(df.columns, "read")
+    validateSchemaHasPartitionCols(df.columns.toIndexedSeq, "read")
 
     df
   }
 
-  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)
+                                 (implicit context: ActionPipelineContext): Unit = {
     val genericDf = SparkDataFrame(df)
     val targetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
     val targetSchema = targetDf.schema
 
     validateSchemaMin(SparkSchema(targetSchema), "write")
-    validateSchemaHasPartitionCols(targetDf.columns, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf.columns, "write")
+    validateSchemaHasPartitionCols(targetDf.columns.toIndexedSeq, "write")
+    validateSchemaHasPrimaryKeyCols(targetDf.columns.toIndexedSeq, "write")
     if (isTableExisting) {
       val existingSchema = SparkSchema(getSparkDataFrame().schema)
       if (!allowSchemaEvolution) validateSchema(SparkSchema(targetSchema), existingSchema, "write")
@@ -357,8 +359,8 @@ case class IcebergTableDataObject(override val id: DataObjectId,
     val targetSchema = targetDf.schema
 
     validateSchemaMin(SparkSchema(targetSchema), "write")
-    validateSchemaHasPartitionCols(targetDf.columns, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf.columns, "write")
+    validateSchemaHasPartitionCols(targetDf.columns.toIndexedSeq, "write")
+    validateSchemaHasPrimaryKeyCols(targetDf.columns.toIndexedSeq, "write")
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 

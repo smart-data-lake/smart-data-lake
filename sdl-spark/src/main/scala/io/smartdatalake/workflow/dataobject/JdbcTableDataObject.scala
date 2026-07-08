@@ -174,7 +174,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
       assert(missingPartitionColumns.isEmpty, s"($id) Virtual partition columns ${missingPartitionColumns.mkString(",")} missing in table definition")
     }
 
-    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame().columns, role = "prepare", obj = "Existing table")
+    if (isTableExisting)
+      validateSchemaHasPrimaryKeyCols(getSparkDataFrame().columns.toIndexedSeq, role = "prepare", obj = "Existing table")
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
@@ -246,7 +247,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     val genericDf = SparkDataFrame(df)
     validateSchemaMin(genericDf.schema, "write")
     validateSchemaHasPartitionCols(df.columns.toSeq, "write")
-    validateSchemaHasPrimaryKeyCols(df.columns, "write")
+    validateSchemaHasPrimaryKeyCols(df.columns.toIndexedSeq, "write")
     val saveModeTargetDf = saveModeOptions.map(_.convertToTargetSchema(genericDf)).getOrElse(genericDf).inner
     if (isTableExisting) {
       if (allowSchemaEvolution) evolveTableSchema(saveModeTargetDf.schema)
@@ -314,7 +315,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     val targetSchema = targetDf.schema
     validateSchemaMin(SparkSchema(targetSchema), "write")
     validateSchemaHasPartitionCols(targetDf.columns.toSeq, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf.columns, "write")
+    validateSchemaHasPrimaryKeyCols(targetDf.columns.toIndexedSeq, "write")
     if (!allowSchemaEvolution) validateSchemaOnWrite(targetDf)
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
@@ -471,7 +472,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   private def getExistingSchema(implicit context: ActionPipelineContext): Option[StructType] = {
     if (isTableExisting && cachedExistingSchema.isEmpty) {
       cachedExistingSchema = Some(getSparkDataFrame().schema)
-      // convert to lowercase when Spark is in non case sensitive mode
+      // convert to lowercase when Spark is in non case-sensitive mode
       if (!Environment.caseSensitive) cachedExistingSchema = Some(StructType(SchemaUtil.prepareSchemaForDiff(SparkSchema(cachedExistingSchema.get).fields, ignoreNullable = false, caseSensitive = false).map(_.asInstanceOf[SparkField].inner)))
     }
     cachedExistingSchema
@@ -556,7 +557,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     else jdbcColumnMetadata.flatMap(_.find(_.nameEqualsIgnoreCaseSensitive(sparkColName)))
   }
 
-  // if we generate sql statements with column names we need to care about quoting them properly
+  // if we generate SQL statements with column names we need to care about quoting them properly
   private def quoteCaseSensitiveColumn(column: String)(implicit context: ActionPipelineContext): String = {
     if (Environment.caseSensitive) connection.catalog.quoteIdentifier(column)
     else {
@@ -586,7 +587,13 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   }
 }
 
-private[smartdatalake] case class JdbcColumn(name: String, isNameCaseSensitiv: Boolean, jdbcType: Option[Int] = None, dbTypeName: Option[String] = None, precision: Option[Int] = None, scale: Option[Int] = None, isNullable: Option[Boolean] = None) {
+private[smartdatalake] case class JdbcColumn(name: String,
+                                             isNameCaseSensitiv: Boolean,
+                                             jdbcType: Option[Int] = None,
+                                             dbTypeName: Option[String] = None,
+                                             precision: Option[Int] = None,
+                                             scale: Option[Int] = None,
+                                             isNullable: Option[Boolean] = None) {
   def nameEquals(other: JdbcColumn): Boolean = {
     if (this.isNameCaseSensitiv || other.isNameCaseSensitiv) this.name.equals(other.name)
     else this.name.equalsIgnoreCase(other.name)

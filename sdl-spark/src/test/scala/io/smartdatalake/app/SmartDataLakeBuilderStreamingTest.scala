@@ -235,6 +235,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
       private val actionRegex = s"Action~(${SdlConfigObject.idRegexStr})".r.unanchored
 
       override def onQueryIdle(event: StreamingQueryListener.QueryIdleEvent): Unit = {
+        debugLog(s"onQueryIdle: batchAfterWriteProcessed=$batchAfterWriteProcessed")
         // TODO: Adapt comment to Spark 4!
         // In Spark 3.5+, idle fires when no new data available instead of onQueryProgress
         // Only stop after the batch that processes the newly written data has completed
@@ -245,7 +246,9 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
         // else: data was recently written, wait for next trigger to pick it up
       }
 
-      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = ()
+      override def onQueryStarted(event: StreamingQueryListener.QueryStartedEvent): Unit = {
+        debugLog(s"onQueryStarted called")
+      }
 
       override def onQueryProgress(event: StreamingQueryListener.QueryProgressEvent): Unit = {
         val prog = event.progress
@@ -259,17 +262,20 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
                 debugLog("onQueryProgress: adding some more data")
                 srcDO.writeSparkDataFrame(dfSrc2)(contextExec)
                 srcDO.getSparkDataFrame()(contextExec).createdLog("srcDO", showRows = true)
-              case x if x > 1 && batchAfterWriteProcessed =>
+              case x if x > 2 && batchAfterWriteProcessed =>
                 debugLog(s"onQueryProgress: x=$x stopping streaming query")
                 session.streams.active.find(_.name == prog.name).get.stop()
               case x if x > 0 && dfWritten && !batchAfterWriteProcessed && prog.numInputRows > 0 =>
+                debugLog(s"onQueryProgress: x=$x setting batchAfterWriteProcessed to true")
                 batchAfterWriteProcessed = true
-              case _ => ()
+              case x => debugLog(s"onQueryProgress: x=$x doing nothing")
             }
         }
       }
 
-      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = ()
+      override def onQueryTerminated(event: StreamingQueryListener.QueryTerminatedEvent): Unit = {
+        debugLog(s"onQueryTerminated called")
+      }
     }
     session.streams.addListener(testStreamingQueryListener)
 
@@ -283,6 +289,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
 
     debugLog("check data after streaming is terminated")
     val tgt1DOdf = tgt1DO.getSparkDataFrame()
+    tgt1DOdf.debLog(dsName = "tgt1DOdf", showRows = true)
     Try {
       assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20190101"))
       assert(tgt1DOdf.select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX

@@ -69,11 +69,6 @@
             <version>${scopt.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${scala.minor.version}</artifactId>
-        </dependency>
-
         <!-- Included instead of hadoop-client-runtime, which is excluded from spark-core, see parent pom -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -94,17 +89,7 @@
 
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-sql_${scala.minor.version}</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.spark</groupId>
             <artifactId>spark-hive_${scala.minor.version}</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-catalyst_${scala.minor.version}</artifactId>
         </dependency>
 
         <dependency>
@@ -125,14 +110,6 @@
             <scope>${spark.deps.scope}</scope>
         </dependency>
 
-        <!-- this is an unused declared dependency, but it's needed to override scope -->
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-tags_${scala.minor.version}</artifactId>
-            <version>${spark.version}</version>
-            <scope>${spark.deps.scope}</scope>
-        </dependency>
-
         <!-- avoid NoClassDefFoundError: javax/xml/bind/annotation/XmlElement in FileTransferActionTest -->
         <dependency>
             <groupId>javax.xml.bind</groupId>
@@ -142,28 +119,10 @@
         </dependency>
 
         <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>dev.mauch</groupId>
-            <artifactId>spark-excel_${scala.minor.version}</artifactId>
-            <version>${spark.excel.version}</version>
-            <classifier>thin</classifier>
-        </dependency>
-
-        <dependency>
             <groupId>org.hsqldb</groupId>
             <artifactId>hsqldb</artifactId>
             <version>${hsqldb.version}</version>
             <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.healthmarketscience.jackcess</groupId>
-            <artifactId>jackcess</artifactId>
-            <version>${jackcess.version}</version>
         </dependency>
 
         <dependency>
@@ -252,18 +211,6 @@
             <groupId>com.github.andyglow</groupId>
             <artifactId>scaladoc-parser_${scala.minor.version}</artifactId>
             <version>0.0.14</version>
-        </dependency>
-
-        <!-- needed for AirbyteDataObject Json handling -->
-        <dependency>
-            <groupId>com.networknt</groupId>
-            <artifactId>json-schema-validator</artifactId>
-            <version>1.0.42</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
-            <version>${fasterxml.jackson.version}</version>
         </dependency>
         <dependency>
             <groupId>org.scalatestplus</groupId>
@@ -375,18 +322,6 @@
             <groupId>com.softwaremill.sttp.client3</groupId>
             <artifactId>core_${scala.minor.version}</artifactId>
             <version>3.9.8</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.jayway.jsonpath</groupId>
-            <artifactId>json-path</artifactId>
-            <version>2.9.0</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>net.minidev</groupId>
-                    <artifactId>json-smart</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
     </dependencies>

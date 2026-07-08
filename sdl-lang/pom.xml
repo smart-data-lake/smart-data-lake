@@ -47,6 +47,11 @@
         <!-- all modules needed to create configuration schema, but not as transitive dependencies (-> optional=true) -->
         <dependency>
             <groupId>io.smartdatalake</groupId>
+            <artifactId>sdl-spark_${scala.minor.version}</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-core_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
             <exclusions>
@@ -230,6 +235,8 @@
                         <ignoredDependency>io.smartdatalake:sdl-iceberg_${scala.minor.version}</ignoredDependency>
                         <ignoredDependency>io.smartdatalake:sdl-gcp_${scala.minor.version}</ignoredDependency>
                         <ignoredDependency>io.smartdatalake:sdl-debezium_${scala.minor.version}</ignoredDependency>
+                        <!-- sdl-spark is used in Lab* main classes via Scala traits; bytecode analyzer misses Scala usages -->
+                        <ignoredDependency>io.smartdatalake:sdl-spark_${scala.minor.version}</ignoredDependency>
                     </ignoredDependencies>
                 </configuration>
             </plugin>

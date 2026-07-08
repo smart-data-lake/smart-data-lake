@@ -22,6 +22,7 @@ import io.smartdatalake.definitions.SDLSaveMode._
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.SparkPlanNoDataWarning
+import io.smartdatalake.util.spark.dataset.Quality
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
@@ -31,11 +32,12 @@ import io.smartdatalake.workflow.dataobject.generic.CanWriteDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, GenericMetrics}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
-import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
+import org.apache.spark.sql.streaming.{DataStreamWriter, OutputMode, StreamingQuery, Trigger}
 
-import scala.reflect.runtime.universe.{typeOf, Type}
+import scala.reflect.runtime.universe.{Type, typeOf}
+import scala.util.{Failure, Success, Try}
 
-trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
+trait CanWriteSparkDataFrame extends CanWriteDataFrame with Quality { this: DataObject =>
 
   /**
    * Configured options for the Spark [[DataFrameReader]]/[[DataFrameWriter]].
@@ -99,20 +101,20 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
     }
 
   def writeStreamingDataFrame(
-      df: GenericDataFrame,
-      trigger: Trigger,
-      options: Map[String, String],
-      checkpointLocation: String,
-      queryName: String,
-      outputMode: OutputMode = OutputMode.Append,
-      saveModeOptions: Option[SaveModeOptions] = None
-  )(implicit context: ActionPipelineContext): StreamingQuery = {
+                               df: GenericDataFrame,
+                               trigger: Trigger,
+                               options: Map[String, String],
+                               checkpointLocation: String,
+                               queryName: String,
+                               outputMode: OutputMode = OutputMode.Append,
+                               saveModeOptions: Option[SaveModeOptions] = None
+                             )(implicit context: ActionPipelineContext): StreamingQuery = {
     logger.debug(s"START writeStreamingDataFrame: checkpointLocation=$checkpointLocation , queryName=$queryName ," +
       s" outputMode=$outputMode , saveModeOptions: $saveModeOptions , options: ${options.mkString(",")}")
     df match {
       case sparkDataFrame: SparkDataFrame =>
-        def microBatchWriter(dfMicrobatch: Dataset[Row], batchId: Long): Unit = {
-          logger.debug(s"microBatchWriter(batchId=$batchId):" +
+        def microBatchWriter(dfMicrobatch: Dataset[Row], batchId: Long): Unit = Try {
+          logger.debug(s"writeStreamingDataFrame.microBatchWriter(batchId=$batchId):" +
             s" Re-set it here so SparkStageMetricsListener can capture stage metrics for every batch.")
           context.currentAction.foreach { action =>
             SparkSubFeed.getSparkSession(context).sparkContext.setJobGroup(
@@ -123,8 +125,16 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
           val metrics = writeSparkDataFrame(dfMicrobatch, Seq(), saveModeOptions = saveModeOptions)
           val actionMetrics = GenericMetrics(s"streaming-microBatchWriter", System.currentTimeMillis() / 1000, metrics)
           context.currentAction.get.addAsyncMetrics(None, Some(id), actionMetrics)
+        } match {
+          case Success(_) => logger.debug(s"writeStreamingDataFrame.microBatchWriter(batchId=$batchId) succeeded :)")
+          case Failure(e) =>
+            logger.error(s"writeStreamingDataFrame.microBatchWriter(batchId=$batchId) failed!")
+            logger.error(s"checkpointLocation=$checkpointLocation , queryName=$queryName ," +
+              s" outputMode=$outputMode , saveModeOptions=$saveModeOptions , options:$options")
+            dfMicrobatch.debLog("dfMicrobatch")(logger)
+            throw e
         }
-        sparkDataFrame.inner
+        val dataStrWriter: DataStreamWriter[Row] = sparkDataFrame.inner
           .writeStream
           .trigger(trigger)
           .queryName(queryName)
@@ -132,9 +142,10 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame { this: DataObject =>
           .option("checkpointLocation", checkpointLocation)
           .options(streamingOptions ++ options) // options override streamingOptions
           .foreachBatch(microBatchWriter _)
-          .start()
+        logger.debug(s"writeStreamingDataFrame(queryName=$queryName): Starting dataStrWriter")
+        dataStrWriter.start()
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType" +
-          s" ${df.subFeedType.typeSymbol.name} in method writeStreamingDataFrame")
+        s" ${df.subFeedType.typeSymbol.name} in method writeStreamingDataFrame")
     }
   }
 
