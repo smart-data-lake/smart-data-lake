@@ -147,6 +147,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
         case t if t =:= typeOf[String] => JsonStringDef(description, deprecated = isDeprecated)
         case t if t =:= typeOf[Long] => JsonIntegerDef(description, deprecated = isDeprecated)
         case t if t =:= typeOf[Int] => JsonIntegerDef(description, deprecated = isDeprecated)
+        case t if t =:= typeOf[Short] => JsonIntegerDef(description, deprecated = isDeprecated)
         case t if t =:= typeOf[Float] => JsonNumberDef(description, deprecated = isDeprecated)
         case t if t =:= typeOf[Double] => JsonNumberDef(description, deprecated = isDeprecated)
         case t if t =:= typeOf[Boolean] => JsonBooleanDef(description, deprecated = isDeprecated)
