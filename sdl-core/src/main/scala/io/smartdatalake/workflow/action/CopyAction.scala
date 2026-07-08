@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId,
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.{Condition, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.ProductUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef}
 import io.smartdatalake.workflow.dataobject._
@@ -34,33 +35,38 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFe
 import scala.reflect.runtime.universe.Type
 
 /**
- * This [[Action]] copies data between an input and output DataObject using DataFrames.
- * The input DataObject reads the data and converts it to a DataFrame according to its definition.
- * The DataFrame might be transformed using SQL or DataFrame transformations.
- * Then the output DataObjects writes the DataFrame to the output according to its definition.
+ * This [[Action]] copies data between an input and output DataObject using DataFrames. The input
+ * DataObject reads the data and converts it to a DataFrame according to its definition. The
+ * DataFrame might be transformed using SQL or DataFrame transformations. Then the output
+ * DataObjects writes the DataFrame to the output according to its definition.
  *
- * @param inputId inputs DataObject
- * @param outputId output DataObject
- * @param deleteDataAfterRead a flag to enable deletion of input partitions after copying.
- * @param transformers optional list of transformations to apply. See [[spark.transformer]] for a list of included Transformers.
- *                     The transformations are applied according to the lists ordering.
+ * @param inputId
+ *   inputs DataObject
+ * @param outputId
+ *   output DataObject
+ * @param deleteDataAfterRead
+ *   a flag to enable deletion of input partitions after copying.
+ * @param transformers
+ *   optional list of transformations to apply. See [[spark.transformer]] for a list of included
+ *   Transformers. The transformations are applied according to the lists ordering.
  */
-case class CopyAction(override val id: ActionId,
-                      inputId: DataObjectId,
-                      outputId: DataObjectId,
-                      deleteDataAfterRead: Boolean = false,
-                      transformers: Seq[GenericDfTransformer] = Seq(),
-                      override val breakDataFrameLineage: Boolean = false,
-                      override val persist: Boolean = false,
-                      override val executionMode: Option[ExecutionMode] = None,
-                      override val executionCondition: Option[Condition] = None,
-                      override val metricsFailCondition: Option[String] = None,
-                      override val expectations: Seq[ActionExpectation] = Seq(),
-                      override val saveModeOptions: Option[SaveModeOptions] = None,
-                      override val metadata: Option[ActionMetadata] = None,
-                      override val agentId: Option[AgentId] = None,
-                      override val engineConnectionId: Option[ConnectionId] = None
-                     )(implicit val instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
+case class CopyAction(
+    override val id: ActionId,
+    inputId: DataObjectId,
+    outputId: DataObjectId,
+    deleteDataAfterRead: Boolean = false,
+    transformers: Seq[GenericDfTransformer] = Seq(),
+    override val breakDataFrameLineage: Boolean = false,
+    override val persist: Boolean = false,
+    override val executionMode: Option[ExecutionMode] = None,
+    override val executionCondition: Option[Condition] = None,
+    override val metricsFailCondition: Option[String] = None,
+    override val expectations: Seq[ActionExpectation] = Seq(),
+    override val saveModeOptions: Option[SaveModeOptions] = None,
+    override val metadata: Option[ActionMetadata] = None,
+    override val agentId: Option[AgentId] = None,
+    override val engineConnectionId: Option[ConnectionId] = None
+)(implicit val instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: DataObject with CanWriteDataFrame = getOutputDataObject[DataObject with CanWriteDataFrame](outputId)
@@ -71,40 +77,42 @@ case class CopyAction(override val id: ActionId,
 
   validateConfig()
 
-  private[smartdatalake] override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
+  private[smartdatalake] override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] =
     transformers
-  }
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     getTransformers.foreach(_.prepare(id))
   }
 
-  override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+  override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit
+      context: ActionPipelineContext
+  ): DataFrameSubFeed =
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
-  }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit
+      context: ActionPipelineContext
+  ): Map[PartitionValues, PartitionValues] =
     applyTransformers(getTransformers, partitionValues)
-  }
 
-  override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit = {
+  override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit =
     if (deleteDataAfterRead) input match {
       // delete input partitions if applicable
-      case (partitionInput: CanHandlePartitions) if partitionInput.partitions.nonEmpty && inputSubFeed.partitionValues.nonEmpty =>
+      case partitionInput: CanHandlePartitions if partitionInput.partitions.nonEmpty && inputSubFeed.partitionValues.nonEmpty =>
         partitionInput.deletePartitions(inputSubFeed.partitionValues)
       // otherwise delete all
-      case (fileInput: FileRefDataObject) =>
+      case fileInput: FileRefDataObject =>
         fileInput.deleteAll
-      case x => throw new IllegalStateException(s"($id) input ${input.id} doesn't support deleting data")
+      case _ => throw new IllegalStateException(s"($id) input ${input.id} doesn't support deleting data")
     }
-  }
 
   override def factory: FromConfigFactory[Action] = CopyAction
+
+  def toDebugString: String = ProductUtil.toDebugString(obj = this)
+
 }
 
 object CopyAction extends FromConfigFactory[Action] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CopyAction = {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CopyAction =
     extract[CopyAction](config)
-  }
 }

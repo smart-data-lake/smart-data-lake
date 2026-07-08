@@ -18,22 +18,31 @@
  */
 package io.smartdatalake.util.misc
 
-import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class ProductUtilTest extends AnyFunSuite {
+class ProductUtilTest extends AnyFlatSpec with Matchers {
 
-  test("get case class field value") {
-    val p1 = XyzProduct("test", 1, true)
-    val v = ProductUtil.getFieldData[Int](p1, "y").get
-    assert(v == 1)
+  val xyProd = XyzProduct(x = "test", y = 1, z = true)
+
+  "getFieldData" should "get case class field value" in {
+    val v = ProductUtil.getFieldData[Int](xyProd, "y").get
+    v should be(1)
   }
 
-  test("dynamic copy constructor") {
-    val p1 = XyzProduct("test", 1, true)
-    val p2 = ProductUtil.dynamicCopy(p1, "y", 2)
-    assert(p2 == p1.copy(y = 2))
+  "dynamicCopy" should "dynamic copy constructor" in {
+    val p2 = ProductUtil.dynamicCopy(xyProd, "y", 2)
+    p2 should be(xyProd.copy(y = 2))
   }
 
+  "toDebugString" should "return string for debugging" in {
+    ProductUtil.toDebugString(xyProd) should be("io.smartdatalake.util.misc.XyzProduct(x=test, y=1, z=true)")
+  }
+
+  "toDebugString" should "succeed even if a field is null" in {
+    ProductUtil.toDebugString(XyzProduct(x = null.asInstanceOf[String], y = 1, z = true)) should
+      be("io.smartdatalake.util.misc.XyzProduct(x=null, y=1, z=true)")
+  }
 }
 
 case class XyzProduct(x: String, y: Int, z: Boolean)

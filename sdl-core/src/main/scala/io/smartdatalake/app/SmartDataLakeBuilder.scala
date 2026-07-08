@@ -33,7 +33,6 @@ import io.smartdatalake.workflow.ExecutionPhase.{Exec, ExecutionPhase, Init, Pre
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl, RuntimeInfo, SDLExecutionId}
-import io.smartdatalake.workflow.DataFrameSubFeed
 import org.apache.hadoop.conf.Configuration
 import org.slf4j.Logger
 import scopt.{OParser, OParserBuilder}
@@ -58,7 +57,9 @@ case class SmartDataLakeBuilderConfig(
     override val statePath: Option[String] = None,
     override val test: Option[TestMode.Value] = None,
     override val streaming: Boolean = false
-) extends CanBuildSmartDataLakeBuilderConfig[SmartDataLakeBuilderConfig]
+) extends CanBuildSmartDataLakeBuilderConfig[SmartDataLakeBuilderConfig] {
+  def toDebugString: String = ProductUtil.toDebugString(obj = this)
+}
 
 object TestMode extends Enumeration {
   type TestMode = Value
@@ -718,23 +719,20 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   /**
-   * Called when synchronous streaming actions stop gracefully.
-   * If hasAsyncActions is true, the implementation should wait for any async streaming query
-   * termination (re-throwing exceptions) and then stop remaining queries.
-   * Default: no-op (non-Spark or non-streaming runtimes).
+   * Called when synchronous streaming actions stop gracefully. If hasAsyncActions is true, the
+   * implementation should wait for any async streaming query termination (re-throwing exceptions)
+   * and then stop remaining queries. Default: no-op (non-Spark or non-streaming runtimes).
    */
   protected def stopSyncStreamingQueriesGracefully(hasAsyncActions: Boolean)(implicit context: ActionPipelineContext): Unit = ()
 
   /**
-   * Called when only async streaming actions exist and the stop signal fires.
-   * Default: no-op.
+   * Called when only async streaming actions exist and the stop signal fires. Default: no-op.
    */
   protected def stopAsyncStreamingQueriesGracefully()(implicit context: ActionPipelineContext): Unit = ()
 
   /**
-   * Called when only async streaming actions exist and we have to wait for their termination
-   * before the process exits.
-   * Default: no-op.
+   * Called when only async streaming actions exist and we have to wait for their termination before
+   * the process exits. Default: no-op.
    */
   protected def awaitAndStopAsyncStreamingQueries(actionDAGRun: ActionDAGRun)(implicit context: ActionPipelineContext): Unit = ()
 }

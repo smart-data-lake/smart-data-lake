@@ -24,6 +24,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
+import io.smartdatalake.util.misc.ProductUtil
 import io.smartdatalake.util.spark.SparkRepartitionDef
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -92,6 +93,8 @@ case class CsvFileDataObject(
     override val metadata: Option[DataObjectMetadata] = None
 )(@transient implicit override val instanceRegistry: InstanceRegistry)
     extends SparkFileDataObject with io.smartdatalake.util.spark.dataset.Transform {
+
+  def toDebugString: String = ProductUtil.toDebugString(obj = this)
 
   override val format = "com.databricks.spark.csv"
 
