@@ -34,7 +34,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
 import org.apache.spark.sql.streaming.{DataStreamWriter, OutputMode, StreamingQuery, Trigger}
 
-import scala.reflect.runtime.universe.{Type, typeOf}
+import scala.reflect.runtime.universe.{typeOf, Type}
 import scala.util.{Failure, Success, Try}
 
 trait CanWriteSparkDataFrame extends CanWriteDataFrame with Quality { this: DataObject =>
@@ -70,12 +70,13 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame with Quality { this: Data
       isRecursiveInput: Boolean,
       saveModeOptions: Option[SaveModeOptions]
   )(implicit context: ActionPipelineContext): MetricsMap =
-    try {
+    try
       df match {
         case sparkDf: SparkDataFrame => writeSparkDataFrame(sparkDf.inner, partitionValues, isRecursiveInput, saveModeOptions)
-        case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeDataFrame")
+        case _                       =>
+          throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeDataFrame")
       }
-    } catch {
+    catch {
       case e: SparkPlanNoDataWarning =>
         val actionId = context.currentAction.map(_.id.id).getOrElse("unknown")
         throw NoDataToProcessWarning(actionId, e.getMessage)
@@ -101,14 +102,14 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame with Quality { this: Data
     }
 
   def writeStreamingDataFrame(
-                               df: GenericDataFrame,
-                               trigger: Trigger,
-                               options: Map[String, String],
-                               checkpointLocation: String,
-                               queryName: String,
-                               outputMode: OutputMode = OutputMode.Append,
-                               saveModeOptions: Option[SaveModeOptions] = None
-                             )(implicit context: ActionPipelineContext): StreamingQuery = {
+      df: GenericDataFrame,
+      trigger: Trigger,
+      options: Map[String, String],
+      checkpointLocation: String,
+      queryName: String,
+      outputMode: OutputMode = OutputMode.Append,
+      saveModeOptions: Option[SaveModeOptions] = None
+  )(implicit context: ActionPipelineContext): StreamingQuery = {
     logger.debug(s"START writeStreamingDataFrame: checkpointLocation=$checkpointLocation , queryName=$queryName ," +
       s" outputMode=$outputMode , saveModeOptions: $saveModeOptions , options: ${options.mkString(",")}")
     df match {
@@ -145,7 +146,7 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame with Quality { this: Data
         logger.debug(s"writeStreamingDataFrame(queryName=$queryName): Starting dataStrWriter")
         dataStrWriter.start()
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType" +
-        s" ${df.subFeedType.typeSymbol.name} in method writeStreamingDataFrame")
+          s" ${df.subFeedType.typeSymbol.name} in method writeStreamingDataFrame")
     }
   }
 
