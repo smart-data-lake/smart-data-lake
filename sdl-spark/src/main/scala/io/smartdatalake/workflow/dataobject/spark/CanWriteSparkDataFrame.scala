@@ -32,7 +32,7 @@ import io.smartdatalake.workflow.dataobject.generic.CanWriteDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, GenericMetrics}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
-import org.apache.spark.sql.streaming.{DataStreamWriter, OutputMode, StreamingQuery, Trigger}
+import org.apache.spark.sql.streaming.{DataStreamWriter, StreamingQuery}
 
 import scala.reflect.runtime.universe.{typeOf, Type}
 import scala.util.{Failure, Success, Try}
@@ -103,15 +103,10 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame with Quality { this: Data
 
   def writeStreamingDataFrame(
       df: GenericDataFrame,
-      trigger: Trigger,
-      options: Map[String, String],
-      checkpointLocation: String,
-      queryName: String,
-      outputMode: OutputMode = OutputMode.Append,
+      options: DataStreamWriterOptions,
       saveModeOptions: Option[SaveModeOptions] = None
   )(implicit context: ActionPipelineContext): StreamingQuery = {
-    logger.debug(s"START writeStreamingDataFrame: checkpointLocation=$checkpointLocation , queryName=$queryName ," +
-      s" outputMode=$outputMode , saveModeOptions: $saveModeOptions , options: ${options.mkString(",")}")
+    logger.debug(s"START writeStreamingDataFrame: options=${options.toDebugString} , saveModeOptions: $saveModeOptions")
     df match {
       case sparkDataFrame: SparkDataFrame =>
         def microBatchWriter(dfMicrobatch: Dataset[Row], batchId: Long): Unit = Try {
@@ -130,20 +125,20 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame with Quality { this: Data
           case Success(_) => logger.debug(s"writeStreamingDataFrame.microBatchWriter(batchId=$batchId) succeeded :)")
           case Failure(e) =>
             logger.error(s"writeStreamingDataFrame.microBatchWriter(batchId=$batchId) failed!")
-            logger.error(s"checkpointLocation=$checkpointLocation , queryName=$queryName ," +
-              s" outputMode=$outputMode , saveModeOptions=$saveModeOptions , options:$options")
+            logger.error(s"options=${options.toDebugString} , saveModeOptions: $saveModeOptions")
             dfMicrobatch.debLog("dfMicrobatch")(logger)
             throw e
         }
+
         val dataStrWriter: DataStreamWriter[Row] = sparkDataFrame.inner
           .writeStream
-          .trigger(trigger)
-          .queryName(queryName)
-          .outputMode(outputMode)
-          .option("checkpointLocation", checkpointLocation)
-          .options(streamingOptions ++ options) // options override streamingOptions
+          .trigger(options.trigger)
+          .queryName(options.queryName)
+          .outputMode(options.outputMode)
+          .option("checkpointLocation", options.checkpointLocation)
+          .options(streamingOptions ++ options.options) // options override streamingOptions
           .foreachBatch(microBatchWriter _)
-        logger.debug(s"writeStreamingDataFrame(queryName=$queryName): Starting dataStrWriter")
+        logger.debug(s"writeStreamingDataFrame(queryName=${options.queryName}): Starting dataStrWriter")
         dataStrWriter.start()
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType" +
           s" ${df.subFeedType.typeSymbol.name} in method writeStreamingDataFrame")

@@ -23,29 +23,45 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.spark.{DummyStreamProvider, SparkStreamingMetrics, SparkStreamingQueryListener}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.DataFrameActionImpl
-import io.smartdatalake.workflow.action.executionMode.ProcessAllMode.extract
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame}
-import io.smartdatalake.workflow.dataobject.spark.{CanCreateStreamingDataFrame, CanWriteSparkDataFrame}
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateStreamingDataFrame, CanWriteSparkDataFrame, DataStreamWriterOptions}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 
 /**
- * Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads and keep track of processed data.
- * This mode needs a DataObject implementing CanCreateStreamingDataFrame and works only with SparkSubFeeds.
- * This mode can be executed synchronously in the DAG by using triggerType=Once, or asynchronously as Streaming Query with triggerType = ProcessingTime or Continuous.
+ * Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data
+ * loads and keep track of processed data. This mode needs a DataObject implementing
+ * CanCreateStreamingDataFrame and works only with SparkSubFeeds. This mode can be executed
+ * synchronously in the DAG by using triggerType=Once, or asynchronously as Streaming Query with
+ * triggerType = ProcessingTime or Continuous.
  *
- * @param checkpointLocation location for checkpoints of streaming query to keep state
- * @param triggerType        define execution interval of Spark streaming query. Possible values are Once (default), ProcessingTime & Continuous. See [[Trigger]] for details.
- *                           Note that this is only applied if SDL is executed in streaming mode. If SDL is executed in normal mode, TriggerType=Once is used always.
- *                           If triggerType=Once, the action is repeated with Trigger.Once in SDL streaming mode.
- * @param triggerTime        Time as String in triggerType = ProcessingTime or Continuous. See [[Trigger]] for details.
- * @param inputOptions       additional option to apply when reading streaming source. This overwrites options set by the DataObjects.
- * @param outputOptions      additional option to apply when writing to streaming sink. This overwrites options set by the DataObjects.
+ * @param checkpointLocation
+ *   location for checkpoints of streaming query to keep state
+ * @param triggerType
+ *   define execution interval of Spark streaming query. Possible values are Once (default),
+ *   ProcessingTime & Continuous. See [[Trigger]] for details. Note that this is only applied if SDL
+ *   is executed in streaming mode. If SDL is executed in normal mode, TriggerType=Once is used
+ *   always. If triggerType=Once, the action is repeated with Trigger.Once in SDL streaming mode.
+ * @param triggerTime
+ *   Time as String in triggerType = ProcessingTime or Continuous. See [[Trigger]] for details.
+ * @param inputOptions
+ *   additional option to apply when reading streaming source. This overwrites options set by the
+ *   DataObjects.
+ * @param outputOptions
+ *   additional option to apply when writing to streaming sink. This overwrites options set by the
+ *   DataObjects.
  */
-case class SparkStreamingMode(checkpointLocation: String, triggerType: String = "Once", triggerTime: Option[String] = None, inputOptions: Map[String, String] = Map(), outputOptions: Map[String, String] = Map(), outputMode: OutputMode = OutputMode.Append) extends DataFrameStreamingExecutionMode {
+case class SparkStreamingMode(
+    checkpointLocation: String,
+    triggerType: String = "Once",
+    triggerTime: Option[String] = None,
+    inputOptions: Map[String, String] = Map(),
+    outputOptions: Map[String, String] = Map(),
+    outputMode: OutputMode = OutputMode.Append
+) extends DataFrameStreamingExecutionMode {
   // parse trigger from config attributes
   private[smartdatalake] val trigger = triggerType.toLowerCase match {
     case "once" =>
@@ -64,21 +80,24 @@ case class SparkStreamingMode(checkpointLocation: String, triggerType: String = 
   // Streaming query state (one per action instance; SparkStreamingMode is instantiated per action config)
   @volatile private var _streamingQuery: Option[StreamingQuery] = None
   override def isStreamingStarted: Boolean = _streamingQuery.nonEmpty
-  override def notifyStreamingQueryTerminated(): Unit = { _streamingQuery = None }
-  override def resetStreamingState(): Unit = { _streamingQuery = None }
+  override def notifyStreamingQueryTerminated(): Unit = _streamingQuery = None
+  override def resetStreamingState(): Unit = _streamingQuery = None
 
   override def enrichSubFeedForStreamingInput(
-    input: DataObject with CanCreateDataFrame,
-    subFeed: DataFrameSubFeed,
-    phase: ExecutionPhase,
-    refreshDataFrame: Boolean
+      input: DataObject with CanCreateDataFrame,
+      subFeed: DataFrameSubFeed,
+      phase: ExecutionPhase,
+      refreshDataFrame: Boolean
   )(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     val sparkSubFeed = subFeed.asInstanceOf[SparkSubFeed]
     implicit val sparkSession: SparkSession = SparkSubFeed.getSparkSession(context)
     if (refreshDataFrame) {
-      assert(input.isInstanceOf[CanCreateStreamingDataFrame],
-        s"DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Cannot create StreamingDataFrame for SparkStreamingMode")
-      val df = input.asInstanceOf[CanCreateStreamingDataFrame].getStreamingDataFrame(inputOptions, sparkSubFeed.dataFrame.map(_.schema.inner))
+      assert(
+        input.isInstanceOf[CanCreateStreamingDataFrame],
+        s"DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Cannot create StreamingDataFrame for SparkStreamingMode"
+      )
+      val df =
+        input.asInstanceOf[CanCreateStreamingDataFrame].getStreamingDataFrame(inputOptions, sparkSubFeed.dataFrame.map(_.schema.inner))
       sparkSubFeed.copy(dataFrame = Some(SparkDataFrame(df)), partitionValues = Seq()) // remove partition values for streaming
     } else if (sparkSubFeed.isStreaming.contains(false)) {
       // convert to dummy streaming DataFrame
@@ -88,17 +107,22 @@ case class SparkStreamingMode(checkpointLocation: String, triggerType: String = 
   }
 
   override def writeSubFeedStreaming(
-    action: DataFrameActionImpl,
-    subFeed: DataFrameSubFeed,
-    output: DataObject with CanWriteDataFrame,
-    queryName: String
+      action: DataFrameActionImpl,
+      subFeed: DataFrameSubFeed,
+      output: DataObject with CanWriteDataFrame,
+      queryName: String
   )(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     val sparkOutput = output.asInstanceOf[CanWriteSparkDataFrame]
     if (isAsynchronous && context.appConfig.streaming) {
       // Asynchronous: start streaming query once, then return immediately on subsequent DAG runs
       if (_streamingQuery.isEmpty) {
         val queryListener = new SparkStreamingQueryListener(action, output.id, queryName)
-        val streamingQuery = sparkOutput.writeStreamingDataFrame(subFeed.dataFrame.get, trigger, outputOptions, checkpointLocation, queryName, outputMode, action.saveModeOptions)
+        val streamingQuery = sparkOutput.writeStreamingDataFrame(
+          df = subFeed.dataFrame.get,
+          options = DataStreamWriterOptions(trigger = trigger, options = outputOptions,
+            checkpointLocation = checkpointLocation, queryName = queryName, outputMode = outputMode),
+          saveModeOptions = action.saveModeOptions
+        )
         queryListener.waitForFirstProgress()
         streamingQuery.exception.foreach(throw _)
         val streamingMetrics = SparkStreamingMetrics(streamingQuery.lastProgress)
@@ -113,7 +137,13 @@ case class SparkStreamingMode(checkpointLocation: String, triggerType: String = 
     } else {
       // Synchronous: run with Trigger.AvailableNow and wait for completion
       val queryListener = new SparkStreamingQueryListener(action, output.id, queryName)
-      val streamingQuery = sparkOutput.writeStreamingDataFrame(subFeed.dataFrame.get, Trigger.AvailableNow(), outputOptions, checkpointLocation, queryName, outputMode, action.saveModeOptions)
+      val streamingQuery = sparkOutput.writeStreamingDataFrame(
+        df = subFeed.dataFrame.get,
+        options = DataStreamWriterOptions(options = outputOptions,
+          checkpointLocation = checkpointLocation,
+          queryName = queryName, outputMode = outputMode),
+        saveModeOptions = action.saveModeOptions
+      )
       streamingQuery.awaitTermination()
       queryListener.waitForFirstProgress()
       val streamingMetrics = SparkStreamingMetrics(streamingQuery.lastProgress)
@@ -128,15 +158,13 @@ case class SparkStreamingMode(checkpointLocation: String, triggerType: String = 
 
 object SparkStreamingMode extends FromConfigFactory[ExecutionMode] {
   import configs.{ConfigReader, Result}
-  implicit val outputModeReader: ConfigReader[OutputMode] = {
+  implicit val outputModeReader: ConfigReader[OutputMode] =
     ConfigReader.fromConfig(_.toString.toLowerCase match {
-      case "append" => Result.successful(OutputMode.Append())
+      case "append"   => Result.successful(OutputMode.Append())
       case "complete" => Result.successful(OutputMode.Complete())
-      case "update" => Result.successful(OutputMode.Update())
+      case "update"   => Result.successful(OutputMode.Update())
       case x => Result.failure(configs.ConfigError(s"$x is not a value of OutputMode. Supported values are append, complete, update."))
     })
-  }
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SparkStreamingMode = {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SparkStreamingMode =
     extract[SparkStreamingMode](config)
-  }
 }
