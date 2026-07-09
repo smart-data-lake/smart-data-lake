@@ -49,6 +49,15 @@
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-spark_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
+            <exclusions>
+                <!-- brought in transitively via hadoop-client; -->
+                <!-- Annotation InterfaceAudience causes "illegal cyclic reference involving class InterfaceAudience"
+                 when searching for annotations with reflection -->
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-annotations</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.smartdatalake</groupId>
@@ -67,6 +76,15 @@
             <artifactId>sdl-azure_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
             <optional>true</optional>
+            <exclusions>
+                <!-- brought in transitively via hadoop-azure -> hadoop-common; -->
+                <!-- Annotation InterfaceAudience causes "illegal cyclic reference involving class InterfaceAudience"
+                when searching for annotations with reflection -->
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-annotations</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.smartdatalake</groupId>
