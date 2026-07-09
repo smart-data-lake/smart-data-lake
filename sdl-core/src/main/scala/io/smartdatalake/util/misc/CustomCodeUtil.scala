@@ -20,6 +20,7 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
+import org.slf4j.Logger
 
 import java.io.{FileNotFoundException, InputStream}
 import scala.reflect.runtime.universe
@@ -27,9 +28,9 @@ import scala.tools.reflect.ToolBox
 import scala.util.{Failure, Success, Try}
 
 /**
-  * Helper functions to work with custom code,
-  * either compiled at runtime or from classes in classpath
-  */
+ * Helper functions to work with custom code, either compiled at runtime or from classes in
+ * classpath
+ */
 object CustomCodeUtil {
 
   private lazy val runtimeMirror = universe.runtimeMirror(Environment.classLoader())
@@ -40,40 +41,51 @@ object CustomCodeUtil {
   /**
    * Compiling Scala Source Code into Object of Type T
    *
-   * @param code scala code to compile
-   * @tparam T Type of object returned by code (typically a function)
-   * @return object returned by code
+   * @param code
+   *   Scala code to compile
+   * @tparam T
+   *   Type of object returned by code (typically a function)
+   * @return
+   *   object returned by code
    */
   // TODO: currently throws exception when using hadoop filesystem -> assertion failed: no symbol could be loaded from interface org.apache.hadoop.classification.InterfaceAudience$Public in object InterfaceAudience with name Public and classloader scala.reflect.internal.util.AbstractFileClassLoader@6c2be147
-  def compileCode[T](code: String): T = {
-    // compile and execute
-    val compiledCode = Try( tb.eval(tb.parse(code))) match {
+  def compileCode[T](code: String)(implicit logger: Logger): T = {
+    logger.debug(s"compileCode: compile and execute. code = $code")
+    val parsedCode: tb.u.Tree = tb.parse(code)
+    val compiledCode = Try(tb.eval(parsedCode)) match {
       case Success(code) => code
-      case Failure(e) => throw new ConfigurationException(s"Error while compiling: "+e.getMessage)
+      case Failure(e)    =>
+        logger.error("compileCode: Parsing code succeeded, but compile or execute FAILED !!!")
+        logger.debug(s"compileCode: code = $code")
+        logger.debug(s"compileCode: parsedCode = $parsedCode")
+        throw new ConfigurationException(s"compileCode: Error while compiling: " + e.getMessage)
     }
-    // cast compiled code to object of expected type and return
+    logger.debug(s"compileCode: cast compiled code to object of expected type and return")
     Try(compiledCode.asInstanceOf[T]) match {
       case Success(obj) => obj
-      case Failure(e) => throw new ConfigurationException(s"Error while casting compiled code: " +e.getMessage)
+      case Failure(e)   =>
+        logger.error("compileCode: casting compiled code to object of expected type FAILED !!!")
+        logger.debug(s"compileCode: code = $code")
+        throw new ConfigurationException(s"compileCode:  Error while casting compiled code: " + e.getMessage)
     }
   }
 
-  def getClassInstanceByName[T](classname:String): T = {
+  def getClassInstanceByName[T](classname: String): T = {
     val clazz = Environment.classLoader().loadClass(classname)
-    require(clazz.getConstructors.exists(con => con.getParameterCount == 0), s"Class $classname needs to have a constructor without parameters!")
+    require(clazz.getConstructors.exists(con => con.getParameterCount == 0),
+      s"Class $classname needs to have a constructor without parameters!")
     clazz.getConstructor().newInstance().asInstanceOf[T]
   }
 
-  def getClassByNameIfExists(classname: String): Option[Class[_]] = {
-    try {
+  def getClassByNameIfExists(classname: String): Option[Class[_]] =
+    try
       Some(Environment.classLoader().loadClass(classname))
-    } catch {
+    catch {
       case _: ClassNotFoundException => None
     }
-  }
 
-  def readResourceFile( filename:String ) : String = {
-    val stream : InputStream = Option(ClassLoader.getSystemClassLoader.getResourceAsStream(filename))
+  def readResourceFile(filename: String): String = {
+    val stream: InputStream = Option(ClassLoader.getSystemClassLoader.getResourceAsStream(filename))
       .getOrElse(throw new FileNotFoundException(filename))
     val source = scala.io.Source.fromInputStream(stream)
     val content = source.getLines().mkString(sys.props("line.separator"))
@@ -93,19 +105,22 @@ object CustomCodeUtil {
 
   /**
    * Extract default values for parameters of a method signature.
-   * @param instance class instance of object the method belongs to
-   * @param method method symbol to read signature from
-   * @return a Map with parameter names and their default values.
+   * @param instance
+   *   class instance of object the method belongs to
+   * @param method
+   *   method symbol to read signature from
+   * @return
+   *   a Map with parameter names and their default values.
    */
   def getMethodParameterDefaultValues(instance: AnyRef, method: universe.MethodSymbol): Map[String, Any] = {
     val instanceMirror = runtimeMirror.reflect(instance)
     val classType = instanceMirror.symbol.toType
     method.paramLists.head.zipWithIndex.flatMap {
-      case (p,i) =>
+      case (p, i) =>
         val parameterName = p.name.toString
         // There is a special method for getting the default value for a given parameter.
         // The method name for default values is by convention, see also https://stackoverflow.com/questions/13812172/how-can-i-create-an-instance-of-a-case-class-with-constructor-arguments-with-no
-        val defaultMethod = classType.member(universe.TermName(s"${method.name.toString}$$default$$${i+1}"))
+        val defaultMethod = classType.member(universe.TermName(s"${method.name.toString}$$default$$${i + 1}"))
         if (defaultMethod != universe.NoSymbol) {
           val defaultMethodMirror = instanceMirror.reflectMethod(defaultMethod.asMethod)
           Some((parameterName, defaultMethodMirror.apply()))
@@ -118,13 +133,15 @@ object CustomCodeUtil {
    */
   def callMethod[R](instance: Any, methodSymbol: universe.MethodSymbol, args: Seq[Any]): R = {
     val instanceMirror = runtimeMirror.reflect(instance)
-    instanceMirror.reflectMethod(methodSymbol).apply(args:_*).asInstanceOf[R]
+    instanceMirror.reflectMethod(methodSymbol).apply(args: _*).asInstanceOf[R]
   }
 
   /**
    * Extract method parameters with default values through reflection.
-   * @param instance: class instance for method to inspect. Needed to get parameter default values.
-   * @param method: method symbol to inspect
+   * @param instance:
+   *   class instance for method to inspect. Needed to get parameter default values.
+   * @param method:
+   *   method symbol to inspect
    */
   def analyzeMethodParameters(instance: Option[AnyRef], method: universe.MethodSymbol): Seq[MethodParameterInfo] = {
     val parameters = method.paramLists.head

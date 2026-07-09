@@ -32,25 +32,45 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.spark.sql.DataFrame
 import org.json4s._
 import org.json4s.jackson.JsonMethods
+import org.slf4j.Logger
 
 import scala.util.{Failure, Success}
 
 /**
- * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.
- * The code is loaded from a Notebook. It should define a transform function with a configurable name, which receives a DataObjectId, a DataFrame
- * and a map of options and has to return a DataFrame, see also ([[fnTransformType]]).
- * Notebook-cells starting with "//!IGNORE" will be ignored.
+ * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)
+ * as Scala code which is compiled at runtime. The code is loaded from a Notebook. It should define
+ * a transform function with a configurable name, which receives a DataObjectId, a DataFrame and a
+ * map of options and has to return a DataFrame, see also ([[fnTransformType]]). Notebook-cells
+ * starting with "//!IGNORE" will be ignored.
  *
- * @param name           name of the transformer
- * @param description    Optional description of the transformer
- * @param url            Url to download notebook in IPYNB-format, which defines transformation.
- * @param functionName   The notebook needs to contain a Scala-function with this name and type [[fnTransformType]].
- * @param authMode       optional authentication information for webservice, e.g. BasicAuthMode for user/pw authentication
- * @param options        Options to pass to the transformation
- * @param runtimeOptions optional tuples of [key, spark SQL expression] to be added as additional options when executing transformation.
- *                       The spark SQL expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param name
+ *   name of the transformer
+ * @param description
+ *   Optional description of the transformer
+ * @param url
+ *   Url to download notebook in IPYNB-format, which defines transformation.
+ * @param functionName
+ *   The notebook needs to contain a Scala-function with this name and type [[fnTransformType]].
+ * @param authMode
+ *   optional authentication information for webservice, e.g. BasicAuthMode for user/pw
+ *   authentication
+ * @param options
+ *   Options to pass to the transformation
+ * @param runtimeOptions
+ *   optional tuples of [key, spark SQL expression] to be added as additional options when executing
+ *   transformation. The spark SQL expressions are evaluated against an instance of
+ *   [[DefaultExpressionData]].
  */
-case class ScalaNotebookSparkDfTransformer(override val name: String = "scalaSparkTransform", override val description: Option[String] = None, url: String, functionName: String, authMode: Option[AuthMode] = None, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsSparkDfTransformer {
+case class ScalaNotebookSparkDfTransformer(
+    override val name: String = "scalaSparkTransform",
+    override val description: Option[String] = None,
+    url: String,
+    functionName: String,
+    authMode: Option[AuthMode] = None,
+    options: Map[String, String] = Map(),
+    runtimeOptions: Map[String, String] = Map()
+) extends OptionsSparkDfTransformer {
+  private implicit val loggImp: Logger = logger
   import ScalaNotebookSparkDfTransformer._
   private lazy val fnTransform: fnTransformType = {
     val notebookCode = prepareFunction(parseNotebook(downloadNotebook(url, authMode)), functionName)
@@ -61,18 +81,21 @@ case class ScalaNotebookSparkDfTransformer(override val name: String = "scalaSpa
     // check lazy parsed transform function
     fnTransform
   }
-  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String, String])(implicit context: ActionPipelineContext): DataFrame = {
+  override def transformWithOptions(
+      actionId: ActionId,
+      partitionValues: Seq[PartitionValues],
+      df: DataFrame,
+      dataObjectId: DataObjectId,
+      options: Map[String, String]
+  )(implicit context: ActionPipelineContext): DataFrame =
     fnTransform(getSparkSession, options, df, dataObjectId.id)
-  }
   override def factory: FromConfigFactory[GenericDfTransformer] = ScalaNotebookSparkDfTransformer
 }
 
-
 object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransformer] {
 
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ScalaNotebookSparkDfTransformer = {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ScalaNotebookSparkDfTransformer =
     extract[ScalaNotebookSparkDfTransformer](config)
-  }
 
   /**
    * Download Notebook content from url
@@ -82,43 +105,44 @@ object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransf
       url = url,
       authMode = authMode,
       followRedirects = true,
-      additionalHeaders = Map("Accept"-> "application/x-ipynb+json; application/json"),
+      additionalHeaders = Map("Accept" -> "application/x-ipynb+json; application/json"),
       proxy = None,
       timeouts = None,
       retries = 0,
       sttpBackendOption = None
-      )
+    )
     client.get() match {
       case Success(content) => new String(content)
-      case Failure(ex) => throw new ConfigurationException(s"Could not read notebook code from url $url: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+      case Failure(ex)      =>
+        throw new ConfigurationException(s"Could not read notebook code from url $url: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
     }
   }
 
   /**
-   * Parse *.ipynb Notebook content
-   * Get code from all cells with cell_type=code and language=scala, ignoring cells which start with "//!IGNORE" comment
+   * Parse *.ipynb Notebook content Get code from all cells with cell_type=code and language=scala,
+   * ignoring cells which start with "//!IGNORE" comment
    */
-    def parseNotebook(notebookContent: String): String = {
-      val notebookJson = JsonMethods.parse(notebookContent)
-      val notebookCells = (notebookJson \ "cells")
-        .filter(_ \ "cell_type" == JString("code"))
-      val notebookCode = notebookCells
-        .map(_ \ "source")
-        .map {
-          case JString(code) => code
-          case JArray(codeList) => codeList.map{
+  def parseNotebook(notebookContent: String): String = {
+    val notebookJson = JsonMethods.parse(notebookContent)
+    val notebookCells = (notebookJson \ "cells")
+      .filter(_ \ "cell_type" == JString("code"))
+    val notebookCode = notebookCells
+      .map(_ \ "source")
+      .map {
+        case JString(code)    => code
+        case JArray(codeList) => codeList.map {
             case JString(code) => code
-            case t => throw new IllegalArgumentException(s"Unexpected type $t in notebook source code array," +
+            case t             => throw new IllegalArgumentException(s"Unexpected type $t in notebook source code array," +
                 " expected JString for each code line")
           }.mkString(System.lineSeparator)
-          case t =>
-            throw new IllegalArgumentException(s"Unexpected type $t for notebook cell 'source' field," +
-              " expected JString or JArray of code lines")
-        }
-        .filterNot(_.startsWith("//!IGNORE"))
-        .mkString(System.lineSeparator)
-      notebookCode
-    }
+        case t =>
+          throw new IllegalArgumentException(s"Unexpected type $t for notebook cell 'source' field," +
+            " expected JString or JArray of code lines")
+      }
+      .filterNot(_.startsWith("//!IGNORE"))
+      .mkString(System.lineSeparator)
+    notebookCode
+  }
 
   /**
    * Prepare function
@@ -133,8 +157,6 @@ object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransf
     defaultImports + System.lineSeparator() + notebookCode + System.lineSeparator() + s"$functionName _"
   }
 
-  def compileCode(code: String): fnTransformType = {
+  def compileCode(code: String)(implicit logger: Logger): fnTransformType =
     CustomCodeUtil.compileCode[fnTransformType](code)
-  }
 }
-

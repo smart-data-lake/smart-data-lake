@@ -19,12 +19,14 @@
 package io.smartdatalake.workflow.action.spark.transformer
 
 import com.fasterxml.jackson.core.JsonParseException
+import io.smartdatalake.util.Compare
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.spark.transformer.ScalaNotebookSparkDfTransformer.{compileCode, parseNotebook, prepareFunction}
 import org.scalatest.funsuite.AnyFunSuite
 
-class ScalaNotebookSparkDfTransformerTest extends AnyFunSuite {
+class ScalaNotebookSparkDfTransformerTest extends AnyFunSuite with SmartDataLakeLogger with Compare {
 
-  val testNotebookContent = """
+  val testNotebookContent: String = """
     {
       "metadata" : {
         "config" : {
@@ -120,7 +122,22 @@ class ScalaNotebookSparkDfTransformerTest extends AnyFunSuite {
         |val t1 = "test"
         |val t3 = "test3"
         |""".stripMargin.trim
-    assert(notebookCode == expectedNotebookCode)
+    if (notebookCode == expectedNotebookCode) {
+      logger.debug("parseNotebook succeeded:")
+    } else if (anyEqual(notebookCode, expectedNotebookCode)) {
+      logger.info("parseNotebook succeeded but notebookCode and expectedNotebookCode" +
+        "contain different control characters, probably different line separators.")
+      logger.debug(s"notebookCode         = $notebookCode")
+      logger.debug(s"expectedNotebookCode = $expectedNotebookCode")
+    } else {
+      println()
+      logger.error("parseNotebook did not return the expected result !!! testNotebookContent:")
+      logger.error(testNotebookContent)
+      logger.error(s"notebookCode         = $notebookCode")
+      logger.error(s"expectedNotebookCode = $expectedNotebookCode")
+    }
+//    assert(notebookCode == expectedNotebookCode)
+    assert(anyEqual(notebookCode, expectedNotebookCode))
   }
 
   test("parse notebook fails if not json") {
@@ -128,17 +145,19 @@ class ScalaNotebookSparkDfTransformerTest extends AnyFunSuite {
   }
 
   test("prepare function fails if function name is not found in content") {
-    intercept[IllegalArgumentException](ScalaNotebookSparkDfTransformer.prepareFunction(ScalaNotebookSparkDfTransformer.parseNotebook(testNotebookContent), "abc"))
+    intercept[IllegalArgumentException](
+      ScalaNotebookSparkDfTransformer.prepareFunction(ScalaNotebookSparkDfTransformer.parseNotebook(testNotebookContent), "abc")
+    )
   }
 
   test("compile transform function") {
     val notebookCode = prepareFunction(parseNotebook(testNotebookContentToCompile), "testTransform")
-    compileCode(notebookCode)
+    compileCode(notebookCode)(logger)
   }
 
   ignore("load notebook") {
-    // test loading from Polynote installation
-    // note that java has some problems to connect to Polynote running in WSL2 over localhost/127.0.0.1
+    logger.debug("test loading from Polynote installation")
+    logger.debug("note that java has some problems to connect to Polynote running in WSL2 over localhost/127.0.0.1")
     ScalaNotebookSparkDfTransformer(url = "http://172.17.125.205:8192/notebook/Test.ipynb?download=true", functionName = "testTransform")
   }
 }
