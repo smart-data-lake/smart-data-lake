@@ -190,7 +190,6 @@ object SparkSchemaUtil {
     val (providerId: String, value: String) = ConfigUtil.parseProviderConfigValue(schemaConfig, Some(DDL.toString))
     val valueElements: Array[String] = value.split(";")
     val numValueElements = valueElements.length
-    val clazz = this.getClass.getClassLoader.loadClass(value)
     val path = valueElements.head
 
     SchemaProviderType.withName(providerId.toLowerCase) match {
@@ -201,10 +200,12 @@ object SparkSchemaUtil {
         val content = readFromPath(new Path(valueElements.head))
         SparkSchema(getSchemaFromDdl(content))
       case CaseClass =>
+        val clazz = this.getClass.getClassLoader.loadClass(value)
         val mirror = scala.reflect.runtime.currentMirror
         val tpe = mirror.classSymbol(clazz).toType
         SparkSchema(getSchemaFromCaseClass(tpe))
       case JavaBean =>
+        val clazz = this.getClass.getClassLoader.loadClass(value)
         SparkSchema(getSchemaFromJavaBean(clazz))
       case _ if lazyFileReading => LazyGenericSchema(schemaConfig)
       case XsdFile =>
