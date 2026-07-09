@@ -23,17 +23,16 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
-import io.smartdatalake.util.spark.SparkSchemaUtil
 import io.smartdatalake.util.spark.evolution.TypeEvolutionUtil
-import io.smartdatalake.util.spark.{DummyStreamProvider, NullAwareMurmur3HashExpr, dataset}
+import io.smartdatalake.util.spark.{DummyStreamProvider, NullAwareMurmur3HashExpr, SparkSchemaUtil, dataset}
 import io.smartdatalake.workflow._
-import org.apache.spark.sql.catalyst.ExtendedAnalysisException
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.connection.SparkClassicConnection
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.ExtendedAnalysisException
 import org.apache.spark.sql.classic.ColumnConversions.toRichColumn
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.types._

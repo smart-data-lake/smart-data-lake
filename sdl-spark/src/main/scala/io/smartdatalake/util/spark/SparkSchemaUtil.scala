@@ -20,12 +20,12 @@ package io.smartdatalake.util.spark
 
 import io.smartdatalake.config.ConfigUtil
 import io.smartdatalake.util.misc.FileUtil.readFromPath
-import io.smartdatalake.util.misc.{ProductUtil, ScaladocUtil, SdlbXsdURIResolver, SchemaProviderType}
+import io.smartdatalake.util.misc.{ProductUtil, ScaladocUtil, SchemaProviderType, SdlbXsdURIResolver}
 import io.smartdatalake.util.spark.SparkProductUtil.getSchemaFromCaseClass
 import io.smartdatalake.util.webservice.OpenApiUtil
 import io.smartdatalake.util.webservice.OpenApiUtil.defaultResponseContentType
-import io.smartdatalake.workflow.dataframe.{GenericSchema, LazyGenericSchema}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.{GenericSchema, LazyGenericSchema}
 import org.apache.avro.Schema
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -187,74 +187,68 @@ object SparkSchemaUtil {
   def readSchemaFromConfigValue(schemaConfig: String, lazyFileReading: Boolean = true): GenericSchema = {
     import io.smartdatalake.util.misc.SchemaProviderType._
     implicit lazy val defaultHadoopConf: Configuration = new Configuration()
-    val (providerId, value) = ConfigUtil.parseProviderConfigValue(schemaConfig, Some(DDL.toString))
+    val (providerId: String, value: String) = ConfigUtil.parseProviderConfigValue(schemaConfig, Some(DDL.toString))
+    val valueElements: Array[String] = value.split(";")
+    val numValueElements = valueElements.length
+    val clazz = this.getClass.getClassLoader.loadClass(value)
+    val path = valueElements.head
+
     SchemaProviderType.withName(providerId.toLowerCase) match {
-      case DDL =>
-        SparkSchema(getSchemaFromDdl(value))
+      case DDL => SparkSchema(getSchemaFromDdl(value))
       case DDLFile =>
-        val valueElements = value.split(";")
-        assert(valueElements.size == 1, s"DDL schema provider configuration error. Configuration format is '<path-to-ddl-file>', but received $value.")
+        require(numValueElements == 1,
+          s"readSchemaFromConfigValue: DDL schema provider configuration error. Configuration format is '<path-to-ddl-file>', but received $value.")
         val content = readFromPath(new Path(valueElements.head))
         SparkSchema(getSchemaFromDdl(content))
       case CaseClass =>
-        val clazz = this.getClass.getClassLoader.loadClass(value)
         val mirror = scala.reflect.runtime.currentMirror
         val tpe = mirror.classSymbol(clazz).toType
         SparkSchema(getSchemaFromCaseClass(tpe))
       case JavaBean =>
-        val clazz = this.getClass.getClassLoader.loadClass(value)
         SparkSchema(getSchemaFromJavaBean(clazz))
+      case _ if lazyFileReading => LazyGenericSchema(schemaConfig)
       case XsdFile =>
-        val valueElements = value.split(";")
-        assert(valueElements.size <= 4, s"XSD schema provider configuration error. Configuration format is '<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>', but received $value.")
-        val path = valueElements.head
-        val rowTag = if (valueElements.size >= 2) Some(valueElements(1)).filter(_.nonEmpty) else None
-        val maxRecursion = if (valueElements.size >= 3) Some(valueElements(2).toInt) else None
-        val jsonCompatibility = if (valueElements.size >= 4) Some(valueElements(3).toBoolean) else None
-        if (!lazyFileReading) {
-          val schema = getSchemaFromXsd(new Path(path), maxRecursion)
-          val sparkSchema = SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
-          if (jsonCompatibility.getOrElse(false)) makeXsdJsonCompatible(sparkSchema)
-          else sparkSchema
-        } else LazyGenericSchema(schemaConfig)
+        require(numValueElements <= 4,
+          s"readSchemaFromConfigValue: XSD schema provider configuration error." +
+            s" Configuration format is '<path-to-xsd-file>;<row-tag>;<maxRecursion:Int>;<jsonCompatibility:Boolean>'," +
+            s" but received $value.")
+        val rowTag = if (numValueElements >= 2) Some(valueElements(1)).filter(_.nonEmpty) else None
+        val maxRecursion = if (numValueElements >= 3) Some(valueElements(2).toInt) else None
+        val jsonCompatibility = if (numValueElements >= 4) Some(valueElements(3).toBoolean) else None
+        val schema = getSchemaFromXsd(new Path(path), maxRecursion)
+        val sparkSchema = SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
+        if (jsonCompatibility.getOrElse(false)) makeXsdJsonCompatible(sparkSchema) else sparkSchema
       case JsonSchemaFile =>
-        val valueElements = value.split(";")
-        assert(valueElements.size <= 4, s"Json schema provider configuration error." +
+        require(numValueElements <= 4, s"readSchemaFromConfigValue: Json schema provider configuration error." +
           s" Configuration format is '<path-to-json-file>;<row-tag>;<strictTyping:Boolean>;" +
           s"<additionalPropertiesDefault:Boolean>', but received $value.")
-        val path = valueElements.head
-        val rowTag = if (valueElements.size >= 2) Some(valueElements(1)).filter(_.nonEmpty) else None
-        val strictTyping = if (valueElements.size >= 3) Some(valueElements(2).toBoolean) else None
-        val additionalPropertiesDefault = if (valueElements.size >= 4) Some(valueElements(3).toBoolean) else None
-        if (!lazyFileReading) {
-          val content = readFromPath(new Path(path))
-          val schema = getSchemaFromJsonSchema(content, strictTyping.getOrElse(false), additionalPropertiesDefault.getOrElse(false))
-          SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
-        } else LazyGenericSchema(schemaConfig)
+        val rowTag = if (numValueElements >= 2) Some(valueElements(1)).filter(_.nonEmpty) else None
+        val strictTyping = if (numValueElements >= 3) Some(valueElements(2).toBoolean) else None
+        val additionalPropertiesDefault = if (numValueElements >= 4) Some(valueElements(3).toBoolean) else None
+        val content = readFromPath(new Path(path))
+        val schema = getSchemaFromJsonSchema(content, strictTyping.getOrElse(false), additionalPropertiesDefault.getOrElse(false))
+        SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
       case AvroSchemaFile =>
-        val valueElements = value.split(";")
-        assert(valueElements.size <= 2, s"Avro schema provider configuration error. Configuration format is '<path-to-avsc-file>;<row-tag>', but received $value.")
-        val path = valueElements.head
+        require(numValueElements <= 2,
+          s"readSchemaFromConfigValue: Avro schema provider configuration error." +
+            s" Configuration format is '<path-to-avsc-file>;<row-tag>', but received $value.")
         val rowTag = valueElements.drop(1).headOption
-        if (!lazyFileReading) {
-          val content = readFromPath(new Path(path))
-          val schema = getSchemaFromAvroSchema(content)
-          SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
-        } else LazyGenericSchema(schemaConfig)
+        val content = readFromPath(new Path(path))
+        val schema = getSchemaFromAvroSchema(content)
+        SparkSchema(rowTag.map(t => extractRowTag(schema, t)).getOrElse(schema))
       case OpenApi =>
-        val valueElements = value.split(";")
-        assert(2 <= valueElements.size && valueElements.size <= 3, s"OpenApi schema provider configuration error. Configuration format is '<apiDocsUrl>;<operationId>;<responseContentType>', but received $value.")
+        require(2 == numValueElements || numValueElements == 3,
+          s"readSchemaFromConfigValue: OpenApi schema provider configuration error." +
+            s" Configuration format is '<apiDocsUrl>;<operationId>;<responseContentType>', but received $value.")
         val apiDocsUrl = valueElements(1)
         val operationId = valueElements(2)
-        val responseContentType = if (valueElements.size >= 3) valueElements(3) else defaultResponseContentType
-        if (!lazyFileReading) {
-          val (_, dataType) = OpenApiUtil.queryOperationSchema(apiDocsUrl, operationId, responseContentType)
-          dataType match {
-            case schema: StructType => SparkSchema(schema)
-            case _ => throw new IllegalStateException(s"'object' type (e.g. Spark StructType) needed," +
-              s" but got dataType $dataType for operation $operationId")
-          }
-        } else LazyGenericSchema(schemaConfig)
+        val responseContentType = if (numValueElements >= 3) valueElements(3) else defaultResponseContentType
+        val (_, dataType) = OpenApiUtil.queryOperationSchema(apiDocsUrl, operationId, responseContentType)
+        dataType match {
+          case schema: StructType => SparkSchema(schema)
+          case _ => throw new IllegalStateException(s"'object' type (e.g. Spark StructType) needed," +
+            s" but got dataType $dataType for operation $operationId")
+        }
     }
   }
 
