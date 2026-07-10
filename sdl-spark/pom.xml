@@ -112,6 +112,7 @@
             <artifactId>spark-excel_${scala.minor.version}</artifactId>
             <version>${spark.excel.version}</version>
             <classifier>thin</classifier>
+            <scope>test</scope>
         </dependency>
 
         <dependency>
