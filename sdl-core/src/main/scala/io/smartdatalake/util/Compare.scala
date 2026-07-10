@@ -20,6 +20,8 @@ package io.smartdatalake.util
 
 import io.smartdatalake.util.Constants.{epsilonDouble, epsilonFloat}
 
+import scala.util.{Failure, Success, Try}
+
 /**
  * Trait Compare provides methods to compare numeric values, sets and maps
  */
@@ -87,16 +89,35 @@ trait Compare extends Serializable {
   final def almostEqual[A](epsilon: A, relative: Boolean)(xy: (A, A))(implicit num: Numeric[A]): Boolean =
     almostEqual[A](epsilon, xy._1, xy._2, relative)(num)
 
+  /**
+   * Checking whether two objects equals where
+   *   - control characters in strings are ignored
+   *   - null equals null, contrary to SQL !
+   * @param x
+   *   first object
+   * @param y
+   *   second equality
+   * @return
+   *   boolean whether x and y equal
+   */
   final def anyEqual(x: Any, y: Any): Boolean = x match {
     // Numeric values
-    case x: Double => almostEqual(epsilonDouble, x, y.asInstanceOf[Double]) ||
-      (x.isNaN && y.asInstanceOf[Double].isNaN) ||
-      (x.isPosInfinity && y.asInstanceOf[Double].isPosInfinity) ||
-      (x.isNegInfinity && y.asInstanceOf[Double].isNegInfinity)
-    case x: Float => almostEqual(epsilonFloat, x, y.asInstanceOf[Float]) ||
-      (x.isNaN && y.asInstanceOf[Float].isNaN) ||
-      (x.isPosInfinity && y.asInstanceOf[Float].isPosInfinity) ||
-      (x.isNegInfinity && y.asInstanceOf[Float].isNegInfinity)
+    case x: Double => Try(y.asInstanceOf[Double]) match {
+        case Success(yDouble) => almostEqual(epsilonDouble, x, yDouble) ||
+          (x.isNaN && yDouble.isNaN) ||
+          (x.isPosInfinity && yDouble.isPosInfinity) ||
+          (x.isNegInfinity && yDouble.isNegInfinity)
+        case Failure(_) => // In case of object cannot be casted we catch the exception and return false
+          false
+      }
+    case x: Float => Try(y.asInstanceOf[Float]) match {
+        case Success(yFloat) => almostEqual(epsilonFloat, x, yFloat) ||
+          (x.isNaN && yFloat.isNaN) ||
+          (x.isPosInfinity && yFloat.isPosInfinity) ||
+          (x.isNegInfinity && yFloat.isNegInfinity)
+        case Failure(_) => // In case of object cannot be casted we catch the exception and return false
+          false
+      }
     case x: String => y match {
         case y: String => x.filter(_ >= ' ') == y.filter(_ >= ' ') // remove control characters
         case _         => false

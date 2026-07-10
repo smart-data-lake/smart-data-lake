@@ -28,6 +28,31 @@ import org.slf4j.{Logger, LoggerFactory}
 class CompareTest extends AnyFlatSpec with Matchers with GenericTestTool {
   private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
+  "anyEqual" should "check equality properly" in {
+    val argExpMap: Map[(String, (Any, Any)), Boolean] = Map(
+      // comparing 0 with 1
+      ("0=1",                                            (0, 0))                                               -> true,
+      ("0=1",                                            (0, 1))                                               -> false,
+      ("a double does not equal an integer",             (0d, 0))                                              -> false,
+      ("a double does not equal a float",                (0d, 0f))                                             -> false,
+      ("2 equal strings",                                ("abc", "abc"))                                       -> true,
+      ("control characters ignored",                     ("", (0 to 31).map(_.toChar).mkString))               -> true,
+      ("control characters ignored but not space",       ("", (0 to 32).map(_.toChar).mkString))               -> false,
+      ("2 equal strings with different line seperators", (s"ab${13.toChar}${10.toChar}c", s"ab${13.toChar}c")) -> true,
+      ("2 equal arrays",                                 (Array(2), Array(2)))                                 -> true,
+      ("2 equal options",                                (Some(2), Some(2)))                                   -> true,
+      ("2 equal sequences",                              (Seq(2), Seq(2)))                                     -> true,
+      ("2 equal pairs",                                  ((1, 2), (1, 2)))                                     -> true,
+      ("a map is not a string",                          (Map(4 -> 6), "this is not a map"))                   -> false,
+      ("null equals null, contrary to SQL !",            (null, null))                                         -> true
+    )
+    val testFun: ((Any, Any)) => Boolean = {
+      case (x, y) => anyEqual(x = x, y = y)
+    }
+    testArgumentExpectedMapWithComment[(Any, Any), Boolean](testFun, argExpMap)
+      .values.forall(identity[Boolean]) shouldBe true
+  }
+
   "Given twice -half, almostEqual" should "return true" in {
     almostEqual(epsilonDouble, 0d - halfDouble, 0d - halfDouble) shouldEqual true
   }
