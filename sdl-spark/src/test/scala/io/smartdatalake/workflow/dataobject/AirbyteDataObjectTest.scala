@@ -32,14 +32,13 @@ import java.time.LocalDateTime
 import scala.collection.mutable
 
 class AirbyteDataObjectTest extends DataObjectTestSuite
-  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
-  with io.smartdatalake.util.spark.dataset.Equality {
+    with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+    with io.smartdatalake.util.spark.dataset.Equality {
 
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
-  private def parseMessage(msg: String): AirbyteMessage = {
+  private def parseMessage(msg: String): AirbyteMessage =
     AirbyteMessage.parseOutput(LazyList(msg), mutable.Buffer(), filterLog = false).head
-  }
 
   import session.implicits._
 
@@ -55,16 +54,19 @@ class AirbyteDataObjectTest extends DataObjectTestSuite
     Files.write(scriptFile, scriptString.replace("\r\n", "\n").getBytes) // remove windows line endings for wsl!
     scriptFile.toFile.setExecutable(true)
     val script = scriptFile.toString
-    val dataObject = AirbyteDataObject("test", config, "mystream", cmd = CmdScript(
-      winCmd = Some(s"wsl $script"), // replace windows line endings to unix before start
-      linuxCmd = Some(script))
+    val dataObject = AirbyteDataObject("test", config, "mystream",
+      cmd = CmdScript(
+        winCmd = Some(s"wsl $script"), // replace windows line endings to unix before start
+        linuxCmd = Some(script)
+      )
     )
     dataObject.prepare
     val actual = dataObject.getSparkDataFrame()(contextExec)
-    val expected = Seq(("TEST", true, "123", BigDecimal(2345.67), "Test Auto", Timestamp.valueOf("2022-11-22 01:23:45"), LocalDateTime.parse("2022-11-22T01:23:45")))
+    val expected = Seq(("TEST", true, "123", BigDecimal(2345.67), "Test Auto", Timestamp.valueOf("2022-11-22 01:23:45"),
+      LocalDateTime.parse("2022-11-22T01:23:45")))
       .toDF("produkttyp", "flag", "artikelID", "price", "artikelbezeichnung", "updated", "updatedNTZ")
     val resultat = expected.equal(actual)
-    if (!resultat) printFailedTestResult("wsl cmd test", Seq())(actual)(expected)
+    if (!resultat) printFailedTestResultDs("wsl cmd test")(actual)(expected)
     assert(resultat)
   }
 
@@ -79,25 +81,60 @@ class AirbyteDataObjectTest extends DataObjectTestSuite
   }
 
   test("parse catalog") {
-   	val msg = parseMessage("""{ "type": "CATALOG", "catalog": { "streams": [ { "name": "mystream", "json_schema": { "$schema": "http://json-schema.org/draft-07/schema#", "type": "object", "properties": { "produkttyp": { "type": "string" }, "flag": { "type": "string" }, "artikelID": { "type": "string" }, "artikelbezeichnung": { "type": "string" } } }, "supported_sync_modes": [ "full_refresh" ]} ] } }""")
-    val stream = AirbyteStream("mystream",
-      json_schema = JObject(List(("$schema",JString("http://json-schema.org/draft-07/schema#")), ("type",JString("object")), ("properties",JObject(("produkttyp",JObject(List(("type",JString("string"))))), ("flag",JObject(List(("type",JString("string"))))), ("artikelID",JObject(List(("type",JString("string"))))), ("artikelbezeichnung",JObject(List(("type",JString("string"))))))))),
+    val msg = parseMessage(
+      """{ "type": "CATALOG", "catalog": { "streams": [ { "name": "mystream", "json_schema": { "$schema": "http://json-schema.org/draft-07/schema#", "type": "object", "properties": { "produkttyp": { "type": "string" }, "flag": { "type": "string" }, "artikelID": { "type": "string" }, "artikelbezeichnung": { "type": "string" } } }, "supported_sync_modes": [ "full_refresh" ]} ] } }"""
+    )
+    val stream = AirbyteStream(
+      "mystream",
+      json_schema = JObject(List(
+          ("$schema",    JString("http://json-schema.org/draft-07/schema#")),
+          ("type",       JString("object")),
+          ("properties",
+            JObject(
+              ("produkttyp",         JObject(List(("type", JString("string"))))),
+              ("flag",               JObject(List(("type", JString("string"))))),
+              ("artikelID",          JObject(List(("type", JString("string"))))),
+              ("artikelbezeichnung", JObject(List(("type", JString("string")))))
+            ))
+        )),
       supported_sync_modes = Seq(SyncModeEnum.full_refresh)
     )
     val catalog = AirbyteCatalog(Seq(stream))
     assert(msg.toString == catalog.toString) // interestingly the objects are not equal, but the string representation is!
-    //assert(msg.asInstanceOf[AirbyteCatalog].streams.head.getSparkSchema == schema)
+    // assert(msg.asInstanceOf[AirbyteCatalog].streams.head.getSparkSchema == schema)
   }
 
   test("parse record") {
-    val msg = parseMessage("""{"type": "RECORD", "record": {"stream": "mystream", "data": {"produkttyp": "TEST", "flag": true, "artikelID": 123, "artikelbezeichnung": "Test Auto"}, "emitted_at": 1640029476000}}""")
-    val record =  AirbyteRecordMessage("mystream", JObject(List(("produkttyp",JString("TEST")), ("flag",JBool(true)), ("artikelID",JInt(123)), ("artikelbezeichnung",JString("Test Auto")))), 1640029476000L, None)
+    val msg = parseMessage(
+      """{"type": "RECORD", "record": {"stream": "mystream", "data": {"produkttyp": "TEST", "flag": true, "artikelID": 123, "artikelbezeichnung": "Test Auto"}, "emitted_at": 1640029476000}}"""
+    )
+    val record = AirbyteRecordMessage(
+      "mystream",
+      JObject(List(("produkttyp", JString("TEST")), ("flag", JBool(true)), ("artikelID", JInt(123)),
+        ("artikelbezeichnung",    JString("Test Auto")))),
+      1640029476000L,
+      None
+    )
     assert(msg.toString == record.toString) // interestingly the objects are not equal, but the string representation is!
   }
 
   test("de/serialization round-trip") {
     implicit val jsonFormats: Formats = AirbyteMessage.formats
-    val stream = AirbyteStream("mystream",JObject(List(("$schema",JString("http://json-schema.org/draft-07/schema#")), ("type",JString("object")), ("properties",JObject(List(("produkttyp",JObject(List(("type",JString("string"))))), ("flag",JObject(List(("type",JString("string"))))), ("artikelID",JObject(List(("type",JString("string"))))), ("artikelbezeichnung",JObject(List(("type",JString("string")))))))))),Seq())
+    val stream = AirbyteStream(
+      "mystream",
+      JObject(List(
+          ("$schema",    JString("http://json-schema.org/draft-07/schema#")),
+          ("type",       JString("object")),
+          ("properties",
+            JObject(List(
+                ("produkttyp",         JObject(List(("type", JString("string"))))),
+                ("flag",               JObject(List(("type", JString("string"))))),
+                ("artikelID",          JObject(List(("type", JString("string"))))),
+                ("artikelbezeichnung", JObject(List(("type", JString("string")))))
+              )))
+        )),
+      Seq()
+    )
     val catalog = AirbyteCatalog(Seq(stream))
     val jsonMsg = """{"type": "CATALOG", "catalog": """ + JsonUtils.caseClassToJsonString(catalog) + """}"""
     val parsedCatalog = parseMessage(jsonMsg)

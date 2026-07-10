@@ -24,7 +24,7 @@ import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.spark.transformer.StandardizeSparkDatatypesTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{ParquetFileDataObject, TestData}
+import io.smartdatalake.workflow.dataobject.ParquetFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
@@ -36,7 +36,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import java.nio.file.{Files, Path => NioPath}
 
 class CopyCustomDfTest extends AnyFunSuite with BeforeAndAfter
-  with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
+    with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
 
@@ -68,7 +68,6 @@ class CopyCustomDfTest extends AnyFunSuite with BeforeAndAfter
     val targetDO = MockSparkDataObject(id = "target").register
     instanceRegistry.register(sourceDO)
 
-
     // prepare & start load
     val testAction = CopyAction(id = s"${feed}Action", inputId = sourceDO.id, outputId = targetDO.id)
     val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
@@ -77,10 +76,9 @@ class CopyCustomDfTest extends AnyFunSuite with BeforeAndAfter
     val expected = sourceDO.getSparkDataFrame()
     val actual = targetDO.getSparkDataFrame()
     val resultat: Boolean = expected.equal(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable", Seq())(actual)(expected)
+    if (!resultat) printFailedTestResultDs("Df2HiveTable")(actual)(expected)
     assert(resultat)
   }
-
 
   test("columns of decimal type should be casted to integral or float type.") {
 
@@ -108,7 +106,7 @@ class CopyCustomDfTest extends AnyFunSuite with BeforeAndAfter
       .withColumn("_decimal_4_3", $"_decimal_4_3".cast(FloatType))
       .withColumn("_decimal_38_1", $"_decimal_38_1".cast(DoubleType))
     val resultat: Boolean = expected.equal(actual)
-    if (!resultat) printFailedTestResult("customDf_dfManyTypes", Seq())(actual)(expected)
+    if (!resultat) printFailedTestResultDs("customDf_dfManyTypes")(actual)(expected)
     assert(resultat)
   }
 

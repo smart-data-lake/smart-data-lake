@@ -19,7 +19,7 @@
 package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.spark.dataset.Collection._
-import io.smartdatalake.testutils.{TestTool, TestUtil}
+import io.smartdatalake.testutils.{TestToolSpark, TestUtil}
 import io.smartdatalake.util.PrecisionDef
 import io.smartdatalake.util.spark.GetSession.loggEnv
 import org.apache.spark.sql.functions.col
@@ -34,7 +34,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
 
 class EqualityTest extends AnyFlatSpec with Matchers with ScalaCheckPropertyChecks
-  with TestTool with Equality {
+  with TestToolSpark with Equality {
   private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   private implicit val spark: SparkSession = TestUtil.session
 

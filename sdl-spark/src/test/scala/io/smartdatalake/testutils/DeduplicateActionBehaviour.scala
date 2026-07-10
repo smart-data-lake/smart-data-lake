@@ -21,7 +21,6 @@ package io.smartdatalake.testutils
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.DataFrameTestHelper.assertDataFramesEqualGeneric
-import io.smartdatalake.testutils.GenericTestTool.printFailedTestResult
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.DeduplicateAction
 import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, SQLDfTransformer}
@@ -36,7 +35,7 @@ import java.sql.Timestamp
 import java.time.{LocalDateTime, Month}
 import scala.reflect.runtime.universe.Type
 
-trait DeduplicateActionBehaviour {
+trait DeduplicateActionBehaviour extends GenericTestTool {
   this: SmartDataLakeLogger =>
 
   implicit private val implicitLogger: Logger = logger
@@ -47,8 +46,7 @@ trait DeduplicateActionBehaviour {
 
   def testDeduplicateTwoRuns(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
-      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
-      tgtConnection: Option[Connection] = None
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -82,7 +80,7 @@ trait DeduplicateActionBehaviour {
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -103,15 +101,14 @@ trait DeduplicateActionBehaviour {
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
   }
 
   def testDeduplicateWithFilter(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
-      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
-      tgtConnection: Option[Connection] = None
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -145,8 +142,7 @@ trait DeduplicateActionBehaviour {
 
   def testDeduplicateWithTransformerChangingSchema(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
-      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
-      tgtConnection: Option[Connection] = None
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -184,7 +180,7 @@ trait DeduplicateActionBehaviour {
         .toDF("lastname", "firstname", "Rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -205,7 +201,7 @@ trait DeduplicateActionBehaviour {
         .toDF("lastname", "firstname", "Rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
   }
@@ -242,7 +238,8 @@ trait DeduplicateActionBehaviour {
 
     val dateTime2 = Timestamp.valueOf(LocalDateTime.of(2020, Month.AUGUST, 16, 10, 0, 0))
     val dfResult2 = DeduplicateAction
-      .deduplicateDataFrame(Option(dfResult1), Seq(colId), dateTime2, ignoreOldDeletedColumns = false, ignoreOldDeletedNestedColumns = true)(df3)
+      .deduplicateDataFrame(Option(dfResult1), Seq(colId), dateTime2, ignoreOldDeletedColumns = false,
+        ignoreOldDeletedNestedColumns = true)(df3)
 
     // the expected result is the final passed value with a captured column
     val dfExpected: GenericDataFrame = Seq((1, "B", 200, ts("2020-08-16 10:00")))
@@ -253,8 +250,7 @@ trait DeduplicateActionBehaviour {
 
   def testDeduplicateWithMergeMode(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
-      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
-      tgtConnection: Option[Connection] = None
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -290,7 +286,7 @@ trait DeduplicateActionBehaviour {
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -315,7 +311,7 @@ trait DeduplicateActionBehaviour {
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context2)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -338,15 +334,14 @@ trait DeduplicateActionBehaviour {
         .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context3)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResult("deduplicate load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("deduplicate load", Seq())(actual)(expected)
       assert(resultat)
     }
   }
 
   def testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
-      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
-      tgtConnection: Option[Connection] = None
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -386,7 +381,7 @@ trait DeduplicateActionBehaviour {
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -416,7 +411,7 @@ trait DeduplicateActionBehaviour {
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context2)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -439,15 +434,14 @@ trait DeduplicateActionBehaviour {
         .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context3)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResult("deduplicate load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("deduplicate load", Seq())(actual)(expected)
       assert(resultat)
     }
   }
 
   def testDeduplicateWithMergeModeSchemaEvolution(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
-      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
-      tgtConnection: Option[Connection] = None
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -489,7 +483,7 @@ trait DeduplicateActionBehaviour {
         .toDF("lastname", "firstname", "rating2", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -514,7 +508,7 @@ trait DeduplicateActionBehaviour {
         .toDF("lastname", "firstname", "rating2", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context2)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
   }

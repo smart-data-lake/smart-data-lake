@@ -107,7 +107,7 @@ class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter
     val actual = tgtDO.getSparkDataFrame()
     val expected = df1.withColumn("dt", lit("20201101"))
     val resultat = actual.equal(expected)
-    if (!resultat) printFailedTestResult("PartitionArchiveMode with SparkFileDataObject")(actual)(expected)
+    if (!resultat) printFailedTestResultDs("PartitionArchiveMode with SparkFileDataObject")(actual)(expected)
     assert(resultat)
   }
 

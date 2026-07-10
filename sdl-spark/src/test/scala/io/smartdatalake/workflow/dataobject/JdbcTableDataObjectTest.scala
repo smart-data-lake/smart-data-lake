@@ -41,7 +41,6 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
 
   private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableDataObjectTest", "org.hsqldb.jdbcDriver")
   private val tempDir = Files.createTempDirectory("test")
-  private val tempPath = tempDir.toAbsolutePath.toString
 
   loggEnv
 
@@ -285,7 +284,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()(contextExec)
     val resultat = df1.equal(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
+    if (!resultat) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
     assert(resultat)
 
     // 2nd load: merge data by primary key
@@ -296,7 +295,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     val expected2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
       .toDF("type", "lastname", "firstname", "rating")
     val resultat2 = expected2.equal(actual2)
-    if (!resultat2) printFailedTestResult("SaveMode merge", Seq())(actual2)(expected2)
+    if (!resultat2) printFailedTestResultDs("SaveMode merge")(actual2)(expected2)
     assert(resultat2)
   }
 
@@ -314,7 +313,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()(contextExec)
     val resultat = df1.equal(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
+    if (!resultat) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
     assert(resultat)
 
     // 2nd load: merge data by primary key with different schema
@@ -328,7 +327,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
     val expected2 = Seq(("ext", "doe", "john", Some(5), Some(10)), ("ext", "smith", "peter", Some(3), None), ("int", "emma", "brown", None, Some(7)))
       .toDF("type", "lastname", "firstname", "rating", "rating2")
     val resultat2 = expected2.equal(actual2)
-    if (!resultat2) printFailedTestResult("SaveMode merge", Seq())(actual2)(expected2)
+    if (!resultat2) printFailedTestResultDs("SaveMode merge")(actual2)(expected2)
     assert(resultat2)
   }
 

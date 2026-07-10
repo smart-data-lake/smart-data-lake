@@ -70,7 +70,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     val dfExpected = toDataDf(dataExpected, colNames ++ Seq("new_col1", Historization.historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName))
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) printFailedTestResultGeneric("History unchanged with new columns but unchanged data")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResult("History unchanged with new columns but unchanged data")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -127,7 +127,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     val dfExpected = dfUpdatedNew.unionByName(dfUpdatedOld)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) printFailedTestResultGeneric("When updating 1 record, the history should contain the old and the new version of the values")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResult("When updating 1 record, the history should contain the old and the new version of the values")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -148,7 +148,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     val dfExpected = toHistorizedDf(baseColumnsUpdatedOld, HistorizationPhase.UpdatedOld, withOperation = true)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) printFailedTestResultGeneric("When deleting 1 record (technical deletion) the dl_ts_delimited column should be updated")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResult("When deleting 1 record (technical deletion) the dl_ts_delimited column should be updated")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -169,7 +169,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     val dfExpected = toHistorizedDf(baseColumnsAdded, HistorizationPhase.NewlyAdded, withOperation = true)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) printFailedTestResultGeneric("When adding 1 record, the history should contain the new record")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResult("When adding 1 record, the history should contain the new record")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -195,7 +195,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     val dfExpected = toHistorizedDf(baseColumnsAdded, HistorizationPhase.NewlyAdded, withOperation = true)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) printFailedTestResultGeneric("When adding 1 record that was technically deleted in the past already, the history should contain the new version")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResult("When adding 1 record that was technically deleted in the past already, the history should contain the new version")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -214,7 +214,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
       .unionByName(toHistorizedDf(baseColumnsNewFeed, HistorizationPhase.NewlyAdded, withOperation = true))
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) printFailedTestResultGeneric("Exchanging non-null value and null value between columns should create a new history entry")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResult("Exchanging non-null value and null value between columns should create a new history entry")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -240,7 +240,7 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     val dfExpected = dfUpdatedNew.unionByName(dfUpdatedOld)
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) printFailedTestResultGeneric("When timeAxisUnit=0, history with half-open intervals should be created")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResult("When timeAxisUnit=0, history with half-open intervals should be created")(dfHistorized)(dfExpected)
     assert(result)
 
     assert(dfHistorized.as("a").join(dfHistorized.as("b"), col("a." + Environment.delimitedColumnName) === col("b." + Environment.capturedColumnName), "inner").count == 1)

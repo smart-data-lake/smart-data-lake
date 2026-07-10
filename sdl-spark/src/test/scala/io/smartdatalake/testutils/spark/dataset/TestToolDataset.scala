@@ -18,15 +18,18 @@
  */
 package io.smartdatalake.testutils.spark.dataset
 
+import io.smartdatalake.testutils.GenericTestTool
+import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import org.apache.spark.sql.Dataset
 import org.slf4j.Logger
-import scala.util.{Failure,Success,Try}
 
-trait TestToolDataset extends io.smartdatalake.util.spark.dataset.Equality {
+import scala.util.{Failure, Success, Try}
 
-  def printFailedTestResult[T](testName: String, arguments: Seq[Dataset[T]] = Nil)(actual: Dataset[T])(expected: Dataset[T])(implicit
+trait TestToolDataset extends GenericTestTool with Equality {
+
+  def printFailedTestResultDs[T](testName: String, arguments: Seq[Dataset[T]] = Nil)(actual: Dataset[T])(expected: Dataset[T])(implicit
       logger: Logger
   ): Unit = {
     def printDf(df: Dataset[T]): Unit = {
@@ -53,16 +56,16 @@ trait TestToolDataset extends io.smartdatalake.util.spark.dataset.Equality {
     }
   }
 
-  def printFailedTestResultGeneric(
+  def printFailedTestResult(
       testName: String,
       arguments: Seq[GenericDataFrame] = Seq()
   )(actual: GenericDataFrame)(expected: GenericDataFrame)(implicit
       logger: Logger
   ): Unit =
     (actual, expected) match {
-      case (actual: SparkDataFrame, expected: SparkDataFrame) =>
-        assert(arguments.forall(_.isInstanceOf[SparkDataFrame]))
-        printFailedTestResult(testName, arguments.map(_.asInstanceOf[SparkDataFrame].inner))(actual.inner)(expected.inner)
+      case (actual: SparkDataFrame, expected: SparkDataFrame) if arguments.forall(_.isInstanceOf[SparkDataFrame]) =>
+        printFailedTestResultDs(testName, arguments.map(_.asInstanceOf[SparkDataFrame].inner))(actual.inner)(expected.inner)
+      case _ => printFailedTestResultGdf(testName, arguments)(actual)(expected)
     }
 
 }

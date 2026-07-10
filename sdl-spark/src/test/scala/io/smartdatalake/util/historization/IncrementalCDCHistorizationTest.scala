@@ -23,9 +23,8 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.historization.HistorizationTestUtils._
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
-import io.smartdatalake.workflow.dataframe.DataFrameFunctions
 import io.smartdatalake.workflow.dataframe.spark.{SparkSimpleDataType, SparkSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.TimestampType
 import org.scalatest.BeforeAndAfter
@@ -33,16 +32,14 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.slf4j.Logger
 
 /**
- * Unit tests for historization with incrementalCDCHistorize.
- * incrementalCDCHistorize is much different from incrementalHistorize because it doesn't need an existing DataFrame
+ * Unit tests for historization with incrementalCDCHistorize. incrementalCDCHistorize is much
+ * different from incrementalHistorize because it doesn't need an existing DataFrame
  */
 class IncrementalCDCHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
-  with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
+    with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
 
   private implicit val loggerImpl: Logger = logger
   private implicit val session: SparkSession = TestUtil.session
-
-  import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val functions: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(SparkSubFeed.subFeedType)
@@ -53,18 +50,21 @@ class IncrementalCDCHistorizationTest extends AnyFunSuite with BeforeAndAfter wi
     val dataNewFeed = List((123, "Egon", 23, "healthy", "new"))
     val dfNewFeed = toDataDf(dataNewFeed, colNames :+ "operation")
 
-    val dfHistorized = Historization.incrementalCDCHistorize(dfNewFeed, col("operation") === lit("deleted"), referenceTimestampNewTs, defaultTimeAxisUnit)
-      .drop("operation")
+    val dfHistorized =
+      Historization.incrementalCDCHistorize(dfNewFeed, col("operation") === lit("deleted"), referenceTimestampNewTs, defaultTimeAxisUnit)
+        .drop("operation")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val dataExpected = Seq(
-      (123, "Egon", 23, "healthy", true, HistorizationRecordOperations.updateClose, null, getReferenceTimestampOldTs()),
-      (123, "Egon", 23, "healthy", false, HistorizationRecordOperations.insertNew, referenceTimestampNewTs, doomsdayTs),
+      (123, "Egon", 23, "healthy", true,  HistorizationRecordOperations.updateClose, null,                    getReferenceTimestampOldTs()),
+      (123, "Egon", 23, "healthy", false, HistorizationRecordOperations.insertNew,   referenceTimestampNewTs, doomsdayTs)
     )
-    val dfExpected = toDataDf(dataExpected, colNames ++ Seq("dl_dummy", Historization.historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName))
+    val dfExpected = toDataDf(dataExpected,
+      colNames ++ Seq("dl_dummy", Historization.historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName))
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) printFailedTestResultGeneric("New/updated record creates updateClose and insertNew records for merge statement")(dfHistorized)(dfExpected)
+    if (!result)
+      printFailedTestResult("New/updated record creates updateClose and insertNew records for merge statement")(dfHistorized)(dfExpected)
     assert(result)
   }
 
@@ -72,18 +72,20 @@ class IncrementalCDCHistorizationTest extends AnyFunSuite with BeforeAndAfter wi
     val dataNewFeed = List((123, "Egon", 23, "healthy", "deleted"))
     val dfNewFeed = toDataDf(dataNewFeed, colNames :+ "operation")
 
-    val dfHistorized = Historization.incrementalCDCHistorize(dfNewFeed, col("operation") === lit("deleted"), referenceTimestampNewTs, defaultTimeAxisUnit)
-      .drop("operation")
+    val dfHistorized =
+      Historization.incrementalCDCHistorize(dfNewFeed, col("operation") === lit("deleted"), referenceTimestampNewTs, defaultTimeAxisUnit)
+        .drop("operation")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
     val dataExpected = Seq(
-      (123, "Egon", 23, "healthy", true, HistorizationRecordOperations.updateClose, null, getReferenceTimestampOldTs()),
+      (123, "Egon", 23, "healthy", true, HistorizationRecordOperations.updateClose, null, getReferenceTimestampOldTs())
     )
-    val dfExpected = toDataDf(dataExpected, colNames ++ Seq("dl_dummy", Historization.historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName))
+    val dfExpected = toDataDf(dataExpected,
+      colNames ++ Seq("dl_dummy", Historization.historizeOperationColName, Environment.capturedColumnName, Environment.delimitedColumnName))
       .withColumn(Environment.capturedColumnName, col(Environment.capturedColumnName).cast(SparkSimpleDataType(TimestampType)))
 
     val result = dfExpected.isEqual(dfHistorized)
-    if (!result) printFailedTestResultGeneric("Deleted record creates updateClose record for merge statement")(dfHistorized)(dfExpected)
+    if (!result) printFailedTestResult("Deleted record creates updateClose record for merge statement")(dfHistorized)(dfExpected)
     assert(result)
   }
 }

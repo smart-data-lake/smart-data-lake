@@ -21,7 +21,6 @@ package io.smartdatalake.testutils
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.GenericTestTool.printFailedTestResult
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Quality
@@ -42,7 +41,7 @@ import java.time.LocalDateTime
  * This trait defines tests for the behaviour of HistorizeAction. They can be used with various
  * output DataObject types to ensure consistent behaviour for e.g. Jdbc, DeltaLake, ...
  */
-trait HistorizeActionBehaviour extends Quality {
+trait HistorizeActionBehaviour extends GenericTestTool with Quality {
   this: AnyFunSuite with Matchers with SmartDataLakeLogger =>
 
   implicit private val implicitLogger: Logger = logger
@@ -93,7 +92,7 @@ trait HistorizeActionBehaviour extends Quality {
         val actual = tgtDO.getDataFrame()
           .drop(Historization.historizeHashColName)
         val resultat = expected.isEqual(actual)
-        if (!resultat) printFailedTestResult("historize 1st load mergeModeEnable", Seq())(actual)(expected)
+        if (!resultat) printFailedTestResultGdf("historize 1st load mergeModeEnable", Seq())(actual)(expected)
         assert(resultat)
       }
 
@@ -119,7 +118,7 @@ trait HistorizeActionBehaviour extends Quality {
         val actual = tgtDO.getDataFrame()
           .drop(Historization.historizeHashColName)
         val resultat = expected.isEqual(actual)
-        if (!resultat) printFailedTestResult("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
+        if (!resultat) printFailedTestResultGdf("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
         assert(resultat)
       }
 
@@ -147,7 +146,7 @@ trait HistorizeActionBehaviour extends Quality {
         val actual = tgtDO.getDataFrame()
           .drop(Historization.historizeHashColName)
         val resultat = expected.isEqual(actual)
-        if (!resultat) printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
+        if (!resultat) printFailedTestResultGdf("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
         assert(resultat)
       }
     }
@@ -190,7 +189,7 @@ trait HistorizeActionBehaviour extends Quality {
         val actual = tgtDO.getDataFrame()
           .drop(Historization.historizeDummyColName)
         val resultat = expected.isEqual(actual)
-        if (!resultat) printFailedTestResult("historize 1st load mergeModeEnable", Seq())(actual)(expected)
+        if (!resultat) printFailedTestResultGdf("historize 1st load mergeModeEnable", Seq())(actual)(expected)
         assert(resultat)
       }
 
@@ -218,7 +217,7 @@ trait HistorizeActionBehaviour extends Quality {
         val actual = tgtDO.getDataFrame()
           .drop(Historization.historizeDummyColName)
         val resultat = expected.isEqual(actual)
-        if (!resultat) printFailedTestResult("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
+        if (!resultat) printFailedTestResultGdf("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
         assert(resultat)
       }
 
@@ -247,7 +246,7 @@ trait HistorizeActionBehaviour extends Quality {
         val actual = tgtDO.getDataFrame()
           .drop(Historization.historizeDummyColName)
         val resultat = expected.isEqual(actual)
-        if (!resultat) printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
+        if (!resultat) printFailedTestResultGdf("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
         assert(resultat)
       }
     }

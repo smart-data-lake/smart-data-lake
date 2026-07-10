@@ -26,12 +26,11 @@ import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.action.DeduplicateAction
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
-import org.slf4j.Logger
 
-class DeduplicateActionTest extends AnyFunSuite with BeforeAndAfter with TestToolDataset with Equality with SmartDataLakeLogger with DeduplicateActionBehaviour {
+class DeduplicateActionTest extends AnyFunSuite with BeforeAndAfter with TestToolDataset with Equality with SmartDataLakeLogger
+    with DeduplicateActionBehaviour {
 
   override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
 

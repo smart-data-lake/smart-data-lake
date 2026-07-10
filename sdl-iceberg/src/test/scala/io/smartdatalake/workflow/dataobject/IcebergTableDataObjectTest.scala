@@ -20,8 +20,8 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions._
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.testutils.spark.dataset.TestToolDataset
+import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkHdfsUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
@@ -80,7 +80,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     val expected = sourceDO.getSparkDataFrame()
     val actual = targetDO.getSparkDataFrame()
     val resultat = expected.equal(actual)
-    if (!resultat) printFailedTestResult("CustomDf2DeltaTable", Seq())(actual)(expected)
+    if (!resultat) printFailedTestResultDs("CustomDf2DeltaTable")(actual)(expected)
     assert(resultat)
 
     // check statistics
@@ -111,7 +111,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     val expected = sourceDO.getSparkDataFrame()
     val actual = targetDO.getSparkDataFrame()
     val resultat: Boolean = actual.equal(expected)
-    if (!resultat) printFailedTestResult("CustomDf2DeltaTable_partitioned", Seq())(actual)(expected)
+    if (!resultat) printFailedTestResultDs("CustomDf2DeltaTable_partitioned")(actual)(expected)
     assert(resultat)
     assert(targetDO.listPartitions.map(_.elements).toSet == Set(Map("num" -> "0"), Map("num" -> "1")))
   }
@@ -128,7 +128,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
     val resultat: Boolean = df1.equal(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
+    if (!resultat) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
     assert(resultat)
 
     // 2nd load: overwrite all with different schema
@@ -137,7 +137,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     targetDO.writeSparkDataFrame(df2)
     val actual2 = targetDO.getSparkDataFrame()
     val resultat2: Boolean = df2.equal(actual2)
-    if (!resultat2) printFailedTestResult("SaveMode overwrite", Seq())(actual2)(df2)
+    if (!resultat2) printFailedTestResultDs("SaveMode overwrite")(actual2)(df2)
     assert(resultat2)
   }
 
@@ -153,7 +153,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
     val result = df1.equal(actual)
-    if (!result) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
+    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
     assert(result)
 
     // 2nd load: append all with different schema
@@ -163,7 +163,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     targetDO.writeSparkDataFrame(df2)
     val actual2 = targetDO.getSparkDataFrame().filter($"lastname" === "doe")
     val result2 = actual2.count() == 2 && (df1.columns ++ df2.columns).toSet == actual2.columns.toSet
-    if (!result2) printFailedTestResult("SaveMode append with different schema", Seq())(actual2)(df2)
+    if (!result2) printFailedTestResultDs("SaveMode append with different schema")(actual2)(df2)
     assert(result2)
   }
 
@@ -181,7 +181,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
     val result = df1.equal(actual)
-    if (!result) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
+    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
     assert(result)
 
     assert(targetDO.listPartitions.toSet == Set(PartitionValues(Map("type" -> "ext")), PartitionValues(Map("type" -> "int"))))
@@ -194,7 +194,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     val expected2 = df2.union(df1.where($"type" =!= "ext"))
     val actual2 = targetDO.getSparkDataFrame()
     val resul2 = expected2.equal(actual2)
-    if (!resul2) printFailedTestResult("SaveMode overwrite and delete partition", Seq())(actual2)(expected2)
+    if (!resul2) printFailedTestResultDs("SaveMode overwrite and delete partition")(actual2)(expected2)
     assert(resul2)
 
     // delete partition
@@ -216,7 +216,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
     val result = df1.equal(actual)
-    if (!result) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
+    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
     assert(result)
 
     assert(targetDO.listPartitions.toSet == Set(PartitionValues(Map("type" -> "ext")), PartitionValues(Map("type" -> "int"))))
@@ -228,7 +228,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     val expected2 = df2.union(df1.where($"type" =!= "ext"))
     val actual2 = targetDO.getSparkDataFrame()
     val resul2 = expected2.equal(actual2)
-    if (!resul2) printFailedTestResult("SaveMode overwrite partitions dynamically", Seq())(actual2)(expected2)
+    if (!resul2) printFailedTestResultDs("SaveMode overwrite partitions dynamically")(actual2)(expected2)
     assert(resul2)
   }
 
@@ -244,7 +244,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
     val result = df1.equal(actual)
-    if (!result) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
+    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
     assert(result)
 
     // 2nd load: append data
@@ -254,7 +254,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     val actual2 = targetDO.getSparkDataFrame()
     val expected2 = df2.union(df1)
     val resultat2: Boolean = expected2.equal(actual2)
-    if (!resultat2) printFailedTestResult("SaveMode append", Seq())(actual2)(expected2)
+    if (!resultat2) printFailedTestResultDs("SaveMode append")(actual2)(expected2)
     assert(resultat2)
   }
 
@@ -272,7 +272,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
     val result = df1.equal(actual)
-    if (!result) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
+    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
     assert(result)
 
     // 2nd load: no data -> NoDataToProcessWarning
@@ -282,7 +282,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     intercept[NoDataToProcessWarning](targetDO.writeSparkDataFrame(df2.where(lit(false))))
     Environment._enableSparkPlanNoDataCheck = Some(true)
 
-    // 3nd load: write data
+    // 3rd load: write data
     targetDO.writeSparkDataFrame(df2)
   }
 
@@ -299,7 +299,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
     val result = df1.equal(actual)
-    if (!result) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
+    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
     assert(result)
 
     // 2nd load: merge data by primary key
@@ -310,7 +310,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     val expected2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
       .toDF("type", "lastname", "firstname", "rating")
     val result2 = expected2.equal(actual2)
-    if (!result2) printFailedTestResult("SaveMode merge", Seq())(actual2)(expected2)
+    if (!result2) printFailedTestResultDs("SaveMode merge")(actual2)(expected2)
     assert(result2)
   }
 
@@ -327,7 +327,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
     val result = df1.equal(actual)
-    if (!result) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
+    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
     assert(result)
 
     // 2nd load: merge data by primary key
@@ -338,7 +338,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     val expected2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
       .toDF("type", "lastname", "firstname", "rating")
     val result2 = expected2.equal(actual2)
-    if (!result2) printFailedTestResult("SaveMode merge", Seq())(actual2)(expected2)
+    if (!result2) printFailedTestResultDs("SaveMode merge")(actual2)(expected2)
     assert(result2)
   }
 
@@ -357,7 +357,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
     val result = df1.equal(actual)
-    if (!result) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
+    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
     assert(result)
 
     // 2nd load: merge data by primary key with different schema
@@ -371,7 +371,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     val expected2 = Seq(("ext", "doe", "john", Some(5), Some(10)), ("ext", "smith", "peter", Some(3), None), ("int", "emma", "brown", None, Some(7)))
       .toDF("tpe", "lastname", "firstname", "rating", "rating2")
     val result2 = expected2.equal(actual2)
-    if (!result2) printFailedTestResult("SaveMode merge", Seq())(actual2)(expected2)
+    if (!result2) printFailedTestResultDs("SaveMode merge")(actual2)(expected2)
     assert(result2)
   }
 
@@ -390,7 +390,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     targetDO.writeSparkDataFrame(df1)
     val actual = targetDO.getSparkDataFrame()
     val resultat = df1.equal(actual)
-    if (!resultat) printFailedTestResult("Df2HiveTable", Seq())(actual)(df1)
+    if (!resultat) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
     assert(resultat)
 
     // 2nd load: merge data by primary key with different schema

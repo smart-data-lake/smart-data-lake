@@ -30,8 +30,8 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.slf4j.{Logger, LoggerFactory}
 
 class CopyWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
-  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
-  with io.smartdatalake.util.spark.dataset.Equality {
+    with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+    with io.smartdatalake.util.spark.dataset.Equality {
 
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
   protected implicit val session: SparkSession = TestUtil.session
@@ -49,8 +49,6 @@ class CopyWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
 
   test("copy 1st 2nd load, SaveModeMergeOptions, schema evolution") {
 
-    // setup DataObjects
-    val feed = "copy"
     val srcDO = MockSparkDataObject("src1").register
     val tgtDO = MockSparkDataObject("tgt1", primaryKey = Some(Seq("lastname", "firstname"))).register
 
@@ -67,7 +65,7 @@ class CopyWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
         .toDF("lastname", "firstname", "rating")
       val actual = tgtDO.getSparkDataFrame()(contextExec)
       val resultat = expected.equal(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultDs("deduplicate 1st 2nd load")(actual)(expected)
       assert(resultat)
     }
 
@@ -78,11 +76,12 @@ class CopyWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
     action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(contextExec)
 
     {
-      val expected = Seq(("doe", "john", Some(5), Some(10)), ("pan", "peter", Some(5), Some(5)), ("pan", "peter2", None, Some(5)), ("hans", "muster", Some(5), None))
+      val expected = Seq(("doe", "john",   Some(5), Some(10)), ("pan", "peter", Some(5), Some(5)), ("pan", "peter2", None, Some(5)),
+        ("hans",                 "muster", Some(5), None))
         .toDF("lastname", "firstname", "rating", "rating2")
       val actual = tgtDO.getSparkDataFrame()(contextExec)
       val resultat = expected.equal(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultDs("deduplicate 1st 2nd load")(actual)(expected)
       assert(resultat)
     }
   }

@@ -90,7 +90,7 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
         .toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
       val resultat = actual.equal(expected)
       if (!resultat)
-        printFailedTestResult(testName = "historize 1st load",
+        printFailedTestResultDs(testName = "historize 1st load",
           arguments = List(srcDO.getSparkDataFrame()(context1)))(actual)(expected)
       assert(resultat)
     }
@@ -115,7 +115,7 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
       val actual = tgtDO.getSparkDataFrame()(context1).drop(Historization.historizeHashColName)
       val resultat = actual.equal(expected)
       if (!resultat)
-        printFailedTestResult(testName = "historize 2nd load", arguments = List(srcDO.getSparkDataFrame()(context1)))(actual)(expected)
+        printFailedTestResultDs(testName = "historize 2nd load", arguments = List(srcDO.getSparkDataFrame()(context1)))(actual)(expected)
       assert(resultat)
     }
 
@@ -140,7 +140,7 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
       val actual = tgtDO.getSparkDataFrame()(context3).drop(Historization.historizeHashColName)
       val resultat = actual.equal(expected)
       if (!resultat)
-        printFailedTestResult("historize 3rd load mergeModeEnable with schema evolution", List(srcDO.getSparkDataFrame()(context1)))(
+        printFailedTestResultDs("historize 3rd load mergeModeEnable with schema evolution", List(srcDO.getSparkDataFrame()(context1)))(
           actual
         )(expected)
       assert(resultat)

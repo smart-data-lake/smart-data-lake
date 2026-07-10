@@ -72,7 +72,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
 
     // Comparing actual with expected
     val resultat: Boolean = actual.isEqual(expected)
-    if (!resultat) printFailedTestResult("normal pk violations", Seq(src.getSparkDataFrame()))(actual.inner)(expected.inner)
+    if (!resultat) printFailedTestResultDs("normal pk violations", Seq(src.getSparkDataFrame()))(actual.inner)(expected.inner)
     assert(resultat)
   }
 
@@ -99,7 +99,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
     val expected = SparkDataFrame(rows_expected.toDF())
 
     val resultat: Boolean = actual.isEqual(expected)
-    if (!resultat) printFailedTestResult("pk violations with null values",
+    if (!resultat) printFailedTestResultDs("pk violations with null values",
       Seq(src.getSparkDataFrame()))(actual.inner)(expected.inner)
     assert(resultat)
   }
@@ -156,7 +156,7 @@ class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sma
     )
 
     val resultat: Boolean = actual.isEqual(expected)
-    if (!resultat) printFailedTestResult("pk violations for multiple sources",
+    if (!resultat) printFailedTestResultDs("pk violations for multiple sources",
       Seq(customDO.getSparkDataFrame(), hiveTablePKidDO.getSparkDataFrame(), hiveTableNoPKDO.getSparkDataFrame(), hiveTablePKidValueDO.getSparkDataFrame()))(actual.inner)(expected.inner)
     assert(resultat)
   }
