@@ -61,7 +61,7 @@ case class SparkClassicConnection(
     master: Option[String],
     deployMode: Option[String] = None,
     sparkOptions: Map[String, StringOrSecret] = Map(),
-    enableHive: Boolean = true,
+    enableHive: Boolean = false,
     sparkUDFs: Option[Map[String, SparkUDFCreatorConfig]] = None,
     pythonUDFs: Option[Map[String, PythonUDFCreatorConfig]] = None,
     kryoClasses: Option[Seq[String]] = None,
@@ -181,7 +181,7 @@ object SparkClassicConnection extends FromConfigFactory[Connection] with SmartDa
       deployModeOpt: Option[String] = None,
       kryoClassNamesOpt: Option[Seq[String]] = None,
       sparkOptionsOpt: Map[String, StringOrSecret] = Map(),
-      enableHive: Boolean = true
+      enableHive: Boolean = false
   ): SparkSession = {
     if (masterOpt.isDefined) logger.info(
       s"Get or create spark session with parameters: name=$name master=$masterOpt deployMode=$deployModeOpt enableHive=$enableHive kryoClassNamesOpt=$kryoClassNamesOpt sparkOptionsOpt=$sparkOptionsOpt"

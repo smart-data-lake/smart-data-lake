@@ -18,9 +18,7 @@
  */
 package io.smartdatalake.util.crypt
 
-import org.apache.hadoop.hive.ql.exec.UDF
-
-class EncryptColumn extends UDF with EncryptDecryptSupport {
+class EncryptColumn extends EncryptDecryptSupport {
   def evaluate(message: String, key: String, algorithm: String): String = {
     val keyBytes: Array[Byte] = key.getBytes
     val crypt: EncryptDecrypt = algorithm.toUpperCase() match {
@@ -34,7 +32,7 @@ class EncryptColumn extends UDF with EncryptDecryptSupport {
 
 }
 
-class DecryptColumn extends UDF with EncryptDecryptSupport {
+class DecryptColumn extends EncryptDecryptSupport {
   def evaluate(message: String, key: String, algorithm: String): String = {
     val keyBytes: Array[Byte] = key.getBytes
     val crypt: EncryptDecrypt = algorithm.toUpperCase() match {

@@ -27,7 +27,7 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.script.CanReceiveScriptNotification
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObject, DataObjectMetadata}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
-import org.apache.commons.lang.NotImplementedException
+import org.apache.commons.lang3.NotImplementedException
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
