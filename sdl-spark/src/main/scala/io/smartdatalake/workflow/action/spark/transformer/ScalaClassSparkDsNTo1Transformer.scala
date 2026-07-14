@@ -26,7 +26,7 @@ import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, Produc
 import io.smartdatalake.util.spark.SparkProductUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.Action
-import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsSparkDfsTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, CustomDsNto1Transformer}
 import io.smartdatalake.workflow.action.spark.transformer.ParameterResolution.ParameterResolution
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.tolerantGet

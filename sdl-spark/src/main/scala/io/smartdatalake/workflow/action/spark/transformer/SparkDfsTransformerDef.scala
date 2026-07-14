@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake Builder - Build your data lake the smart way.
+ * Smart Data Lake - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,11 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.action.generic.transformer
+package io.smartdatalake.workflow.action.spark.transformer
 
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, OptionsGenericDfsTransformer}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import org.apache.spark.sql.DataFrame

@@ -24,7 +24,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.SparkRepartitionDef
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, SparkDfTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import org.apache.spark.sql.DataFrame
 
 /**

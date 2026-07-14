@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake Builder - Build your data lake the smart way.
+ * Smart Data Lake - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.util.spark.hive
+package io.smartdatalake.util.spark
 
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionLayout, PartitionValues, SparkHdfsUtil}
@@ -34,7 +34,7 @@ import scala.util.{Failure, Success, Try}
 /**
  * Provides utility functions for Hive.
  */
-private[smartdatalake] object HiveUtil extends SmartDataLakeLogger {
+private[smartdatalake] object SparkSQLUtil extends SmartDataLakeLogger {
 
   /**
    * Deletes a Hive table

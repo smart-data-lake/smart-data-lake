@@ -21,7 +21,6 @@ package io.smartdatalake.util.spark
 import io.smartdatalake.testutils.spark.Collection.dsComplex
 import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.spark.dataset.{StructTypeUtil, getEmptyDataFrame}
-import io.smartdatalake.util.spark.hive.HiveUtil
 import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
@@ -83,7 +82,7 @@ class SDLSparkExtensionTest extends AnyFunSuite with StructTypeUtil {
   def writeTable[T](ds: Dataset[T], name: String): Unit = {
     val path = new Path(new File(s"target/$name").getAbsolutePath)
     val table = Table(Some("default"), name)
-    HiveUtil.dropTable(table, path)
+    SparkSQLUtil.dropTable(table, path)
     ds.write.option("path", path.toString).saveAsTable(table.fullName)
   }
 }

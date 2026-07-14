@@ -24,7 +24,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, FileUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.generic.transformer.{CanRecompileFromSrc, GenericDfTransformer, OptionsSparkDfTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.{CanRecompileFromSrc, GenericDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.hadoop.conf.Configuration

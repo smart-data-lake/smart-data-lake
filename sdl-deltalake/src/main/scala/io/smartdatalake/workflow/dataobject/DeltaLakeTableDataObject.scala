@@ -27,8 +27,7 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactory}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc._
-import io.smartdatalake.util.spark.hive.HiveUtil
-import io.smartdatalake.util.spark.{SparkQueryUtil, SparkSchemaUtil, SparkStageMetricsListener}
+import io.smartdatalake.util.spark.{SparkSQLUtil, SparkQueryUtil, SparkSchemaUtil, SparkStageMetricsListener}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
@@ -248,7 +247,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   private def activateCdc()(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = SparkSubFeed.getSparkSession
-    if(!propertyExists(enableCdcFeedProperty) && isTableExisting) HiveUtil.alterTableProperties(table, Map(enableCdcFeedProperty -> "true"))
+    if(!propertyExists(enableCdcFeedProperty) && isTableExisting) SparkSQLUtil.alterTableProperties(table, Map(enableCdcFeedProperty -> "true"))
   }
 
   private def propertyExists(name: String)(implicit session: SparkSession): Boolean = {
@@ -570,7 +569,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = SparkSubFeed.getSparkSession
-    HiveUtil.dropTableOptionalPath(table, if (path.isDefined) Some(hadoopPath) else None, doPurge = false)
+    SparkSQLUtil.dropTableOptionalPath(table, if (path.isDefined) Some(hadoopPath) else None, doPurge = false)
   }
 
   def getDetails(implicit session: SparkSession): DataFrame = {
