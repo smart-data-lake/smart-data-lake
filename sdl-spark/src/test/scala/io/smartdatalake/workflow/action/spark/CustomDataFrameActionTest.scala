@@ -21,8 +21,8 @@ package io.smartdatalake.workflow.action.spark
 import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.definitions._
-import io.smartdatalake.testutils.TestUtil.createParquetDataObject
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.SparkTestUtil.createParquetDataObject
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.dag.TaskSkippedDontStopWarning
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, ExecutionModeResult, PartitionDiffMode}
@@ -44,12 +44,12 @@ import org.scalatest.funsuite.AnyFunSuite
 import java.nio.file.{Files, Path => NioPath}
 
 class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   private var tempDir: NioPath = _
@@ -57,7 +57,7 @@ class CustomDataFrameActionTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
     tempDir = Files.createTempDirectory("test")
     tempPath = tempDir.toAbsolutePath.toString
   }

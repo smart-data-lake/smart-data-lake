@@ -19,8 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.spark.dataset.Collection
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{Collection, MockSparkDataObject, SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
@@ -32,20 +31,20 @@ import org.slf4j.Logger
 import scala.reflect.runtime.universe.typeOf
 
 class PKViolatorsDataObjectTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
-  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+  with SparkTestTool
   with io.smartdatalake.util.spark.dataset.Equality {
 
   private implicit val loggerImpl: Logger = logger
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
    test("normal pk violations") {

@@ -20,8 +20,8 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.custom.TestCustomDfsTransformer
-import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{DataObjectTestSuite, MockSparkDataObject}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool}
+import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
@@ -33,7 +33,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
 
-class JdbcTableDataObjectTest extends DataObjectTestSuite with TestToolDataset {
+class JdbcTableDataObjectTest extends DataObjectTestSuite with SparkTestTool {
 
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 

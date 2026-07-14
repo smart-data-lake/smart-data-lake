@@ -16,16 +16,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.action.scala
+package io.smartdatalake.workflow.action.plainScala
 
-import io.smartdatalake.testutils.{CopyActionBehaviour, MockScalaDataObject, TestUtil}
+import io.smartdatalake.testutils.plainScala.{MockScalaDataObject, ScalaTestUtil}
+import io.smartdatalake.testutils.CopyActionBehaviour
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.scalatest.funsuite.AnyFunSuite
 
 class OfflineCopyActionTest extends AnyFunSuite with SmartDataLakeLogger with CopyActionBehaviour {
 
-  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultScalaConnection
+  override def defaultEngineConnection: Connection with EngineConnection = ScalaTestUtil.defaultScalaConnection
 
   test("copy dry-run in offline environment, reading exported schemas") {
     testCopyActionOffline(

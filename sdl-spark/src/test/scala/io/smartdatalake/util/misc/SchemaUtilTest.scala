@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.util.misc
 
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.spark.SparkSchemaUtil
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataframe.{GenericArrayDataType, GenericStructDataType}
@@ -34,24 +34,24 @@ class SchemaUtilTest extends AnyFunSuite {
   // copy xsd file from resource to filesystem
   private val xsdResourceFile = "xmlSchema/basket.xsd"
   private val xsdFile = tempDir.resolve(xsdResourceFile).toFile
-  TestUtil.copyResourceToFile(xsdResourceFile, xsdFile)
+  SparkTestUtil.copyResourceToFile(xsdResourceFile, xsdFile)
 
   // copy json file from resource to filesystem
   private val jsonSchemaResourceFile = "jsonSchema/testJsonSchema.json"
   private val jsonSchemaFile = tempDir.resolve(jsonSchemaResourceFile).toFile
-  TestUtil.copyResourceToFile(jsonSchemaResourceFile, jsonSchemaFile)
+  SparkTestUtil.copyResourceToFile(jsonSchemaResourceFile, jsonSchemaFile)
 
   /* TODO: Why are these resources missing?
       
   // copy avsc file from resource to filesystem
   private val avroSchemaResourceFile = "avscSchema/testAvroSchema.avsc"
   private val avroSchemaFile = tempDir.resolve(avroSchemaResourceFile).toFile
-  TestUtil.copyResourceToFile(avroSchemaResourceFile, avroSchemaFile)
+  SparkTestUtil.copyResourceToFile(avroSchemaResourceFile, avroSchemaFile)
 
   // copy ddl file from resource to filesystem
   private val ddlSchemaResourceFile = "ddlSchema/testDDLSchema.ddl"
   private val ddlSchemaFile = tempDir.resolve(ddlSchemaResourceFile).toFile
-  TestUtil.copyResourceToFile(ddlSchemaResourceFile, ddlSchemaFile)
+  SparkTestUtil.copyResourceToFile(ddlSchemaResourceFile, ddlSchemaFile)
    */
 
   test("parse ddl schema") {

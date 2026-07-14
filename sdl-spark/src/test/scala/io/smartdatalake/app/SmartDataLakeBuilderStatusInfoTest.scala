@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Quality
 import io.smartdatalake.util.webservice.SttpWebserviceClient
@@ -42,7 +42,7 @@ import scala.util.{Failure, Success}
  */
 class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with Quality with BeforeAndAfter {
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  private implicit val session: SparkSession = TestUtil.session
+  private implicit val session: SparkSession = SparkTestUtil.session
   private val sdlb = DefaultSmartDataLakeBuilder
 
   import session.implicits._
@@ -54,7 +54,7 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with Quality with B
   // Note that this test produces a StackOverflowError in the Log with JDK11. The test succeeds nevertheless. Details see below.
   test("sdlb run with statusinfoserver: Test connectivity of REST API and Websocket") {
     val feedName = "test"
-    implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)
+    implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)
 
     logger.debug("setup input DataObject")
     val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)

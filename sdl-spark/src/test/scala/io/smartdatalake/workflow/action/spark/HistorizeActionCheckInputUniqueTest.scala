@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.workflow.action.HistorizeAction
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -33,18 +33,18 @@ import org.slf4j.{Logger, LoggerFactory}
 class HistorizeActionCheckInputUniqueTest extends AnyFunSuite with BeforeAndAfter {
   private implicit lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
   val contextPrepare: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Prepare)
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
   test("HistorizeAction with checkInputUnique=true should succeed with unique input keys") {

@@ -20,8 +20,7 @@ package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeGenericOptions}
-import io.smartdatalake.testutils.spark.dataset.Collection
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{Collection, MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.LogUtil.getRootCause
@@ -48,7 +47,7 @@ import java.nio.file.{Files, Path => NioPath}
 class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   val functions: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(SparkSubFeed.subFeedType)
@@ -59,7 +58,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
     tempDir = Files.createTempDirectory("test")
     tempPath = tempDir.toAbsolutePath.toString
   }

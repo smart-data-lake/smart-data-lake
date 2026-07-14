@@ -18,8 +18,8 @@
  */
 package io.smartdatalake.util.spark.dataset
 
-import io.smartdatalake.testutils.spark.dataset.Collection._
-import io.smartdatalake.testutils.{TestToolSpark, TestUtil}
+import io.smartdatalake.testutils.spark.Collection._
+import io.smartdatalake.testutils.spark.{SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.spark.GetSession.loggEnv
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -28,9 +28,9 @@ import org.scalatest.matchers.should.Matchers
 import org.slf4j.{Logger, LoggerFactory}
 
 class StructTypeUtilTest extends AnyFlatSpec with Matchers
-    with TestToolSpark with StructTypeUtil with Transform {
+    with SparkTestTool with StructTypeUtil with Transform {
   private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  private implicit val spark: SparkSession = TestUtil.session
+  private implicit val spark: SparkSession = SparkTestUtil.session
 
   loggEnv
 

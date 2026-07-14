@@ -19,8 +19,7 @@
 package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.spark.dataset.Collection
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{Collection, MockSparkDataObject, SparkTestTool, SparkTestUtil}
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.spark.transformer.StandardizeSparkDatatypesTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
@@ -36,21 +35,21 @@ import org.slf4j.{Logger, LoggerFactory}
 import java.nio.file.{Files, Path => NioPath}
 
 class CopyCustomDfTest extends AnyFunSuite with BeforeAndAfter
-    with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
+    with SparkTestTool {
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+  implicit val contextExec: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
   private var tempDir: NioPath = _
   private var tempPath: String = _
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
     tempDir = Files.createTempDirectory("test")
     tempPath = tempDir.toAbsolutePath.toString
   }

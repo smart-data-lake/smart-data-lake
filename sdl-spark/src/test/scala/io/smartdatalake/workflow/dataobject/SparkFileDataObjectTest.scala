@@ -19,7 +19,8 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
-import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
+import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ProcessingLogicException
@@ -244,7 +245,7 @@ class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogg
     val sourceFileColName = "_sourcefile"
 
     // copy data file to test directory
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
     // setup DataObject
     val dataObject = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'),
       csvOptions = Map("header" -> "true", "delimiter" -> CustomFileActionTest.delimiter), filenameColumn = Some(sourceFileColName),

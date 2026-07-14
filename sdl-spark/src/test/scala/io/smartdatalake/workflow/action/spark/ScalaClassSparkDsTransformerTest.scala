@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsTransformer
@@ -47,7 +47,7 @@ class TestDSTransformer extends CustomDsTransformer[InputDataSet, OutputDataSet]
 
 class ScalaClassSparkDsTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
@@ -55,11 +55,11 @@ class ScalaClassSparkDsTransformerTest extends AnyFunSuite with BeforeAndAfter {
   private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+  implicit val contextExec: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
   after {
     instanceRegistry.clear()

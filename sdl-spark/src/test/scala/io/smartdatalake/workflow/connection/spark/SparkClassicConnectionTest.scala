@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.connection.spark
 
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, GlobalConfig, SmartDataLakeBuilderConfig, TestUDFAddXCreator}
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.secrets.{SecretProvider, SecretProviderConfig, StringOrSecret}
 import io.smartdatalake.workflow.{ActionDAGRun, ActionPipelineContext, ExecutionPhase}
@@ -36,11 +36,11 @@ import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 
 class SparkClassicConnectionTest extends AnyFunSuite with BeforeAndAfter {
-  implicit lazy val session: SparkSession = TestUtil.session
+  implicit lazy val session: SparkSession = SparkTestUtil.session
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
 
-  private val contextInit = TestUtil.getDefaultActionPipelineContext
+  private val contextInit = SparkTestUtil.getDefaultActionPipelineContext
   private val contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
   private implicit val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
@@ -48,7 +48,7 @@ class SparkClassicConnectionTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
   test("sparkOptions secrets are resolved in Spark session configuration") {
@@ -64,7 +64,7 @@ class SparkClassicConnectionTest extends AnyFunSuite with BeforeAndAfter {
       master = Some("local"),
       sparkOptions = Map("spark.authenticate.secret" -> StringOrSecret("###TESTPROVIDER#secret###"))
     )
-    val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(globalConfig = globalConfig)
+    val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(globalConfig = globalConfig)
     val sparkSession = sparkClassicConnection.sparkSession(context)
 
     // check

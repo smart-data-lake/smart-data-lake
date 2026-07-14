@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake Builder - Build your data lake the smart way.
+ * Smart Data Lake - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,9 +16,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.testutils.spark.dataset
+package io.smartdatalake.testutils.spark
 
-import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.spark.dataset.StructTypeUtil
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
@@ -35,7 +34,7 @@ import scala.jdk.CollectionConverters._
  */
 object Collection extends StructTypeUtil {
 
-  private val spark = TestUtil.session
+  private val spark = SparkTestUtil.session
 
   import spark.implicits._
 

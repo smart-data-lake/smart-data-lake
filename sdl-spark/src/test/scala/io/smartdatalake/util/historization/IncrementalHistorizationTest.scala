@@ -20,7 +20,7 @@ package io.smartdatalake.util.historization
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.{SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.historization.HistorizationTestUtils._
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
@@ -37,16 +37,16 @@ import java.time.Duration
  * Unit tests for historization
  */
 class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
-  with io.smartdatalake.testutils.spark.dataset.TestToolDataset {
+  with SparkTestTool {
 
   private implicit val loggerImpl: Logger = logger
-  private implicit val session: SparkSession = TestUtil.session
+  private implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val functions: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(SparkSubFeed.subFeedType)
-  implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   import functions._
 
   test("History changed with new columns but unchanged data") {

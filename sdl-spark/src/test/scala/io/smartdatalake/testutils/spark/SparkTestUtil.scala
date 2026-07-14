@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake Builder - Build your data lake the smart way.
+ * Smart Data Lake - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,11 +16,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.testutils
+package io.smartdatalake.testutils.spark
 
-import com.github.tomakehurst.wiremock.WireMockServer
-import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -41,13 +38,6 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
-import org.apache.sshd.common.file.nativefs.NativeFileSystemFactory
-import org.apache.sshd.server.SshServer
-import org.apache.sshd.server.auth.password.PasswordAuthenticator
-import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
-import org.apache.sshd.server.session.ServerSession
-import org.apache.sshd.server.subsystem.SubsystemFactory
-import org.apache.sshd.sftp.server.SftpSubsystemFactory
 import org.scalacheck.{Arbitrary, Gen}
 
 import java.io.File
@@ -55,12 +45,11 @@ import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.{Instant, LocalDateTime}
 import scala.collection.mutable
-import scala.jdk.CollectionConverters._
 
 /**
  * Utility methods for testing.
  */
-object TestUtil extends SmartDataLakeLogger with Equality {
+object SparkTestUtil extends SmartDataLakeLogger with Equality {
 
   // TODO: merge with io.smartdatalake.util.spark.GetSession, to avoid code duplication.
   //  Note that GetSession is in main sources, so it cannot depend on test sources,
@@ -192,7 +181,7 @@ object TestUtil extends SmartDataLakeLogger with Equality {
   def createParquetDataObject(id: String)(implicit instanceRegistry: InstanceRegistry): ParquetFileDataObject = {
     val tempDir = Files.createTempDirectory("sdlb-test")
     val tempPath = tempDir.toAbsolutePath.toString
-    TestUtil.deleteOnExit(tempPath)
+    SparkTestUtil.deleteOnExit(tempPath)
     val dataObject = ParquetFileDataObject(id, path = tempPath)
     instanceRegistry.register(dataObject)
     dataObject

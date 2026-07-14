@@ -18,8 +18,8 @@
  */
 package io.smartdatalake.util.spark.dataset
 
-import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.testutils.spark.dataset.Collection._
+import io.smartdatalake.testutils.spark.Collection._
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.spark.GetSession.loggEnv
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.lit
@@ -30,7 +30,7 @@ import org.slf4j.{Logger, LoggerFactory}
 class DsPkTest extends AnyFlatSpec with Matchers
   with Quality with Equality {
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  private implicit val spark: SparkSession = TestUtil.session
+  private implicit val spark: SparkSession = SparkTestUtil.session
 
   import spark.implicits._
 

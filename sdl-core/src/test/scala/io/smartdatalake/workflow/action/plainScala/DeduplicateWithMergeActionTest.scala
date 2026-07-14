@@ -16,16 +16,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.action.scala
+package io.smartdatalake.workflow.action.plainScala
 
-import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockScalaDataObject, TestUtil}
+import io.smartdatalake.testutils.plainScala.{MockScalaDataObject, ScalaTestUtil}
+import io.smartdatalake.testutils.DeduplicateActionBehaviour
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.scalatest.funsuite.AnyFunSuite
 
 class DeduplicateWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogger with DeduplicateActionBehaviour {
 
-  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultScalaConnection
+  override def defaultEngineConnection: Connection with EngineConnection = ScalaTestUtil.defaultScalaConnection
 
   test("deduplicate load mergeModeEnable") {
     testDeduplicateWithMergeMode(

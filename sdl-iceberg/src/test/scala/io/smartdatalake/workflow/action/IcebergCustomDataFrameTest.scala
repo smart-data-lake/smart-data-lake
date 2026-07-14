@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.SparkSchemaUtil
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
@@ -46,14 +46,14 @@ class IcebergCustomDataFrameTest extends AnyFunSuite with BeforeAndAfter {
   private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   private val contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
   private val contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
   Environment._globalConfig = GlobalConfig()
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
   test("CustomDataFrameAction with recursiveInput") {

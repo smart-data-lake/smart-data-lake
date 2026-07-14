@@ -21,7 +21,7 @@ package io.smartdatalake.workflow
 import io.smartdatalake.app.{AppUtil, BuildVersionInfo, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.SdlConfigObject._
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.action.{RuntimeEventState, RuntimeInfo, SDLExecutionId}
@@ -35,7 +35,7 @@ import java.time.{Duration, LocalDateTime}
 
 class ActionDAGRunTest extends AnyFunSuite {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
   import session.implicits._
 
   private val sdlbVersionInfo = BuildVersionInfo.sdlbVersionInfo.map(_.entries().toMap)

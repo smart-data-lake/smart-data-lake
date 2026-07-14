@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action.spark
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.historization.HistorizationTestUtils.defaultTimeAxisUnit
 import io.smartdatalake.workflow.ExecutionPhase
@@ -38,11 +38,11 @@ import java.sql.Timestamp
 import java.time.LocalDateTime
 
 class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
-    with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+    with SparkTestTool
     with io.smartdatalake.util.spark.dataset.Equality {
 
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
@@ -53,7 +53,7 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
     tempDir = Files.createTempDirectory("test")
     tempPath = tempDir.toAbsolutePath.toString
   }
@@ -70,7 +70,7 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+    val context1 = SparkTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
     val action1 = HistorizeAction("ha", srcDO.id, tgtDO.id)
     val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())(context1)
@@ -97,7 +97,7 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+    val context2 = SparkTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
     val action2 = HistorizeAction("ha2", srcDO.id, tgtDO.id)
     val l2 = Seq(("doe", "john", 10)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l2, Seq())(context1)
@@ -121,7 +121,7 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
 
     // prepare & start 3rd load with schema evolution
     val refTimestamp3 = LocalDateTime.now()
-    val context3 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
+    val context3 = SparkTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
     val action3 = HistorizeAction("ha3", srcDO.id, tgtDO.id)
     val l3 = Seq(("doe", "john", 10, "test")).toDF("lastname", "firstname", "rating", "test")
     srcDO.writeSparkDataFrame(l3, Seq())(context3)

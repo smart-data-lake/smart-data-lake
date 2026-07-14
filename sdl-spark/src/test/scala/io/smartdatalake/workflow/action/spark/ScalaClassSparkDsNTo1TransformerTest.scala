@@ -22,7 +22,7 @@ import com.typesafe.config.ConfigFactory
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CustomDataFrameAction
@@ -111,7 +111,7 @@ class BadSignatureTransformDsNTo1Transformer extends CustomDsNto1Transformer {
 
 class ScalaClassSparkDsNTo1TransformerTest extends AnyFunSuite with BeforeAndAfter {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
@@ -120,12 +120,12 @@ class ScalaClassSparkDsNTo1TransformerTest extends AnyFunSuite with BeforeAndAft
 
   private val sdlb = DefaultSmartDataLakeBuilder
   implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-  val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   implicit val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
   test("One Ds2To1 Transformation (direct call to exec)") {

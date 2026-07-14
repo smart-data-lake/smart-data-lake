@@ -18,8 +18,8 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
+import io.smartdatalake.testutils.HistorizeActionBehaviour
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.util.spark.dataset.Equality
@@ -33,7 +33,7 @@ import org.scalatest.matchers.should.Matchers
 import java.nio.file.Files
 
 class IcebergHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with SmartDataLakeLogger
-    with TestToolDataset with Equality with HistorizeActionBehaviour {
+    with SparkTestTool with Equality with HistorizeActionBehaviour {
 
   // set additional spark options for iceberg lake
   protected implicit val session: SparkSession = IcebergTestUtils.session
@@ -41,7 +41,7 @@ class IcebergHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
 
-  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
+  override def defaultEngineConnection: Connection with EngineConnection = SparkTestUtil.defaultSparkConnection
 
   loggEnv(session, logger)
 

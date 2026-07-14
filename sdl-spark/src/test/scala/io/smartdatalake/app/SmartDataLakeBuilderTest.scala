@@ -23,7 +23,8 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId, stringTo
 import io.smartdatalake.config.{ConfigParser, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.custom.TestCustomDfsTransformer
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil, WebserviceTestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
+import io.smartdatalake.testutils.WebserviceTestUtil
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.StateUploader
@@ -58,7 +59,7 @@ import java.nio.file.Files
 class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
   with io.smartdatalake.util.spark.dataset.Equality {
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
@@ -76,7 +77,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
 
   before {
     sdlb.instanceRegistry.clear()
-    sdlb.instanceRegistry.register(TestUtil.defaultSparkConnection)
+    sdlb.instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
   test("Test command line argument parsing") {
@@ -109,7 +110,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
     Environment._sdlPlugins = Seq(new TestSDLPlugin)
 
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
     val contextExec = actionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
@@ -168,7 +169,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
 
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     // source table has partitions columns dt and type
@@ -258,7 +259,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
 
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     // source table has partitions columns dt and type
@@ -331,7 +332,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
 
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val srcDO = MockSparkDataObject("src1", partitions = Seq("dt")).register
@@ -424,7 +425,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
 
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val srcDO = MockSparkDataObject("src1", partitions = Seq("dt")).register
@@ -474,7 +475,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
 
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val srcDO = MockSparkDataObject("src1", partitions = Seq("dt")).register
@@ -528,7 +529,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
 
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val src1DO = MockSparkDataObject("src1").register
@@ -585,7 +586,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
 
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     // source table has partitions columns dt and type
@@ -669,7 +670,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     val srcDO1 = TestIncrementalDataObject("src1")
@@ -732,7 +733,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
 
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     // source table has partitions columns dt and type
@@ -791,7 +792,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
         |""".stripMargin).resolve
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = "ids:act")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
@@ -838,7 +839,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
         |""".stripMargin).resolve
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = "ids:act")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")
@@ -863,7 +864,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
     WebserviceTestUtil.setupWebserviceStubs()
 
     val feedName = "test"
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)
+    implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)
 
     // write csv data to target/src1, which is defined in "/configState/WithFinalStateWriter.conf"
     val dummySrcDO = CsvFileDataObject("dummysrc1", "target/src1")(sdlb.instanceRegistry)
@@ -912,7 +913,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
 
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
     // setup DataObjects
     // partition columns: dt, type
@@ -1015,7 +1016,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter
   ignore("sdlb run test aws ui upload") {
 
     val feedName = "test"
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)
+    implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry)
 
     // write csv data to target/src1, which is defined in "/configState/WithFinalStateWriter.conf"
     val dummySrcDO = CsvFileDataObject("dummysrc1", "target/src1")(sdlb.instanceRegistry)

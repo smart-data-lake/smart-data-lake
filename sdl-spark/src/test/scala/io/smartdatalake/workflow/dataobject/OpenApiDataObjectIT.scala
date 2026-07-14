@@ -19,16 +19,16 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.explode
 import org.scalatest.funsuite.AnyFunSuite
 
 class OpenApiDataObjectIT extends AnyFunSuite {
-  protected implicit lazy val session: SparkSession = TestUtil.session
+  protected implicit lazy val session: SparkSession = SparkTestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   implicit val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   test("get data.sbb.ch datasets with struct return type") {

@@ -21,7 +21,7 @@ package io.smartdatalake.workflow
 import io.github.embeddedkafka.EmbeddedKafka
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutil.KafkaTestUtil
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
@@ -43,12 +43,12 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
  * see also https://www.oracle.com/java/technologies/javase/14all-relnotes.html#JDK-8225499
  */
 class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeAndAfter with EmbeddedKafka with SmartDataLakeLogger {
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   val contextPrep: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Prepare)
   implicit val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
@@ -63,7 +63,7 @@ class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeA
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
     instanceRegistry.register(kafkaConnection)
   }
 

@@ -21,7 +21,7 @@ package io.smartdatalake.workflow
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions._
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action._
@@ -46,7 +46,7 @@ import java.time.{Instant, LocalDateTime}
 
 class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
@@ -63,8 +63,8 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
-    contextInit = TestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
+    contextInit = SparkTestUtil.getDefaultActionPipelineContext
     contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
     contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
   }
@@ -103,7 +103,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     assert(r1 == Seq(5))
 
     // check metrics for MockSparkDataObject
-    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
+    val action2MainMetrics = SparkTestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written") == 1)
 
     // check state: two actions succeeded
@@ -154,7 +154,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     assert(r1.head == 5)
 
     // check metrics for MockSparkDataObject
-    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
+    val action2MainMetrics = SparkTestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written") == 1)
   }
 
@@ -195,7 +195,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     assert(r1 == Seq("5"))
 
     // check metrics
-    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
+    val action2MainMetrics = SparkTestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written") == 1)
   }
 
@@ -444,7 +444,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data file
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
 
     // setup src DataObject
     val srcDO = new CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","))
@@ -483,7 +483,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data file
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
 
     // setup src DataObject
     val srcDO = new CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> ","))
@@ -519,12 +519,12 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     assert(srcCount == tgtCount)
 
     // check metrics for CsvFileDataObject
-    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
+    val action2MainMetrics = SparkTestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written") == 40)
     assert(action2MainMetrics("num_tasks") == 1)
 
     // check metrics for FileTransferAction
-    val action3MainMetrics = TestUtil.getMetrics(action3.getRuntimeInfo().get, action3.outputId)
+    val action3MainMetrics = SparkTestUtil.getMetrics(action3.getRuntimeInfo().get, action3.outputId)
     assert(action3MainMetrics("files_written") == 1)
   }
 
@@ -701,7 +701,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     assert(r3.size == 2)
 
     // check metrics
-    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
+    val action2MainMetrics = SparkTestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written") == 1)
     assert(outputSubFeeds.find(_.dataObjectId == action2.outputId).get.metrics.get("records_written") == 1)
   }
@@ -764,7 +764,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     assert(r3.size == 2)
 
     // check metrics
-    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
+    val action2MainMetrics = SparkTestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written") == 2) // without execution mode always the whole table is processed
   }
 
@@ -824,7 +824,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     assert(r3 == (data1src1 ++ data1src2 ++ data2).toSet)
 
     // check metrics
-    val action1MainMetrics = TestUtil.getMetrics(action1.getRuntimeInfo().get, action1.outputIds.head)
+    val action1MainMetrics = SparkTestUtil.getMetrics(action1.getRuntimeInfo().get, action1.outputIds.head)
     assert(action1MainMetrics("records_written") == 1)
   }
 
@@ -886,7 +886,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     assert(r3.size == 2)
 
     // check metrics
-    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
+    val action2MainMetrics = SparkTestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputId)
     assert(action2MainMetrics("records_written") == 2) // without execution mode always the whole table is processed
   }
 
@@ -946,7 +946,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     assert(r2 == Set((5, "honolulu")))
 
     // check metrics
-    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputIds.head)
+    val action2MainMetrics = SparkTestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputIds.head)
     assert(action2MainMetrics("records_written") == 1)
   }
 
@@ -1000,7 +1000,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     assert(tgt2DO.getSparkDataFrame().count() == 1)
 
     // check metrics
-    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputIds.head)
+    val action2MainMetrics = SparkTestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputIds.head)
     assert(action2MainMetrics("records_written") == 1)
   }
 
@@ -1057,7 +1057,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     assert(r2 == Set((5, "honolulu")))
 
     // check metrics
-    val action2MainMetrics = TestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputIds.head)
+    val action2MainMetrics = SparkTestUtil.getMetrics(action2.getRuntimeInfo().get, action2.outputIds.head)
     assert(action2MainMetrics("records_written") == 1)
   }
 
@@ -1240,7 +1240,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("dataFrameReuseStatistics shared between ActionPipelineContext when cloning") {
-    val context1 = TestUtil.getDefaultActionPipelineContext
+    val context1 = SparkTestUtil.getDefaultActionPipelineContext
     context1.dataFrameReuseStatistics.update(("test", Seq()), Seq("action1"))
     val context2 = context1.copy(phase = ExecutionPhase.Init)
     assert(context2.dataFrameReuseStatistics.apply(("test", Seq())).size == 1)

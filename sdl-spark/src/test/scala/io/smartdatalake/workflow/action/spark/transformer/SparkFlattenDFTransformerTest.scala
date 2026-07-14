@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action.spark.transformer
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import org.apache.spark.sql.types.{ArrayType, IntegerType, StringType, StructType}
 import org.apache.spark.sql.{Row, SparkSession}
@@ -30,10 +30,10 @@ import java.util
 
 class SparkFlattenDFTransformerTest extends AnyFunSuite {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
   test("Nested DataFrame returns a flat Dataframe") {
     val flattenDfTransformer = SparkFlattenDfTransformer()

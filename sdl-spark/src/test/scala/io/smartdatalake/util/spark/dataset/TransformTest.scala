@@ -18,9 +18,8 @@
  */
 package io.smartdatalake.util.spark.dataset
 
-import io.smartdatalake.testutils.spark.dataset.Collection._
-import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{TestToolSpark, TestUtil}
+import io.smartdatalake.testutils.spark.Collection._
+import io.smartdatalake.testutils.spark.{SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.spark.GetSession.loggEnv
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types._
@@ -35,9 +34,9 @@ import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
 
 class TransformTest extends AnyFlatSpec with Matchers
-    with TestToolSpark with TestToolDataset with Equality with StructTypeUtil {
+    with SparkTestTool with Equality with StructTypeUtil {
   private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  private implicit val spark: SparkSession = TestUtil.session
+  private implicit val spark: SparkSession = SparkTestUtil.session
 
   import spark.implicits._
 

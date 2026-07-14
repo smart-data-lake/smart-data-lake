@@ -18,8 +18,8 @@
  */
 package io.smartdatalake.util.spark
 
-import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.testutils.spark.dataset.Collection.dsComplex
+import io.smartdatalake.testutils.spark.Collection.dsComplex
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.spark.dataset.{StructTypeUtil, getEmptyDataFrame}
 import io.smartdatalake.util.spark.hive.HiveUtil
 import io.smartdatalake.workflow.dataobject.generic.Table
@@ -31,7 +31,7 @@ import java.io.File
 
 class SDLSparkExtensionTest extends AnyFunSuite with StructTypeUtil {
 
-  private implicit val session: SparkSession = TestUtil.session
+  private implicit val session: SparkSession = SparkTestUtil.session
   private val emptyDf = getEmptyDataFrame(scheme = createStruct(fieldName = "value"))
   import org.apache.spark.sql.classic.ClassicConversions._
 

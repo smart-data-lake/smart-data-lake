@@ -20,8 +20,8 @@ package io.smartdatalake.lab
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.testutils.TestUtil
-import io.smartdatalake.testutils.spark.dataset.Collection.dsComplex
+import io.smartdatalake.testutils.spark.Collection.dsComplex
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.dataobject.ParquetFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -30,10 +30,10 @@ import org.scalatest.funsuite.AnyFunSuite
 
 class SmartDataLakeBuilderLabTest extends AnyFunSuite {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   test("create one DataFrame using Transformer") {

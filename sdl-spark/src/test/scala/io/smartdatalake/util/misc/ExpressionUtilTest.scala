@@ -20,14 +20,14 @@ package io.smartdatalake.util.misc
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.action.executionMode.DefaultExecutionModeExpressionData
 import org.scalatest.funsuite.AnyFunSuite
 
 class ExpressionUtilTest extends AnyFunSuite {
 
   private implicit val registry: InstanceRegistry = new InstanceRegistry
-  private val context = TestUtil.getDefaultActionPipelineContext
+  private val context = SparkTestUtil.getDefaultActionPipelineContext
   private val data: DefaultExecutionModeExpressionData = DefaultExecutionModeExpressionData.from(context)
 
   test("evaluate boolean") {

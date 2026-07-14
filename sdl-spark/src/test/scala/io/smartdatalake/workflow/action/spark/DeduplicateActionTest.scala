@@ -19,8 +19,8 @@
 package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
+import io.smartdatalake.testutils.DeduplicateActionBehaviour
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.action.DeduplicateAction
@@ -29,10 +29,10 @@ import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 
-class DeduplicateActionTest extends AnyFunSuite with BeforeAndAfter with TestToolDataset with Equality with SmartDataLakeLogger
+class DeduplicateActionTest extends AnyFunSuite with BeforeAndAfter with SparkTestTool with Equality with SmartDataLakeLogger
     with DeduplicateActionBehaviour {
 
-  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
+  override def defaultEngineConnection: Connection with EngineConnection = SparkTestUtil.defaultSparkConnection
 
   test("deduplicate 1st 2nd load") {
     testDeduplicateTwoRuns(

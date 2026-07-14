@@ -19,7 +19,8 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.{SshTestUtil, TestUtil, WebserviceTestUtil}
+import io.smartdatalake.testutils.spark.SparkTestUtil
+import io.smartdatalake.testutils.{SshTestUtil, WebserviceTestUtil}
 import io.smartdatalake.util.filetransfer.StreamFileTransfer
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.secrets.StringOrSecret
@@ -37,9 +38,9 @@ import java.nio.file.{Files, Path}
 
 class SFtpFileRefDataObjectTest extends AnyFunSuite with Matchers with BeforeAndAfterEach with BeforeAndAfterAll {
 
-  implicit val session: SparkSession = TestUtil.session
+  implicit val session: SparkSession = SparkTestUtil.session
   implicit val registry: InstanceRegistry = new InstanceRegistry
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
   private var sshd: SshServer = _
   val sshPort = 8001
@@ -97,7 +98,7 @@ class SFtpFileRefDataObjectTest extends AnyFunSuite with Matchers with BeforeAnd
     val resourceFile = "AB_NYC_2019.csv"
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
 
     // setup DataObject
     val sftpDO = SFtpFileRefDataObject("src1", tempDir.resolve(ftpDir).toString.replace('\\', '/'), connectionId = "con1")
@@ -115,7 +116,7 @@ class SFtpFileRefDataObjectTest extends AnyFunSuite with Matchers with BeforeAnd
     val resourceFile = "AB_NYC_2019.csv"
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
 
     // setup DataObject
     val sftpDO = SFtpFileRefDataObject("src1"
@@ -152,7 +153,7 @@ class SFtpFileRefDataObjectTest extends AnyFunSuite with Matchers with BeforeAnd
     val resourceFile = "AB_NYC_2019.csv"
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(partitionDir).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(partitionDir).resolve(resourceFile).toFile)
 
     // setup DataObject
     val sftpDO = SFtpFileRefDataObject("src1"
@@ -188,7 +189,7 @@ class SFtpFileRefDataObjectTest extends AnyFunSuite with Matchers with BeforeAnd
     val resourceFile = "AB_NYC_2019.csv"
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
 
     // setup DataObject
     val sftpDO = SFtpFileRefDataObject("src1", tempDir.resolve(ftpDir).toString.replace('\\', '/'), connectionId = "con1")
@@ -204,7 +205,7 @@ class SFtpFileRefDataObjectTest extends AnyFunSuite with Matchers with BeforeAnd
     assert(fileRefs1.map(_.fileName) == Seq(resourceFile + ".temp"))
 
     // copy data file again to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
 
     // rename 2 -> handle already existing
     sftpDO.renameFileHandleAlreadyExisting(
@@ -224,8 +225,8 @@ class SFtpFileRefDataObjectTest extends AnyFunSuite with Matchers with BeforeAnd
     val resourceFile = "AB_NYC_2019.csv"
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir1).resolve(resourceFile + "1").toFile)
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir2).resolve(resourceFile + "2").toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir1).resolve(resourceFile + "1").toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir2).resolve(resourceFile + "2").toFile)
 
     // setup DataObject
     val srcDO1 = SFtpFileRefDataObject("src1", tempDir.resolve(srcDir1).toString.replace('\\', '/'), connectionId = "con1")
@@ -261,8 +262,8 @@ class SFtpFileRefDataObjectTest extends AnyFunSuite with Matchers with BeforeAnd
     val resourceFile = "AB_NYC_2019.csv"
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir1).resolve("2022").resolve(resourceFile + "1").toFile)
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir2).resolve("2022").resolve(resourceFile + "2").toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir1).resolve("2022").resolve(resourceFile + "1").toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir2).resolve("2022").resolve(resourceFile + "2").toFile)
 
     // setup DataObject
     val srcDO1 = SFtpFileRefDataObject("src1", tempDir.resolve(srcDir1).toString.replace('\\', '/'), connectionId = "con1", partitions = Seq("year"), partitionLayout = Some("%year%/"))
@@ -297,10 +298,10 @@ class SFtpFileRefDataObjectTest extends AnyFunSuite with Matchers with BeforeAnd
     val resourceFile = "AB_NYC_2019.csv"
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir1).resolve("20220101").resolve(resourceFile + "2").toFile)
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(tgtDir).resolve("20220101").resolve(resourceFile + "1").toFile)
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(tgtDir).resolve("20220101").resolve("AB_BN_2019.csv").toFile)
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(tgtDir).resolve("20220201").resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir1).resolve("20220101").resolve(resourceFile + "2").toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(tgtDir).resolve("20220101").resolve(resourceFile + "1").toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(tgtDir).resolve("20220101").resolve("AB_BN_2019.csv").toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(tgtDir).resolve("20220201").resolve(resourceFile).toFile)
 
     // setup DataObject
     val srcDO1 = SFtpFileRefDataObject("src1", tempDir.resolve(srcDir1).toString.replace('\\', '/'), connectionId = "con1", partitions = Seq("date", "town", "year"), partitionLayout = Some("%date%/AB_%town%_%year:[0-9]+%"))

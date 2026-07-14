@@ -20,7 +20,7 @@ package io.smartdatalake.util.spark
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.misc.ExpressionUtil
 import io.smartdatalake.workflow.action.executionMode.DefaultExecutionModeExpressionData
 import org.apache.spark.sql.SparkSession
@@ -29,10 +29,10 @@ import org.scalatest.funsuite.AnyFunSuite
 
 class SparkExpressionUtilTest extends AnyFunSuite {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   private implicit val registry: InstanceRegistry = new InstanceRegistry
-  private val context = TestUtil.getDefaultActionPipelineContext
+  private val context = SparkTestUtil.getDefaultActionPipelineContext
   private val data: DefaultExecutionModeExpressionData = DefaultExecutionModeExpressionData.from(context)
 
   case class MyData(a: Double, b: Double, c: Double, d: Double, x: Double)

@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.util.crypt
 
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import org.apache.spark.sql.SparkSession
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -27,7 +27,7 @@ import org.scalatest.funsuite.AnyFunSuite
  *
  */
 class DatabricksCryptTest extends AnyFunSuite {
-  implicit lazy val session: SparkSession = TestUtil.session
+  implicit lazy val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 

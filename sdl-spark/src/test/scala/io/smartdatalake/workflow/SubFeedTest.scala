@@ -19,8 +19,8 @@
 package io.smartdatalake.workflow
 
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
-import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.dataobject.file.FileRef
 import org.apache.spark.sql.SparkSession
@@ -28,9 +28,9 @@ import org.scalatest.funsuite.AnyFunSuite
 
 class SubFeedTest extends AnyFunSuite {
 
-  implicit val session: SparkSession = TestUtil.session
+  implicit val session: SparkSession = SparkTestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val context1: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry)
+  implicit val context1: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry)
 
   test("FileSubFeed to SparkSubFeed") {
     val fileSubFeed = FileSubFeed(None, "test1", Seq(PartitionValues(Map("dt"->"20190101"))))

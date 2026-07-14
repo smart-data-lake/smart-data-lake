@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action.file
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CustomFileAction
 import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode
@@ -39,10 +39,10 @@ import scala.util.Using
 
 class CustomFileActionTest extends AnyFunSuite with BeforeAndAfter {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   private var tempDir: NioPath = _
@@ -50,7 +50,7 @@ class CustomFileActionTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
     tempDir = Files.createTempDirectory("test")
     tempPath = tempDir.toAbsolutePath.toString
   }
@@ -68,7 +68,7 @@ class CustomFileActionTest extends AnyFunSuite with BeforeAndAfter {
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
 
     // setup DataObjects
     val srcDO = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true", "delimiter" -> CustomFileActionTest.delimiter))
@@ -110,7 +110,7 @@ class CustomFileActionTest extends AnyFunSuite with BeforeAndAfter {
 
     // copy data file to ftp
     val srcPartitionValues = Seq(PartitionValues(Map("p" -> "test")))
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve("p=test/" + resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve("p=test/" + resourceFile).toFile)
 
     // setup DataObjects
     val srcDO = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), partitions = Seq("p"), csvOptions = Map("header" -> "true", "delimiter" -> CustomFileActionTest.delimiter))

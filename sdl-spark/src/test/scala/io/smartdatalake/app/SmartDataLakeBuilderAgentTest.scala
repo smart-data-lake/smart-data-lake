@@ -23,7 +23,7 @@ import io.smartdatalake.communication.agent.{AgentClient, JettyAgentServer, Stor
 import io.smartdatalake.config.ConfigParser.{getActionConfigMap, getConnectionConfigMap, getDataObjectConfigMap, parseConfigObjectWithId}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId, DataObjectId}
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ExecutionPhase
 import io.smartdatalake.workflow.action.{Action, ProxyAction}
@@ -41,7 +41,7 @@ import scala.util.{Failure, Success}
 
 class SmartDataLakeBuilderAgentTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
@@ -50,7 +50,7 @@ class SmartDataLakeBuilderAgentTest extends AnyFunSuite with BeforeAndAfter with
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
   test("Test Config Parsing") {
@@ -88,7 +88,7 @@ class SmartDataLakeBuilderAgentTest extends AnyFunSuite with BeforeAndAfter with
     // setup input DataObject and data
     val srcDO = CsvFileDataObject("src1", tempDir.resolve("agent_src/remote_file").toString)(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(SparkTestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     // setup remote SDLB agent
     val remoteSDLB = new SmartDataLakeBuilder {}
@@ -116,7 +116,7 @@ class SmartDataLakeBuilderAgentTest extends AnyFunSuite with BeforeAndAfter with
     // setup input DataObject and data
     val srcDO = CsvFileDataObject("src1", tempDir.resolve("agent_src/remote_file").toString)(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
-    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+    srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(SparkTestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
     // setup remote SDLB agent, needs to run in separate thread
     val remoteSDLB = new SmartDataLakeBuilder {}

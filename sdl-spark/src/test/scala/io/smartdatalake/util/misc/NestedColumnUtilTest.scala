@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.util.misc
 
-import io.smartdatalake.testutils.TestUtil.session
+import io.smartdatalake.testutils.spark.SparkTestUtil.session
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSimpleDataType, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataType}
 import org.apache.spark.sql.types._

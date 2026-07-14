@@ -21,7 +21,7 @@ package io.smartdatalake.app
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.LogUtils.debugLog
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
@@ -52,7 +52,7 @@ import _root_.scala.util.{Failure, Success, Try}
 
 class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with SmartDataLakeLogger with BeforeAndAfter {
   @transient implicit private lazy val loggImpl: Logger = logger
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
@@ -115,7 +115,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     val feedName = "test"
 
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
-    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+    implicit val contextExec: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     // source table has partitions columns dt and type
@@ -207,7 +207,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     HdfsUtil.deleteFiles(path = new Path(checkpointPath), doWarn = false)
-    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+    implicit val contextExec: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     // source has partitions columns dt and type
@@ -365,7 +365,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     HdfsUtil.deleteFiles(path = new Path(checkpointPath), doWarn = false)
-    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+    implicit val contextExec: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     // source has partition columns dt and type
@@ -448,7 +448,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     HdfsUtil.deleteFiles(path = new Path(checkpointPath), doWarn = false)
-    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+    implicit val contextExec: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     // source has partition columns dt and type
@@ -542,7 +542,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     HdfsUtil.deleteFiles(path = new Path(checkpointPath), doWarn = false)
-    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+    implicit val contextExec: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     // source has partition columns dt and type
@@ -618,7 +618,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     HdfsUtil.deleteFiles(path = new Path(checkpointPath), doWarn = false)
-    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+    implicit val contextExec: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     // source has partition columns dt and type
@@ -710,7 +710,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     HdfsUtil.deleteFiles(path = new Path(tempPath), doWarn = false)
     HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
     HdfsUtil.deleteFiles(new Path(checkpointPath), doWarn = false)
-    implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+    implicit val contextExec: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
     // setup DataObjects
     // source has partition columns dt and type

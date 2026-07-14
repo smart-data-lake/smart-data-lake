@@ -19,7 +19,7 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.communication.agent._
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
 import org.apache.commons.io.FileUtils
@@ -36,7 +36,7 @@ import scala.concurrent.Future
  */
 object SmartDataLakeBuilderAzureRelayAgentIT extends App {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
@@ -48,7 +48,7 @@ object SmartDataLakeBuilderAzureRelayAgentIT extends App {
   // setup input DataObject
   val srcDO = CsvFileDataObject("src1", "target/relay_agent_dummy_connection/remote-file")(sdlb.instanceRegistry)
   val dfSrc1 = Seq("testData").toDF("testColumn")
-  srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(TestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
+  srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())(SparkTestUtil.getDefaultActionPipelineContext(sdlb.instanceRegistry))
 
   val azureRelayUrl = "Endpoint=sb://relay-tbb-test2.servicebus.windows.net/;SharedAccessKeyName=tbb-test-policy;" +
     "EntityPath=tbb-test-connection;SharedAccessKey="

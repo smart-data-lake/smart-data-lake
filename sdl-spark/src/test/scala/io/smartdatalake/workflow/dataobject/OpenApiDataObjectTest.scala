@@ -20,7 +20,8 @@ package io.smartdatalake.workflow.dataobject
 
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.{TestUtil, WebserviceTestUtil}
+import io.smartdatalake.testutils.WebserviceTestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.misc.ResourceUtil
 import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -32,9 +33,9 @@ import org.slf4j.{Logger, LoggerFactory}
 
 class OpenApiDataObjectTest extends AnyFunSuite {
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  protected implicit lazy val session: SparkSession = TestUtil.session
+  protected implicit lazy val session: SparkSession = SparkTestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   implicit val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   val port = 8080 // for some reason, only the default port seems to work

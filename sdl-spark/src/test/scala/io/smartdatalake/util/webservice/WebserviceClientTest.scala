@@ -20,7 +20,8 @@ package io.smartdatalake.util.webservice
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.{TestUtil, WebserviceTestUtil}
+import io.smartdatalake.testutils.WebserviceTestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.authMode.{AuthHeaderMode, BasicAuthMode, CustomHttpAuthModeLogic}
@@ -41,7 +42,7 @@ class WebserviceClientTest extends AnyFunSuite with BeforeAndAfter with BeforeAn
 
   // provide an empty instance registry
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
   override protected def beforeAll(): Unit =
     wireMockServer = WebserviceTestUtil.startWebservice(host, port, httpsPort)

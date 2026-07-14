@@ -20,8 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions._
-import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkHdfsUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
@@ -40,7 +39,7 @@ import org.slf4j.Logger
 import java.nio.file.Files
 
 class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
-  with TestToolDataset with Equality {
+  with SparkTestTool with Equality {
   private implicit val implLogger: Logger = logger
 
   protected implicit val session: SparkSession = IcebergTestUtils.session
@@ -51,12 +50,12 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
   private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = context.copy(phase = ExecutionPhase.Exec)
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
   test("Write data") {

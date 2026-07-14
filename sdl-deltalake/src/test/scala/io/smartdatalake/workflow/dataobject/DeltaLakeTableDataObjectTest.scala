@@ -21,8 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{ColumnStatsType, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
-import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkHdfsUtil}
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
@@ -43,7 +42,7 @@ import java.nio.file
 import java.nio.file.Files
 
 class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAfterAll
-  with TestToolDataset with Equality {
+  with SparkTestTool with Equality {
   private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
   // set additional spark options for delta lake
@@ -54,7 +53,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
   val tempPath: String = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = context.copy(phase = ExecutionPhase.Exec)
   val contextInit: ActionPipelineContext = context.copy(phase = ExecutionPhase.Init)
 
@@ -66,7 +65,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
   test("CustomDf2DeltaTable") {
@@ -619,7 +618,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with 
   test("copy load expectations test") {
     val sdlb = DefaultSmartDataLakeBuilder
     implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
 
     // setup DataObjects
     val src1Table = Table(db = Some(deltaDb), name = "test_expectations_src1")

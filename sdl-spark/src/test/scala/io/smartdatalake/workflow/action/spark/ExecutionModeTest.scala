@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action.spark
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.definitions._
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ExpressionUtil
 import io.smartdatalake.util.spark.SparkExpressionUtil
@@ -44,7 +44,7 @@ import java.nio.file.Files
 
 class ExecutionModeTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAfterAll {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
@@ -53,7 +53,7 @@ class ExecutionModeTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAf
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
   // setup some data objects
   val srcDO = MockSparkDataObject("src1", partitions = Seq("lastname")).register

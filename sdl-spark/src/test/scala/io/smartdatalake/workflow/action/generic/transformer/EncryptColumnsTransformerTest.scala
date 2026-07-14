@@ -22,7 +22,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.SdlConfigObject.stringToDataObjectId
 import io.smartdatalake.config.{ConfigParser, ConfigurationException, InstanceRegistry}
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.crypt.{EncryptDecrypt, EncryptDecryptECB}
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.spark.dataset.Quality
@@ -51,7 +51,7 @@ case class Test_Record(
 
 class EncryptColumnsTransformerTest extends AnyFunSuite with Quality {
   private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  implicit val session: SparkSession = TestUtil.session
+  implicit val session: SparkSession = SparkTestUtil.session
   import session.implicits._
 
   val statePath = "target/stateTest/"
@@ -113,9 +113,9 @@ class EncryptColumnsTransformerTest extends AnyFunSuite with Quality {
 
     val globalConfig = GlobalConfig.from(config)
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
 
-    implicit val actionPipelineContext: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val actionPipelineContext: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = s"ids:actenc,ids:actdec")
 
     val srcDO = instanceRegistry.get[CsvFileDataObject]("src")

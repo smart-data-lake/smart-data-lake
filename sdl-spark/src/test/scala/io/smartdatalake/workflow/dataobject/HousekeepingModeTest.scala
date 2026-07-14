@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.CopyAction
@@ -36,11 +36,11 @@ import org.slf4j.{Logger, LoggerFactory}
 import java.nio.file.Files
 
 class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter
-    with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+    with SparkTestTool
     with io.smartdatalake.util.spark.dataset.Equality {
 
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
@@ -48,7 +48,7 @@ class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter
   private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
   private val df1 = Seq(
     ("doe",      "john",   5, "20201101"),
@@ -58,7 +58,7 @@ class HousekeepingModeTest extends AnyFunSuite with BeforeAndAfter
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
     FileUtils.deleteDirectory(tempDir.toFile)
   }
 

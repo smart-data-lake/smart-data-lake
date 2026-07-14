@@ -21,7 +21,8 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
-import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
+import io.smartdatalake.testutils.spark.{SparkTestTool, SparkTestUtil}
+import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.{SparkSchemaUtil, WoodstoxXMLOutputFactory}
@@ -37,7 +38,7 @@ import java.nio.file.Files
 import scala.io.Source
 
 class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjectSchemaBehavior
-    with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+    with SparkTestTool
     with io.smartdatalake.util.spark.dataset.Equality {
 
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
@@ -91,7 +92,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     // prepare data
     val xmlResourceFile = "xmlSchema/basket.xml"
     val xmlFile = tempDir.resolve(xmlResourceFile.split("/").last).toFile
-    TestUtil.copyResourceToFile(xmlResourceFile, xmlFile)
+    SparkTestUtil.copyResourceToFile(xmlResourceFile, xmlFile)
 
     val dataObj = XmlFileDataObject(id = "test1", path = tempDir.toFile.getPath,
       schema = Some(SparkSchema(schema)),
@@ -116,7 +117,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     // prepare data
     val xmlResourceFile = "xmlSchema/complex.xml"
     val xmlFile = tempDir.resolve(xmlResourceFile.split("/").last).toFile
-    TestUtil.copyResourceToFile(xmlResourceFile, xmlFile)
+    SparkTestUtil.copyResourceToFile(xmlResourceFile, xmlFile)
 
     val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath),
       schema = Some(SparkSchema(schema)),
@@ -159,7 +160,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     // prepare data and config
     val xmlResourceFile = "xmlSchema/lists.xml"
     val xmlFile = tempDir.resolve(xmlResourceFile.split("/").last).toFile
-    TestUtil.copyResourceToFile(xmlResourceFile, xmlFile)
+    SparkTestUtil.copyResourceToFile(xmlResourceFile, xmlFile)
     val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath),
       schema = Some(SparkSchema(schema)),
       xmlOptions = Some(Map("rowTag" -> "node"))

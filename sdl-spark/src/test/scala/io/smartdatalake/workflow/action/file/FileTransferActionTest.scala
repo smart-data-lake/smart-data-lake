@@ -22,7 +22,8 @@ import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, get, stubFor, urlEqualTo}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.SDLSaveMode
-import io.smartdatalake.testutils.{SshTestUtil, TestUtil, WebserviceTestUtil}
+import io.smartdatalake.testutils.spark.SparkTestUtil
+import io.smartdatalake.testutils.{SshTestUtil, WebserviceTestUtil}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.FileTransferAction
@@ -40,10 +41,10 @@ import java.nio.file.Files
 
 class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAfterAll {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextExec: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+  implicit val contextExec: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
   private var sshd: SshServer = _
   val sshPort = 8001
@@ -87,7 +88,7 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
 
     // setup DataObjects
     val srcDO = SFtpFileRefDataObject("src1", tempDir.resolve(ftpDir).toString.replace('\\', '/'), "con1")
@@ -115,7 +116,7 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(resourceFile).toFile)
 
     // setup DataObjects
     val srcDO = SFtpFileRefDataObject("src1", tempDir.resolve(ftpDir).toString.replace('\\', '/'), "con1")
@@ -144,7 +145,7 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
 
     // setup DataObjects
     val srcDO = SFtpFileRefDataObject(
@@ -180,7 +181,7 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
 
     // setup DataObjects
     val srcDO = SFtpFileRefDataObject(
@@ -217,7 +218,7 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
 
     // setup DataObjects
     val srcDO = SFtpFileRefDataObject(
@@ -253,7 +254,7 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
 
     // setup DataObjects
     val srcDO = SFtpFileRefDataObject(
@@ -290,7 +291,7 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(ftpDir).resolve(datePartitionVal).resolve(resourceFile).toFile)
 
     // setup DataObjects
     val srcDO = SFtpFileRefDataObject(
@@ -336,7 +337,7 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
 
     // setup DataObjects
     val srcDO = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
@@ -364,7 +365,7 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data 1 file to hadoop
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile + "1").toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile + "1").toFile)
 
     // setup DataObjects
     val srcDO = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
@@ -388,7 +389,7 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     assert(srcDO.getFileRefs(Seq()).isEmpty)
 
     // copy data 2 file to hadoop
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile + "2").toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile + "2").toFile)
 
     // start load 2
     action1.init(Seq(srcSubFeed))
@@ -411,7 +412,7 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     val tempDir = Files.createTempDirectory(feed)
 
     // copy data 1 file to hadoop
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile + "1").toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile + "1").toFile)
 
     // setup DataObjects
     val srcDO = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'), csvOptions = Map("header" -> "true"))
@@ -435,7 +436,7 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
     assert(srcDO.getFileRefs(Seq()).isEmpty)
 
     // copy data 2 file to hadoop
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile + "2").toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile + "2").toFile)
 
     // start load 2
     action1.init(Seq(srcSubFeed))

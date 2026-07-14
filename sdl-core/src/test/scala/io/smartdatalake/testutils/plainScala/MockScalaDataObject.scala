@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake Builder - Build your data lake the smart way.
+ * Smart Data Lake - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.testutils
+package io.smartdatalake.testutils.plainScala
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -259,15 +259,15 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
 
   private def getPartitionValueFilter(pv: PartitionValues) = pv.getFilterExpr.asInstanceOf[ScalaAbstractColumn]
 
-  override def factory: FromConfigFactory[DataObject] = MockSparkDataObject
+  override def factory: FromConfigFactory[DataObject] = MockScalaDataObject
 
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {}
 
 }
 
 object MockScalaDataObject extends FromConfigFactory[DataObject] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): MockSparkDataObject = {
-    extract[MockSparkDataObject](config)
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): MockScalaDataObject = {
+    extract[MockScalaDataObject](config)
   }
 }
 

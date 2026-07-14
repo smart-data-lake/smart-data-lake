@@ -18,7 +18,8 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
+import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import org.apache.commons.io.FileUtils
 import org.scalatest.BeforeAndAfterEach
@@ -75,7 +76,7 @@ class RawFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterEach 
     val resourceFile = "AB_NYC_2019.csv"
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(resourceFile).toFile)
 
     // setup DataObject
     val rawDO = RawFileDataObject( "src1"
@@ -110,7 +111,7 @@ class RawFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterEach 
     val resourceFile = "AB_NYC_2019.csv"
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(partitionDir).resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(partitionDir).resolve(resourceFile).toFile)
 
     // setup DataObject
     val rawDO = RawFileDataObject( "src1"

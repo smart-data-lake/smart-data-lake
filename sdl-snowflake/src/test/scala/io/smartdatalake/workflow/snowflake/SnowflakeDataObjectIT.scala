@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.snowflake
 import com.snowflake.snowpark
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.SparkSchemaUtil
@@ -43,7 +43,7 @@ import org.scalatest.matchers.should.Matchers.intercept
  */
 object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
 
-  implicit val sparkSession: SparkSession = TestUtil.session
+  implicit val sparkSession: SparkSession = SparkTestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
   io.smartdatalake.util.spark.GetSession.loggEnv(sparkSession, logger)

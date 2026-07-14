@@ -1,5 +1,5 @@
 /*
- * Smart Data Lake Builder - Build your data lake the smart way.
+ * Smart Data Lake - Build your data lake the smart way.
  *
  * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
@@ -16,12 +16,58 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.testutils
+package io.smartdatalake.testutils.spark
 
+import io.smartdatalake.testutils.GenericTestTool
+import io.smartdatalake.util.spark.dataset.Equality
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
 import org.apache.spark.sql.Dataset
 import org.slf4j.Logger
 
-trait TestToolSpark extends GenericTestTool {
+import scala.util.{Failure, Success, Try}
+
+trait SparkTestTool extends GenericTestTool with Equality {
+
+  def printFailedTestResultDs[T](testName: String, arguments: Seq[Dataset[T]] = Nil)(actual: Dataset[T])(expected: Dataset[T])(implicit
+      logger: Logger
+  ): Unit = {
+    def printDf(df: Dataset[T]): Unit = {
+      logger.error(df.schema.simpleString)
+      df.printSchema()
+      df.orderBy(df.columns.head, df.columns.tail.toIndexedSeq: _*).show(false)
+    }
+
+    logger.error(s"!!!! Test $testName Failed !!!")
+    logger.error(s"   ${arguments.length} Arguments: ")
+    arguments.foreach(printDf)
+    logger.error("   Actual ")
+    printDf(actual)
+    logger.error("   Expected ")
+    printDf(expected)
+    logger.error(s"  Do schemata equal? ${actual.schema.fields.toSet == expected.schema.fields.toSet}")
+    logger.error(
+      s"  Do cardinalities equal? ${actual.count() == expected.count()} (actual.count=${actual.count()}, expected.count()=${expected.count()}"
+    )
+    logger.error("   symmetric Difference ")
+    Try(actual.getSymmetricDifference(expected).withColumnRenamed("_this", "_actual")) match {
+      case Success(df) => df.show(false)
+      case Failure(e)  => logger.error(s"Could not calculate symmetric difference: ${e.getMessage}")
+    }
+  }
+
+  def printFailedTestResult(
+      testName: String,
+      arguments: Seq[GenericDataFrame] = Seq()
+  )(actual: GenericDataFrame)(expected: GenericDataFrame)(implicit
+      logger: Logger
+  ): Unit =
+    (actual, expected) match {
+      case (actual: SparkDataFrame, expected: SparkDataFrame) if arguments.forall(_.isInstanceOf[SparkDataFrame]) =>
+        printFailedTestResultDs(testName, arguments.map(_.asInstanceOf[SparkDataFrame].inner))(actual.inner)(expected.inner)
+      case _ => printFailedTestResultGdf(testName, arguments)(actual)(expected)
+    }
+
 
   /**
    * testArgumentExpectedMapWithComment overrides GenericTestTool.testArgumentExpectedMapWithComment
@@ -41,9 +87,9 @@ trait TestToolSpark extends GenericTestTool {
    *   booleans which indicate whether tests were successful
    */
   override def testArgumentExpectedMapWithComment[K, V](
-      experiendum: K => V,
-      argExpMapComm: Map[(String, K), V]
-  )(implicit logger: Logger): Map[(String, K), Boolean] = {
+                                                         experiendum: K => V,
+                                                         argExpMapComm: Map[(String, K), V]
+                                                       )(implicit logger: Logger): Map[(String, K), Boolean] = {
 
     def logFailureObject(argName: String, x: Any): Unit = {
       val printPrefix = s"   ${argName.padTo(8, " ").mkString("")} = "
@@ -53,7 +99,7 @@ trait TestToolSpark extends GenericTestTool {
           df.show(false)
         case x: Array[_] => logger.error(s"$printPrefix${x.mkString(", ")}")
         case x: Seq[_]   => logger.error(s"$printPrefix${x.mkString(", ")}")
-        // case x: scala.collection.GenSeq[_] => logger.error(s"$printPrefix${x.mkString(", ")}")
+          // case x: scala.collection.GenSeq[_] => logger.error(s"$printPrefix${x.mkString(", ")}")
         case _ => logger.error(s"$printPrefix${x.toString}")
       }
     }

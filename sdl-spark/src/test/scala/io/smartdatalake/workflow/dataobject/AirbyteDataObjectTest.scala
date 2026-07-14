@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.testutils.spark.SparkTestTool
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.util.spark.json.JsonUtils
 import io.smartdatalake.workflow.action.script.CmdScript
@@ -32,7 +33,7 @@ import java.time.LocalDateTime
 import scala.collection.mutable
 
 class AirbyteDataObjectTest extends DataObjectTestSuite
-    with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+    with SparkTestTool
     with io.smartdatalake.util.spark.dataset.Equality {
 
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)

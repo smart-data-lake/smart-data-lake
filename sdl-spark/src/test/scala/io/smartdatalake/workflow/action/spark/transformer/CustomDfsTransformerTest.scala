@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action.spark.transformer
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.action.CustomDataFrameAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
@@ -33,11 +33,11 @@ import org.slf4j.{Logger, LoggerFactory}
 import scala.reflect.runtime.universe.typeOf
 
 class CustomDfsTransformerTest extends AnyFunSuite
-  with io.smartdatalake.testutils.spark.dataset.TestToolDataset
+  with SparkTestTool
   with io.smartdatalake.util.spark.dataset.Equality {
 
   @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
@@ -61,17 +61,17 @@ class CustomDfsTransformerTest extends AnyFunSuite
          |}
          |dataObjects {
          |  src {
-         |    type = io.smartdatalake.testutils.MockSparkDataObject
+         |    type = io.smartdatalake.testutils.spark.MockSparkDataObject
          |  }
          |  tgt {
-         |    type = io.smartdatalake.testutils.MockSparkDataObject
+         |    type = io.smartdatalake.testutils.spark.MockSparkDataObject
          |  }
          |}
          |""".stripMargin).resolve
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
-    implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    implicit val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
     val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
     val src = instanceRegistry.get[MockSparkDataObject](DataObjectId("src"))
     val tgt = instanceRegistry.get[MockSparkDataObject](DataObjectId("tgt"))
@@ -107,17 +107,17 @@ class CustomDfsTransformerTest extends AnyFunSuite
          |}
          |dataObjects {
          |  src {
-         |    type = io.smartdatalake.testutils.MockSparkDataObject
+         |    type = io.smartdatalake.testutils.spark.MockSparkDataObject
          |  }
          |  tgt {
-         |    type = io.smartdatalake.testutils.MockSparkDataObject
+         |    type = io.smartdatalake.testutils.spark.MockSparkDataObject
          |  }
          |}
          |""".stripMargin).resolve
 
     implicit val instanceRegistry: InstanceRegistry = ConfigParser.parse(config)
-    implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    implicit val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
     val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
     val src = instanceRegistry.get[MockSparkDataObject](DataObjectId("src"))
     val tgt = instanceRegistry.get[MockSparkDataObject](DataObjectId("tgt"))

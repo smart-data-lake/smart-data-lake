@@ -19,7 +19,8 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
-import io.smartdatalake.testutils.{DataObjectTestSuite, TestToolSpark}
+import io.smartdatalake.testutils.spark.SparkTestTool
+import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import org.apache.spark.SparkException
@@ -28,7 +29,7 @@ import org.apache.spark.sql.types.{StringType, StructType}
 
 import java.nio.file.Files
 
-class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite with TestToolSpark {
+class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite with SparkTestTool {
 
   import session.implicits._
 

@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action.generic.transformer
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
@@ -33,19 +33,19 @@ import org.scalatest.funsuite.AnyFunSuite
 
 class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter {
 
-  protected implicit val session: SparkSession = TestUtil.session
+  protected implicit val session: SparkSession = SparkTestUtil.session
 
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
-  val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   val contextPrep: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Prepare)
   implicit val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
   test("deduplication test with primary key") {

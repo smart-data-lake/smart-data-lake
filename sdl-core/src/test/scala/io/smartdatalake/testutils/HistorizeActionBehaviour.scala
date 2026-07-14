@@ -21,13 +21,13 @@ package io.smartdatalake.testutils
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.dataset.Quality
 import io.smartdatalake.workflow.action.executionMode.DataFrameIncrementalMode
 import io.smartdatalake.workflow.action.{CopyAction, HistorizeAction, NoDataToProcessWarning}
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.{ActionDAGRun, ActionPipelineContext, DataFrameSubFeed, ExecutionPhase}
 import org.scalatest.funsuite.AnyFunSuite
@@ -41,12 +41,12 @@ import java.time.LocalDateTime
  * This trait defines tests for the behaviour of HistorizeAction. They can be used with various
  * output DataObject types to ensure consistent behaviour for e.g. Jdbc, DeltaLake, ...
  */
-trait HistorizeActionBehaviour extends GenericTestTool with Quality {
+trait HistorizeActionBehaviour extends GenericTestTool {
   this: AnyFunSuite with Matchers with SmartDataLakeLogger =>
 
   implicit private val implicitLogger: Logger = logger
 
-  import TestUtil.registerDataObject
+  import io.smartdatalake.testutils.plainScala.ScalaTestUtil.registerDataObject
 
   def defaultEngineConnection: Connection with EngineConnection
 
@@ -63,7 +63,7 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
       tgtConnection.foreach(instanceRegistry.register)
       instanceRegistry.register(defaultEngineConnection)
 
-      implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+      implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
         .copy(phase = ExecutionPhase.Exec)
 
       // setup DataObjects
@@ -76,11 +76,11 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
       val refTimestamp1 = LocalDateTime.now()
       val action1 = HistorizeAction("ha", srcDO.id, tgtDO.id)
       val context1 =
-        TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec,
+        ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec,
           currentAction = Some(action1))
       val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
       srcDO.writeDataFrame(l1, Seq())
-      val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+      val srcSubFeed = ScalaSubFeed(None, "src1", Seq())
       action1.prepare(context1.copy(phase = ExecutionPhase.Prepare))
       action1.preInit(Seq(srcSubFeed), Seq())(context1.copy(phase = ExecutionPhase.Init))
       action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
@@ -100,11 +100,11 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
       val refTimestamp2 = LocalDateTime.now()
       val action2 = HistorizeAction("ha2", srcDO.id, tgtDO.id)
       val context2 =
-        TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec,
+        ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec,
           currentAction = Some(action2))
       val l2 = Seq(("doe", "john", 10)).toDF("lastname", "firstname", "rating")
       srcDO.writeDataFrame(l2, Seq())
-      val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
+      val srcSubFeed2 = ScalaSubFeed(None, "src1", Seq())
       action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
       action2.preInit(Seq(srcSubFeed2), Seq())(context2.copy(phase = ExecutionPhase.Init))
       action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
@@ -126,11 +126,11 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
       val refTimestamp3 = LocalDateTime.now()
       val action3 = HistorizeAction("ha3", srcDO.id, tgtDO.id)
       val context3 =
-        TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec,
+        ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec,
           currentAction = Some(action3))
       val l3 = Seq(("doe", "john", 10, "test")).toDF("lastname", "firstname", "rating", "test")
       srcDO.writeDataFrame(l3, Seq())
-      val srcSubFeed3 = SparkSubFeed(None, "src1", Seq())
+      val srcSubFeed3 = ScalaSubFeed(None, "src1", Seq())
       action3.prepare(context3.copy(phase = ExecutionPhase.Prepare))
       action3.preInit(Seq(srcSubFeed3), Seq())(context3.copy(phase = ExecutionPhase.Init))
       action3.init(Seq(srcSubFeed3))(context3.copy(phase = ExecutionPhase.Init))
@@ -157,7 +157,7 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
       tgtConnection.foreach(instanceRegistry.register)
       instanceRegistry.register(defaultEngineConnection)
 
-      implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+      implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
         .copy(phase = ExecutionPhase.Exec)
 
       // setup DataObjects
@@ -171,11 +171,11 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
       val action1 =
         HistorizeAction("ha", srcDO.id, tgtDO.id, mergeModeCDCColumn = Some("operation"), mergeModeCDCDeletedValue = Some("deleted"))
       val context1 =
-        TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec,
+        ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec,
           currentAction = Some(action1))
       val l1 = Seq(("doe", "john", 5, "new"), ("pan", "peter", 5, "new")).toDF("lastname", "firstname", "rating", "operation")
       srcDO.writeDataFrame(l1, Seq())
-      val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+      val srcSubFeed = ScalaSubFeed(None, "src1", Seq())
       action1.prepare(context1.copy(phase = ExecutionPhase.Prepare))
       action1.preInit(Seq(srcSubFeed), Seq())(context1.copy(phase = ExecutionPhase.Init))
       action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
@@ -198,11 +198,11 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
       val action2 =
         HistorizeAction("ha2", srcDO.id, tgtDO.id, mergeModeCDCColumn = Some("operation"), mergeModeCDCDeletedValue = Some("deleted"))
       val context2 =
-        TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec,
+        ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec,
           currentAction = Some(action2))
       val l2 = Seq(("doe", "john", 10, "updated"), ("pan", "peter", 5, "deleted")).toDF("lastname", "firstname", "rating", "operation")
       srcDO.writeDataFrame(l2, Seq())
-      val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
+      val srcSubFeed2 = ScalaSubFeed(None, "src1", Seq())
       action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
       action2.preInit(Seq(srcSubFeed2), Seq())(context2.copy(phase = ExecutionPhase.Init))
       action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
@@ -226,11 +226,11 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
       val action3 =
         HistorizeAction("ha3", srcDO.id, tgtDO.id, mergeModeCDCColumn = Some("operation"), mergeModeCDCDeletedValue = Some("deleted"))
       val context3 =
-        TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec,
+        ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec,
           currentAction = Some(action3))
       val l3 = Seq(("doe", "john", 10, "test", "updated")).toDF("lastname", "firstname", "rating", "test", "operation")
       srcDO.writeDataFrame(l3, Seq())(context3)
-      val srcSubFeed3 = SparkSubFeed(None, "src1", Seq())
+      val srcSubFeed3 = ScalaSubFeed(None, "src1", Seq())
       action3.prepare(context3.copy(phase = ExecutionPhase.Prepare))
       action3.preInit(Seq(srcSubFeed), Seq())(context3.copy(phase = ExecutionPhase.Init))
       action3.init(Seq(srcSubFeed3))(context3.copy(phase = ExecutionPhase.Init))
@@ -256,7 +256,7 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
       tgtConnection.foreach(instanceRegistry.register)
       instanceRegistry.register(defaultEngineConnection)
 
-      implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+      implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
         .copy(phase = ExecutionPhase.Exec)
 
       // setup DataObjects
@@ -267,7 +267,7 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
 
       // prepare & start 1st load
       val refTimestamp1 = LocalDateTime.now()
-      val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+      val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
       val action1 = HistorizeAction("ha",
         inputId = srcDO.id,
         outputId = tgtDO.id,
@@ -277,7 +277,7 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
 
       val l1 = Seq((1, "doe", "john", 5, "new")).toDF("id", "lastname", "firstname", "rating", "operation")
       srcDO.writeDataFrame(l1)(context1)
-      val srcSubFeed = SparkSubFeed(None, "src1", Seq())
+      val srcSubFeed = ScalaSubFeed(None, "src1", Seq())
       action1.prepare(context1.copy(phase = ExecutionPhase.Prepare))
       action1.preInit(Seq(srcSubFeed), Seq())(context1.copy(phase = ExecutionPhase.Init))
       action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
@@ -288,13 +288,13 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
 
       // prepare & start 2nd load
       val refTimestamp2 = LocalDateTime.now()
-      val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+      val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
       val action2 = HistorizeAction("ha",
         inputId = srcDO.id,
         outputId = tgtDO.id
       )
 
-      val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
+      val srcSubFeed2 = ScalaSubFeed(None, "src1", Seq())
       action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
       action2.preInit(Seq(srcSubFeed), Seq())(context2.copy(phase = ExecutionPhase.Init))
       action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))
@@ -326,7 +326,7 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
       tgtConnection.foreach(instanceRegistry.register)
       instanceRegistry.register(defaultEngineConnection)
 
-      implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+      implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
         .copy(phase = ExecutionPhase.Exec)
 
       // setup DataObjects
@@ -393,7 +393,7 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
       tgtConnection.foreach(instanceRegistry.register)
       instanceRegistry.register(defaultEngineConnection)
 
-      implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+      implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
         .copy(phase = ExecutionPhase.Exec)
 
       // setup DataObjects
@@ -405,7 +405,7 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
 
       // prepare & start 1st load without merge mode
       val refTimestamp1 = LocalDateTime.now()
-      val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+      val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
 
       // create a legacy historized dataframe without dl_hash column, and write to target
       val l1 = Seq((1, "doe", "john", 5, Timestamp.valueOf(refTimestamp1), Environment.historizationUpperHorizonTimestamp))
@@ -418,12 +418,12 @@ trait HistorizeActionBehaviour extends GenericTestTool with Quality {
       // prepare & start load with merge mode and migrate existing data to merge mode
       val refTimestamp2 = LocalDateTime.now()
       val action2 = HistorizeAction("ha2", inputId = srcDO.id, outputId = tgtDO.id)
-      val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec,
+      val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec,
         currentAction = Some(action2))
 
       val l2 = Seq((1, "doe", "john", 4)).toDF("id", "lastname", "firstname", "rating")
       srcDO.writeDataFrame(l2)(context2)
-      val srcSubFeed2 = SparkSubFeed(None, "src1", Seq())
+      val srcSubFeed2 = ScalaSubFeed(None, "src1", Seq())
       action2.prepare(context2.copy(phase = ExecutionPhase.Prepare))
       action2.preInit(Seq(srcSubFeed2), Seq())(context2.copy(phase = ExecutionPhase.Init))
       action2.init(Seq(srcSubFeed2))(context2.copy(phase = ExecutionPhase.Init))

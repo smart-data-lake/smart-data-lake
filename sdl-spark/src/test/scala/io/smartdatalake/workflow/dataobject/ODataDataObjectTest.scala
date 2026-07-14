@@ -22,7 +22,8 @@ import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.{WireMock => w}
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil, WebserviceTestUtil}
+import io.smartdatalake.testutils.spark.SparkTestUtil
+import io.smartdatalake.testutils.{DataObjectTestSuite, WebserviceTestUtil}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.webservice.{HttpRequestError, HttpTimeoutConfig}
 import io.smartdatalake.workflow.ExecutionPhase
@@ -41,7 +42,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   test("getODataURL basic") {
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(ProcessAllMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry)
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry)
       .copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val sut = ODataDataObject(
@@ -62,7 +63,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   test("getODataURL with state") {
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -84,7 +85,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   test("getODataURL with state and source filter") {
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -107,7 +108,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
   test("getODataURL with maxrecordcount") {
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(ProcessAllMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val sut = ODataDataObject(
       id = DataObjectId("test-dataobject")
@@ -130,7 +131,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
     m.doReturn(Some(ProcessAllMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
     m.doReturn(None).when(action_mock).engineConnectionId
     m.doCallRealMethod().when(action_mock).getEngineConnection
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry)
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry)
       .copy(phase = ExecutionPhase.Init, currentAction = Some(action_mock))
 
     val sut = ODataDataObject(
@@ -173,7 +174,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(ProcessAllMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     sut.validateConfiguration(actionPipelineContext)
   }
@@ -192,7 +193,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(ProcessAllMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     sut.validateConfiguration(actionPipelineContext)
   }
@@ -211,7 +212,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     sut.validateConfiguration(actionPipelineContext)
   }
@@ -230,7 +231,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     assertThrows[ConfigurationException] {
       sut.validateConfiguration(actionPipelineContext)
@@ -251,7 +252,7 @@ class ODataDataObjectUnitTest extends DataObjectTestSuite {
 
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     assertThrows[ConfigurationException] {
       sut.validateConfiguration(actionPipelineContext)
@@ -297,7 +298,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     m.doReturn(Some(ProcessAllMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
     m.doReturn(None).when(action_mock).engineConnectionId
     m.doCallRealMethod().when(action_mock).getEngineConnection
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
     val resultData = resultDf.collect()
@@ -347,7 +348,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     m.doReturn(Some(ProcessAllMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
     m.doReturn(None).when(action_mock).engineConnectionId
     m.doCallRealMethod().when(action_mock).getEngineConnection
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
     val resultData = resultDf.collect()
@@ -393,7 +394,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
     m.doReturn(None).when(action_mock).engineConnectionId
     m.doCallRealMethod().when(action_mock).getEngineConnection
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
     val resultData = resultDf.collect()
@@ -460,7 +461,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
     m.doReturn(None).when(action_mock).engineConnectionId
     m.doCallRealMethod().when(action_mock).getEngineConnection
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
     val resultData = resultDf.collect()
@@ -542,7 +543,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
     m.doReturn(None).when(action_mock).engineConnectionId
     m.doCallRealMethod().when(action_mock).getEngineConnection
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
     val resultData = resultDf.collect()
@@ -625,7 +626,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     m.doReturn(Some(ProcessAllMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
     m.doReturn(None).when(action_mock).engineConnectionId
     m.doCallRealMethod().when(action_mock).getEngineConnection
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
 
     val resultDf = sut.getSparkDataFrame(Seq.empty)(actionPipelineContext)
@@ -664,7 +665,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(ProcessAllMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     intercept[Exception](sut.getSparkDataFrame(Seq.empty)(actionPipelineContext))
   }
@@ -685,7 +686,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
 
     val action_mock = m.mock(classOf[CopyAction])
     m.doReturn(Some(DataObjectStateIncrementalMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Init, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Init, currentAction = Some(action_mock))
 
     assertThrows[ConfigurationException] {
       sut.prepare(actionPipelineContext)
@@ -714,7 +715,7 @@ class ODataDataObjectComponentTest extends DataObjectTestSuite {
     m.doReturn(Some(ProcessAllMode()),Seq.empty.toIndexedSeq: _*).when(action_mock).executionMode
     m.doReturn(None).when(action_mock).engineConnectionId
     m.doCallRealMethod().when(action_mock).getEngineConnection
-    val actionPipelineContext = TestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
+    val actionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(instanceRegistry).copy(phase = ExecutionPhase.Exec, currentAction = Some(action_mock))
 
     val error = intercept[HttpRequestError](sut.getSparkDataFrame(Seq.empty)(actionPipelineContext))
     assert(error.err == "FoobarErrorMessage")

@@ -19,7 +19,8 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.testutils.{DataObjectTestSuite, TestUtil}
+import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.SparkRepartitionDef
@@ -260,7 +261,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite
     val resourceFile = "AB_NYC_2019.csv"
 
     // copy data file to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(resourceFile).toFile)
 
     // setup DataObject
     val csvDO = CsvFileDataObject("src1", path = tempDir.toFile.getPath)
@@ -276,7 +277,7 @@ class CsvFileDataObjectTest extends DataObjectTestSuite
     assert(fileRefs1.map(_.fileName) == Seq(resourceFile+".temp"))
 
     // copy data file again to ftp
-    TestUtil.copyResourceToFile(resourceFile, tempDir.resolve(resourceFile).toFile)
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(resourceFile).toFile)
 
     // rename 2 -> handle already existing
     csvDO.renameFileHandleAlreadyExisting(

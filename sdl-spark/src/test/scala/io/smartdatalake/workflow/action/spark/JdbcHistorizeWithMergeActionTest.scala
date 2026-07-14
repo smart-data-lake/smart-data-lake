@@ -18,8 +18,8 @@
  */
 package io.smartdatalake.workflow.action.spark
 
-import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{HistorizeActionBehaviour, MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
+import io.smartdatalake.testutils.HistorizeActionBehaviour
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
@@ -30,18 +30,18 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
 class JdbcHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with SmartDataLakeLogger
-  with TestToolDataset with Equality with HistorizeActionBehaviour {
+  with SparkTestTool with Equality with HistorizeActionBehaviour {
 
   private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:HistorizeWithMergeActionTest", "org.hsqldb.jdbcDriver")
 
-  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
+  override def defaultEngineConnection: Connection with EngineConnection = SparkTestUtil.defaultSparkConnection
 
   testsFor(historizeWithMergeMode(
     (id, registry) => MockSparkDataObject(id)(registry),
     (id, pks, registry) => {
       val tgtTable = Table(Some("public"), id.replaceAll("-", "_"), None, pks)
       val dataObject = JdbcTableDataObject(id, table = tgtTable, connectionId = jdbcConnection.id, allowSchemaEvolution = true)(registry)
-      dataObject.dropTable(TestUtil.getDefaultActionPipelineContext(registry))
+      dataObject.dropTable(SparkTestUtil.getDefaultActionPipelineContext(registry))
       dataObject
     },
     tgtConnection = Some(jdbcConnection)

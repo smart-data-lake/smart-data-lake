@@ -18,14 +18,14 @@
  */
 package io.smartdatalake.util.misc
 
-import io.smartdatalake.testutils.TestToolSpark
+import io.smartdatalake.testutils.spark.SparkTestTool
 import io.smartdatalake.util.misc.StringUtil._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.slf4j.{Logger, LoggerFactory}
 
 class StringUtilTest extends AnyFlatSpec with Matchers
-  with TestToolSpark {
+  with SparkTestTool {
   private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
 
   "strCamelCase2LowerCaseWithUnderscores" should "transform camelCase to lower_case_with_underscore" in {

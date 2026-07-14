@@ -21,6 +21,7 @@ package io.smartdatalake.testutils
 import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql._
 import org.scalatest.BeforeAndAfter
@@ -31,7 +32,7 @@ import java.nio.file.{Files, Path}
 
 trait DataObjectTestSuite extends AnyFunSuite with Matchers with BeforeAndAfter {
 
-  protected implicit lazy val session: SparkSession = TestUtil.session
+  protected implicit lazy val session: SparkSession = SparkTestUtil.session
 
   protected val escapedFilePath: String => String = (path: String) => path.replaceAll("\\\\", "\\\\\\\\")
   protected val convertFilePath: String => String = (path: String) => path.replaceAll("\\\\", "/")
@@ -41,17 +42,17 @@ trait DataObjectTestSuite extends AnyFunSuite with Matchers with BeforeAndAfter 
 
   // initialize empty instance registry
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  instanceRegistry.register(TestUtil.defaultSparkConnection)
+  instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
 
   // prepare contexts to reuse
-  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   protected def createTempDir: Path = Files.createTempDirectory("test")
 
   before {
     instanceRegistry.clear()
-    instanceRegistry.register(TestUtil.defaultSparkConnection)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
     additionalBefore()
   }
 
