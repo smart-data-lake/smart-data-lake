@@ -32,7 +32,7 @@ import io.smartdatalake.util.misc.StringUtil.strToLowerCamelCase
 import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, ScaladocUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomTransformMethodDef, CustomTransformMethodWrapper}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
-import org.apache.commons.lang.NotImplementedException
+import org.apache.commons.lang3.NotImplementedException
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import scopt.OptionParser

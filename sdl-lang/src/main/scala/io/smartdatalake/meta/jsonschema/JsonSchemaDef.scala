@@ -20,7 +20,7 @@ package io.smartdatalake.meta.jsonschema
 
 import io.smartdatalake.meta.jsonschema.JsonTypeEnum.JsonTypeEnum
 import io.smartdatalake.util.misc.ProductUtil
-import org.apache.commons.lang.NotImplementedException
+import org.apache.commons.lang3.NotImplementedException
 import org.json4s._
 import org.json4s.jackson.Serialization
 
