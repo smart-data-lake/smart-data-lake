@@ -19,25 +19,30 @@
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.DataValidationTransformerBehaviour
-import io.smartdatalake.testutils.spark.SparkTestUtil
+import io.smartdatalake.testutils.DebugTransformerBehaviour
+import io.smartdatalake.testutils.plainScala.{MockScalaDataObject, ScalaTestUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
+import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-class DataValidationTransformerTest extends AnyFunSuite with DataValidationTransformerBehaviour {
+// this test combines two inputs via SQLDfsTransformer, which uses DataFrameFunctions.sql, not implemented for ScalaSubFeed
+class DebugTransformerTest extends AnyFunSuite with BeforeAndAfter with DebugTransformerBehaviour {
 
-  protected implicit val session: SparkSession = SparkTestUtil.session
-
-  override def subFeedType: Type = typeOf[SparkSubFeed]
+  override def subFeedType: Type = typeOf[ScalaSubFeed]
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
 
-  test("RowLevelDataValidation") {
-    testRowLevelDataValidation()
+  before {
+    instanceRegistry.clear()
   }
 
+  ignore("copy load with transformer, a regular and a skipped input, skipped input is reset after decision to execute Action was made") {
+    testCopyLoadWithTransformerRegularAndSkippedInput(
+      id => MockScalaDataObject(id),
+      id => MockScalaDataObject(id, partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname")))
+    )
+  }
 }

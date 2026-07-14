@@ -19,33 +19,25 @@
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.SQLDfTransformerBehaviour
-import io.smartdatalake.testutils.spark.SparkTestUtil
+import io.smartdatalake.testutils.StandardizeColNamesTransformerBehaviour
+import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import org.scalatest.funsuite.AnyFunSuite
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-class SQLDfTransformerTest extends AnyFunSuite with SQLDfTransformerBehaviour {
+class StandardizeColNamesTransformerTest extends AnyFunSuite with StandardizeColNamesTransformerBehaviour {
 
-  protected implicit val session: SparkSession = SparkTestUtil.session
-
-  override def subFeedType: Type = typeOf[SparkSubFeed]
+  override def subFeedType: Type = typeOf[ScalaSubFeed]
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
-  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
 
-  test("options and view name token are replaced") {
-    testOptionsAndViewNameTokenAreReplaced()
+  test("dots in column names are removed") {
+    testDotsInColumnNamesAreRemoved()
   }
 
-  test("view name token without input name is replaced") {
-    testViewNameTokenWithoutInputNameIsReplaced()
+  test("blanks in column names are replaces") {
+    testBlanksInColumnNamesAreReplaced()
   }
-
-  test("legacy view name without postfix is still supported") {
-    testLegacyViewNameWithoutPostfixIsStillSupported()
-  }
-
 }

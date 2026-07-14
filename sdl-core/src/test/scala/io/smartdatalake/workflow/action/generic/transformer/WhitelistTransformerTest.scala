@@ -19,33 +19,33 @@
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.SQLDfTransformerBehaviour
-import io.smartdatalake.testutils.spark.SparkTestUtil
+import io.smartdatalake.testutils.WhitelistTransformerBehaviour
+import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import org.scalatest.funsuite.AnyFunSuite
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-class SQLDfTransformerTest extends AnyFunSuite with SQLDfTransformerBehaviour {
+class WhitelistTransformerTest extends AnyFunSuite with WhitelistTransformerBehaviour {
 
-  protected implicit val session: SparkSession = SparkTestUtil.session
-
-  override def subFeedType: Type = typeOf[SparkSubFeed]
+  override def subFeedType: Type = typeOf[ScalaSubFeed]
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
-  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
 
-  test("options and view name token are replaced") {
-    testOptionsAndViewNameTokenAreReplaced()
+  test("only columns where the names match are whitelisted") {
+    testOnlyMatchingColumnsWhitelisted()
   }
 
-  test("view name token without input name is replaced") {
-    testViewNameTokenWithoutInputNameIsReplaced()
+  test("column whitelisting is case insensitive per default") {
+    testCaseInsensitiveByDefault()
   }
 
-  test("legacy view name without postfix is still supported") {
-    testLegacyViewNameWithoutPostfixIsStillSupported()
+  test("column whitelisting is case sensitive if Environment.caseSensitive=true") {
+    testCaseSensitiveIfEnvironmentCaseSensitive()
   }
 
+  test("column whitelisting throws no error if whitelisted column has dots") {
+    testNoErrorIfWhitelistedColumnHasDots()
+  }
 }

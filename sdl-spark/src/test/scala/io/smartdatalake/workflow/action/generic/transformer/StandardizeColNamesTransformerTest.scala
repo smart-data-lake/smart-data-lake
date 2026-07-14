@@ -19,37 +19,29 @@
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.testutils.StandardizeColNamesTransformerBehaviour
 import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.sql.SparkSession
 import org.scalatest.funsuite.AnyFunSuite
 
-class StandardizeColNamesTransformerTest extends AnyFunSuite {
+import scala.reflect.runtime.universe.{Type, typeOf}
+
+class StandardizeColNamesTransformerTest extends AnyFunSuite with StandardizeColNamesTransformerBehaviour {
 
   protected implicit val session: SparkSession = SparkTestUtil.session
-  import session.implicits._
 
+  override def subFeedType: Type = typeOf[SparkSubFeed]
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
   test("dots in column names are removed") {
-    val colNamesTransformer = StandardizeColNamesTransformer()
-    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("one.dot", "two.do.ts"))
-
-    val transformed = colNamesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    assert(transformed.schema.columns == Seq("onedot", "twodots"))
+    testDotsInColumnNamesAreRemoved()
   }
 
   test("blanks in column names are replaces") {
-    val colNamesTransformer = StandardizeColNamesTransformer(removeNonStandardSQLNameChars=false, replaceNonStandardSQLNameCharsWithUnderscores = true)
-    val df = SparkDataFrame(Seq((1, 1, 1), (2, 2,2)).toDF("one dot", "two-do-ts", "value of property!in$$"))
-
-    val transformed = colNamesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    assert(transformed.schema.columns == Seq("one_dot", "two_do_ts", "value_of_property_in_"))
+    testBlanksInColumnNamesAreReplaced()
   }
 
 }

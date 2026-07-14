@@ -20,22 +20,18 @@ package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.BlacklistTransformerBehaviour
-import io.smartdatalake.testutils.spark.SparkTestUtil
+import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.internal.SQLConf
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import org.scalatest.funsuite.AnyFunSuite
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 class BlacklistTransformerTest extends AnyFunSuite with BlacklistTransformerBehaviour {
 
-  protected implicit val session: SparkSession = SparkTestUtil.session
-
-  override def subFeedType: Type = typeOf[SparkSubFeed]
+  override def subFeedType: Type = typeOf[ScalaSubFeed]
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
-  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
 
   test("only columns where the names match are removed") {
     testOnlyMatchingColumnsRemoved()
@@ -46,14 +42,7 @@ class BlacklistTransformerTest extends AnyFunSuite with BlacklistTransformerBeha
   }
 
   test("column blacklisting is case sensitive if Environment.caseSensitive=true") {
-    // Spark session must be set to case sensitive as well, as the DataFrame contains two columns differing only by case
-    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
-    try {
-      testCaseSensitiveIfEnvironmentCaseSensitive()
-    } finally {
-      session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
-    }
+    testCaseSensitiveIfEnvironmentCaseSensitive()
   }
 
   test("column blacklisting throws no error if remaining column has dots") {

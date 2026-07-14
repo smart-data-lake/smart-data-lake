@@ -20,56 +20,39 @@ package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.app.DefaultSmartDataLakeBuilder
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.testutils.ColumnsTransformerBehaviour
 import io.smartdatalake.testutils.spark.SparkTestUtil
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 
-class ColumnTransformerTest extends AnyFunSuite with BeforeAndAfter {
+import scala.reflect.runtime.universe.{Type, typeOf}
+
+class ColumnTransformerTest extends AnyFunSuite with BeforeAndAfter with ColumnsTransformerBehaviour {
 
   protected implicit val session: SparkSession = SparkTestUtil.session
 
-  import session.implicits._
-
-
+  override def subFeedType: Type = typeOf[SparkSubFeed]
   val sdlb: DefaultSmartDataLakeBuilder.type = DefaultSmartDataLakeBuilder
   implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-  implicit val contextExec: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
 
   before {
     instanceRegistry.clear()
     instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
-  test("only columns where the names match are removed") {
-    // prepare
+  test("additional derived, renamed and dropped columns") {
+    testAdditionalDerivedRenamedAndDroppedColumns()
+  }
 
-    val colTransformer = ColumnsTransformer(
-      additionalColumns = Map("run_id" -> "runId"),
-      additionalDerivedColumns = Map(
-        "col_1_plus_col2" -> """col_1 + col_2"""
-        , "sum_col_1" -> """sum(col_1) over (partition by 'whatever')"""
-      ),
-      renamedColumns = Map("col_1" -> "new_col_1"),
-      droppedColumns = Seq("col_2")
+  test("additional columns using a context expression") {
+    testAdditionalColumnsUsingContextExpression()
+  }
 
-    )
-    val df = SparkDataFrame(Seq(
-      (1, 11),
-      (2, 22)).toDF("col_1", "col_2"))
-
-    // execute
-    val transformed = colTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-    val resultDF = transformed.asInstanceOf[SparkDataFrame]
-    val expectedSeq: Seq[(Option[Int], Option[Int], Option[Int], Option[Int])] = Seq(
-      (Some(1), Some(1), Some(12), Some(3)),
-      (Some(2), Some(1), Some(24), Some(3))
-    )
-    val expectedDf = SparkDataFrame(expectedSeq.toDF("new_col_1", "run_id", "col_1_plus_col2", "sum_col_1"))
-    resultDF.inner.show(false)
-    assert(expectedDf.collect == resultDF.collect)
+  test("additional derived column using a window function") {
+    testAdditionalDerivedColumnUsingWindowFunction()
   }
 }

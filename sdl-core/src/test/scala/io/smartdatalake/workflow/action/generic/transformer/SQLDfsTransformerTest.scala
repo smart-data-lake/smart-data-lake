@@ -19,33 +19,27 @@
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.SQLDfTransformerBehaviour
-import io.smartdatalake.testutils.spark.SparkTestUtil
+import io.smartdatalake.testutils.SQLDfsTransformerBehaviour
+import io.smartdatalake.testutils.plainScala.{MockScalaDataObject, ScalaTestUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import org.scalatest.funsuite.AnyFunSuite
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-class SQLDfTransformerTest extends AnyFunSuite with SQLDfTransformerBehaviour {
+// SQLDfsTransformer uses DataFrameFunctions.sql, which is not implemented for ScalaSubFeed
+class SQLDfsTransformerTest extends AnyFunSuite with SQLDfsTransformerBehaviour {
 
-  protected implicit val session: SparkSession = SparkTestUtil.session
-
-  override def subFeedType: Type = typeOf[SparkSubFeed]
+  override def subFeedType: Type = typeOf[ScalaSubFeed]
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
-  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
 
-  test("options and view name token are replaced") {
-    testOptionsAndViewNameTokenAreReplaced()
+  ignore("options and view name token are replaced and sql can be parsed") {
+    testOptionsAndViewNameTokenAreReplacedAndSqlCanBeParsed(id => MockScalaDataObject(id))
   }
 
-  test("view name token without input name is replaced") {
-    testViewNameTokenWithoutInputNameIsReplaced()
-  }
-
-  test("legacy view name without postfix is still supported") {
-    testLegacyViewNameWithoutPostfixIsStillSupported()
+  ignore("legacy view name without postfix is still supported and sql can be parsed") {
+    testLegacyViewNameWithoutPostfixIsStillSupportedAndSqlCanBeParsed(id => MockScalaDataObject(id))
   }
 
 }
