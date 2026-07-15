@@ -31,7 +31,7 @@ case class ScalaGroupedDataFrame(keyCols: Seq[ScalaAbstractColumn], df: ScalaDat
   private val functions = ScalaSubFeed.asInstanceOf[DataFrameFunctions]
   import functions._
 
-  override def agg(columns: Seq[GenericColumn]): GenericDataFrame = {
+  override def agg(columns: Seq[GenericColumn]): ScalaDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     val aggCols = columns.map {
       case c: ScalaAbstractColumn =>
@@ -50,7 +50,7 @@ case class ScalaGroupedDataFrame(keyCols: Seq[ScalaAbstractColumn], df: ScalaDat
       groupDf.agg(aggKeyCols ++ aggCols)
     }.reduceLeft(_.unionByName(_))
 
-    dfAgg
+    dfAgg.asInstanceOf[ScalaDataFrame]
   }
 
   override def subFeedType: universe.Type = universe.typeOf[ScalaSubFeed]

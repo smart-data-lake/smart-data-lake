@@ -28,7 +28,7 @@ import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.executionMode.DataFrameStreamingExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, PartitionValueTransformer}
-import io.smartdatalake.workflow.dataframe.{CombinedObservation, GenericDataFrame, PrefixedObservation}
+import io.smartdatalake.workflow.dataframe.{CombinedObservation, GenericDataFrame, SuffixedObservation}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, Expectation, ExpectationScope}
 import io.smartdatalake.workflow.dataobject.generic._
@@ -316,7 +316,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         val inputObservationsToCombine = inputSubFeeds.flatMap { subFeed =>
           subFeed.observation match {
             case Some(obs) if !obs.includeInInputObservationCombine => None // handled by cross-linking above
-            case Some(otherObservation) => Some(PrefixedObservation(otherObservation, subFeed.dataObjectId.id + "#")) // add input DataObjectId prefix to metrics
+            case Some(otherObservation) => Some(SuffixedObservation(otherObservation, "#" + subFeed.dataObjectId.id)) // add input DataObjectId suffix to metrics, e.g. count#src1
             case None => None
           }
         }

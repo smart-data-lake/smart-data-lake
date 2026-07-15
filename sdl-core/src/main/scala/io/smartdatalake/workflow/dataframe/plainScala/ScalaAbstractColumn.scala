@@ -222,9 +222,13 @@ abstract class ScalaAbstractColumn extends GenericColumn {
   }
 
   override def cast(toDataType: GenericDataType): ScalaAbstractColumn = {
-    if (toDataType.isSameType(this.dataType)) this
-    else toDataType match {
-      case scalaDataType: ScalaDataType[_] => ScalaUnaryExpr(this, "cast", optionalizeUnaryFunc(scalaDataType.getCastFunction(this.dataType)), Some(scalaDataType))
+    toDataType match {
+      case scalaDataType: ScalaDataType[_] =>
+        // resolve the cast function lazily, as the input data type might not yet be resolved, e.g. a column reference not yet bound to a DataFrame
+        lazy val castFunc: Any => Any =
+          if (toDataType.isSameType(this.dataType)) identity
+          else scalaDataType.getCastFunction(this.dataType)
+        ScalaUnaryExpr(this, "cast", optionalizeUnaryFunc(v => castFunc(v)), Some(scalaDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(toDataType)
     }
   }

@@ -251,7 +251,7 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
     ScalaDataFrame(expandedCols)
   }
 
-  override def groupBy(columns: Seq[GenericColumn]): GenericGroupedDataFrame = {
+  override def groupBy(columns: Seq[GenericColumn]): ScalaGroupedDataFrame = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     ScalaGroupedDataFrame(columns.map(_.asInstanceOf[ScalaAbstractColumn]), this)
   }

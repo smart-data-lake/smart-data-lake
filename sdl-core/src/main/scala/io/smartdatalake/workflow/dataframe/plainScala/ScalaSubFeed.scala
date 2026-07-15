@@ -36,7 +36,7 @@ import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
  * - Performance might be limited for large DataFrames, as algorithms are not optimized
  * - only a limited set of DataFrame functions are implemented, for example there is no support for UDFs or window functions
  */
-case class ScalaSubFeed(override val dataFrame: Option[ScalaDataFrame],
+case class ScalaSubFeed(@transient override val dataFrame: Option[ScalaDataFrame],
                         override val dataObjectId: DataObjectId,
                         override val partitionValues: Seq[PartitionValues] = Seq(),
                         override val isDAGStart: Boolean = false,
@@ -307,7 +307,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = throwNotImplementedError
 
-  def stringType: GenericDataType = throwNotImplementedError
+  def stringType: GenericDataType = ScalaStringDataType
 
   def struct(columns: GenericColumn*): ScalaAbstractColumn = throwNotImplementedError
 

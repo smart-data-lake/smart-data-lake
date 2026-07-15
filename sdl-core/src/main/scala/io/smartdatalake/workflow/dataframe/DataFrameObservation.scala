@@ -86,11 +86,11 @@ private[smartdatalake] case class GenericCalculatedObservation(df: GenericDataFr
 }
 
 /**
- * Observation that wraps another observation and adds a prefix to all metrics.
+ * Observation that wraps another observation and adds a suffix to all metrics.
  */
-private[smartdatalake] case class PrefixedObservation(observation: DataFrameObservation, metricsPrefix: String) extends DataFrameObservation {
+private[smartdatalake] case class SuffixedObservation(observation: DataFrameObservation, metricsSuffix: String) extends DataFrameObservation {
   override def waitFor(timeoutSec: Int): Map[String, _] = observation.waitFor(timeoutSec).map{
-    case (k,v) => metricsPrefix+k -> v
+    case (k,v) => k+metricsSuffix -> v
   }
 }
 

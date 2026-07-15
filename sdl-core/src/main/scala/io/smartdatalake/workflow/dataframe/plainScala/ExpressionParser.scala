@@ -148,12 +148,18 @@ object ExpressionParser {
               index += 1
               true
             } else false
-            if (current.tokenType != TokenType.Identifier || !current.text.equalsIgnoreCase("null")) {
-              fail(s"Expected NULL but found '${current.text}'")
-            }
-            index += 1
             val valueCol = left.toColumn(functions)
-            left = ParsedColumn(if (isNegated) valueCol.isNotNull else valueCol.isNull)
+            if (current.tokenType == TokenType.BooleanLiteral) {
+              // IS [NOT] TRUE/FALSE: null-safe comparison with the boolean literal, e.g. null IS FALSE evaluates to false
+              val comparison = valueCol <=> functions.lit(current.text.toBoolean)
+              index += 1
+              left = ParsedColumn(if (isNegated) functions.not(comparison) else comparison)
+            } else if (current.tokenType == TokenType.Identifier && current.text.equalsIgnoreCase("null")) {
+              index += 1
+              left = ParsedColumn(if (isNegated) valueCol.isNotNull else valueCol.isNull)
+            } else {
+              fail(s"Expected NULL, TRUE or FALSE but found '${current.text}'")
+            }
           case _ =>
             continue = false
         }
@@ -230,7 +236,10 @@ object ExpressionParser {
     private def parseIdentifierOrSpecialSymbol(): ParsedValue = {
       val identifierToken = current
       val identifierText = identifierToken.text
-      if (index + 1 < tokens.length && tokens(index + 1).tokenType == TokenType.LeftParen) {
+      if (identifierText.equalsIgnoreCase("case") && index + 1 < tokens.length
+        && tokens(index + 1).tokenType == TokenType.Identifier && tokens(index + 1).text.equalsIgnoreCase("when")) {
+        parseCaseWhen()
+      } else if (index + 1 < tokens.length && tokens(index + 1).tokenType == TokenType.LeftParen) {
         parseIdentifier()
       } else if ((identifierText.equalsIgnoreCase("timestamp") || identifierText.equalsIgnoreCase("date"))
         && index + 1 < tokens.length && tokens(index + 1).tokenType == TokenType.StringLiteral) {
@@ -261,6 +270,35 @@ object ExpressionParser {
           case _: Exception => throw ExpressionParserException(s"Invalid date literal '${literalToken.text}'", typeToken.position)
         }
       } else throw ExpressionParserException(s"Unknown literal type '${typeToken.text}'", typeToken.position)
+    }
+
+    private def parseCaseWhen(): ParsedValue = {
+      index += 1 // consume CASE
+      var conditionValues = Seq[(GenericColumn, GenericColumn)]()
+      while (current.tokenType == TokenType.Identifier && current.text.equalsIgnoreCase("when")) {
+        index += 1
+        val condition = parseOr().toColumn(functions)
+        expectIdentifier("THEN")
+        val value = parseOr().toColumn(functions)
+        conditionValues = conditionValues :+ (condition, value)
+      }
+      if (conditionValues.isEmpty) fail(s"Expected WHEN but found '${current.text}'")
+      val elseValue = if (current.tokenType == TokenType.Identifier && current.text.equalsIgnoreCase("else")) {
+        index += 1
+        Some(parseOr().toColumn(functions))
+      } else None
+      expectIdentifier("END")
+      val whenExpr = conditionValues.tail.foldLeft(functions.when(conditionValues.head._1, conditionValues.head._2)) {
+        case (whenExpr, (condition, value)) => whenExpr.when(condition, value)
+      }
+      ParsedColumn(elseValue.map(whenExpr.otherwise).getOrElse(whenExpr))
+    }
+
+    private def expectIdentifier(keyword: String): Unit = {
+      if (current.tokenType != TokenType.Identifier || !current.text.equalsIgnoreCase(keyword)) {
+        fail(s"Expected $keyword but found '${current.text}'")
+      }
+      index += 1
     }
 
     private def parseIdentifier(): ParsedValue = {

@@ -68,8 +68,7 @@ case class ScalaSchema(override val fields: Seq[ScalaColumnDefinition[_]], isInf
   override def removeMetadata: ScalaSchema = copy(fields = fields.map(_.removeMetadata))
 
   override def getEmptyDataFrame(dataObjectId: SdlConfigObject.DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    // TODO
-    null
+    toEmptyScalaDataFrame
   }
 
   override def treeString(level: Int): String = {
