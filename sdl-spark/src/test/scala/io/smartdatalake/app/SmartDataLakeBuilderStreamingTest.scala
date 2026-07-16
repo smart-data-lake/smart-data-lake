@@ -193,7 +193,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     }
   }
 
-  ignore("sdlb streaming run with streaming action asynchronously, csv files") {
+  test("sdlb streaming run with streaming action asynchronously, csv files") {
 
     //TODO: Fix this test.
     // Sometimes it succeeds but mostly it fails with  Set("20180101") did not equal Set("20180101", "20190101")
@@ -531,7 +531,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     assert(tgt2DO.getSparkDataFrame().select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
   }
 
-  ignore("sdlb spark streaming failure, synchronous action before asynchronously streaming action, asynchronous action failing after first run") {
+  test("sdlb spark streaming failure, synchronous action before asynchronously streaming action, asynchronous action failing after first run") {
     //TODO: Fix this test. It fails with
     // Expected exception org.apache.spark.sql.streaming.StreamingQueryException to be thrown, but no exception was thrown
 
@@ -697,7 +697,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     assert(tgt2DO.getSparkDataFrame().select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
   }
 
-  ignore("sdlb streaming restart, synchronous action skipped before asynchronously streaming action") {
+  test("sdlb streaming restart, synchronous action skipped before asynchronously streaming action") {
     //TODO: Fix this test. It fails with
     // Task b failed. Root cause is 'IllegalArgumentException:
     //  Cannot start query with name sdlb-streaming6 Action~b writing DataObject~tgt2

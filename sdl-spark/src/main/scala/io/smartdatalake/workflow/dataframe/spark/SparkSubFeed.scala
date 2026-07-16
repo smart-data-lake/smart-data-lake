@@ -463,6 +463,21 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
+  override def getStreamingQueryNames(implicit context: ActionPipelineContext): Seq[String] = {
+    getSparkSession.streams.active.map(_.name)
+  }
+
+  override def awaitAnyStreamingQueryTermination(timeoutMs: Option[Long] = None)(implicit context: ActionPipelineContext): Unit = {
+    timeoutMs match {
+      case Some(t) => getSparkSession.streams.awaitAnyTermination(t)
+      case None => getSparkSession.streams.awaitAnyTermination()
+    }
+  }
+
+  override def stopStreamingQueries()(implicit context: ActionPipelineContext): Unit = {
+    getSparkSession.streams.active.foreach(_.stop())
+  }
+
   // This is for testing/lab only: define a default spark connection
   private[smartdatalake] var _defaultSparkSession: Option[SparkSession] = None
 

@@ -160,6 +160,25 @@ trait DataFrameSubFeedCompanion extends SubFeedConverter[DataFrameSubFeed] with 
   def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A])(implicit context: ActionPipelineContext): GenericDataFrame
   def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame
 
+  /**
+   * Names of this engine's currently active streaming queries, if any.
+   * Default: no-op, as most engines do not support streaming.
+   */
+  def getStreamingQueryNames(implicit context: ActionPipelineContext): Seq[String] = Seq()
+
+  /**
+   * Block until any of this engine's active streaming queries terminates, re-throwing its exception if it failed.
+   * Default: no-op, as most engines do not support streaming.
+   * @param timeoutMs if defined, return after this timeout even if no query has terminated; otherwise wait indefinitely.
+   */
+  def awaitAnyStreamingQueryTermination(timeoutMs: Option[Long] = None)(implicit context: ActionPipelineContext): Unit = ()
+
+  /**
+   * Stop all of this engine's active streaming queries.
+   * Default: no-op, as most engines do not support streaming.
+   */
+  def stopStreamingQueries()(implicit context: ActionPipelineContext): Unit = ()
+
   object implicits {
     implicit class ProductExtensions[A <: Product: ClassTag: TypeTag](rows: Seq[A]) {
       def toDF(implicit context: ActionPipelineContext): GenericDataFrame = {

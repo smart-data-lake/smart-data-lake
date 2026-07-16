@@ -720,20 +720,59 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   }
 
   /**
-   * Called when synchronous streaming actions stop gracefully. If hasAsyncActions is true, the
-   * implementation should wait for any async streaming query termination (re-throwing exceptions)
-   * and then stop remaining queries. Default: no-op (non-Spark or non-streaming runtimes).
+   * All engine companions (SparkSubFeed, ScalaSubFeed, SnowparkSubFeed, ...) present on the classpath.
+   * Used to dispatch streaming lifecycle calls to every engine without the caller needing to know which ones are in use.
    */
-  protected def stopSyncStreamingQueriesGracefully(hasAsyncActions: Boolean)(implicit context: ActionPipelineContext): Unit = ()
+  private def allSubFeedCompanions: Seq[DataFrameSubFeedCompanion] =
+    DataFrameSubFeed.getKnownSubFeedTypes.map(DataFrameSubFeed.getCompanion)
 
   /**
-   * Called when only async streaming actions exist and the stop signal fires. Default: no-op.
+   * Called when synchronous streaming actions stop gracefully. If hasAsyncActions is true, wait briefly for
+   * any async streaming query termination (re-throwing exceptions) and then stop all remaining queries of
+   * every engine on the classpath.
    */
-  protected def stopAsyncStreamingQueriesGracefully()(implicit context: ActionPipelineContext): Unit = ()
+  protected def stopSyncStreamingQueriesGracefully(hasAsyncActions: Boolean)(implicit context: ActionPipelineContext): Unit = {
+    if (hasAsyncActions) {
+      // re-throw exception if any async streaming query already terminated with exception;
+      // awaitAnyStreamingQueryTermination returns immediately if it already fired
+      allSubFeedCompanions.foreach(_.awaitAnyStreamingQueryTermination(Some(1)))
+      allSubFeedCompanions.foreach(_.stopStreamingQueries())
+    }
+  }
 
   /**
-   * Called when only async streaming actions exist and we have to wait for their termination before
-   * the process exits. Default: no-op.
+   * Called when only async streaming actions exist and the stop signal fires.
+   * Stops all active streaming queries of every engine on the classpath.
    */
-  protected def awaitAndStopAsyncStreamingQueries(actionDAGRun: ActionDAGRun)(implicit context: ActionPipelineContext): Unit = ()
+  protected def stopAsyncStreamingQueriesGracefully()(implicit context: ActionPipelineContext): Unit = {
+    val activeQueryNames = allSubFeedCompanions.flatMap(_.getStreamingQueryNames)
+    logger.info(s"stopAsyncStreamingQueriesGracefully: stopStreamingGracefully=${Environment.stopStreamingGracefully}," +
+      s" stopping ${activeQueryNames.size} active streams")
+    allSubFeedCompanions.foreach(_.stopStreamingQueries())
+  }
+
+  /**
+   * Called when only async streaming actions exist and we have to wait for their termination before the process
+   * exits. Waits for any streaming query of the single active engine to terminate, then stops all remaining
+   * queries of every engine on the classpath.
+   *
+   * Waiting is only supported for one engine having active streaming queries at a time: if multiple engines
+   * have active streaming queries simultaneously, waiting for termination sequentially per engine could miss
+   * or delay noticing termination/failure on a different engine. In that case all active streaming queries
+   * are stopped and an exception is thrown instead of waiting.
+   */
+  protected def awaitAndStopAsyncStreamingQueries(actionDAGRun: ActionDAGRun)(implicit context: ActionPipelineContext): Unit = {
+    logger.info(s"awaitAndStopAsyncStreamingQueries: waiting for any streaming query to terminate")
+    val companionsWithActiveQueries = allSubFeedCompanions.filter(_.getStreamingQueryNames.nonEmpty)
+    if (companionsWithActiveQueries.size > 1) {
+      val activeQueryNames = companionsWithActiveQueries.flatMap(_.getStreamingQueryNames)
+      allSubFeedCompanions.foreach(_.stopStreamingQueries())
+      throw new IllegalStateException(s"awaitAndStopAsyncStreamingQueries: active streaming queries exist for multiple engines" +
+        s" (${companionsWithActiveQueries.size}) simultaneously (${activeQueryNames.mkString(", ")})." +
+        s" Waiting for termination across multiple engines at the same time is not supported. All active streaming queries have been stopped.")
+    }
+    companionsWithActiveQueries.foreach(_.awaitAnyStreamingQueryTermination())
+    logger.info(s"awaitAndStopAsyncStreamingQueries: awaitAnyTermination returned, active=${allSubFeedCompanions.flatMap(_.getStreamingQueryNames).mkString(",")}")
+    allSubFeedCompanions.foreach(_.stopStreamingQueries())
+  }
 }
