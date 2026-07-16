@@ -61,7 +61,7 @@ jobs:
 
   deploy:
     needs: build
-    if: ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ !cancelled() && (inputs.skipBuild || needs.build.result == 'success') }}
 
     runs-on: ubuntu-latest
 
