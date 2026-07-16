@@ -22,7 +22,6 @@ import io.smartdatalake.app.StatusInfoConfig
 import io.smartdatalake.communication.statusinfo.api.{SnapshotStatusInfoListener, StatusInfoMethods}
 import io.smartdatalake.communication.statusinfo.websocket.{IncrementalStatusInfoListener, StatusInfoSocket}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.apache.spark.util.PortUtils
 import org.eclipse.jetty.server._
 import org.eclipse.jetty.server.handler.{ContextHandler, ContextHandlerCollection}
 import org.eclipse.jetty.servlet.{ServletContextHandler, ServletHolder}
@@ -46,7 +45,7 @@ object StatusInfoServer extends SmartDataLakeLogger {
       config: StatusInfoConfig
   ): Unit = {
     val contextHandler = getServletContextHandler(snapshotListener, incrementalListener)
-    PortUtils.startOnPort(startServer(contextHandler), "StatusInfoServer", config.port, config.maxPortRetries, logger)
+    startOnPort(startServer(contextHandler), "StatusInfoServer", config.port, config.maxPortRetries)
   }
 
   def stop(): Unit =
@@ -92,6 +91,19 @@ object StatusInfoServer extends SmartDataLakeLogger {
     server.setHandler(handlers)
     server.start()
     port
+  }
+
+  private def startOnPort(startService: Int => Int, serviceName: String, startPort: Int, maxRetries: Int): Int = {
+    for (offset <- 0 to maxRetries) {
+      val tryPort = startPort + offset
+      try {
+        return startService(tryPort)
+      } catch {
+        case e: Exception if offset < maxRetries =>
+          logger.warn(s"$serviceName: Failed to start on port $tryPort, trying ${tryPort + 1}")
+      }
+    }
+    throw new RuntimeException(s"$serviceName: Failed to bind on any port from $startPort to ${startPort + maxRetries}")
   }
 
 }

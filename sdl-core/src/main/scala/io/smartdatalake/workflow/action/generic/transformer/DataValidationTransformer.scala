@@ -22,11 +22,8 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
-
-import scala.reflect.runtime.universe.typeOf
 
 /**
  * Apply validation rules to a DataFrame and collect potential violation error messages in a new column.
@@ -37,7 +34,7 @@ import scala.reflect.runtime.universe.typeOf
  * @param subFeedTypeForValidation For validating the rule expression, the runtime subFeedType is not yet known.
  *                                 By default SparkSubFeed langauge is used, but you can configure a different one if needed.
  */
-case class DataValidationTransformer(override val name: String = "dataValidation", override val description: Option[String] = None, rules: Seq[ValidationRule], errorsColumn: String = "errors", subFeedTypeForValidation: String = typeOf[SparkSubFeed].typeSymbol.fullName) extends GenericDfTransformer {
+case class DataValidationTransformer(override val name: String = "dataValidation", override val description: Option[String] = None, rules: Seq[ValidationRule], errorsColumn: String = "errors", subFeedTypeForValidation: String = "io.smartdatalake.workflow.dataframe.spark.SparkSubFeed") extends GenericDfTransformer {
   private implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedTypeForValidation)
   // check that rules are parsable
   rules.foreach(_.getValidationColumn(functions))

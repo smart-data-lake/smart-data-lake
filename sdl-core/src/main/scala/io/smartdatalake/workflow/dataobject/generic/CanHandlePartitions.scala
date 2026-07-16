@@ -23,13 +23,10 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{ExpressionUtil, SchemaUtil}
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
-import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.sql.DataFrame
 
 /**
  * A trait to be implemented by DataObjects which store partitioned data
  */
-@DeveloperApi
 trait CanHandlePartitions { this: DataObject =>
 
   /**
@@ -102,14 +99,14 @@ trait CanHandlePartitions { this: DataObject =>
   private[smartdatalake] case class PartitionValueFilterExpressionData(elements: Map[String, String], _hashCode: Int)
 
   /**
-   * Validate the schema of a given Spark Data Frame `df` that it contains the specified partition columns
+   * Validate that the given column names contain all partition columns.
    *
-   * @param df The data frame to validate.
+   * @param columnNames columns to check (e.g. df.columns.toSeq or schema.columns.map(_.name))
    * @param role role used in exception message. Set to read or write.
-   * @throws SchemaViolationException if the partitions columns are not included.
+   * @throws SchemaViolationException if the partition columns are not included.
    */
-  def validateSchemaHasPartitionCols(df: DataFrame, role: String): Unit = {
-    val missingCols = SchemaUtil.checkMissingCols(partitions, df.columns.toSeq, Environment.caseSensitive)
+  def validateSchemaHasPartitionCols(columnNames: Seq[String], role: String): Unit = {
+    val missingCols = SchemaUtil.checkMissingCols(partitions, columnNames, Environment.caseSensitive)
     if (missingCols.nonEmpty) throw new SchemaViolationException(s"($id) DataFrame is missing partition cols ${missingCols.mkString(", ")} on $role")
   }
 

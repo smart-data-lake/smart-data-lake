@@ -1,0 +1,413 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+package io.smartdatalake.workflow.dataobject
+
+import io.smartdatalake.definitions.{Environment, SDLSaveMode}
+import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.testutils.spark.SparkTestUtil
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ProcessingLogicException
+import io.smartdatalake.workflow.action.file.CustomFileActionTest
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import org.apache.commons.io.FileUtils
+import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.StructType
+import org.scalatest.Assertion
+
+import java.nio.file.{Files, Paths, StandardOpenOption}
+
+class SparkFileDataObjectTest extends DataObjectTestSuite with SmartDataLakeLogger {
+  import session.implicits._
+
+  test("overwrite only one partition") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p"), csvOptions = Map("header" -> "true") )
+
+    // write test data 1 - create partition A and B
+    val partitionValuesCreated1 = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
+    val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df1, partitionValuesCreated1 )
+
+    // test 1
+    dataObject.getSparkDataFrame().count() shouldEqual 4 // four records should remain, 2 from partition A and 2 from partition B
+    partitionValuesCreated1.toSet shouldEqual dataObject.listPartitions.toSet
+
+    // write test data 2 - overwrite partition B
+    val partitionValuesCreated2 = Seq(PartitionValues(Map("p"->"B")))
+    val df2 = Seq(("B",5)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df2, partitionValuesCreated2 )
+
+    // test 2
+    dataObject.getSparkDataFrame().count() shouldEqual 3 // three records should remain, 2 from partition A and 1 from partition B
+    partitionValuesCreated1.toSet shouldEqual dataObject.listPartitions.toSet
+
+    FileUtils.deleteQuietly(tempDir.toFile)
+  }
+
+  test("create and list partition one level") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p"), csvOptions = Map("header" -> "true") )
+
+    // write test files
+    val partitionValuesCreated = Seq(PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
+    val df = Seq(("A",1),("B",2)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df, partitionValuesCreated )
+
+    val partitionValuesListed = dataObject.listPartitions
+    partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
+
+    FileUtils.deleteQuietly(tempDir.toFile)
+  }
+
+  test("create and list partition multi level") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p1","p2"), csvOptions = Map("header" -> "true"))
+
+    // write test files
+    val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"A","p2"->"L2B"))
+      , PartitionValues(Map("p1"->"B","p2"->"L2B")), PartitionValues(Map("p1"->"B","p2"->"L2C")))
+    val df = Seq(("A","L2A",1),("A","L2B",2),("B","L2B",3),("B","L2C",4)).toDF("p1", "p2", "value")
+    dataObject.writeSparkDataFrame(df, partitionValuesCreated)
+
+    val partitionValuesListed = dataObject.listPartitions
+    partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
+
+    FileUtils.deleteQuietly(tempDir.toFile)
+  }
+
+  test("create empty partition") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p1","p2"), csvOptions = Map("header" -> "true"))
+
+    // write test files
+    val partitionValuesCreated = Seq( PartitionValues(Map("p1"->"A","p2"->"L2A")), PartitionValues(Map("p1"->"X","p2"->"L2X")))
+    val df = Seq(("A","L2A",1)).toDF("p1", "p2", "value")
+    dataObject.writeSparkDataFrame(df, partitionValuesCreated)
+
+    val partitionValuesListed = dataObject.listPartitions
+    partitionValuesCreated.toSet shouldEqual partitionValuesListed.toSet
+
+    FileUtils.deleteQuietly(tempDir.toFile)
+  }
+
+  test("read partitioned data and filter expected partitions") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p"), csvOptions = Map("header" -> "true"), expectedPartitionsCondition = Some("elements['p'] != 'A'"))
+
+    // write test data - create partition A and B
+    val partitionValuesCreated = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
+    val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df1, partitionValuesCreated )
+
+    // test reading data
+    dataObject.getSparkDataFrame().count() shouldEqual 4 // four records in total, 2 from partition A and 2 from partition B
+    dataObject.getSparkDataFrame(Seq(PartitionValues(Map("p"->"B")))).count() shouldEqual 2 // two records in partition B
+    dataObject.getSparkDataFrame(Seq(PartitionValues(Map("p"->"A")),PartitionValues(Map("p"->"A","p"->"B")))).count() shouldEqual 4
+
+    // test expected partitions
+    assert( dataObject.filterExpectedPartitionValues(partitionValuesCreated) == Seq(PartitionValues(Map("p"->"B"))))
+
+    FileUtils.deleteQuietly(tempDir.toFile)
+  }
+
+  test("overwrite partitioned data") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, partitions = Seq("p"), csvOptions = Map("header" -> "true"))
+
+    // write test data - create partition A, B, C
+    val partitionValuesCreated1 = Seq( PartitionValues(Map("p"->"A")), PartitionValues(Map("p"->"B")))
+    val df1 = Seq(("A",1),("A",2),("B",3),("B",4),("C",5),("C",6)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df1, partitionValuesCreated1)
+
+    // overwrite partition B with new data, overwrite partition C with no data
+    val partitionValuesCreated2 = Seq( PartitionValues(Map("p"->"B")), PartitionValues(Map("p"->"C")))
+    val df2 = Seq(("B",7),("B",8)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df2, partitionValuesCreated2)
+
+    // test reading data
+    val result = dataObject.getSparkDataFrame()
+      .select($"p",$"value".cast("int"))
+      .as[(String,Int)].collect().toSeq.sorted
+    assert( result == Seq(("A",1),("A",2),("B",7),("B",8)))
+    assert( dataObject.listPartitions.map(pv => pv("p").toString).sorted == Seq("A","B","C"))
+
+    FileUtils.deleteQuietly(tempDir.toFile)
+  }
+
+  test("overwrite all") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, csvOptions = Map("header" -> "true"))
+
+    // write test data
+    val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df1)
+
+    // overwrite with new data
+    val df2 = Seq(("B",3),("B",4)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df2)
+
+    // test reading data
+    val result = dataObject.getSparkDataFrame()
+      .select($"p",$"value".cast("int"))
+      .as[(String,Int)].collect().toSeq.sorted
+    assert( result == Seq(("B",3),("B",4)))
+
+    FileUtils.deleteQuietly(tempDir.toFile)
+  }
+
+  // This throws SDLBs SparkPlanNoDataWarning, as there is no data to write.
+  // Test ignored for now, as overwriting with no data is rather an anti-pattern.
+  ignore("overwrite all empty") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, csvOptions = Map("header" -> "true"))
+
+    // write test data
+    val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df1)
+
+    // overwrite with no data
+    val df2 = Seq[(String,Int)]().toDF("p", "value")
+    Environment._enableSparkPlanNoDataCheck = Some(false)
+    dataObject.writeSparkDataFrame(df2)
+    Environment._enableSparkPlanNoDataCheck = Some(false)
+
+    // test reading data
+    assert(dataObject.getSparkDataFrame().isEmpty)
+
+    FileUtils.deleteQuietly(tempDir.toFile)
+  }
+
+  test("overwrite all preserve directory") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", path = tempDir.toString, csvOptions = Map("header" -> "true"), saveMode = SDLSaveMode.OverwritePreserveDirectories)
+
+    // write test data
+    val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df1)
+
+    // overwrite with new data
+    val df2 = Seq(("B",3),("B",4)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df2)
+
+    // test reading data
+    val result = dataObject.getSparkDataFrame()
+      .select($"p",$"value".cast("int"))
+      .as[(String,Int)].collect().toSeq.sorted
+    assert( result == Seq(("B",3),("B",4)))
+
+    FileUtils.deleteQuietly(tempDir.toFile)
+  }
+
+  test("append filename") {
+
+    // create data object
+
+    val feed = "filenametest"
+    val srcDir = "testSrc"
+    val resourceFile = "AB_NYC_2019.csv"
+    val tempDir = Files.createTempDirectory(feed)
+    val sourceFileColName = "_sourcefile"
+
+    // copy data file to test directory
+    SparkTestUtil.copyResourceToFile(resourceFile, tempDir.resolve(srcDir).resolve(resourceFile).toFile)
+    // setup DataObject
+    val dataObject = CsvFileDataObject("src1", tempDir.resolve(srcDir).toString.replace('\\', '/'),
+      csvOptions = Map("header" -> "true", "delimiter" -> CustomFileActionTest.delimiter), filenameColumn = Some(sourceFileColName),
+      schema = Some(SparkSchema(StructType.fromDDL("id string,name string,host_id string,host_name string,neighbourhood_group string,neighbourhood string,latitude string,longitude string,room_type string,price string,minimum_nights string,number_of_reviews string,last_review string,reviews_per_month string,calculated_host_listings_count string,availability_365 string")))
+    )
+
+    // test received DataFrame
+    val dfInit = dataObject.getSparkDataFrame()(contextInit)
+    dfInit.columns.contains(sourceFileColName) //retrieved Dataframe has sourcefile column appended
+    val df = dataObject.getSparkDataFrame()(contextExec)
+    df.columns.contains(sourceFileColName) //retrieved Dataframe has sourcefile column appended
+    df.select(sourceFileColName).collect().head.getAs[String](0).endsWith(resourceFile) //content of sourcefile column corresponds to sourcefile
+
+    // test if it could be written again
+    dataObject.initSparkDataFrame(df.drop(sourceFileColName), Seq())
+
+    FileUtils.deleteQuietly(tempDir.toFile)
+  }
+
+  test("get concrete paths") {
+    val tempDir = Files.createTempDirectory("concretePaths")
+    val dir111 = tempDir.resolve("a=1").resolve("b=1").resolve("c=1")
+    dir111.toFile.mkdirs()
+    dir111.resolve("abc.test").toFile.createNewFile()
+    tempDir.resolve("a=1").resolve("b=1").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=2").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=2").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=3").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=1").resolve("b=3").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=1").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=1").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=2").resolve("c=1").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=2").resolve("c=2").toFile.mkdirs()
+    tempDir.resolve("a=2").resolve("b=3").resolve("c=1").toFile.mkdirs()
+    val dir232 = tempDir.resolve("a=2").resolve("b=3").resolve("c=2")
+    dir232.toFile.mkdirs()
+    dir232.resolve("abc.test").toFile.createNewFile()
+
+
+    val do1 = RawFileDataObject("testDO", tempDir.toString, partitions = Seq("a","b","c"), fileName = "*.test")
+    def removeDOBase(p: String) = p.replaceFirst(".*concretePaths.*?/", "")
+    def getInitPaths(pv: PartitionValues) = do1.getConcreteInitPaths(pv).map(p => removeDOBase(p.toString)).toSet
+    def getFullPaths(pv: PartitionValues, returnFiles: Boolean = false) = do1.getConcreteFullPaths(pv,returnFiles).map(p => removeDOBase(p.toString)).toSet
+    // inits
+    assert(getInitPaths(PartitionValues(Map("a" -> 1))) == Set("a=1"))
+    assert(getInitPaths(PartitionValues(Map("a" -> 1, "b" -> 1))) == Set("a=1/b=1"))
+    assert(getInitPaths(PartitionValues(Map("a" -> 1, "b" -> 1, "c" -> 1))) == Set("a=1/b=1/c=1"))
+    // no inits
+    assert(getInitPaths(PartitionValues(Map("b" -> 1))) == Set("a=1/b=1","a=2/b=1"))
+    assert(getInitPaths(PartitionValues(Map("c" -> 1))) == Set("a=1/b=1/c=1","a=1/b=2/c=1","a=1/b=3/c=1","a=2/b=1/c=1","a=2/b=2/c=1","a=2/b=3/c=1"))
+    assert(getInitPaths(PartitionValues(Map("b" -> 1, "c" -> 1))) == Set("a=1/b=1/c=1","a=2/b=1/c=1"))
+    // full directories
+    assert(getFullPaths(PartitionValues(Map("b" -> 1))) == Set("a=1/b=1/c=1","a=2/b=1/c=1","a=1/b=1/c=2","a=2/b=1/c=2"))
+    assert(getFullPaths(PartitionValues(Map("c" -> 1))) == Set("a=1/b=1/c=1","a=1/b=2/c=1","a=2/b=1/c=1","a=2/b=2/c=1","a=1/b=3/c=1","a=2/b=3/c=1"))
+    assert(getFullPaths(PartitionValues(Map("b" -> 1, "c" -> 1))) == Set("a=1/b=1/c=1","a=2/b=1/c=1"))
+    // files
+    assert(getFullPaths(pv = PartitionValues(elements = Map("b" -> 1)), returnFiles = true) == Set("a=1/b=1/c=1/abc.test"))
+  }
+
+  test("delete files only") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", partitions = Seq("p"), path = tempDir.toString, csvOptions = Map("header" -> "true"))
+
+    // write test data
+    val df1 = Seq(("A",1),("A",2)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df1)
+
+    // delete partition files
+    val partitionValues = PartitionValues(Map("p"->"A"))
+    val partitionPath = new Path(dataObject.hadoopPath, dataObject.getPartitionString(partitionValues).get)
+    assert(dataObject.filesystem.getFileStatus(partitionPath).isDirectory)
+    assert(dataObject.filesystem.listStatus(partitionPath).nonEmpty)
+    dataObject.deletePartitionsFiles(Seq(partitionValues))
+    assert(dataObject.filesystem.listStatus(partitionPath).isEmpty)
+    assert(dataObject.filesystem.getFileStatus(partitionPath).isDirectory)
+
+    // delete files in base dir
+    dataObject.filesystem.createNewFile(new Path(dataObject.hadoopPath, "testFile"))
+    assert(dataObject.filesystem.listStatus(dataObject.hadoopPath).exists(_.isFile))
+    dataObject.deleteAllFiles(dataObject.hadoopPath)
+    assert(!dataObject.filesystem.listStatus(dataObject.hadoopPath).exists(_.isFile))
+    assert(dataObject.filesystem.getFileStatus(dataObject.hadoopPath).isDirectory)
+    assert(dataObject.filesystem.getFileStatus(new Path(dataObject.hadoopPath,"p=A")).isDirectory)
+
+    FileUtils.deleteQuietly(tempDir.toFile)
+  }
+
+  test("OverwriteOptimized without partition values not allowed for partitioned DataObject") {
+    val df = Seq(("A", "2", 1), ("B", "1", 2), ("C", "X", 3)).toDF("p1", "p2", "value")
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = CsvFileDataObject(id = "partitionTestCsv", partitions = Seq("p1","p2"), path = tempDir.toString, saveMode = SDLSaveMode.OverwriteOptimized)
+    a [ProcessingLogicException] should be thrownBy dataObject.writeSparkDataFrame(df, partitionValues = Seq())
+  }
+
+  private def createJsonFiles(path: java.nio.file.Path,
+                              filenamePrefix: String = "test",
+                              nbOfFile: Int = 10): Assertion = {
+    Files.createDirectory(path)
+    logger.info(s"creating test files in $path")
+    (1 to nbOfFile).foreach { i =>
+      val writer = Files.newBufferedWriter(path.resolve(s"$filenamePrefix$i.json"), StandardOpenOption.CREATE, StandardOpenOption.WRITE)
+      writer.write(s"""{"value": $i}""")
+      writer.close()
+    }
+    assert(Files.list(path).count == nbOfFile)
+  }
+
+  // create data for 2 partitions and compact one of them
+  test("move partition function") {
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = JsonFileDataObject(id = "movePartitionTestJson", partitions = Seq("p"), path = tempDir.toString, jsonOptions = Some(Map("multiLine"->"false")))
+
+    // create 100 json files for partition p=A and p=B
+    val partitionPathA = Paths.get(tempDir.toString, "p=A")
+    val partitionPathB = Paths.get(tempDir.toString, "p=B")
+    createJsonFiles(path = partitionPathA, filenamePrefix = "testA")
+    createJsonFiles(path = partitionPathB, filenamePrefix = "testB")
+
+    // move partition p=A to p=B
+    val pvsToMove = Seq((PartitionValues(Map("p" -> "A")), PartitionValues(Map("p" -> "B"))))
+    dataObject.movePartitions(pvsToMove)
+
+    //check
+    assert(!Files.exists(partitionPathA)) // p=A is deleted
+    assert(Files.list(partitionPathB).count() == 20) // check p=A moved to p=B
+    assert(dataObject.getSparkDataFrame(pvsToMove.map(_._2)).select(sum($"value")).as[Long].head() == 110) // check completeness of p=A + p=B
+  }
+
+  test("incremental output mode") {
+
+    // create data object
+    val tempDir = Files.createTempDirectory("tempHadoopDO")
+    val dataObject = ParquetFileDataObject(id = "partitionTest", path = tempDir.toString, saveMode = SDLSaveMode.Append)
+
+    // write test data 1
+    val df1 = Seq(("A",1),("A",2),("B",3),("B",4)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df1)
+    Thread.sleep(1) // sleep 1 millisecond as file modified date is stored in milliseconds and we need the created file in the next increment
+
+    // test 1
+    dataObject.setState(None) // initialize incremental output with empty state
+    dataObject.getSparkDataFrame()(contextExec).count() shouldEqual 4
+    val newState1 = dataObject.getState
+
+    // append test data 2
+    val df2 = Seq(("B",5)).toDF("p", "value")
+    dataObject.writeSparkDataFrame(df2)
+    Thread.sleep(1) // sleep 1 millisecond as file modified date is stored in milliseconds and we need the created file in the next increment
+
+    // test 2
+    dataObject.setState(newState1)
+    val df2result = dataObject.getSparkDataFrame()(contextExec)
+    df2result.count() shouldEqual 1
+    val newState2 = dataObject.getState
+    assert(newState1.get < newState2.get)
+
+    dataObject.getSparkDataFrame()(contextInit).count() shouldEqual 5
+
+    FileUtils.deleteQuietly(tempDir.toFile)
+  }
+
+}

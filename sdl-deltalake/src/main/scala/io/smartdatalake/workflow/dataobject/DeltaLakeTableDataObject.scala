@@ -27,8 +27,7 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactory}
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc._
-import io.smartdatalake.util.spark.hive.HiveUtil
-import io.smartdatalake.util.spark.{SparkQueryUtil, SparkStageMetricsListener}
+import io.smartdatalake.util.spark.{SparkSQLUtil, SparkQueryUtil, SparkSchemaUtil, SparkStageMetricsListener}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
@@ -40,6 +39,7 @@ import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame, SparkSaveMode}
 import io.smartdatalake.workflow.{ActionPipelineContext, ProcessingLogicException}
 import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.delta.DeltaLog
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
@@ -144,7 +144,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   // prepare final path and table
   @transient private var hadoopPathHolder: Path = _
 
-  val filetype: String = ".parquet"
+  private val filetype: String = ".parquet"
 
   def hadoopPath(implicit context: ActionPipelineContext): Path = {
     implicit val session: SparkSession = SparkSubFeed.getSparkSession
@@ -228,7 +228,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
       }
     }
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
-    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
+    if (isTableExisting)
+      validateSchemaHasPrimaryKeyCols(getSparkDataFrame().columns.toIndexedSeq, role = "prepare", obj = "Existing table")
   }
 
   /**
@@ -246,7 +247,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   private def activateCdc()(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = SparkSubFeed.getSparkSession
-    if(!propertyExists(enableCdcFeedProperty) && isTableExisting) HiveUtil.alterTableProperties(table, Map(enableCdcFeedProperty -> "true"))
+    if(!propertyExists(enableCdcFeedProperty) && isTableExisting) SparkSQLUtil.alterTableProperties(table, Map(enableCdcFeedProperty -> "true"))
   }
 
   private def propertyExists(name: String)(implicit session: SparkSession): Boolean = {
@@ -292,14 +293,15 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     if(!propertyExists(enableCdcFeedProperty) && incrementalOutputExpr.isDefined) activateCdc()
 
     validateSchemaMin(SparkSchema(df.schema), "read")
-    validateSchemaHasPartitionCols(df, "read")
+    validateSchemaHasPartitionCols(df.columns.toIndexedSeq, "read")
     df
   }
 
-  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
+  override def initSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)
+                                 (implicit context: ActionPipelineContext): Unit = {
     validateSchemaMin(SparkSchema(df.schema), "write")
-    validateSchemaHasPartitionCols(df, "write")
-    validateSchemaHasPrimaryKeyCols(df, "write")
+    validateSchemaHasPartitionCols(df.columns.toIndexedSeq, "write")
+    validateSchemaHasPrimaryKeyCols(df.columns.toIndexedSeq, "write")
   }
 
   override def preWrite(implicit context: ActionPipelineContext): Unit = {
@@ -328,12 +330,12 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     val targetDf = if (schemaMin.isDefined) {
       validateSchemaMin(SparkSchema(targetSchema), "write") //needed for merging the schemas
       val sparkSchemaMin = schemaMin.get.asInstanceOf[SparkSchema] //writeSparkDataFrame is only done with SparkSubFeeds
-      val targetSchemaWithMetadata: StructType = SchemaUtil.mergeSchemaMetadata(sparkSchemaMin.inner, targetSchema)
+      val targetSchemaWithMetadata: StructType = SparkSchemaUtil.mergeSchemaMetadata(sparkSchemaMin.inner, targetSchema)
       targetDfIncoming.to(targetSchemaWithMetadata)
     } else targetDfIncoming
 
-    validateSchemaHasPartitionCols(targetDf, "write")
-    validateSchemaHasPrimaryKeyCols(targetDf, "write")
+    validateSchemaHasPartitionCols(targetDf.columns.toIndexedSeq, "write")
+    validateSchemaHasPrimaryKeyCols(targetDf.columns.toIndexedSeq, "write")
 
     val finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
@@ -386,7 +388,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     //if the flag is set, update comments of existing columns (one by one)
     if (updateColumnComments) {
-      val columnsToUpdate = SchemaUtil.identifyMissingComments(targetDf.schema, session.table(table.fullName).schema).map(kv => (kv._1.mkString("."), kv._2))
+      val columnsToUpdate = SparkSchemaUtil.identifyMissingComments(targetDf.schema, session.table(table.fullName).schema).map(kv => (kv._1.mkString("."), kv._2))
       updateExistingColumnComments(columnsToUpdate)
     }
 
@@ -444,9 +446,9 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
     // enable schema evolution
     if (allowSchemaEvolution) {
-      mergeStmt = mergeStmt.withSchemaEvolution() // doesnt work in Spark 4.1
+      mergeStmt = mergeStmt.withSchemaEvolution() // does not work in Spark 4.1
       // workaround: set this globally and check same schema before (in writeSparkDataFrame)
-      session.conf.set("spark.databricks.delta.schema.autoMerge.enabled", true)
+      session.conf.set(key = "spark.databricks.delta.schema.autoMerge.enabled", value = true)
     }
     // delete clause if configured
     saveModeExpr.deleteConditionExpr.map(toSpark).foreach(c => mergeStmt = mergeStmt.whenMatched(c).delete())
@@ -567,7 +569,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     implicit val session: SparkSession = SparkSubFeed.getSparkSession
-    HiveUtil.dropTableOptionalPath(table, if (path.isDefined) Some(hadoopPath) else None, doPurge = false)
+    SparkSQLUtil.dropTableOptionalPath(table, if (path.isDefined) Some(hadoopPath) else None, doPurge = false)
   }
 
   def getDetails(implicit session: SparkSession): DataFrame = {
@@ -598,7 +600,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def getColumnStats(update: Boolean, lastModifiedAt: Option[Long])(implicit context: ActionPipelineContext): Map[String, Map[String,Any]] = {
     try {
       val session = SparkSubFeed.getSparkSession
-      val deltaLog = DeltaLog.forTable(session, table.tableIdentifier)
+      val deltaLog = DeltaLog.forTable(session, TableIdentifier(table.name, table.db, table.catalog))
       val snapshot = deltaLog.unsafeVolatileSnapshot
       val columns = snapshot.schema.fieldNames
       import session.implicits._

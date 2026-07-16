@@ -22,7 +22,6 @@ import io.smartdatalake.definitions.{Environment, TableStatsType}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
-import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import java.io.IOException
 import java.net.URI
@@ -227,13 +226,6 @@ object HdfsUtil extends SmartDataLakeLogger {
    */
   def getHadoopFsWithDefaultConf(path: Path): FileSystem = {
     getHadoopFsWithConf(path)(new Configuration())
-  }
-
-  /**
-   * Get Hadoop Filesystem from specified Path with additional Configuration from the SparkSession
-   */
-  def getHadoopFsFromSpark(path: Path)(implicit session: SparkSession): FileSystem = {
-    getHadoopFsWithConf(path)(session.sparkContext.hadoopConfiguration)
   }
 
   /**

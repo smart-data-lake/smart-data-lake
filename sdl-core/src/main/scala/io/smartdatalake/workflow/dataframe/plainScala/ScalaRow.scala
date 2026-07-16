@@ -28,20 +28,25 @@ import scala.reflect.runtime.universe
  * The data is stored as an IndexedSeq.
  */
 case class ScalaRow(values: IndexedSeq[Option[Any]]) extends GenericRow {
+  // Every entry is stored as Option, null is represented as None (plain-Scala null handling).
+  // Note that the GenericRow interface functions (get, getAs, toSeq) resolve the Option and return plain values
+  // with null for missing values, as defined by the generic contract. Use apply or values for Option-based access.
   def apply(ix: Int): Option[Any] = values(ix)
 
-  override def get(index: Int): Option[Any] = values(index)
+  override def get(index: Int): Any = values(index).orNull
 
   override def getStruct(index: Int): GenericRow = throw new NotImplementedError("getStruct is not implemented for ScalaRow")
 
   override def getAs[T: ClassTag](index: Int): T = {
     val v = values(index)
     val cls = implicitly[ClassTag[T]].runtimeClass
-    if (cls.isAssignableFrom(classOf[Option[_]])) v.asInstanceOf[T]
+    // return the value as Option only if T is of type Option, e.g. getAs[Option[Int]].
+    // note that for unspecific types as getAs[Any], the plain value must be returned.
+    if (classOf[Option[_]].isAssignableFrom(cls)) v.asInstanceOf[T]
     else v.orNull.asInstanceOf[T]
   }
 
-  override def toSeq: Seq[Option[Any]] = values
+  override def toSeq: Seq[Any] = values.map(_.orNull)
 
   override def subFeedType: universe.Type =  universe.typeOf[ScalaSubFeed]
 }

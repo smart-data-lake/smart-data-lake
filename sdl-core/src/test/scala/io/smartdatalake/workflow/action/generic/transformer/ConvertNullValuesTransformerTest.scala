@@ -19,288 +19,78 @@
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.ConvertNullValuesTransformerBehaviour
+import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.internal.SQLConf
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import org.scalatest.funsuite.AnyFunSuite
 
-class ConvertNullValuesTransformerTest extends AnyFunSuite {
+import scala.reflect.runtime.universe.{Type, typeOf}
 
-  protected implicit val session: SparkSession = TestUtil.session
+// ConvertNullValuesTransformer uses coalesce, which is not implemented for ScalaSubFeed
+class ConvertNullValuesTransformerTest extends AnyFunSuite with ConvertNullValuesTransformerBehaviour {
 
-  import session.implicits._
-
+  override def subFeedType: Type = typeOf[ScalaSubFeed]
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
 
-  test("exclusive include- or excludeColumns") {
-
-    // prepare
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("column1"), excludeColumns = Seq("column2"))
-    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
-
-    // execute
-    val thrown = intercept[IllegalArgumentException] {
-      convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-    }
-
-    // check
-    assert(thrown.isInstanceOf[IllegalArgumentException])
-    assert(thrown.getMessage == "requirement failed: Conflicting parameters. Please use either includeColumns or excludeColumns, as simultaneous application is not supported.")
+  ignore("exclusive include- or excludeColumns") {
+    testExclusiveIncludeOrExcludeColumns()
   }
 
-  test("default values") {
-
-    // prepare
-    val convertNullValuesTransformer = ConvertNullValuesTransformer()
-    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
-    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Some(-1), Some(3.0)), (Some("na"), Some(2), Some(-1.0)), (Some("na"), Some(-1), Some(-1.0)))
-    val df = SparkDataFrame(initSeq.toDF("column1", "column2", "column3"))
-    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
-
-    // execute
-    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformedDf.collect == resultDf.collect)
-
+  ignore("default values") {
+    testDefaultValues()
   }
 
-  test("includeColumns set") {
-
-    // prepare
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("column1", "column2"))
-    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
-    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Some(-1), Some(3.0)), (Some("na"), Some(2), Option.empty[Double]), (Some("na"), Some(-1), Option.empty[Double]))
-    val df = SparkDataFrame(initSeq.toDF("column1", "column2", "column3"))
-    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
-
-    // execute
-    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformedDf.collect == resultDf.collect)
-
+  ignore("includeColumns set") {
+    testIncludeColumnsSet()
   }
 
-  test("excludeColumns set") {
-    // prepare
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(excludeColumns = Seq("column1", "column2"))
-    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
-    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Some(-1.0)), (Option.empty[String], Option.empty[Int], Some(-1.0)))
-    val df = SparkDataFrame(initSeq.toDF("column1", "column2", "column3"))
-    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
-
-    // execute
-    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformedDf.collect == resultDf.collect)
+  ignore("excludeColumns set") {
+    testExcludeColumnsSet()
   }
 
-  test("custom string value check") {
-    // prepare
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(valueForString = "n/a")
-    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
-    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Some(-1), Some(3.0)), (Some("n/a"), Some(2), Some(-1.0)), (Some("n/a"), Some(-1), Some(-1.0)))
-    val df = SparkDataFrame(initSeq.toDF("column1", "column2", "column3"))
-    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
-
-    // execute
-    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformedDf.collect == resultDf.collect)
+  ignore("custom string value check") {
+    testCustomStringValueCheck()
   }
 
-  test("custom number value check") {
-    // prepare
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(valueForNumber = -7)
-    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
-    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Some(-7), Some(3.0)), (Some("na"), Some(2), Some(-7.0)), (Some("na"), Some(-7), Some(-7.0)))
-    val df = SparkDataFrame(initSeq.toDF("column1", "column2", "column3"))
-    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
-
-    // execute
-    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformedDf.collect == resultDf.collect)
+  ignore("custom number value check") {
+    testCustomNumberValueCheck()
   }
 
-  test("ignore other than string / number types columns") {
-    // prepare
-    val convertNullValuesTransformer = ConvertNullValuesTransformer()
-    val initSeq: Seq[(Option[String], Option[Int], Option[Double], Option[Float], Option[Boolean])] = Seq((Some("1"), Option.empty[Int], Some(3.0), Option.empty[Float], Option.empty[Boolean]), (Option.empty[String], Some(2), Option.empty[Double], Option.empty[Float], Option.empty[Boolean]), (Option.empty[String], Option.empty[Int], Option.empty[Double], Some(9.0f), Some(false)))
-    val resultSeq: Seq[(Option[String], Option[Int], Option[Double], Option[Float], Option[Boolean])] = Seq((Some("1"), Some(-1), Some(3.0), Some(-1.0f), Option.empty[Boolean]), (Some("na"), Some(2), Some(-1.0), Some(-1.0f), Option.empty[Boolean]), (Some("na"), Some(-1), Some(-1.0), Some(9.0f), Some(false)))
-    val df = SparkDataFrame(initSeq.toDF("column1", "column2", "column3", "column4", "column5"))
-    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3", "column4", "column5"))
-
-    // execute
-    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformedDf.collect == resultDf.collect)
+  ignore("ignore other than string / number types columns") {
+    testIgnoreOtherThanStringOrNumberTypesColumns()
   }
 
-  test("no error for existing include columns (case insensitive)") {
-
-    // prepare
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("coluMN1", "colUMn2", "COLUMn3"))
-    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
-    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Some(-1), Some(3.0)), (Some("na"), Some(2), Some(-1.0)), (Some("na"), Some(-1), Some(-1.0)))
-    val df = SparkDataFrame(initSeq.toDF("column1", "column2", "column3"))
-    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
-
-    // execute
-    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformedDf.collect == resultDf.collect)
-
+  ignore("no error for existing include columns (case insensitive)") {
+    testNoErrorForExistingIncludeColumnsCaseInsensitive()
   }
 
-  test("error for non existing include columns (case insensitive)") {
-    // prepare
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("coluMN1", "colUMn2", "column3")) // column3 does not exists
-    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
-
-    // execute
-    val thrown = intercept[IllegalArgumentException] {
-      convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-    }
-
-    // check
-    assert(thrown.isInstanceOf[IllegalArgumentException])
+  ignore("error for non existing include columns (case insensitive)") {
+    testErrorForNonExistingIncludeColumnsCaseInsensitive()
   }
 
-  test("no error for existing include columns (case sensitive)") {
-
-    // prepare
-    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
-    Environment._caseSensitive = Some(true)
-
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("coluMN1", "colUMn2", "COLUMn3"))
-    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
-    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Some(-1), Some(3.0)), (Some("na"), Some(2), Some(-1.0)), (Some("na"), Some(-1), Some(-1.0)))
-    val df = SparkDataFrame(initSeq.toDF("coluMN1", "colUMn2", "COLUMn3"))
-    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
-
-    // execute
-    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformedDf.collect == resultDf.collect)
-
-    // cleanup
-    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
-
+  ignore("no error for existing include columns (case sensitive)") {
+    testNoErrorForExistingIncludeColumnsCaseSensitive()
   }
 
-  test("error for non existing include columns (case sensitive)") {
-    // prepare
-    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
-    Environment._caseSensitive = Some(true)
-
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(includeColumns = Seq("coluMN1", "column2"))
-    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
-
-    // execute
-    val thrown = intercept[IllegalArgumentException] {
-      convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-    }
-
-    // check
-    assert(thrown.isInstanceOf[IllegalArgumentException])
-
-    // cleanup
-    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+  ignore("error for non existing include columns (case sensitive)") {
+    testErrorForNonExistingIncludeColumnsCaseSensitive()
   }
 
-  test("no error for existing exclude columns (case insensitive)") {
-
-    // prepare
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(excludeColumns = Seq("coluMN1", "colUMn2"))
-    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
-    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Some(-1.0)), (Option.empty[String], Option.empty[Int], Some(-1.0)))
-    val df = SparkDataFrame(initSeq.toDF("column1", "column2", "column3"))
-    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
-
-    // execute
-    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformedDf.collect == resultDf.collect)
-
+  ignore("no error for existing exclude columns (case insensitive)") {
+    testNoErrorForExistingExcludeColumnsCaseInsensitive()
   }
 
-  test("error for non existing exclude columns (case insensitive)") {
-    // prepare
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(excludeColumns = Seq("coluMN1", "colUMn2", "column3")) // column3 does not exists
-    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
-
-    // execute
-    val thrown = intercept[IllegalArgumentException] {
-      convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-    }
-
-    // check
-    assert(thrown.isInstanceOf[IllegalArgumentException])
+  ignore("error for non existing exclude columns (case insensitive)") {
+    testErrorForNonExistingExcludeColumnsCaseInsensitive()
   }
 
-  test("no error for existing exclude columns (case sensitive)") {
-
-    // prepare
-    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
-    Environment._caseSensitive = Some(true)
-
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(excludeColumns = Seq("colUMN1", "coLUmn2"))
-    val initSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Option.empty[Double]), (Option.empty[String], Option.empty[Int], Option.empty[Double]))
-    val resultSeq: Seq[(Option[String], Option[Int], Option[Double])] = Seq((Some("1"), Option.empty[Int], Some(3.0)), (Option.empty[String], Some(2), Some(-1.0)), (Option.empty[String], Option.empty[Int], Some(-1.0)))
-    val df = SparkDataFrame(initSeq.toDF("colUMN1", "coLUmn2", "column3"))
-    val resultDf = SparkDataFrame(resultSeq.toDF("column1", "column2", "column3"))
-
-    // execute
-    val transformedDf = convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformedDf.collect == resultDf.collect)
-
-    // cleanup
-    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
-
+  ignore("no error for existing exclude columns (case sensitive)") {
+    testNoErrorForExistingExcludeColumnsCaseSensitive()
   }
 
-  test("error for non existing exclude columns (case sensitive)") {
-    // prepare
-    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
-    Environment._caseSensitive = Some(true)
-
-    val convertNullValuesTransformer = ConvertNullValuesTransformer(excludeColumns = Seq("coluMN1", "column2"))
-    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
-
-    // execute
-    val thrown = intercept[IllegalArgumentException] {
-      convertNullValuesTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-    }
-
-    // check
-    assert(thrown.isInstanceOf[IllegalArgumentException])
-
-    // cleanup
-    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+  ignore("error for non existing exclude columns (case sensitive)") {
+    testErrorForNonExistingExcludeColumnsCaseSensitive()
   }
-
 }

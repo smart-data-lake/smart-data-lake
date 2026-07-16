@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.snowflake
 import com.snowflake.snowpark.{DataFrame, Session}
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTransformer
 import io.smartdatalake.workflow.action.generic.transformer._
@@ -50,7 +50,7 @@ object SparkAndSnowparkDataPipelineIT extends App {
 
   val sdlb = DefaultSmartDataLakeBuilder
   implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
-  implicit val sparkSession: SparkSession = TestUtil.session
+  implicit val sparkSession: SparkSession = SparkTestUtil.session
   implicit val context: ActionPipelineContext =  ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
 
   val tempDir = Files.createTempDirectory("test")

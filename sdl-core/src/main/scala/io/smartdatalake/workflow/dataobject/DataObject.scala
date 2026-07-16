@@ -25,15 +25,12 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.generic.{HousekeepingMode, SchemaValidation, UserDefinedSchema}
-import org.apache.spark.annotation.DeveloperApi
-
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 /**
  * This is the root trait for every DataObject.
  */
-@DeveloperApi
 trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] with SmartDataLakeLogger {
 
   /**

@@ -22,8 +22,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.util.misc.LogUtil
 import io.smartdatalake.util.misc.LogUtil.getRootCause
-import io.smartdatalake.workflow.{SimplifiedAnalysisException, SubFeed}
-import org.apache.spark.sql.catalyst.ExtendedAnalysisException
+import io.smartdatalake.workflow.SubFeed
 
 private[smartdatalake] abstract class DAGException(msg: String, cause: Throwable = null) extends Exception(msg, cause) {
   def severity: ExceptionSeverity.ExceptionSeverity
@@ -34,6 +33,12 @@ private[smartdatalake] case class TaskFailedException(id: NodeId, msg: String, c
   override def getDAGRootExceptions: Seq[DAGException] = Seq(this)
 }
 private[smartdatalake] object TaskFailedException {
+  // Provider registered by sdl-spark to wrap Spark-specific exceptions (e.g. ExtendedAnalysisException)
+  private[smartdatalake] var _exceptionWrapper: PartialFunction[Throwable, Throwable] = PartialFunction.empty
+  private[smartdatalake] def registerExceptionWrapper(wrapper: PartialFunction[Throwable, Throwable]): Unit = {
+    _exceptionWrapper = wrapper
+  }
+
   def apply(id: NodeId, cause: Throwable, results: Option[Seq[SubFeed]]): TaskFailedException = {
     // get root cause to show create message of this exception
     val rootCause = Option(getRootCause(cause))
@@ -44,9 +49,8 @@ private[smartdatalake] object TaskFailedException {
     // create exception
     val ex = cause match {
       case ex: DAGException => TaskFailedException(id, msg, cause, ex.severity, results)
-      case ex: ExtendedAnalysisException if Environment.simplifyFinalExceptionLog =>
-        // reduce logical plan output to 5 lines
-        TaskFailedException(id, msg, new SimplifiedAnalysisException(ex), ExceptionSeverity.FAILED, results)
+      case ex if _exceptionWrapper.isDefinedAt(ex) && Environment.simplifyFinalExceptionLog =>
+        TaskFailedException(id, msg, _exceptionWrapper(ex), ExceptionSeverity.FAILED, results)
       case _ => TaskFailedException(id, msg, cause, ExceptionSeverity.FAILED, results)
     }
     // remove stacktrace: avoid many lines of DAG, Monix and Java stacktrace and show directly the real exception that made the task fail

@@ -34,7 +34,7 @@ import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.KafkaColumnType.{AvroSchemaRegistry, JsonSchemaRegistry, KafkaColumnType}
 import io.smartdatalake.workflow.dataobject.TopicPartitionOffsets.getOffsetForSpark
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, CanEvolveSchema, CanHandlePartitions, SchemaValidation}
-import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanCreateStreamingDataFrame, CanWriteSparkDataFrame}
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanCreateStreamingDataFrame, CanWriteSparkDataFrame, DataStreamWriterOptions}
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer, OffsetAndMetadata}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
@@ -46,7 +46,7 @@ import org.apache.spark.sql.confluent.avro.{AvroHelper, ConfluentAvroConnector}
 import org.apache.spark.sql.confluent.json.ConfluentJsonConnector
 import org.apache.spark.sql.confluent.{ConfluentConnector, SubjectType}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
+import org.apache.spark.sql.streaming.StreamingQuery
 import org.apache.spark.sql.types._
 import org.slf4j.Logger
 
@@ -169,13 +169,13 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   if (allowSchemaEvolution && Seq(keyType,valueType).intersect(Seq(JsonSchemaRegistry,AvroSchemaRegistry)).isEmpty) logger.warn(s"($id) allowSchemaEvolution=true is ignored if keyType or valueType is not set to Json/AvroSchemaRegistry")
   require(batchReadMaxOffsetsPerTask.isEmpty || batchReadMaxOffsetsPerTask.exists(_>0), s"($id) batchReadMaxOffsetsPerTask must be greater than 0")
 
-  @transient lazy val keyConfluentConnector: Option[ConfluentConnector] = keyType match {
+  @transient private lazy val keyConfluentConnector: Option[ConfluentConnector] = keyType match {
     case KafkaColumnType.JsonSchemaRegistry => connection.schemaRegistry.map(ConfluentJsonConnector(_))
     case KafkaColumnType.AvroSchemaRegistry => connection.schemaRegistry.map(ConfluentAvroConnector(_))
     case _ => None
   }
 
-  @transient lazy val valueConfluentConnector: Option[ConfluentConnector] = valueType match {
+  @transient private lazy val valueConfluentConnector: Option[ConfluentConnector] = valueType match {
     case KafkaColumnType.JsonSchemaRegistry => connection.schemaRegistry.map(ConfluentJsonConnector(_))
     case KafkaColumnType.AvroSchemaRegistry => connection.schemaRegistry.map(ConfluentAvroConnector(_))
     case _ => None
@@ -389,7 +389,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         .option("topic", topicName)
         .save()
     )
-    // Kafka might return 0 for records_written even if the write was successful.
+    // Kafka might return 0 for records_written even if writing was successful.
     // Filter out this metric to avoid NoDataToProcessException and skipping this and subsequent actions.
     if (metrics.get("records_written").contains(0)) {
       metrics = metrics - "records_written"
@@ -397,18 +397,20 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     metrics
   }
 
-  override def writeStreamingDataFrame(df: GenericDataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode, saveModeOptions: Option[SaveModeOptions] = None)
+  override def writeStreamingDataFrame(df: GenericDataFrame,
+                                       options: DataStreamWriterOptions,
+                                       saveModeOptions: Option[SaveModeOptions] = None)
                                       (implicit context: ActionPipelineContext): StreamingQuery = {
     df match {
       case sparkDf: SparkDataFrame =>
         encodeKeyValue(sparkDf.inner)
           .writeStream
           .format("kafka")
-          .trigger(trigger)
-          .queryName(queryName)
-          .outputMode(outputMode)
-          .options(instanceOptions ++ options)
-          .option("checkpointLocation", checkpointLocation)
+          .trigger(options.trigger)
+          .queryName(options.queryName)
+          .outputMode(options.outputMode)
+          .options(instanceOptions ++ options.options)
+          .option("checkpointLocation", options.checkpointLocation)
           .option("topic", topicName)
           .start()
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeStreamingDataFrame")
@@ -631,7 +633,7 @@ private case class TopicPartitionOffsets(topicPartition: TopicPartition, startOf
 private object TopicPartitionOffsets {
   // default offset definitions according to spark
   val defaultOffsetEarliest: Int = -2
-  val defaultOffsetLatest: Int = -1
+  private val defaultOffsetLatest: Int = -1
 
   /**
    * Create string to use as starting/endingOffset option for Spark Kafka data source

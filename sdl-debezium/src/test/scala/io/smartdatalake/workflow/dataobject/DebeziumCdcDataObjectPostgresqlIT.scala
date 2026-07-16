@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
@@ -48,7 +48,7 @@ object DebeziumCdcDataObjectPostgresqlIT extends App with SmartDataLakeLogger {
    * Init tests
    */
 
-  implicit val sparkSession: SparkSession = TestUtil.session
+  implicit val sparkSession: SparkSession = SparkTestUtil.session
   import sparkSession.implicits._
 
   val COMMIT_TYPE_COLUMN_NAME = "__commit_event"

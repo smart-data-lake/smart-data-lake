@@ -21,6 +21,7 @@ package io.smartdatalake.testutils
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.exporter.ExportWriter.formatSchema
 import io.smartdatalake.config.exporter.HadoopExportWriter
+import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTransformer
@@ -30,7 +31,6 @@ import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame, TableDataObject}
 import io.smartdatalake.workflow.dataobject.DataObject
-import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.hadoop.fs.Path
 import org.slf4j.Logger
@@ -41,7 +41,7 @@ trait CopyActionBehaviour {
   this: SmartDataLakeLogger =>
 
   implicit private val implicitLogger: Logger = logger
-  import TestUtil.registerDataObject
+  import io.smartdatalake.testutils.plainScala.ScalaTestUtil.registerDataObject
 
   def defaultEngineConnection: Connection with EngineConnection
 
@@ -51,7 +51,7 @@ trait CopyActionBehaviour {
                             ): DataFrameSubFeed = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-    implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+    implicit val contextInit: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
     instanceRegistry.register(defaultEngineConnection)
 
     // setup DataObjects

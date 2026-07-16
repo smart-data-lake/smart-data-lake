@@ -26,7 +26,6 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.MetricsUtil.{orderMetrics, orderMetricsDefault}
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow._
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.generic.CanHandlePartitions
 
@@ -226,9 +225,10 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   }
 
   override final def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = try {
+    logger.debug(s"START ActionSubFeedsImpl.exec: ${subFeeds.length} subFeeds")
     require(context.isExecPhase, throw new IllegalStateException(s"context.phase=${context.phase} but should be Exec for executing action!"))
     validateInputSubFeeds(subFeeds)
-    if (isAsynchronousProcessStarted) return outputs.map(output => SparkSubFeed(None, output.id, Seq())) // empty output subfeeds if asynchronous action started
+    if (isAsynchronousProcessStarted) return outputs.map(output => InitSubFeed(output.id, Seq())) // empty output subfeeds if asynchronous action started
     // prepare
     var (inputSubFeeds, outputSubFeeds) = prepareInputSubFeeds(subFeeds)
     try {

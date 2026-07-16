@@ -23,7 +23,6 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.{ExpectationScope, Job}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.ExpectationSeverity
@@ -72,7 +71,7 @@ case class SQLFractionExpectation(
     }
   }
   def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])
-                              (implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
+                              (implicit context: ActionPipelineContext): (Seq[GenericColumn],Map[String,_]) = {
     import ExpectationValidation.partitionDelimiter
     val totalMetric = if (globalConditionExpression.isDefined) totalName else "count"
     if (scope == ExpectationScope.JobPartition) {
@@ -81,8 +80,8 @@ case class SQLFractionExpectation(
           val countExpectation = getMetric[Long](dataObjectId,metrics,n)
           val totalPartitionMetric = (totalMetric +: n.split(partitionDelimiter).drop(1)).mkString(partitionDelimiter)
           val countTotal = getMetric[Long](dataObjectId,metrics,totalPartitionMetric)
-          val (col, pct) = getValidationErrorColumn(dataObjectId, countExpectation, countTotal, n)
-          (col.map(SparkColumn), Map(n -> pct))
+          val (col, pct) = getValidationErrorColumnSql(dataObjectId, countExpectation, countTotal, n)
+          (col.toSeq, Map(n -> pct))
         }
       val cols = colsAndUpdatedMetrics.flatMap(_._1)
       val updatedMetrics = metrics.view.filterKeys(!_.startsWith(totalName)).toMap ++ colsAndUpdatedMetrics.map(_._2).reduce(_ ++ _)
@@ -90,9 +89,9 @@ case class SQLFractionExpectation(
     } else {
       val countExpectation = getMetric[Long](dataObjectId,metrics,name)
       val countTotal = getMetric[Long](dataObjectId,metrics,totalMetric)
-      val (col, pct) = getValidationErrorColumn(dataObjectId, countExpectation, countTotal)
+      val (col, pct) = getValidationErrorColumnSql(dataObjectId, countExpectation, countTotal)
       val updatedMetrics = metrics.view.filterKeys(_ != totalName).toMap + (name -> pct)
-      (col.map(SparkColumn).toSeq, updatedMetrics)
+      (col.toSeq, updatedMetrics)
     }
   }
 

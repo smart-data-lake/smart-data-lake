@@ -24,7 +24,7 @@ import io.smartdatalake.config.exporter.ExportWriter.formatSchema
 import io.smartdatalake.config.exporter.FileExportWriter
 import io.smartdatalake.meta.configexporter.DataObjectSchemaExporter.{exportSchemaAndStats, getCurrentVersion}
 import io.smartdatalake.testutils.DataFrameTestHelper.ComplexTypeTest
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
@@ -174,8 +174,8 @@ class DataObjectSchemaExporterTest extends AnyFunSuite with BeforeAndAfter {
 
   test("export statistics") {
     val (registry, _) = ConfigToolbox.loadAndParseConfig(Seq(configPath))
-    implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext(registry)
-    val session: SparkSession = TestUtil.session
+    implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext(registry)
+    val session: SparkSession = SparkTestUtil.session
     import session.implicits._
     // prepare data object
     val testDO = registry.get[JdbcTableDataObject](DataObjectId("dataObjectJdbc14"))

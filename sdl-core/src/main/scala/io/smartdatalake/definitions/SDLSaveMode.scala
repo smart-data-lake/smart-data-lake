@@ -19,11 +19,8 @@
 package io.smartdatalake.definitions
 
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.DataFrameSubFeed
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
-import org.apache.spark.sql.{DataFrameWriterV2, Row, SaveMode}
 
 import scala.language.implicitConversions
 import scala.reflect.runtime.universe.Type
@@ -36,19 +33,19 @@ object SDLSaveMode extends Enumeration {
 
   // Standard Spark SaveMode's
   /**
-   * @see [[SaveMode]]
+   * @see Spark SaveMode
    */
   val Overwrite: Value = Value("Overwrite")
   /**
-   * @see [[SaveMode]]
+   * @see Spark SaveMode
    */
   val Append: Value = Value("Append")
   /**
-   * @see [[SaveMode]]
+   * @see Spark SaveMode
    */
   val ErrorIfExists: Value = Value("Error")
   /**
-   * @see [[SaveMode]]
+   * @see Spark SaveMode
    */
   val Ignore: Value = Value("Ignore")
 
@@ -89,17 +86,6 @@ object SDLSaveMode extends Enumeration {
    * Note that only few DataObjects are able to merge new data, e.g. DeltaLakeTableDataObject and JdbcTableDataObject
    */
   val Merge: Value = Value("Merge")
-
-  private[smartdatalake] def execV2(saveMode: SDLSaveMode.Value, writer: DataFrameWriterV2[Row], partitionValues: Seq[PartitionValues], partitionOverwriteModeDynamic: Boolean = false): Unit = {
-    implicit val helper: SparkSubFeed.type = SparkSubFeed
-    import org.apache.spark.sql.functions.expr
-    saveMode match {
-      case SDLSaveMode.Append => writer.append()
-      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.nonEmpty => writer.overwrite(expr(partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql))
-      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty && partitionOverwriteModeDynamic => writer.overwritePartitions()
-      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty => writer.replace()
-    }
-  }
 }
 
 /**

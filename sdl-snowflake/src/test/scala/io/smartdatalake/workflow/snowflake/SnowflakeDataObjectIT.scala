@@ -21,9 +21,10 @@ package io.smartdatalake.workflow.snowflake
 import com.snowflake.snowpark
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.SparkSchemaUtil
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.dataframe.snowflake.SnowparkSubFeed
@@ -42,9 +43,10 @@ import org.scalatest.matchers.should.Matchers.intercept
  */
 object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
 
-  implicit val sparkSession: SparkSession = TestUtil.session
+  implicit val sparkSession: SparkSession = SparkTestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
+  io.smartdatalake.util.spark.GetSession.loggEnv(sparkSession, logger)
 
   instanceRegistry.register(SnowflakeConnectionConfig.sfConnection)
 
@@ -55,7 +57,7 @@ object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
   )
   instanceRegistry.register(testDO)
   val testDOSchemaMin = testDO.copy(
-    schemaMin = Some(SparkSchema(SchemaUtil.getSchemaFromDdl("id bigint, s1 string, s2 string, dt string")))
+    schemaMin = Some(SparkSchema(SparkSchemaUtil.getSchemaFromDdl("id bigint, s1 string, s2 string, dt string")))
   )
   val testDOWithReadTransformer =
     testDO.copy(readTransformer = Some(SQLDfTransformer(code = Some(s"select cast(id as bigint) id, s1, s2, dt from %{inputViewName}"))))
@@ -128,7 +130,7 @@ object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
   // validate schemaMin while reading
   {
     val testDOSchemaX = testDOSchemaMin.copy(
-      schemaMin = Some(SparkSchema(SchemaUtil.getSchemaFromDdl("id bigint, s1 string, s2 string, dt string, x string")))
+      schemaMin = Some(SparkSchema(SparkSchemaUtil.getSchemaFromDdl("id bigint, s1 string, s2 string, dt string, x string")))
     )
     intercept[SchemaViolationException](testDOSchemaX.getSnowparkDataFrame(Seq()))
   }
@@ -137,7 +139,7 @@ object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
   testDO.dropTable
 
   // get empty DataFrame (from SparkSchema)
-  SnowparkSubFeed.getEmptyDataFrame(SparkSchema(SchemaUtil.getSchemaFromDdl("id bigint, s1 string, s2 string, dt string")), testDO.id)
+  SnowparkSubFeed.getEmptyDataFrame(SparkSchema(SparkSchemaUtil.getSchemaFromDdl("id bigint, s1 string, s2 string, dt string")), testDO.id)
 
   // validate schemaMin while writing
   {

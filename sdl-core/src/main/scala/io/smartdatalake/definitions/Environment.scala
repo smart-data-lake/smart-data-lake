@@ -23,6 +23,7 @@ import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.hdfs.{DefaultFileSystemFactory, FileSystemFactory, UCFileSystemFactory}
 import io.smartdatalake.util.misc._
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaExpressionEvaluatorFactory
 import org.slf4j.event.Level
 
 import java.net.URI
@@ -56,11 +57,12 @@ object Environment extends SmartDataLakeLogger {
         EnvironmentUtil.getSdlParameter("expressionEvaluatorFactory")
           .map(ScalaUtil.companionOf[ExpressionEvaluatorFactory])
           .getOrElse {
-            val defaultFactories = Seq("ch.zzeekk.spark.expressions.SparkExpressionEvaluatorFactory", "org.apache.spark.sql.custom.SparkExpressionEvaluatorFactory")
+            val sparkFactories = Seq("ch.zzeekk.spark.expressions.SparkExpressionEvaluatorFactory", "org.apache.spark.sql.custom.SparkExpressionEvaluatorFactory")
               .flatMap(CustomCodeUtil.getClassByNameIfExists)
-            assert(defaultFactories.nonEmpty, "No ExpressionEvaluatorFactory found. Make sure spark-extensions or spark-expressions-standalone library is in the classpath.")
-            if (defaultFactories.size > 1) logger.warn(s"Multiple ExpressionEvaluatorFactory implementations found. Using ${defaultFactories.head.getName}. Make sure only one of spark-extensions or spark-expressions-standalone library is in the classpath.")
-            ScalaUtil.companionOf[ExpressionEvaluatorFactory](defaultFactories.head.getName)
+            if (sparkFactories.size > 1) logger.warn(s"Multiple ExpressionEvaluatorFactory implementations found. Using ${sparkFactories.head.getName}. Make sure only one of spark-extensions or spark-expressions-standalone library is in the classpath.")
+            // if no Spark expression library is in the classpath, fall back to the plain-Scala expression evaluator with limited expression support
+            val factoryClassName = sparkFactories.headOption.map(_.getName).getOrElse(classOf[ScalaExpressionEvaluatorFactory].getName)
+            ScalaUtil.companionOf[ExpressionEvaluatorFactory](factoryClassName)
           }
       )
     }

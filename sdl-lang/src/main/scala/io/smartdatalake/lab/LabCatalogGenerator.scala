@@ -19,8 +19,8 @@
 package io.smartdatalake.lab
 
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException, InstanceRegistry}
-import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.misc.StringUtil.strToLowerCamelCase
+import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.{Action, CustomDataFrameAction, DataFrameOneToOneActionImpl}
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
@@ -53,14 +53,16 @@ case class LabCatalogGeneratorConfig(
     dataObjectCatalogClassName: String = "DataObjectCatalog",
     actionCatalogClassName: String = "ActionCatalog",
     additionalSrcPath: Option[String] = None
-)
+) {
+  def toDebugString: String = ProductUtil.toDebugString(obj = this)
+}
 
 /**
- * Command line interface to generate a scala files that serve as catalog for
+ * Command line interface to generate a Scala files that serve as catalog for
  * SmartDataLakeBuilderLab. For now a catalog for DataObjects is created, but could be extended to
  * Actions in the future.
  *
- * The compilation of the scala file has to be added in the build process of the SDLB application as
+ * The compilation of the Scala file has to be added in the build process of the SDLB application as
  * a second compilation phase because it needs to parse the configuration, incl. potential
  * transformers defined. In Maven this can be done by defining the following additional plugins and
  * adding `sdl-lang` as additional project dependency:
@@ -168,7 +170,7 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
     // parse config
     val (registry, _) = ConfigToolbox.loadAndParseConfig(config.configPaths)
 
-    // write scala files
+    // write Scala files
     val dataObjectCatalogClassDef = generateDataObjectCatalogClass(config.packageName, config.dataObjectCatalogClassName, registry)
     createCatalogScalaFile(config.srcDirectory, config.packageName, config.dataObjectCatalogClassName, dataObjectCatalogClassDef)
     val actionCatalogClassDef = generateActionCatalogClass(config.packageName, config.actionCatalogClassName, registry)

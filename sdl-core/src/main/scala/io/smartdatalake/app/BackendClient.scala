@@ -24,9 +24,8 @@ import io.smartdatalake.config.{ConfigLoader, ConfigurationException}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.SDLExecutionId
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.util.Json4sCompat
 import org.json4s.jackson.JsonMethods
-import org.json4s.{DefaultFormats, Formats, JString}
+import org.json4s.{CustomSerializer, DefaultFormats, Formats, JString}
 import sttp.client3.multipart
 import sttp.model.{MediaType, Method}
 
@@ -103,11 +102,9 @@ case class BackendClient(uploader: UploadService) extends ExportWriter with Smar
   }
 
   org.json4s.ext.JavaTimeSerializers.all
-  implicit private val formats: Formats = DefaultFormats + Json4sCompat.getCustomSerializer[Timestamp](_ => ( {
-    case json: JString => Timestamp.from(OffsetDateTime.parse(json.s).toInstant)
-  }, {
-    case obj: Timestamp => JString(obj.toLocalDateTime.toString)
-  }
+  implicit private val formats: Formats = DefaultFormats + new CustomSerializer[Timestamp](_ => (
+    { case json: JString => Timestamp.from(OffsetDateTime.parse(json.s).toInstant) },
+    { case obj: Timestamp => JString(obj.toLocalDateTime.toString) }
   ))
 
   private def parseFileDescriptors(jsonStr: String): Seq[FileDescriptor] = {

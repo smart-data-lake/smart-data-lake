@@ -19,75 +19,33 @@
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.BlacklistTransformerBehaviour
+import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.internal.SQLConf
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import org.scalatest.funsuite.AnyFunSuite
 
-class BlacklistTransformerTest extends AnyFunSuite {
+import scala.reflect.runtime.universe.{Type, typeOf}
 
-  protected implicit val session: SparkSession = TestUtil.session
-  import session.implicits._
+class BlacklistTransformerTest extends AnyFunSuite with BlacklistTransformerBehaviour {
 
+  override def subFeedType: Type = typeOf[ScalaSubFeed]
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
 
   test("only columns where the names match are removed") {
-    // prepare
-    val blacklistTransformer = BlacklistTransformer(columnBlacklist = Seq("column1", "column3"))
-    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "column2"))
-
-    // execute
-    val transformed = blacklistTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformed.schema.columns == Seq("column2"))
+    testOnlyMatchingColumnsRemoved()
   }
 
   test("column blacklisting is case insensitive per default") {
-    // prepare
-    val blacklistTransformer = BlacklistTransformer(columnBlacklist = Seq("ColumN1"))
-    val df = SparkDataFrame(Seq(1, 2).toDF("column1"))
-
-    // execute
-    val transformed = blacklistTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformed.schema.columns.isEmpty)
+    testCaseInsensitiveByDefault()
   }
 
   test("column blacklisting is case sensitive if Environment.caseSensitive=true") {
-    // prepare
-    val previousCaseSensitive = session.conf.get(SQLConf.CASE_SENSITIVE.key)
-    session.conf.set(key = SQLConf.CASE_SENSITIVE.key, value = true)
-    Environment._caseSensitive = Some(true)
-    val blacklistTransformer = BlacklistTransformer(columnBlacklist = Seq("ColumN1"))
-    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column1", "ColumN1"))
-
-    // execute
-    val transformed = blacklistTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformed.schema.columns == Seq("column1"))
-
-    // cleanup
-    Environment._caseSensitive = Some(previousCaseSensitive.toBoolean)
-    session.conf.set(SQLConf.CASE_SENSITIVE.key, previousCaseSensitive)
+    testCaseSensitiveIfEnvironmentCaseSensitive()
   }
 
   test("column blacklisting throws no error if remaining column has dots") {
-    // prepare
-    val blacklistTransformer = BlacklistTransformer(columnBlacklist = Seq("column.2"))
-    val df = SparkDataFrame(Seq((1, 1), (2, 2)).toDF("column.1", "column.2"))
-
-    // execute
-    val transformed = blacklistTransformer.transform("id", Seq(), df, DataObjectId("dataObjectId"), None, Map())
-
-    // check
-    assert(transformed.schema.columns == Seq("column.1"))
+    testNoErrorIfRemainingColumnHasDots()
   }
 }

@@ -1,0 +1,276 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+package io.smartdatalake.workflow.dataobject
+
+import io.smartdatalake.definitions.{Environment, SDLSaveMode}
+import io.smartdatalake.testutils.spark.SparkTestTool
+import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import org.apache.spark.SparkException
+import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.types.{StringType, StructType}
+
+import java.nio.file.Files
+
+class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite with SparkTestTool {
+
+  import session.implicits._
+
+  test("CSV files with missing and superfluous column") {
+    val tempDir = Files.createTempDirectory("csv")
+
+    // exact schema
+    val data1 = Seq(("A", "1", "-"), ("B", "2", null))
+    val df1 = data1.toDF("h1", "h2", "h3")
+    df1.write.mode(SaveMode.Append).option(key = "header", value = true).csv(tempDir.toFile.getPath)
+
+    // schema missing column h3
+    val data2 = Seq(("C", "1"), ("D", "2"))
+    val df2 = data2.toDF("h1", "h2")
+    df2.write.mode(SaveMode.Append).option(key = "header", value = true).csv(tempDir.toFile.getPath)
+
+    // schema has superfluous column h4
+    val data3 = Seq(("C", "1", "-", "x"), ("D", "2", "-", "x"))
+    val df3= data3.toDF("h1", "h2", "h3", "h4")
+    df3.write.mode(SaveMode.Append).option(key = "header", value = true).csv(tempDir.toFile.getPath)
+
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = Some(SparkSchema(df1.schema)))
+
+    val dfResult = dataObj.getSparkDataFrame()
+
+    assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3"))
+    val expectedResult = data1 ++ data2.map(x => (x._1, x._2, null)) ++ data3.map(x => (x._1, x._2, x._3))
+    assert(dfResult.as[(String,String,String)].collect().toSet == expectedResult.toSet )
+  }
+
+  test("CSV files with missing and superfluous column treated as error") {
+    val tempDir = Files.createTempDirectory("csv")
+
+    // exact schema
+    val data1 = Seq(("A", "1", "-"), ("A", "2", null))
+    val df1 = data1.toDF("h1", "h2", "h3")
+    df1.write.mode(SaveMode.Append).option(key = "header", value = true).csv(tempDir.toFile.getPath)
+
+    // schema missing column h3
+    val data2 = Seq(("B", "1"), ("B", "2"))
+    val df2 = data2.toDF("h1", "h2")
+    df2.write.mode(SaveMode.Append).option(key = "header", value = true).csv(tempDir.toFile.getPath)
+
+    // schema has superfluous column h4
+    val data3 = Seq(("C", "1", "-", "x"), ("C", "2", "-", "x"))
+    val df3= data3.toDF("h1", "h2", "h3", "h4")
+    df3.write.mode(SaveMode.Append).option(key = "header", value = true).csv(tempDir.toFile.getPath)
+
+    val schema = Some(df1.schema.add("_filename", StringType).add("_corrupt_record", StringType).add("_corrupt_record_msg", StringType))
+    val dataObj = RelaxedCsvFileDataObject( id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema.apply), filenameColumn = Some("_filename")
+                                          , treatMissingColumnsAsCorrupt = true, treatSuperfluousColumnsAsCorrupt = true)
+
+    val dfResult = dataObj.getSparkDataFrame().cache()
+
+    assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3", "_corrupt_record", "_corrupt_record_msg", "_filename"))
+    assert(dfResult.where($"h1"==="A" and $"_corrupt_record".isNull and $"_corrupt_record_msg".isNull).count() == 2)
+    assert(dfResult.where($"h1"==="B" and $"_corrupt_record".isNotNull and $"_corrupt_record_msg".isNotNull).count() == 2)
+    assert(dfResult.where($"h1"==="C" and $"_corrupt_record".isNotNull and $"_corrupt_record_msg".isNotNull).count() == 2)
+  }
+
+  test("CSV files with different column order") {
+    val tempDir = Files.createTempDirectory("csv")
+
+    // column order 1
+    val data1 = Seq(("A", "1", "-"), ("B", "2", null))
+    val df1 = data1.toDF("h1", "h2", "h3")
+    df1.write.mode(SaveMode.Append).option(key = "header", value = true).csv(tempDir.toFile.getPath)
+
+    // column order 2
+    val data2 = Seq(("1","-","C"), ("2","-","D"))
+    val df2 = data2.toDF("h2", "h3", "h1")
+    df2.write.mode(SaveMode.Append).option(key = "header", value = true).csv(tempDir.toFile.getPath)
+
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = Some(SparkSchema(df1.schema)))
+
+    val dfResult = dataObj.getSparkDataFrame()
+
+    assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3"))
+    val expectedResult = data1 ++ data2.map(x => (x._3, x._1, x._2))
+    assert(dfResult.as[(String,String,String)].collect().toSet == expectedResult.toSet )
+  }
+
+  test("CSV files with filename col") {
+    val tempDir = Files.createTempDirectory("csv")
+
+    val data1 = Seq(("A", "1", "-"), ("B", "2", null))
+    val df1 = data1.toDF("h1", "h2", "h3")
+    df1.write.mode(SaveMode.Append).option(key = "header", value = true).csv(tempDir.toFile.getPath)
+
+    val data2 = Seq(("1","-","C"), ("2","-","D"))
+    val df2 = data2.toDF("h2", "h3", "h1")
+    df2.write.mode(SaveMode.Append).option(key = "header", value = true).csv(tempDir.toFile.getPath)
+
+    val schema = Some(df1.schema.add("_filename", StringType))
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema.apply), filenameColumn = Some("_filename"))
+
+    val dfResult = dataObj.getSparkDataFrame().cache()
+
+    assert(dfResult.columns.toSet == Set("h1", "h2", "h3", "_filename"))
+    val expectedResult = data1 ++ data2.map(x => (x._3, x._1, x._2))
+    assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect().toSet == expectedResult.toSet )
+    assert(dfResult.select($"_filename").distinct().count() > 1 )
+  }
+
+  test("CSV files partitioned") {
+    val tempDir = Files.createTempDirectory("csv")
+
+    val data1 = Seq(("A", "1", "-"), ("B", "2", null))
+    val df1 = data1.toDF("h1", "h2", "h3")
+    val pv1 = Seq(PartitionValues(Map("h1"->"A")), PartitionValues(Map("h1"->"B")))
+
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), partitions = Seq("h1"), schema = Some(SparkSchema(df1.schema)), filenameColumn = Some("_filename"))
+    dataObj.writeSparkDataFrame(df1, pv1)
+
+    val dfResult = dataObj.getSparkDataFrame(pv1).cache()
+
+    assert(dfResult.columns.toSeq == Seq("h2", "h3", "h1", "_filename"))
+    assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect().toSet == data1.toSet)
+    assert(dfResult.where($"_filename".isNull).isEmpty)
+  }
+
+  test("CSV files partitioned, schema without partition cols") {
+    val tempDir = Files.createTempDirectory("csv")
+
+    val data1 = Seq(("A", "1", "-"), ("B", "2", null))
+    val df1 = data1.toDF("h1", "h2", "h3")
+    val pv1 = Seq(PartitionValues(Map("h1"->"A")), PartitionValues(Map("h1"->"B")))
+
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), partitions = Seq("h1"),
+      schema = Some(SparkSchema(df1.drop("h1").schema)), filenameColumn = Some("_filename"))
+    dataObj.writeSparkDataFrame(df1, pv1)
+
+    val dfResult = dataObj.getSparkDataFrame(pv1).cache()
+
+    assert(dfResult.columns.toSet == Set("h2", "h3", "h1", "_filename"))
+    assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect().toSet == data1.toSet)
+    assert(dfResult.where($"_filename".isNull).isEmpty)
+  }
+
+  test("Read CSV file with header only") {
+    val tempDir = Files.createTempDirectory("csv")
+
+    // File with header only
+    val data1 = Seq[(String,String,String)]()
+    val df1 = data1.toDF("h1", "h2", "h3")
+    Environment._enableSparkPlanNoDataCheck = Some(false)
+    df1.write.mode(SaveMode.Append).option(key = "header", value = true).csv(tempDir.toFile.getPath)
+    Environment._enableSparkPlanNoDataCheck = Some(true)
+
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = Some(SparkSchema(df1.schema)))
+
+    val dfResult = dataObj.getSparkDataFrame()
+
+    assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3"))
+    assert(dfResult.isEmpty)
+  }
+
+  test("Read empty file (no header, no data)") {
+    val tempDir = Files.createTempDirectory("csv")
+
+    // File with header only
+    val data1 = Seq[(String,String,String)]()
+    val df1 = data1.toDF("h1", "h2", "h3")
+    Environment._enableSparkPlanNoDataCheck = Some(false)
+    df1.write.mode(SaveMode.Append).option(key = "header", value = false).csv(tempDir.toFile.getPath)
+    Environment._enableSparkPlanNoDataCheck = Some(true)
+
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = Some(SparkSchema(df1.schema)))
+
+    val dfResult = dataObj.getSparkDataFrame()
+
+    assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3"))
+    assert(dfResult.isEmpty)
+  }
+
+  test("Bad CSV File with PermissiveMode and _corrupt_record col") {
+    val tempDir = Files.createTempDirectory("csv")
+    val badCsvContent = """
+        |h1,h2,h3
+        |A,1
+        |""".stripMargin
+    Files.write(tempDir.resolve("bad.csv"), badCsvContent.getBytes)
+
+    val options = Map("mode" -> "permissive")
+    val schema = Some(StructType.fromDDL("h1 string, h2 string, h3 string, _corrupt_record string"))
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema.apply), csvOptions = options)
+    val dfResult = dataObj.getSparkDataFrame().cache()
+
+    assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3", "_corrupt_record"))
+    val expectedResult = Seq[(String,String,String)](("A","1",null))
+    assert(dfResult.select($"h1", $"h2", $"h3").as[(String,String,String)].collect().toSet == expectedResult.toSet )
+    assert(dfResult.where($"_corrupt_record".isNotNull).count() == 1)
+  }
+
+  test("Bad CSV File with FailFastMode") {
+    val tempDir = Files.createTempDirectory("csv")
+    val badCsvContent = """
+                          |h1,h2,h3
+                          |A,1
+                          |""".stripMargin
+    Files.write(tempDir.resolve("bad.csv"), badCsvContent.getBytes)
+
+    val options = Map("mode" -> "failfast")
+    val schema = Some(StructType.fromDDL("h1 string, h2 string, h3 string"))
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema.apply), csvOptions = options)
+    intercept[SparkException](dataObj.getSparkDataFrame().count())
+  }
+
+  test("Bad CSV File with DropMalformedMode") {
+    val tempDir = Files.createTempDirectory("csv")
+    val badCsvContent = """
+                          |h1,h2,h3
+                          |A,1
+                          |""".stripMargin
+    Files.write(tempDir.resolve("bad.csv"), badCsvContent.getBytes)
+
+    val options = Map("mode" -> "dropmalformed")
+    val schema = Some(StructType.fromDDL("h1 string, h2 string, h3 string"))
+    val dataObj = RelaxedCsvFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = schema.map(SparkSchema.apply), csvOptions = options)
+    val dfResult = dataObj.getSparkDataFrame()
+
+    assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3"))
+    assert(dfResult.count() == 0)
+  }
+
+  private val testDf = Seq(
+    ("string1",1),
+    ("string2",2),
+    ("string3",3)
+  ).toDF("str","number")
+
+  test("read parquet files mixed with other files in same directory") {
+    val tempDir = Files.createTempDirectory("csv")
+    val srcDO = RelaxedCsvFileDataObject(id = "src1", path = tempDir.toString, filenameColumn = Some("_filename"), schema=Some(SparkSchema(testDf.schema)))
+    val jsonDO = JsonFileDataObject(id = "src2", path = tempDir.toString, filenameColumn = Some("_filename"), saveMode = SDLSaveMode.Append, jsonOptions = Some(Map("multiline" -> "false")))
+    srcDO.writeSparkDataFrame(testDf, Seq())
+    jsonDO.writeSparkDataFrame(testDf, Seq())
+    val resultParquet = srcDO.getSparkDataFrame()(contextExec)
+    assert(resultParquet.select($"_filename").as[String].collect().map(_.split('.').last).toSeq == Seq("csv", "csv", "csv"))
+    val resultJson = jsonDO.getSparkDataFrame()(contextExec)
+    assert(resultJson.select($"_filename").as[String].collect().map(_.split('.').last).toSeq == Seq("json", "json", "json"))
+  }
+
+}

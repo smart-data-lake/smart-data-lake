@@ -33,9 +33,7 @@ import io.smartdatalake.workflow.ExecutionPhase.{Exec, ExecutionPhase, Init, Pre
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl, RuntimeInfo, SDLExecutionId}
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.sql.SparkSession
 import org.slf4j.Logger
 import scopt.{OParser, OParserBuilder}
 
@@ -59,7 +57,9 @@ case class SmartDataLakeBuilderConfig(
     override val statePath: Option[String] = None,
     override val test: Option[TestMode.Value] = None,
     override val streaming: Boolean = false
-) extends CanBuildSmartDataLakeBuilderConfig[SmartDataLakeBuilderConfig]
+) extends CanBuildSmartDataLakeBuilderConfig[SmartDataLakeBuilderConfig] {
+  def toDebugString: String = ProductUtil.toDebugString(obj = this)
+}
 
 object TestMode extends Enumeration {
   type TestMode = Value
@@ -234,10 +234,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    *   Application configuration (parsed from command line).
    */
   def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState, Int] = {
+    debugLog(s"START SmartDataLakeBuilder.run: appConfig = ${appConfig.toDebugString}")
     require(!EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME") != null,
       "Env variable HADOOP_HOME needs to be set in local mode on Windows!")
     AppUtil.setSdlbRunLoggerContext(appConfig)
-    val stats = try {
+    val stats: Map[RuntimeEventState, Int] = try {
       // invoke SDLPlugins if configured
       Environment.sdlPlugins.foreach(_.startup())
       // create default hadoop configuration, as we did not yet load custom spark/hadoop properties
@@ -277,7 +278,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         throw e
     }
     shutdown()
-    // return
+    debugLog(s"SmartDataLakeBuilder.run: stats = $stats")
     stats
   }
 
@@ -361,7 +362,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    */
   def startSimulation(
       appConfig: SmartDataLakeBuilderConfig,
-      initialSubFeeds: Seq[SparkSubFeed],
+      initialSubFeeds: Seq[DataFrameSubFeed],
       dataObjectsState: Seq[DataObjectState] = Seq(),
       failOnMissingInputSubFeeds: Boolean = true
   )(implicit instanceRegistry: InstanceRegistry): (Seq[DataFrameSubFeed], Map[RuntimeEventState, Int]) = {
@@ -379,7 +380,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       simulation = true,
       globalConfig = GlobalConfig()
     )
-    (subFeeds.map(_.asInstanceOf[SparkSubFeed]), stats)
+    (subFeeds.map(_.asInstanceOf[DataFrameSubFeed]), stats)
   }
 
   /**
@@ -388,10 +389,10 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    */
   def startSimulationWithConfigFile(
       appConfig: SmartDataLakeBuilderConfig,
-      initialSubFeeds: Seq[SparkSubFeed],
+      initialSubFeeds: Seq[DataFrameSubFeed],
       dataObjectsState: Seq[DataObjectState] = Seq()
-  )(session: SparkSession): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
-    loadConfigIntoInstanceRegistry(appConfig, session.sparkContext.hadoopConfiguration)
+  )(hadoopConf: Configuration): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
+    loadConfigIntoInstanceRegistry(appConfig, hadoopConf)
     startSimulation(appConfig, initialSubFeeds, dataObjectsState)(this.instanceRegistry)
   }
 
@@ -673,13 +674,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           debugLog(s"execActionDAG: actionsSelected.exists(!_.isAsynchronous) = ${actionsSelected.exists(!_.isAsynchronous)}")
           if (actionsSelected.exists(!_.isAsynchronous)) {
             if (Environment.stopStreamingGracefully) {
-              if (actionsSelected.exists(_.isAsynchronous)) {
-                // re-throw exception if any async streaming query terminated with exception
-                // awaitAnyTermination returns immediately since onQueryTerminated already fired (which set stopStreamingGracefully=true)
-                SparkSubFeed.getSparkSession(context).streams.awaitAnyTermination(1)
-                // stop remaining active streaming queries gracefully
-                SparkSubFeed.getSparkSession(context).streams.active.foreach(_.stop())
-              }
+              stopSyncStreamingQueriesGracefully(actionsSelected.exists(_.isAsynchronous))(context)
               logger.info("Stopped streaming gracefully")
               None
             } else {
@@ -696,7 +691,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
               // remove spark caches so that new data is read in next iteration
               // TODO: in the future it might be interesting to keep some DataFrames cached for performance reason...
               // TODO: add additional method actionDAGRun.finalizeIteration or similar, which can be used to do some finalization tasks at the end of an iteration, for all connections
-              // if (context.hasSparkSession) SparkSubFeed.getSparkSession.sqlContext.clearCache()
               // iterate execution
               // note that this re-executes also asynchronous actions - they have to handle by themself that they are already started
               Some(actionDAGRun.copy(executionId = newContext.executionId), newContext, Some(startTime))
@@ -708,14 +702,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
               " (if we don't wait, the main process will end and kill the streaming query threads...)")
 
             if (Environment.stopStreamingGracefully) {
-              SparkSubFeed.getSparkSession(context).streams.active.foreach(_.stop())
+              stopAsyncStreamingQueriesGracefully()(context)
               logger.info("Stopped streaming gracefully")
             } else {
               actionDAGRun.saveState(ExecutionPhase.Exec, changedActionId = None, isFinal = true)(
                 context
               ) // notify about this asynchronous iteration
-              SparkSubFeed.getSparkSession(context).streams.awaitAnyTermination()
-              SparkSubFeed.getSparkSession(context).streams.active.foreach(_.stop()) // stopping other streaming queries gracefully
+              awaitAndStopAsyncStreamingQueries(actionDAGRun)(context)
             }
             None
           }
@@ -724,5 +717,62 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     debugLog(s"execActionDAG: execute tail recursion. nextExec.isDefined = ${nextExec.isDefined}")
     if (nextExec.isDefined) execActionDAG(nextExec.get._1, actionsSelected, nextExec.get._2, nextExec.get._3)
     else Seq()
+  }
+
+  /**
+   * All engine companions (SparkSubFeed, ScalaSubFeed, SnowparkSubFeed, ...) present on the classpath.
+   * Used to dispatch streaming lifecycle calls to every engine without the caller needing to know which ones are in use.
+   */
+  private def allSubFeedCompanions: Seq[DataFrameSubFeedCompanion] =
+    DataFrameSubFeed.getKnownSubFeedTypes.map(DataFrameSubFeed.getCompanion)
+
+  /**
+   * Called when synchronous streaming actions stop gracefully. If hasAsyncActions is true, wait briefly for
+   * any async streaming query termination (re-throwing exceptions) and then stop all remaining queries of
+   * every engine on the classpath.
+   */
+  protected def stopSyncStreamingQueriesGracefully(hasAsyncActions: Boolean)(implicit context: ActionPipelineContext): Unit = {
+    if (hasAsyncActions) {
+      // re-throw exception if any async streaming query already terminated with exception;
+      // awaitAnyStreamingQueryTermination returns immediately if it already fired
+      allSubFeedCompanions.foreach(_.awaitAnyStreamingQueryTermination(Some(1)))
+      allSubFeedCompanions.foreach(_.stopStreamingQueries())
+    }
+  }
+
+  /**
+   * Called when only async streaming actions exist and the stop signal fires.
+   * Stops all active streaming queries of every engine on the classpath.
+   */
+  protected def stopAsyncStreamingQueriesGracefully()(implicit context: ActionPipelineContext): Unit = {
+    val activeQueryNames = allSubFeedCompanions.flatMap(_.getStreamingQueryNames)
+    logger.info(s"stopAsyncStreamingQueriesGracefully: stopStreamingGracefully=${Environment.stopStreamingGracefully}," +
+      s" stopping ${activeQueryNames.size} active streams")
+    allSubFeedCompanions.foreach(_.stopStreamingQueries())
+  }
+
+  /**
+   * Called when only async streaming actions exist and we have to wait for their termination before the process
+   * exits. Waits for any streaming query of the single active engine to terminate, then stops all remaining
+   * queries of every engine on the classpath.
+   *
+   * Waiting is only supported for one engine having active streaming queries at a time: if multiple engines
+   * have active streaming queries simultaneously, waiting for termination sequentially per engine could miss
+   * or delay noticing termination/failure on a different engine. In that case all active streaming queries
+   * are stopped and an exception is thrown instead of waiting.
+   */
+  protected def awaitAndStopAsyncStreamingQueries(actionDAGRun: ActionDAGRun)(implicit context: ActionPipelineContext): Unit = {
+    logger.info(s"awaitAndStopAsyncStreamingQueries: waiting for any streaming query to terminate")
+    val companionsWithActiveQueries = allSubFeedCompanions.filter(_.getStreamingQueryNames.nonEmpty)
+    if (companionsWithActiveQueries.size > 1) {
+      val activeQueryNames = companionsWithActiveQueries.flatMap(_.getStreamingQueryNames)
+      allSubFeedCompanions.foreach(_.stopStreamingQueries())
+      throw new IllegalStateException(s"awaitAndStopAsyncStreamingQueries: active streaming queries exist for multiple engines" +
+        s" (${companionsWithActiveQueries.size}) simultaneously (${activeQueryNames.mkString(", ")})." +
+        s" Waiting for termination across multiple engines at the same time is not supported. All active streaming queries have been stopped.")
+    }
+    companionsWithActiveQueries.foreach(_.awaitAnyStreamingQueryTermination())
+    logger.info(s"awaitAndStopAsyncStreamingQueries: awaitAnyTermination returned, active=${allSubFeedCompanions.flatMap(_.getStreamingQueryNames).mkString(",")}")
+    allSubFeedCompanions.foreach(_.stopStreamingQueries())
   }
 }

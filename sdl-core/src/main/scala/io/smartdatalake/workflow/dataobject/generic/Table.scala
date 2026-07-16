@@ -18,8 +18,6 @@
  */
 package io.smartdatalake.workflow.dataobject.generic
 
-import org.apache.spark.sql.catalyst.TableIdentifier
-
 /**
  * Table attributes
  *
@@ -78,9 +76,6 @@ case class Table(
 
   def nameParts: Seq[String] = Seq(catalog, db, Some(name)).flatten
 
-  private[smartdatalake] def tableIdentifier: TableIdentifier = {
-    TableIdentifier(name, db, catalog)
-  }
 }
 
 /**
@@ -90,7 +85,7 @@ case class Table(
  * @param table referenced target table name
  * @param columns mapping of source column(s) to referenced target table column(s). The map is given
  * as a list of objects with the following syntax: {"local_column_name" : "external_column_name"}
- * @param name optional name for foreign key, e.g to depict it's role.
+ * @param name optional name for foreign key, e.g. to depict its role.
  * 
  * 
  * Foreign keys in .conf files are to be defined like the following example 

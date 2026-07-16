@@ -22,7 +22,7 @@ import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.ConfigParser
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.json.JsonUtils
+import io.smartdatalake.util.json.SdlJsonUtils
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{ExecutionId, RuntimeEventState, RuntimeInfo, SDLExecutionId}
 import org.json4s._
@@ -82,7 +82,7 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
   implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections(ConfigParser.WORKFLOW_PACKAGE)
 
   private lazy val typeHints = ShortTypeHints(ReflectionUtil.getTraitImplClasses[SubFeed].toList ++ ReflectionUtil.getSealedTraitImplClasses[ExecutionId], "type")
-  implicit val formats: Formats = JsonUtils.getFormats(typeHints).strict
+  implicit val formats: Formats = SdlJsonUtils.getFormats(typeHints).strict
 
   // write state to JSON
   def toJson(actionDAGRunState: ActionDAGRunState): String = {

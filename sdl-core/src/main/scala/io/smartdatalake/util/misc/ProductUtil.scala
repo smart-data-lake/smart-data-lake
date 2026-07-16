@@ -90,7 +90,7 @@ object ProductUtil {
         case None => msg.append("None")
         case Some(obj) => addObjToBuilder(msg, obj, spacing = false)
         // handle key->value pairs
-        case obj: Tuple2[_, _] =>
+        case obj: (_, _) =>
           addObjToBuilder(msg, obj._1, spacing = false)
           msg.append("=")
           addObjToBuilder(msg, obj._2, spacing = false)
@@ -233,5 +233,16 @@ object ProductUtil {
         (key, value)
       }
     inst.reflectMethod(copyConstructor.asMethod).apply(attributes.map(_._2).toIndexedSeq: _*).asInstanceOf[T]
+  }
+
+  def toDebugString(obj: Product): String = {
+    val cls = obj.getClass
+    val flds: String = cls.getDeclaredFields.map { f =>
+        f.setAccessible(true)
+        val v = f.get(obj)
+        s"${f.getName}=${if (v==null) "null" else v.toString}"
+      }
+      .reduce[String] { case (x, y) => s"$x, $y" }
+    s"${cls.getName}($flds)"
   }
 }

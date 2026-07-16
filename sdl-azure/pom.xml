@@ -68,6 +68,12 @@
             <version>${project.parent.version}</version>
             <scope>${sdl-core.scope}</scope>
         </dependency>
+        <dependency>
+            <groupId>io.smartdatalake</groupId>
+            <artifactId>sdl-spark_${scala.minor.version}</artifactId>
+            <version>${project.parent.version}</version>
+            <scope>${sdl-core.scope}</scope>
+        </dependency>
 
         <!-- Azure Relay Service for Remote Agent Communication -->
         <dependency>
@@ -159,6 +165,14 @@
         <dependency>
             <groupId>io.smartdatalake</groupId>
             <artifactId>sdl-core_${scala.minor.version}</artifactId>
+            <version>${project.parent.version}</version>
+            <classifier>test-jar</classifier>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.smartdatalake</groupId>
+            <artifactId>sdl-spark_${scala.minor.version}</artifactId>
             <version>${project.parent.version}</version>
             <classifier>test-jar</classifier>
             <type>test-jar</type>

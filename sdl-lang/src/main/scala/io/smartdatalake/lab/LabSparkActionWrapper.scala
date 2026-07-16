@@ -26,7 +26,7 @@ import io.smartdatalake.util.misc.StringUtil.strToCamelCase
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, CustomDfsTransformer}
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
+import io.smartdatalake.workflow.action.spark.transformer.{OptionsSparkDfTransformer, OptionsSparkDfsTransformer, ScalaClassSparkDfTransformer}
 import io.smartdatalake.workflow.action.{CustomDataFrameAction, DataFrameActionImpl, DataFrameOneToOneActionImpl}
 import io.smartdatalake.workflow.dataframe.spark.{SparkColumn, SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}

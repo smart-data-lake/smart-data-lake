@@ -18,54 +18,78 @@
  */
 package io.smartdatalake.lab
 
-import io.smartdatalake.util.misc.{CustomCodeUtil, ScalaUtil}
+import io.smartdatalake.util.misc.{CustomCodeUtil, SmartDataLakeLogger}
 import org.scalatest.funsuite.AnyFunSuite
 
+import java.io.File
 import java.nio.file.{Files, Paths}
+import _root_.scala.util.{Failure, Success, Try, Using}
 import scala.io.Source
-import scala.util.Using
 
-class LabCatalogGeneratorTest extends AnyFunSuite {
+class LabCatalogGeneratorTest extends AnyFunSuite with SmartDataLakeLogger {
+
+  def getCodeFromFile(f: File): String = Using.resource(Source.fromFile(f)) {
+    x =>
+      x.getLines().dropWhile(!_.contains("import")) // remove 'package' statement for compilation below
+        .mkString(System.lineSeparator())
+  }
+
   test("generate catalog") {
     val srcDir = "target/generatedSrc"
     val packageName = "ch.smartdatalake.generated"
     val dataObjectCatalogClassName = "MyDataObjectCatalog"
     val actionCatalogClassName = "MyActionCatalog"
-    val config = LabCatalogGeneratorConfig(Seq(getClass.getResource("/dagexporter/dagexporterTest.conf").getPath), srcDir, packageName, dataObjectCatalogClassName, actionCatalogClassName)
+    val config = LabCatalogGeneratorConfig(Seq(getClass.getResource("/dagexporter/dagexporterTest.conf").getPath), srcDir, packageName,
+      dataObjectCatalogClassName, actionCatalogClassName)
     LabCatalogGenerator.generateCatalogs(config)
 
-    // test DataObjectCatalog
-    {
-      val path = Paths.get(s"$srcDir/${packageName.split('.').mkString("/")}/$dataObjectCatalogClassName.scala")
-      assert(Files.exists(path))
-      val catalogCode = Using.resource(Source.fromFile(path.toFile)) {
-        x => x.getLines()
-          .dropWhile(!_.contains("import")) // remove 'package' statement for compilation below
-          .mkString(System.lineSeparator())
-      }
-      assert(catalogCode.contains("dataObjectParquet12"))
-      // check compilation
-      CustomCodeUtil.compileCode[Class[Product]](s"""
-        $catalogCode
+    val pathCatalog = Paths.get(s"$srcDir/${packageName.split('.').mkString("/")}/$dataObjectCatalogClassName.scala")
+    val catalogCodeDOcatalog = getCodeFromFile(pathCatalog.toFile)
+    val codeCatalog = s"""
+        $catalogCodeDOcatalog
         classOf[$dataObjectCatalogClassName]
-      """)
+      """
+
+    logger.debug("test DataObjectCatalog")
+    Try {
+      assert(Files.exists(pathCatalog))
+      assert(catalogCodeDOcatalog.contains("dataObjectParquet12"))
+      logger.debug("check compilation")
+      CustomCodeUtil.compileCode[Class[Product]](codeCatalog)(logger)
+    } match {
+      case Success(_) => logger.debug("check compilation succeeded")
+      case Failure(e) =>
+        println()
+        logger.error("!!! testing DataObjectCatalog FAILED !!!")
+        logger.error(s"srcDir = $srcDir , packageName = $packageName , pathCatalog = $pathCatalog ," +
+          s" dataObjectCatalogClassName = $dataObjectCatalogClassName , actionCatalogClassName = $actionCatalogClassName")
+        logger.error(s"config : ${config.toDebugString}")
+        logger.error(s"codeCatalog : $codeCatalog")
+        throw e
     }
 
-    // test ActionCatalog
-    {
-      val path = Paths.get(s"$srcDir/${packageName.split('.').mkString("/")}/$actionCatalogClassName.scala")
-      assert(Files.exists(path))
-      val catalogCode = Using.resource(Source.fromFile(path.toFile)) {
-        x => x.getLines()
-          .dropWhile(!_.contains("import")) // remove 'package' statement for compilation below
-          .mkString(System.lineSeparator())
-      }
-      assert(catalogCode.contains("actionId1"))
-      // check compilation
-      CustomCodeUtil.compileCode[Class[Product]](s"""
-        $catalogCode
+    val pathAction = Paths.get(s"$srcDir/${packageName.split('.').mkString("/")}/$actionCatalogClassName.scala")
+    val catalogCodeAction = getCodeFromFile(pathAction.toFile)
+    val codeAction = s"""
+        $catalogCodeAction
         classOf[$actionCatalogClassName]
-      """)
+      """
+    logger.debug(s"test ActionCatalog: pathAction = $pathAction")
+    Try {
+      assert(Files.exists(pathAction))
+      assert(codeAction.contains("actionId1"))
+      logger.debug("check compilation")
+      CustomCodeUtil.compileCode[Class[Product]](codeAction)(logger)
+    } match {
+      case Success(_) => logger.debug("check compilation succeeded")
+      case Failure(e) =>
+        println()
+        logger.error("!!! testing ActionCatalog FAILED !!!")
+        logger.error(s"srcDir = $srcDir , packageName = $packageName , pathAction = $pathAction ," +
+          s" dataObjectCatalogClassName = $dataObjectCatalogClassName , actionCatalogClassName = $actionCatalogClassName")
+        logger.error(s"config : ${config.toDebugString}")
+        logger.error(s"codeAction : $codeAction")
+        throw e
     }
   }
 }

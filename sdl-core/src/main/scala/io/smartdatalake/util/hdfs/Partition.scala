@@ -43,6 +43,14 @@ case class PartitionValues(elements: Map[String, Any]) {
     // "and" filter concatenation of each element
     elements.map {case (k,v) => col(k) === lit(v)}.reduce( (a,b) => a and b)
   }
+  private[smartdatalake] def getFilterExprSql: String = {
+    elements.map { case (k, v) =>
+      v match {
+        case s: String => s"$k = '$s'"
+        case other => s"$k = $other"
+      }
+    }.mkString(" AND ")
+  }
   override def toString: String = {
     elements.map {case (k,v) => s"$k=$v"}.mkString("/")
   }

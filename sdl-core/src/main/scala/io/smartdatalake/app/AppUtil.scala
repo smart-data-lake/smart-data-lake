@@ -18,17 +18,14 @@
  */
 package io.smartdatalake.app
 
-import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.{GraphUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
 import org.apache.hadoop.security.UserGroupInformation
-import org.apache.spark.util.ChildFirstURLClassLoader
 import org.slf4j.MDC
 
-import java.net.{InetAddress, URL, URLClassLoader}
+import java.net.InetAddress
 import java.time.LocalDateTime
-import scala.annotation.tailrec
 
 /**
  * Utilities and conventions to name and validate command line parameters
@@ -40,46 +37,6 @@ object AppUtil extends SmartDataLakeLogger {
     val hadoopConf = new org.apache.hadoop.conf.Configuration()
     UserGroupInformation.setConfiguration(hadoopConf)
     UserGroupInformation.loginUserFromKeytab(userAtRealm, keytab)
-  }
-
-  /**
-   * create a class loader which first loads classes from a given list of jar names, instead of delegating to the
-   * parent class loader first
-   * searches parent classpaths until all jars were found or no more parent classpaths are available
-   *
-   * @param jars names of jar files available in the classpath
-   * @return a class loader
-   */
-  def getChildFirstClassLoader(jars: Seq[String]): ChildFirstURLClassLoader = {
-    val initialLoader = getClass.getClassLoader.asInstanceOf[URLClassLoader]
-
-    @tailrec
-    def collectUrls(clazz: ClassLoader, acc: Map[String, URL]): Map[String, URL] = {
-
-      val urlsAcc: Map[String, URL] = acc++
-        // add urls on this level to accumulator
-        clazz.asInstanceOf[URLClassLoader].getURLs
-        .map( url => (url.getFile.split('/').last, url))
-        .filter{ case (name, _) => jars.contains(name)}
-        .toMap
-
-      // check if any jars without URL are left
-      val jarMissing = jars.exists(jar => !urlsAcc.contains(jar))
-      // return accumulated if there is no parent left or no jars are missing anymore
-      if (clazz.getParent == null || !jarMissing) urlsAcc else collectUrls(clazz.getParent, urlsAcc)
-    }
-
-    // search classpath hierarchy until all jars are found or we have reached the top
-    val urlsMap = collectUrls(initialLoader, Map())
-
-    // check if everything found
-    val jarsNotFound = jars.filter( jar => !urlsMap.contains(jar))
-    if (jarsNotFound.nonEmpty) {
-      logger.info(s"""available jars are ${initialLoader.getURLs.mkString(", ")} (not including parent classpaths)""")
-      throw ConfigurationException(s"""jars ${jarsNotFound.mkString(", ")} not found in parent class loaders classpath. Cannot initialize ChildFirstURLClassLoader.""")
-    }
-    // create child-first classloader
-    new ChildFirstURLClassLoader(urlsMap.values.toArray, initialLoader)
   }
 
   /**

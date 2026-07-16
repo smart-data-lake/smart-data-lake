@@ -18,7 +18,8 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
+import io.smartdatalake.testutils.DeduplicateActionBehaviour
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataobject.generic.Table
@@ -35,7 +36,7 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
   // set additional spark options for iceberg
   protected implicit val session: SparkSession = IcebergTestUtils.session
 
-  override def defaultEngineConnection: Connection with EngineConnection = TestUtil.defaultSparkConnection
+  override def defaultEngineConnection: Connection with EngineConnection = SparkTestUtil.defaultSparkConnection
 
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString

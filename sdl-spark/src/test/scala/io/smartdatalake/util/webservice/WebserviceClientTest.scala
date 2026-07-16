@@ -1,0 +1,121 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+package io.smartdatalake.util.webservice
+
+import com.github.tomakehurst.wiremock.WireMockServer
+import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.testutils.WebserviceTestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
+import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.connection.authMode.{AuthHeaderMode, BasicAuthMode, CustomHttpAuthModeLogic}
+import io.smartdatalake.workflow.dataobject.WebserviceFileDataObject
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
+import sttp.client3.Response
+import sttp.model.StatusCode
+
+import scala.util.Try
+
+class WebserviceClientTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAfterAll {
+
+  val port = 8080 // for some reason, only the default port seems to work
+  val httpsPort = 8443
+  val host = "127.0.0.1"
+  private var wireMockServer: WireMockServer = _
+
+  // provide an empty instance registry
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
+
+  override protected def beforeAll(): Unit =
+    wireMockServer = WebserviceTestUtil.startWebservice(host, port, httpsPort)
+
+  override protected def afterAll(): Unit =
+    wireMockServer.stop()
+
+  before {
+    wireMockServer.resetAll()
+    WebserviceTestUtil.setupWebserviceStubs()
+  }
+
+  test("Call webservice with wrong Url") {
+    val webserviceDO = WebserviceFileDataObject("do1", url = "http://...")
+    val response = Try(SttpWebserviceClient(webserviceDO).get())
+    assert(response.isFailure)
+  }
+
+  test("Call webservice without Authentication") {
+    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/no_auth/")
+    val webserviceClient = SttpWebserviceClient(webserviceDO)
+    val response = webserviceClient.get()
+    assert(response.isSuccess)
+  }
+
+  // TODO: Get https calls working. Error: Failure(javax.net.ssl.SSLHandshakeException: Remote host closed connection during handshake)
+  ignore("Call a URL with Basic authentication") {
+    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/basic_auth/",
+      authMode = Some(BasicAuthMode(user = StringOrSecret("testuser"), password = StringOrSecret("abc"))))
+    val webserviceClient = SttpWebserviceClient(webserviceDO)
+    val response = webserviceClient.get()
+    assert(response.isSuccess)
+  }
+
+  test("Call webservice with invalid AuthHeader") {
+    val webserviceDO = WebserviceFileDataObject(
+      "do1",
+      url = s"http://$host:$port/good/basic_auth/",
+      authMode = Some(AuthHeaderMode(headerName = "auth-header", secret = StringOrSecret("Basic xxxxxxxxxxxxx")))
+    )
+    val webserviceClient = SttpWebserviceClient(webserviceDO)
+    val response = webserviceClient.get()
+    assert(response.isFailure)
+  }
+
+  test("STTP: Check response: http status code == 200") {
+    val response: Response[Either[String, String]] = Response(body = Right("Hello There"), code = StatusCode(200))
+    val validation = Try(SttpUtil.validateResponse(response, "Test res"))
+    assert(validation.isSuccess)
+  }
+
+  test("STTP: Check response with http error status code") {
+    val response: Response[Either[String, String]] = Response(body = Left("Error Message"), code = StatusCode(403))
+    val validation = Try(SttpUtil.validateResponse(response, "Test res"))
+    assert(validation.isFailure)
+  }
+
+  test("Check posting JSON") {
+    val webserviceDO = WebserviceFileDataObject("do1", url = s"http://$host:$port/good/post/no_auth")
+    val webserviceClient = SttpWebserviceClient(webserviceDO)
+    val testJson = s"""{name: "Samantha", age: 31, city: "San Francisco"};""".getBytes
+    val response = webserviceClient.post(testJson, "application/json")
+    assert(response.isSuccess)
+  }
+
+}
+
+private class MyCustomHttpAuthMode extends CustomHttpAuthModeLogic {
+  var additionalHeaders: Map[String, StringOrSecret] = _
+
+  override def prepare(options: Map[String, StringOrSecret]): Unit =
+    // add options as headers
+    additionalHeaders = options
+
+  override def getHeaders: Map[String, String] = additionalHeaders.view.mapValues(_.resolve()).toMap
+}

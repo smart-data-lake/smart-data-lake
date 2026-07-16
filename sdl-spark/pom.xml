@@ -1,0 +1,342 @@
+<!--
+  ~ Smart Data Lake - Build your data lake the smart way.
+  ~
+  ~ Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License
+  ~ along with this program. If not, see <http://www.gnu.org/licenses/>.
+  -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.smartdatalake</groupId>
+        <artifactId>sdl-parent</artifactId>
+        <version>3.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>sdl-spark_2.13</artifactId>
+    <packaging>jar</packaging>
+
+    <name>sdl-spark</name>
+
+    <properties>
+        <test-suffix-regex>Test</test-suffix-regex>
+    </properties>
+
+    <dependencies>
+
+        <!-- sdl-core is the base dependency -->
+        <dependency>
+            <groupId>io.smartdatalake</groupId>
+            <artifactId>sdl-core_${scala.minor.version}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-core_${scala.minor.version}</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-sql_${scala.minor.version}</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-catalyst_${scala.minor.version}</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-hadoop-cloud_${scala.minor.version}</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.smartdatalake</groupId>
+            <artifactId>spark-extensions_${scala.minor.version}</artifactId>
+            <version>${spark-extensions.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-avro_${scala.minor.version}</artifactId>
+            <version>${spark.version}</version>
+            <scope>${spark.deps.scope}</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-tags_${scala.minor.version}</artifactId>
+            <version>${spark.version}</version>
+            <scope>${spark.deps.scope}</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.mauch</groupId>
+            <artifactId>spark-excel_${scala.minor.version}</artifactId>
+            <version>${spark.excel.version}</version>
+            <classifier>thin</classifier>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.healthmarketscience.jackcess</groupId>
+            <artifactId>jackcess</artifactId>
+            <version>${jackcess.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>1.0.42</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>${fasterxml.jackson.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.jayway.jsonpath</groupId>
+            <artifactId>json-path</artifactId>
+            <version>2.9.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>net.minidev</groupId>
+                    <artifactId>json-smart</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>net.i2p.crypto</groupId>
+            <artifactId>eddsa</artifactId>
+            <version>0.3.0</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+        </dependency>
+
+        <!-- test scope: avoid NoClassDefFoundError: javax/xml/bind/annotation/XmlElement -->
+        <dependency>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+            <version>2.2.11</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.hsqldb</groupId>
+            <artifactId>hsqldb</artifactId>
+            <version>${hsqldb.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- sdl-core test utils -->
+        <dependency>
+            <groupId>io.smartdatalake</groupId>
+            <artifactId>sdl-core_${scala.minor.version}</artifactId>
+            <version>${project.version}</version>
+            <classifier>test-jar</classifier>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.scalatest</groupId>
+            <artifactId>scalatest_${scala.minor.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scalactic</groupId>
+            <artifactId>scalactic_${scala.minor.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scalatestplus</groupId>
+            <artifactId>scalacheck-1-18_${scala.minor.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.tomakehurst</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>3.5.15</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-sftp</artifactId>
+            <version>${sshd.test.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-common</artifactId>
+            <version>${sshd.test.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-core</artifactId>
+            <version>${sshd.test.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.circe</groupId>
+            <artifactId>circe-yaml_${scala.minor.version}</artifactId>
+            <version>0.15.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.circe</groupId>
+            <artifactId>circe-generic_${scala.minor.version}</artifactId>
+            <version>0.14.6</version>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <sourceDirectory>src/main/scala</sourceDirectory>
+        <testSourceDirectory>src/test/scala</testSourceDirectory>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <targetPath>META-INF</targetPath>
+                <directory>${basedir}</directory>
+                <filtering>false</filtering>
+                <includes>
+                    <include>COPYING</include>
+                </includes>
+            </resource>
+        </resources>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+            </testResource>
+        </testResources>
+        <plugins>
+            <plugin>
+                <groupId>net.alchim31.maven</groupId>
+                <artifactId>scala-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <!-- create an additional test-jar file to reuse test utils in other modules -->
+                <executions>
+                    <execution>
+                        <id>spark-test-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                        <configuration>
+                            <classifier>test-jar</classifier>
+                            <includes>
+                                <include>**/testutils/**</include>
+                            </includes>
+                            <excludes>
+                                <exclude>dummy-entry
+                                </exclude> <!-- override excludes inherited from parent plugin management with dummy entry -->
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.scalatest</groupId>
+                <artifactId>scalatest-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- Checks for declared but unused and undeclared but used dependencies in the verify stage -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <configuration>
+                    <ignoredUnusedDeclaredDependencies>
+                        <!-- Scala trait/implicit usage is invisible to Java bytecode analyzer (ASM) -->
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-core_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-sql_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-catalyst_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- spark-extensions: custom Spark extensions registered via SPI/reflection -->
+                        <ignoredUnusedDeclaredDependency>io.smartdatalake:spark-extensions_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- spark-excel: DataSource registered via string format name -->
+                        <ignoredUnusedDeclaredDependency>dev.mauch:spark-excel_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- jackcess: loaded via reflection for Access file format -->
+                        <ignoredUnusedDeclaredDependency>com.healthmarketscience.jackcess:jackcess</ignoredUnusedDeclaredDependency>
+                        <!-- spark-tags: scope override for fat-jar exclusion -->
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-tags_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- Hadoop classes accessed through SparkContext; bytecode analyzer misses Scala usages -->
+                        <ignoredUnusedDeclaredDependency>org.apache.hadoop:hadoop-client</ignoredUnusedDeclaredDependency>
+                        <!-- Cloud FS providers registered via SPI; scope controlled by spark.deps.scope profile -->
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-hadoop-cloud_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- Hive classes loaded via enableHiveSupport() reflection; scope controlled by spark.deps.scope profile -->
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-hive_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- Avro DataSource registered via SPI string format; scope controlled by spark.deps.scope profile -->
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-avro_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <!-- scala-library is used implicitly by all Scala code; not detectable by bytecode analysis -->
+                        <ignoredUnusedDeclaredDependency>org.scala-lang:scala-library</ignoredUnusedDeclaredDependency>
+                    </ignoredUnusedDeclaredDependencies>
+                    <ignoredNonTestScopedDependencies>
+                        <!-- spark-sql-api is a transitive dep of spark-sql; its public-API interfaces are
+                             only directly referenced in test code while main code uses spark-sql's higher-level APIs -->
+                        <ignoredNonTestScopedDependency>org.apache.spark:spark-sql-api_${scala.minor.version}</ignoredNonTestScopedDependency>
+                    </ignoredNonTestScopedDependencies>
+                </configuration>
+            </plugin>
+
+            <!-- check for dependency version conflicts -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

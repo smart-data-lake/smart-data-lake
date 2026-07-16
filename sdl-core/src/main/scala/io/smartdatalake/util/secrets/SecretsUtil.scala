@@ -20,11 +20,8 @@ package io.smartdatalake.util.secrets
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.apache.spark.annotation.DeveloperApi
-
 import scala.collection.mutable
 
-@DeveloperApi
 object SecretsUtil extends SmartDataLakeLogger {
 
   private val providers = mutable.Map[String, SecretProvider]()

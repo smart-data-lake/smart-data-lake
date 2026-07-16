@@ -19,48 +19,27 @@
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.SQLDfsTransformerBehaviour
+import io.smartdatalake.testutils.plainScala.{MockScalaDataObject, ScalaTestUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.CustomDataFrameAction
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
-import io.smartdatalake.workflow.dataobject.generic.Table
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import org.scalatest.funsuite.AnyFunSuite
 
-class SQLDfsTransformerTest extends AnyFunSuite {
+import scala.reflect.runtime.universe.{Type, typeOf}
 
-  protected implicit val session: SparkSession = TestUtil.session
-  import session.implicits._
+// SQLDfsTransformer uses DataFrameFunctions.sql, which is not implemented for ScalaSubFeed
+class SQLDfsTransformerTest extends AnyFunSuite with SQLDfsTransformerBehaviour {
 
+  override def subFeedType: Type = typeOf[ScalaSubFeed]
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
 
-  val con1 = JdbcTableConnection("con1", url = "123", driver = "driver") // dummy
-  instanceRegistry.register(con1)
-
-  val srcTable1 = Table(Some("default"), "src1")
-  val srcDO1 = JdbcTableDataObject("src1", table = srcTable1, connectionId = "con1")
-  instanceRegistry.register(srcDO1)
-
-  val tgtTable1 = Table(Some("default"), "tgt1")
-  val tgtDO1 = JdbcTableDataObject("tgt1", table = tgtTable1, connectionId = "con1")
-  instanceRegistry.register(tgtDO1)
-
-  val action1 = CustomDataFrameAction("action1", List(srcDO1.id), List(tgtDO1.id))
-  instanceRegistry.register(action1)
-
-  val emptyDf: DataFrame = Seq((1,"a")).toDF("num","str")
-
-  test("options and view name token are replaced and sql can be parsed") {
-    val customTransformer = SQLDfsTransformer(code = Map(tgtDO1.id.id -> s"select %{inputViewName_src1}.num, %{option1} from %{inputViewName_src1}"))
-    customTransformer.transformWithOptions(action1.id, Seq(), Map(srcDO1.id.id -> SparkDataFrame(emptyDf)), Map("option1" -> "str"))
+  ignore("options and view name token are replaced and sql can be parsed") {
+    testOptionsAndViewNameTokenAreReplacedAndSqlCanBeParsed(id => MockScalaDataObject(id))
   }
 
-  test("legacy view name without postfix is still supported and sql can be parsed") {
-    val customTransformer = SQLDfsTransformer(code = Map(tgtDO1.id.id -> s"select src1.num, %{option1} from src1"))
-    customTransformer.transformWithOptions(action1.id, Seq(), Map(srcDO1.id.id -> SparkDataFrame(emptyDf)), Map("option1" -> "str"))
+  ignore("legacy view name without postfix is still supported and sql can be parsed") {
+    testLegacyViewNameWithoutPostfixIsStillSupportedAndSqlCanBeParsed(id => MockScalaDataObject(id))
   }
 
 }

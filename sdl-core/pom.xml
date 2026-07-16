@@ -52,9 +52,15 @@
             <artifactId>databricks-sdk-java</artifactId>
             <version>0.7.0</version>
         </dependency>
+
+        <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
         </dependency>
         <!-- Log4j2 needs this to read configuration in yaml format (runtime only, loaded via ServiceLoader) -->
         <dependency>
@@ -67,11 +73,6 @@
             <groupId>com.github.scopt</groupId>
             <artifactId>scopt_${scala.minor.version}</artifactId>
             <version>${scopt.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${scala.minor.version}</artifactId>
         </dependency>
 
         <!-- Included instead of hadoop-client-runtime, which is excluded from spark-core, see parent pom -->
@@ -93,77 +94,9 @@
         </dependency>
 
         <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-sql_${scala.minor.version}</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-hive_${scala.minor.version}</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-catalyst_${scala.minor.version}</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-hadoop-cloud_${scala.minor.version}</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>io.smartdatalake</groupId>
-            <artifactId>spark-extensions_${scala.minor.version}</artifactId>
-            <version>${spark-extensions.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-avro_${scala.minor.version}</artifactId>
-            <version>${spark.version}</version>
-            <scope>${spark.deps.scope}</scope>
-        </dependency>
-
-        <!-- this is an unused declared dependency, but it's needed to override scope -->
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-tags_${scala.minor.version}</artifactId>
-            <version>${spark.version}</version>
-            <scope>${spark.deps.scope}</scope>
-        </dependency>
-
-        <!-- avoid NoClassDefFoundError: javax/xml/bind/annotation/XmlElement in FileTransferActionTest -->
-        <dependency>
-            <groupId>javax.xml.bind</groupId>
-            <artifactId>jaxb-api</artifactId>
-            <version>2.2.11</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>dev.mauch</groupId>
-            <artifactId>spark-excel_${scala.minor.version}</artifactId>
-            <version>${spark.excel.version}</version>
-            <classifier>thin</classifier>
-        </dependency>
-
-        <dependency>
-            <groupId>org.hsqldb</groupId>
-            <artifactId>hsqldb</artifactId>
-            <version>${hsqldb.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.healthmarketscience.jackcess</groupId>
-            <artifactId>jackcess</artifactId>
-            <version>${jackcess.version}</version>
+            <groupId>ch.zzeekk.spark</groupId>
+            <artifactId>expression-interface_${scala.minor.version}</artifactId>
+            <version>3.5.0</version>
         </dependency>
 
         <dependency>
@@ -194,6 +127,11 @@
         <dependency>
             <groupId>org.scala-lang.modules</groupId>
             <artifactId>scala-xml_${scala.minor.version}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-lang.modules</groupId>
+            <artifactId>scala-parallel-collections_${scala.minor.version}</artifactId>
+            <version>1.2.0</version>
         </dependency>
 
         <dependency>
@@ -254,82 +192,13 @@
             <version>0.0.14</version>
         </dependency>
 
-        <!-- needed for AirbyteDataObject Json handling -->
-        <dependency>
-            <groupId>com.networknt</groupId>
-            <artifactId>json-schema-validator</artifactId>
-            <version>1.0.42</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
-            <version>${fasterxml.jackson.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.scalatestplus</groupId>
-            <artifactId>scalacheck-1-18_${scala.minor.version}</artifactId>
-        </dependency>
-
-        <!-- TEST dependencies -->
-        <dependency>
-            <groupId>org.scalatest</groupId>
-            <artifactId>scalatest_${scala.minor.version}</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.scalactic</groupId>
-            <artifactId>scalactic_${scala.minor.version}</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>3.5.15</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.sshd</groupId>
-            <artifactId>sshd-sftp</artifactId>
-            <version>${sshd.test.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.sshd</groupId>
-            <artifactId>sshd-common</artifactId>
-            <version>${sshd.test.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.sshd</groupId>
-            <artifactId>sshd-core</artifactId>
-            <version>${sshd.test.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.github.tomakehurst</groupId>
-            <artifactId>wiremock-standalone</artifactId>
-            <version>2.25.1</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>io.circe</groupId>
-            <artifactId>circe-yaml_${scala.minor.version}</artifactId>
-            <version>0.15.1</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.circe</groupId>
-            <artifactId>circe-generic_${scala.minor.version}</artifactId>
-            <version>0.14.6</version>
-            <scope>test</scope>
-        </dependency>
-
         <dependency>
             <groupId>org.json4s</groupId>
             <artifactId>json4s-ext_${scala.minor.version}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.json4s</groupId>
+            <artifactId>json4s-jackson_2.13</artifactId>
         </dependency>
 
         <!-- Dependency for StatusInfoRestApi-->
@@ -338,11 +207,19 @@
             <artifactId>jetty-servlet</artifactId>
             <version>${jetty.version}</version>
         </dependency>
-        <!-- Dependency for StatusInfoRestApi-->
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-http</artifactId>
             <version>${jetty.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.glassfish.jersey.core</groupId>
+            <artifactId>jersey-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jersey.containers</groupId>
+            <artifactId>jersey-container-servlet</artifactId>
         </dependency>
 
         <!--Jetty Websocket server side dependencies start here -->
@@ -379,16 +256,79 @@
             <version>3.9.8</version>
         </dependency>
 
+        <!-- TEST dependencies -->
         <dependency>
-            <groupId>com.jayway.jsonpath</groupId>
-            <artifactId>json-path</artifactId>
-            <version>2.9.0</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>net.minidev</groupId>
-                    <artifactId>json-smart</artifactId>
-                </exclusion>
-            </exclusions>
+            <groupId>org.scalatest</groupId>
+            <artifactId>scalatest_${scala.minor.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scalactic</groupId>
+            <artifactId>scalactic_${scala.minor.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scalatestplus</groupId>
+            <artifactId>scalacheck-1-18_${scala.minor.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>3.5.15</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-sftp</artifactId>
+            <version>${sshd.test.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-common</artifactId>
+            <version>${sshd.test.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.sshd</groupId>
+            <artifactId>sshd-core</artifactId>
+            <version>${sshd.test.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.tomakehurst</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.circe</groupId>
+            <artifactId>circe-yaml_${scala.minor.version}</artifactId>
+            <version>0.15.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.circe</groupId>
+            <artifactId>circe-generic_${scala.minor.version}</artifactId>
+            <version>0.14.6</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- avoid NoClassDefFoundError: javax/xml/bind/annotation/XmlElement in FileTransferActionTest -->
+        <dependency>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+            <version>2.2.11</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.hsqldb</groupId>
+            <artifactId>hsqldb</artifactId>
+            <version>${hsqldb.version}</version>
+            <scope>test</scope>
         </dependency>
 
     </dependencies>
@@ -450,10 +390,14 @@
                         <configuration>
                             <classifier>test-jar</classifier>
                             <includes>
-                                <include>**/testutils/**</include>
+                                <include>application.conf</include>
+                                <include>config/**</include>
+                                <include>io/smartdatalake/config/objects/**</include>
+                                <include>io/smartdatalake/testutils/**</include>
+                                <include>io/smartdatalake/util/historization/HistorizationTestUtils*</include>
                                 <include>log4j2.yml</include> <!-- Add logging configuration for testing. -->
-                                <include>test_keystore.pkcs12
-                                </include> <!-- Add key store for wiremock server for testing. -->
+                                <!-- Add key store for wiremock server for testing. -->
+                                <include>test_keystore.pkcs12</include>
                             </includes>
                             <excludes>
                                 <exclude>dummy-entry
@@ -499,22 +443,28 @@
                 <configuration>
                     <ignoredUnusedDeclaredDependencies>
                         <!-- Hadoop classes are imported in Scala source; bytecode analyzer misses Scala usages -->
-                        <ignoredUnusedDeclaredDependency>org.apache.hadoop:hadoop-client</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>org.apache.hadoop:hadoop-client
+                        </ignoredUnusedDeclaredDependency>
                         <!-- Cloud FS providers registered via SPI; scope controlled by spark.deps.scope profile -->
-                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-hadoop-cloud_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-hadoop-cloud_${scala.minor.version}
+                        </ignoredUnusedDeclaredDependency>
                         <!-- Hive classes loaded via enableHiveSupport() reflection; scope controlled by spark.deps.scope profile -->
-                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-hive_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-hive_${scala.minor.version}
+                        </ignoredUnusedDeclaredDependency>
                         <!-- Avro DataSource registered via SPI string format; scope controlled by spark.deps.scope profile -->
-                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-avro_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>org.apache.spark:spark-avro_${scala.minor.version}
+                        </ignoredUnusedDeclaredDependency>
                         <!-- scala-library is used implicitly by all Scala code; not detectable by bytecode analysis -->
                         <ignoredUnusedDeclaredDependency>org.scala-lang:scala-library</ignoredUnusedDeclaredDependency>
                         <!-- scala-xml is required by the Scala compiler and Scala reflection infrastructure -->
-                        <ignoredUnusedDeclaredDependency>org.scala-lang.modules:scala-xml_${scala.minor.version}</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>org.scala-lang.modules:scala-xml_${scala.minor.version}
+                        </ignoredUnusedDeclaredDependency>
                     </ignoredUnusedDeclaredDependencies>
                     <ignoredNonTestScopedDependencies>
                         <!-- jackson-core is a transitive compile dependency of jackson-databind used in main source;
                              only the direct import in ScalaNotebookSparkDfTransformerTest triggers this warning -->
-                        <ignoredNonTestScopedDependency>com.fasterxml.jackson.core:jackson-core</ignoredNonTestScopedDependency>
+                        <ignoredNonTestScopedDependency>com.fasterxml.jackson.core:jackson-core
+                        </ignoredNonTestScopedDependency>
                     </ignoredNonTestScopedDependencies>
                 </configuration>
             </plugin>

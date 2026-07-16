@@ -17,6 +17,7 @@ spark-warehouse
 
 # User-specific stuff
 .bloop
+.claude
 .idea/**/dictionaries
 .idea/**/shelf
 .idea/**/tasks.xml
@@ -63,3 +64,5 @@ atlassian-ide-plugin.xml
 /*/*.crc
 /*/_SUCCESS
 /*/*.parquet
+/sdl-lang/exportedConfig.json
+/exportedConfig.json

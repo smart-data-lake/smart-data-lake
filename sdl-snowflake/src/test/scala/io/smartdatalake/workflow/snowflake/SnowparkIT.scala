@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.snowflake
 
 import com.snowflake.snowpark.types._
 import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.dataobject.generic.Table
@@ -33,7 +33,7 @@ import org.scalatest.matchers.should.Matchers.intercept
  */
 object SnowparkIT extends App {
 
-  implicit val sparkSession: SparkSession = TestUtil.session
+  implicit val sparkSession: SparkSession = SparkTestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: InstanceRegistry => ActionPipelineContext =  ConfigToolbox.getDefaultActionPipelineContext
 

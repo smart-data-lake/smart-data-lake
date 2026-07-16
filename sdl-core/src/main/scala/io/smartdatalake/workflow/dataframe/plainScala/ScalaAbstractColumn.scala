@@ -29,6 +29,22 @@ import scala.reflect.runtime.universe.typeOf
 /**
  * Abstraction of columns that include data (ScalaColumn and ScalaExplodingColumn), and expressions that calculate data and can be evaluated to a column.
  */
+object ScalaAbstractColumn {
+
+  /**
+   * Splits a (possibly SQL-identifier-quoted) column reference into an optional alias and the column name.
+   * A fully backtick-quoted reference (e.g. produced by SQLUtil.sparkQuoteSQLIdentifier) is treated as a single
+   * atomic name and not split on '.', so that dots inside the quoted name are not mistaken for alias separators.
+   */
+  def unquoteIdentifier(raw: String): (Option[String], String) = {
+    if (raw.length >= 2 && raw.head == '`' && raw.last == '`') (None, raw.substring(1, raw.length - 1))
+    else raw.split('.') match {
+      case Array(alias, name) => (Some(alias), name)
+      case _ => (None, raw)
+    }
+  }
+}
+
 abstract class ScalaAbstractColumn extends GenericColumn {
 
   def dataType: ScalaDataType[_]
@@ -48,18 +64,17 @@ abstract class ScalaAbstractColumn extends GenericColumn {
   def toScalaColumn(df: ScalaDataFrame): ScalaColumn[_] = {
     // get input columns and data
     val inputColumns = visit[Set[String]](_.inputColumns, _ ++ _)
-    val inputData = inputColumns.map(_.split('.')).map {
-        case Array(alias, name) =>
-          val dfCol = df.cols.find( c => (c.getName.contains(name) || name == "*") && c.definition.dataFrameAlias.contains(alias))
-            .getOrElse(throw ColumnNotFoundException(s"$alias.$name", df.cols.map(_.definition.getFullName())))
-            .asInstanceOf[ScalaColumn[Any]] //TODO: can be removed when we switch to Scala 2.13, because of improved type inference
-          (s"$alias.$name", dfCol)
-        case Array(name) =>
-          val dfCol = df.cols.find(c => c.getName.contains(name) || name == "*")
+    val inputData = inputColumns.map { raw =>
+      val dfCol = ScalaAbstractColumn.unquoteIdentifier(raw) match {
+        case (None, name) =>
+          df.cols.find(c => c.getName.contains(name) || name == "*")
             .getOrElse(throw ColumnNotFoundException(name, df.cols.map(_.definition.name)))
-            .asInstanceOf[ScalaColumn[Any]] //TODO: can be removed when we switch to Scala 2.13, because of improved type inference
-          (name, dfCol)
-      }.toMap
+        case (Some(alias), name) =>
+          df.cols.find(c => (c.getName.contains(name) || name == "*") && c.definition.dataFrameAlias.contains(alias))
+            .getOrElse(throw ColumnNotFoundException(s"$alias.$name", df.cols.map(_.definition.getFullName())))
+      }
+      (raw, dfCol.asInstanceOf[ScalaColumn[Any]]) //TODO: can be removed when we switch to Scala 2.13, because of improved type inference
+    }.toMap
     toScalaColumn(inputData, df.nrRows)
   }
 
@@ -71,9 +86,9 @@ abstract class ScalaAbstractColumn extends GenericColumn {
   }
 
   def toScalaColumn(data: IndexedSeq[Option[_]]): ScalaColumn[_] = {
-    val columnDefinition = getName.getOrElse(ScalaColumn.nextColName).split('.') match {
-      case Array(alias, name) => dataType.createColumnDefinition(name).withDataFrameAlias(Some(alias))
-      case Array(name) => dataType.createColumnDefinition(name)
+    val columnDefinition = ScalaAbstractColumn.unquoteIdentifier(getName.getOrElse(ScalaColumn.nextColName)) match {
+      case (Some(alias), name) => dataType.createColumnDefinition(name).withDataFrameAlias(Some(alias))
+      case (None, name) => dataType.createColumnDefinition(name)
     }
     columnDefinition.createColumn(data)
   }
@@ -207,9 +222,13 @@ abstract class ScalaAbstractColumn extends GenericColumn {
   }
 
   override def cast(toDataType: GenericDataType): ScalaAbstractColumn = {
-    if (toDataType.isSameType(this.dataType)) this
-    else toDataType match {
-      case scalaDataType: ScalaDataType[_] => ScalaUnaryExpr(this, "cast", optionalizeUnaryFunc(scalaDataType.getCastFunction(this.dataType)), Some(scalaDataType))
+    toDataType match {
+      case scalaDataType: ScalaDataType[_] =>
+        // resolve the cast function lazily, as the input data type might not yet be resolved, e.g. a column reference not yet bound to a DataFrame
+        lazy val castFunc: Any => Any =
+          if (toDataType.isSameType(this.dataType)) identity
+          else scalaDataType.getCastFunction(this.dataType)
+        ScalaUnaryExpr(this, "cast", optionalizeUnaryFunc(v => castFunc(v)), Some(scalaDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(toDataType)
     }
   }

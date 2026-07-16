@@ -21,8 +21,6 @@ package io.smartdatalake.util.secrets
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.LogUtil.getRootCause
-import org.apache.spark.annotation.DeveloperApi
-
 /**
  * Configuration to register a SecretProvider.
  *
@@ -46,7 +44,6 @@ case class SecretProviderConfig(className: String, options: Option[Map[String,St
 /**
  * Interface to by implement by a SecretProvider.
  */
-@DeveloperApi
 trait SecretProvider {
   def getSecret(name: String): String
 }

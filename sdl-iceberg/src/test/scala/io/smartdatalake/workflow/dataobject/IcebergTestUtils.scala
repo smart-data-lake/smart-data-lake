@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.sql.SparkSession
 
@@ -39,7 +39,7 @@ object IcebergTestUtils {
   )
   lazy val session : SparkSession = {
     val session = additionalSparkProperties
-      .foldLeft(TestUtil.sparkSessionBuilder()) {
+      .foldLeft(SparkTestUtil.sparkSessionBuilder()) {
         case (builder, config) => builder.config(config._1, config._2)
       }.getOrCreate()
     session.sql("CREATE DATABASE IF NOT EXISTS iceberg1.default")
