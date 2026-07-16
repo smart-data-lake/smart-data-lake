@@ -16,17 +16,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow
+package io.smartdatalake.workflow.dataframe.spark
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.spark.SparkTestUtil
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.dataobject.file.FileRef
+import io.smartdatalake.workflow.{ActionPipelineContext, FileSubFeed}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.funsuite.AnyFunSuite
 
-class SubFeedTest extends AnyFunSuite {
+class SparkSubFeedTest extends AnyFunSuite {
 
   implicit val session: SparkSession = SparkTestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -74,15 +73,5 @@ class SubFeedTest extends AnyFunSuite {
     val sfUnion = sf1.union(sf2).asInstanceOf[SparkSubFeed]
     assert(sfUnion.partitionValues.toSet == Set(PartitionValues(Map("dt"->"20190101")), PartitionValues(Map("dt"->"20200101"))))
     assert(sfUnion.dataFrame.get.inner.as[Int].collect().toSeq.sorted == Seq(1,2,3,4,5,6))
-  }
-
-  test("FileSubFeed union with FileRefs, with partitionValues") {
-    val fr1 = Seq("f1","f2","f3").map(f => FileRef(f, f, PartitionValues(Map("dt"->"20190101"))))
-    val sf1 = FileSubFeed(Some(fr1), "test1", Seq(PartitionValues(Map("dt"->"20190101"))))
-    val fr2 = Seq("f4","f5","f6").map(f => FileRef(f, f, PartitionValues(Map("dt"->"20200101"))))
-    val sf2 = FileSubFeed(Some(fr2), "test1", Seq(PartitionValues(Map("dt"->"20200101"))))
-    val sfUnion = sf1.union(sf2).asInstanceOf[FileSubFeed]
-    assert(sfUnion.partitionValues.toSet == Set(PartitionValues(Map("dt"->"20190101")), PartitionValues(Map("dt"->"20200101"))))
-    assert(sfUnion.fileRefs.get.sortBy(_.fileName) == fr1 ++ fr2)
   }
 }
