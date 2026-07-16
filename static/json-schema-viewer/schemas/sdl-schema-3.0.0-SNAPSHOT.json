@@ -244,7 +244,7 @@
           },
           "triggerType" : {
             "type" : "string",
-            "description" : "define execution interval of Spark streaming query. Possible values are Once (default), ProcessingTime & Continuous. See`Trigger` for details.  \nNote that this is only applied if SDL is executed in streaming mode. If SDL is executed in normal mode, TriggerType=Once is used always.  \nIf triggerType=Once, the action is repeated with Trigger.Once in SDL streaming mode."
+            "description" : "define execution interval of Spark streaming query. Possible values are Once (default),\nProcessingTime & Continuous. See`Trigger` for details. Note that this is only applied if SDL\nis executed in streaming mode. If SDL is executed in normal mode, TriggerType=Once is used\nalways. If triggerType=Once, the action is repeated with Trigger.Once in SDL streaming mode."
           },
           "triggerTime" : {
             "type" : "string",
@@ -255,14 +255,14 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "additional option to apply when reading streaming source. This overwrites options set by the DataObjects."
+            "description" : "additional option to apply when reading streaming source. This overwrites options set by the\nDataObjects."
           },
           "outputOptions" : {
             "type" : "object",
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "additional option to apply when writing to streaming sink. This overwrites options set by the DataObjects."
+            "description" : "additional option to apply when writing to streaming sink. This overwrites options set by the\nDataObjects."
           },
           "outputMode" : {
             "type" : "string",
@@ -272,7 +272,7 @@
         "title" : "SparkStreamingMode",
         "required" : [ "type", "checkpointLocation" ],
         "additionalProperties" : false,
-        "description" : "Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data loads and keep track of processed data.  \nThis mode needs a DataObject implementing CanCreateStreamingDataFrame and works only with SparkSubFeeds.  \nThis mode can be executed synchronously in the DAG by using triggerType=Once, or asynchronously as Streaming Query with triggerType = ProcessingTime or Continuous."
+        "description" : "Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data\nloads and keep track of processed data. This mode needs a DataObject implementing\nCanCreateStreamingDataFrame and works only with SparkSubFeeds. This mode can be executed\nsynchronously in the DAG by using triggerType=Once, or asynchronously as Streaming Query with\ntriggerType = ProcessingTime or Continuous."
       }
     },
     "ValidationRule" : {
@@ -426,9 +426,8 @@
             "description" : "Optional SQL comparison operator and literal to define expected percentage for validation, e.g. '= 0.9\".  \nIf no expectation is defined, the result value is just recorded in metrics."
           },
           "precision" : {
-            "type" : "string",
-            "description" : "Number of digits to keep when calculating fraction. Default is 4.",
-            "existingJavaType" : "scala.Short"
+            "type" : "integer",
+            "description" : "Number of digits to keep when calculating fraction. Default is 4."
           },
           "scope" : {
             "type" : "string",
@@ -506,9 +505,8 @@
             "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
           },
           "precision" : {
-            "type" : "string",
-            "description" : "Number of digits to keep when calculating fraction. Default is 4.",
-            "existingJavaType" : "scala.Short"
+            "type" : "integer",
+            "description" : "Number of digits to keep when calculating fraction. Default is 4."
           },
           "approximate" : {
             "type" : "boolean",
@@ -1236,7 +1234,7 @@
         "title" : "CsvFileDataObject",
         "required" : [ "type", "path" ],
         "additionalProperties" : false,
-        "description" : "A `DataObject` backed by a comma-separated value (CSV) data source.\n\nIt manages read and write access and configurations required for `io.smartdatalake.workflow.action.Action`s to\nwork on CSV formatted files.\n\nCSV reading and writing details are delegated to Apache Spark `org.apache.spark.sql.DataFrameReader` and `org.apache.spark.sql.DataFrameWriter` respectively.\n\nRead Schema specifications:\n\nIf a data object schema is not defined via the `schema` attribute (default) and `inferSchema` option is\ndisabled (default) in `csvOptions` , then all column types are set to String and the first row of the CSV file is read\nto determine the column names and the number of fields.\n\nIf the `header` option is disabled (default) in `csvOptions` , then the header is defined as \"_c#\" for each column\nwhere \"#\" is the column index.  \nOtherwise the first row of the CSV file is not included in the DataFrame content and its entries\nare used as the column names for the schema.\n\nIf a data object schema is not defined via the `schema` attribute and `inferSchema` is enabled in `csvOptions` , then\nthe `samplingRatio` (default: 1.0) option in `csvOptions` is used to extract a sample from the CSV file in order to\ndetermine the input schema automatically.\n\nNOTE: This data object sets the following default values for `csvOptions` : delimiter = \"|\", quote = null, header = false, and inferSchema = false.  \nAll other `csvOption` default to the values defined by Apache Spark.\n\nSEE: `org.apache.spark.sql.DataFrameReader`\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]"
+        "description" : "A `DataObject` backed by a comma-separated value (CSV) data source.\n\nIt manages read and write access and configurations required for `io.smartdatalake.workflow.action.Action`s to work on CSV formatted files.\n\nCSV reading and writing details are delegated to Apache Spark `org.apache.spark.sql.DataFrameReader` and `org.apache.spark.sql.DataFrameWriter` respectively.\n\nRead Schema specifications:\n\nIf a data object schema is not defined via the `schema` attribute (default) and `inferSchema` option is disabled (default) in `csvOptions` , then all column types are set to String and the\nfirst row of the CSV file is read to determine the column names and the number of fields.\n\nIf the `header` option is disabled (default) in `csvOptions` , then the header is defined as \"_c#\"\nfor each column where \"#\" is the column index. Otherwise the first row of the CSV file is not\nincluded in the DataFrame content and its entries are used as the column names for the schema.\n\nIf a data object schema is not defined via the `schema` attribute and `inferSchema` is enabled in `csvOptions` , then the `samplingRatio` (default: 1.0) option in `csvOptions` is used to extract a\nsample from the CSV file in order to determine the input schema automatically.\n\nNOTE: This data object sets the following default values for `csvOptions` : delimiter = \"|\", quote =\nnull, header = false, and inferSchema = false. All other `csvOption` default to the values\ndefined by Apache Spark.\n\nSEE: `org.apache.spark.sql.DataFrameReader`\n\nSEE: [[org.apache.spark.sql.DataFrameWriter]]"
       },
       "DataObjectsExporterDataObject" : {
         "type" : "object",
@@ -1754,7 +1752,7 @@
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
-            "description" : "meta data"
+            "description" : "metadata"
           },
           "preReadSql" : {
             "type" : "string",
@@ -2299,7 +2297,7 @@
           },
           "apiDocsUrl" : {
             "type" : "string",
-            "description" : "The url to load the OpenApi specification from.  \nIf it is a relative Url it is appended to baseUrl.  \nDefault is \"v3/api-docs\", which will be concatenated to`<baseUrl>/v3/api-docs` .  \nAlternatively this can also be a hadoop file or classpath resource.  \nAn url starting with protocol \"cp:\" will be resolved as classpath resource.  \nAll protocols different from http/https/cp will be resolved as Hadoop path. To use a relative Hadoop path start with \"./\"."
+            "description" : "The url to load the OpenApi specification from.  \nIf it is a relative Url it is appended to baseUrl.  \nDefault is \"v3/api-docs\", which will be concatenated to`<baseUrl>/v3/api-docs` .  \nAlternatively this can also be a hadoop file or classpath resource.  \nAn url starting with protocol \"cp:\" will be resolved as classpath resource.  \nAll protocols different from http/https/cp will be resolved as Hadoop path.  \nTo use a relative Hadoop path start with \"./\"."
           },
           "useFirstOpenApiSpecServer" : {
             "type" : "boolean",
@@ -2409,7 +2407,7 @@
         "title" : "OpenApiDataObject",
         "required" : [ "type", "baseUrl", "operationId" ],
         "additionalProperties" : false,
-        "description" : "Reads data from an OpenApi compliant WebService operation.  \nThe operation must return Json and have its schema defined in the OpenApi specification.\n\nLimitations:\n- Only GET method implemented for now\n- No dynamic URL parameters supported for now\n- Only responseContentType=application/json will be parsed into schema. Otherwise schema will be a single column with name 'content' of type String or Binary.  \n- Only token based pagination is supported. Use pagingLinkJsonPath to extract Url for the next page.  \n- OpenApi Webservice requests can not be parallelized and distributed to executors. They run on the driver.  \nIn order to avoid memory problems Spark BlockManager is used to create a new Spark partition after every maxRecordsPerPartition number of records.\n\nAlso note that the getDataFrame method is not lazy in Exec-Phase. It will query the WebService before creating the DataFrame."
+        "description" : "Reads data from an OpenApi compliant WebService operation.  \nThe operation must return JSON and have its schema defined in the OpenApi specification.\n\nLimitations:\n- Only GET method implemented for now\n- No dynamic URL parameters supported for now\n- Only responseContentType=application/json will be parsed into schema.  \nOtherwise schema will be a single column with name 'content' of type String or Binary.  \n- Only token based pagination is supported. Use pagingLinkJsonPath to extract Url for the next page.  \n- OpenApi Webservice requests can not be parallelized and distributed to executors. They run on the driver.  \nIn order to avoid memory problems Spark BlockManager is used to create\na new Spark partition after every maxRecordsPerPartition number of records.\n\nAlso note that the getDataFrame method is not lazy in Exec-Phase.  \nIt will query the WebService before creating the DataFrame."
       },
       "PKViolatorsDataObject" : {
         "type" : "object",
@@ -3104,7 +3102,7 @@
           },
           "syncComments" : {
             "type" : "boolean",
-            "description" : "Defines if the comments defined in the schema should be synched the Snowflake table. Please note that this can be an expensive operation and it only works if using Spark as an execution engine."
+            "description" : "Defines if the comments defined in the schema should be synched the Snowflake table.  \nPlease note that this can be an expensive operation, and it only works if using Spark as an execution engine."
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
@@ -3472,7 +3470,7 @@
                 "$ref" : "#/definitions/GenericDfTransformer/WhitelistTransformer"
               } ]
             },
-            "description" : "optional list of transformations to apply. See`spark.transformer` for a list of included Transformers.  \nThe transformations are applied according to the lists ordering."
+            "description" : "optional list of transformations to apply. See`spark.transformer` for a list of included\nTransformers. The transformations are applied according to the lists ordering."
           },
           "breakDataFrameLineage" : {
             "type" : "boolean",
@@ -3545,9 +3543,8 @@
                     "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
                   },
                   "precision" : {
-                    "type" : "string",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
-                    "existingJavaType" : "scala.Short"
+                    "type" : "integer",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4."
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -3574,9 +3571,8 @@
                     "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
                   },
                   "precision" : {
-                    "type" : "string",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
-                    "existingJavaType" : "scala.Short"
+                    "type" : "integer",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4."
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -3615,7 +3611,7 @@
         "title" : "CopyAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "This `Action` copies data between an input and output DataObject using DataFrames.  \nThe input DataObject reads the data and converts it to a DataFrame according to its definition.  \nThe DataFrame might be transformed using SQL or DataFrame transformations.  \nThen the output DataObjects writes the DataFrame to the output according to its definition."
+        "description" : "This `Action` copies data between an input and output DataObject using DataFrames. The input\nDataObject reads the data and converts it to a DataFrame according to its definition. The\nDataFrame might be transformed using SQL or DataFrame transformations. Then the output\nDataObjects writes the DataFrame to the output according to its definition."
       },
       "CustomDataFrameAction" : {
         "type" : "object",
@@ -3739,9 +3735,8 @@
                     "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
                   },
                   "precision" : {
-                    "type" : "string",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
-                    "existingJavaType" : "scala.Short"
+                    "type" : "integer",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4."
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -3768,9 +3763,8 @@
                     "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
                   },
                   "precision" : {
-                    "type" : "string",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4.",
-                    "existingJavaType" : "scala.Short"
+                    "type" : "integer",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4."
                   },
                   "failedSeverity" : {
                     "type" : "string",
@@ -3837,11 +3831,11 @@
               },
               "scalaFile" : {
                 "type" : "string",
-                "description" : "Optional file where scala code for transformation is loaded from"
+                "description" : "Optional file where Scala code for transformation is loaded from"
               },
               "scalaCode" : {
                 "type" : "string",
-                "description" : "Optional scala code for transformation"
+                "description" : "Optional Scala code for transformation"
               },
               "options" : {
                 "type" : "object",
@@ -4310,7 +4304,7 @@
           },
           "mergeModeCDCColumn" : {
             "type" : "string",
-            "description" : "Optional colum holding the CDC operation to replay to enable mergeModeCDC. If CDC information\nis available from the source incremental historization can be further optimized, as the join\nwith existing data can be omitted. Note that this should be enabled only, if input data\ncontains just inserted, updated and deleted records. HistorizeAction in mergeModeCDC will make\nno* change detection on its own, and create a new version for every inserted/updated record it\nreceives! You will also need to specify parameter mergeModeCDCDeletedValue to use this.  \nIncrement CDC historization will add a column \"dl_dummy\" to the target table, which is used to\nwork around limitations of SQL merge statement, but \"dl_hash\" column from mergeMode is no\nlonger needed."
+            "description" : "Optional column holding the CDC operation to replay to enable mergeModeCDC. If CDC information\nis available from the source incremental historization can be further optimized, as the join\nwith existing data can be omitted. Note that this should be enabled only, if input data\ncontains just inserted, updated and deleted records. HistorizeAction in mergeModeCDC will make\nno* change detection on its own, and create a new version for every inserted/updated record it\nreceives! You will also need to specify parameter mergeModeCDCDeletedValue to use this.  \nIncrement CDC historization will add a column \"dl_dummy\" to the target table, which is used to\nwork around limitations of SQL merge statement, but \"dl_hash\" column from mergeMode is no\nlonger needed."
           },
           "mergeModeCDCDeletedValue" : {
             "type" : "string",
@@ -5573,7 +5567,7 @@
                 },
                 "name" : {
                   "type" : "string",
-                  "description" : "optional name for foreign key, e.g to depict it's role.  \nForeign keys in .conf files are to be defined like the following example\n(here two foreign key objects):\nforeignKeys = [\n{\ndb = \"OPTIONAL_DB_name\"\ntable = \"table_id\"\ncolumns = {\n\"local_column_name\": \"external_column_name\"\n}\nname = \"OPTIONAL_key_name\"\n},\n{\ntable = \"another_table_id\"\ncolumns = {\n\"another_local_column_name\": \"another_external_column_name\"\n}\nname = \"another_OPTIONAL_key_name\"\n}\n]"
+                  "description" : "optional name for foreign key, e.g. to depict its role.  \nForeign keys in .conf files are to be defined like the following example\n(here two foreign key objects):\nforeignKeys = [\n{\ndb = \"OPTIONAL_DB_name\"\ntable = \"table_id\"\ncolumns = {\n\"local_column_name\": \"external_column_name\"\n}\nname = \"OPTIONAL_key_name\"\n},\n{\ntable = \"another_table_id\"\ncolumns = {\n\"another_local_column_name\": \"another_external_column_name\"\n}\nname = \"another_OPTIONAL_key_name\"\n}\n]"
                 }
               },
               "title" : "ForeignKey",
@@ -6127,13 +6121,13 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.  \nThe spark sql expressions are evaluated against an instance of`DefaultExpressionData`."
+            "description" : "optional tuples of [key, spark SQL expression] to be added as additional options when executing\ntransformation. The spark SQL expressions are evaluated against an instance of`DefaultExpressionData`."
           }
         },
         "title" : "ScalaClassSparkDfTransformer",
         "required" : [ "type", "className" ],
         "additionalProperties" : false,
-        "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.  \nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface `CustomDfTransformer`.\n\nNote that the following options are passed by default to the transformation:\n- isExec: defined as `context.isExecPhase`"
+        "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)\nas Java/Scala Class. Define a transform function which receives a DataObjectId, a DataFrame and a\nmap of options and has to return a DataFrame. The Java/Scala class has to implement interface `CustomDfTransformer`.\n\nNote that the following options are passed by default to the transformation:\n- isExec: defined as `context.isExecPhase`"
       },
       "ScalaClassSparkDsTransformer" : {
         "type" : "object",
@@ -6189,11 +6183,11 @@
           },
           "code" : {
             "type" : "string",
-            "description" : "Scala code for transformation. The scala code needs to be a function of type`fnTransformType`."
+            "description" : "Scala code for transformation. The Scala code needs to be a function of type`fnTransformType`."
           },
           "file" : {
             "type" : "string",
-            "description" : "File where scala code for transformation is loaded from. The scala code in the file needs to be a function of type`fnTransformType`."
+            "description" : "File where Scala code for transformation is loaded from. The Scala code in the file needs to be\na function of type`fnTransformType`."
           },
           "options" : {
             "type" : "object",
@@ -6207,13 +6201,13 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.  \nThe spark sql expressions are evaluated against an instance of`DefaultExpressionData`."
+            "description" : "optional tuples of [key, spark SQL expression] to be added as additional options when executing\ntransformation. The spark SQL expressions are evaluated against an instance of`DefaultExpressionData`."
           }
         },
         "title" : "ScalaCodeSparkDfTransformer",
         "required" : [ "type" ],
         "additionalProperties" : false,
-        "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.  \nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The scala code has to implement a function of type `fnTransformType`."
+        "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)\nas Scala code which is compiled at runtime. Define a transform function which receives a\nDataObjectId, a DataFrame and a map of options and has to return a DataFrame. The Scala code has\nto implement a function of type `fnTransformType`."
       },
       "ScalaNotebookSparkDfTransformer" : {
         "type" : "object",
@@ -6261,7 +6255,7 @@
             }, {
               "$ref" : "#/definitions/HttpAuthMode/TokenAuthMode"
             } ],
-            "description" : "optional authentication information for webservice, e.g. BasicAuthMode for user/pw authentication"
+            "description" : "optional authentication information for webservice, e.g. BasicAuthMode for user/pw\nauthentication"
           },
           "options" : {
             "type" : "object",
@@ -6275,13 +6269,13 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "optional tuples of [key, spark SQL expression] to be added as additional options when executing transformation.  \nThe spark SQL expressions are evaluated against an instance of`DefaultExpressionData`."
+            "description" : "optional tuples of [key, spark SQL expression] to be added as additional options when executing\ntransformation. The spark SQL expressions are evaluated against an instance of`DefaultExpressionData`."
           }
         },
         "title" : "ScalaNotebookSparkDfTransformer",
         "required" : [ "type", "url", "functionName" ],
         "additionalProperties" : false,
-        "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Scala code which is compiled at runtime.  \nThe code is loaded from a Notebook. It should define a transform function with a configurable name, which receives a DataObjectId, a DataFrame\nand a map of options and has to return a DataFrame, see also ( `fnTransformType` ).  \nNotebook-cells starting with \"//!IGNORE\" will be ignored."
+        "description" : "Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)\nas Scala code which is compiled at runtime. The code is loaded from a Notebook. It should define\na transform function with a configurable name, which receives a DataObjectId, a DataFrame and a\nmap of options and has to return a DataFrame, see also ( `fnTransformType` ). Notebook-cells\nstarting with \"//!IGNORE\" will be ignored."
       },
       "SparkFlattenDfTransformer" : {
         "type" : "object",
@@ -6789,31 +6783,31 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.  \nThe spark sql expressions are evaluated against an instance of`DefaultExpressionData`."
+            "description" : "optional tuples of [key, spark SQL expression] to be added as additional options when executing\ntransformation. The spark SQL expressions are evaluated against an instance of`DefaultExpressionData`."
           },
           "renamedInputIds" : {
             "type" : "object",
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "optional map of [input DataFrame name, renamed input DataFrame name].  \nAdapt names of input DataFrames to the expected names in the transformation.  \nThis is useful if the transformation expects specific input names, or if you want to use more\ngeneric names in the transformation than the actual input DataObjectIds."
+            "description" : "optional map of [input DataFrame name, renamed input DataFrame name]. Adapt names of input\nDataFrames to the expected names in the transformation. This is useful if the transformation\nexpects specific input names, or if you want to use more generic names in the transformation\nthan the actual input DataObjectIds."
           },
           "renamedOutputIds" : {
             "type" : "object",
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "optional map of [output DataFrame name, renamed output DataFrame name].  \nAdapt names of output DataFrames of the transformation to the expected names of the output DataObjects or the next transformation.  \nThis is useful if the transformation returns DataFrames with specific names, or if you want to use more\ngeneric names in the transformation than the actual output DataObjectIds."
+            "description" : "optional map of [output DataFrame name, renamed output DataFrame name]. Adapt names of output\nDataFrames of the transformation to the expected names of the output DataObjects or the next\ntransformation. This is useful if the transformation returns DataFrames with specific names, or\nif you want to use more generic names in the transformation than the actual output\nDataObjectIds."
           },
           "overrideOutputId" : {
             "type" : "string",
-            "description" : "override name of output DataFrame, if the transformer returns a single DataFrame/Dataset, and not a Map of type String → DataFrame.  \nBy default, a single DataFrame/Dataset is named after the output DataObjectId of the Action if the action has only one output DataObject.  \nWith this parameter you can explicitly define the name of the output DataFrame/Dataset independent of the output DataObjectId of the Action.  \nThis parameter is ignored if the transformation returns multiple DataFrames."
+            "description" : "override name of output DataFrame, if the transformer returns a single DataFrame/Dataset, and\nnot a Map of type String → DataFrame. By default, a single DataFrame/Dataset is named after\nthe output DataObjectId of the Action if the action has only one output DataObject. With this\nparameter you can explicitly define the name of the output DataFrame/Dataset independent of the\noutput DataObjectId of the Action. This parameter is ignored if the transformation returns\nmultiple DataFrames."
           }
         },
         "title" : "ScalaClassSparkDfsTransformer",
         "required" : [ "type", "className" ],
         "additionalProperties" : false,
-        "description" : "Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m)\n\nTo define the transformation a class implementing the trait `CustomDfsTransformer` has to be created.  \nThere are two methods to define of defining transformation:\n\n1) Overwrite the generic transform function of CustomDfsTransformer: Define a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and has\nto return a map of output DataObjectIds with DataFrames. The exact signature is `transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]): Map[String,DataFrame]` .\n\n2) Implement any transform method using parameters of type SparkSession, Map[String,String], DataFrame, Dataset[<Product>] and any primitive data type (String, Boolean, Int, ...).  \nPrimitive data types might also use default values or be enclosed in an Option[...] to mark it as non required.  \nThe transform method is then called dynamically by looking for the parameter values in the input DataFrames and Options.  \nUsing this method you can avoid writing code to prepare DataFrames and Options from the corresponding Map parameters.  \nIt also allows the UI to display input parameter details of your transformation.\n\nNote that the following options are passed by default to the transformation:\n- isExec: defined as `context.isExecPhase` - outputDataObjectId: defined as outputDataObject.id if transformation has only one output DataObject configured."
+        "description" : "Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs\n(n:m)\n\nTo define the transformation a class implementing the trait `CustomDfsTransformer` has to be\ncreated. There are two methods to define of defining transformation:\n\n1) Overwrite the generic transform function of CustomDfsTransformer: Define a transform function\nwhich receives a map of input DataObjectIds with DataFrames and a map of options and has to\nreturn a map of output DataObjectIds with DataFrames. The exact signature is `transform(session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]): Map[String,DataFrame]` .\n\n2) Implement any transform method using parameters of type SparkSession, Map[String,String],\nDataFrame, Dataset[<Product>] and any primitive data type (String, Boolean, Int, ...). Primitive\ndata types might also use default values or be enclosed in an Option[...] to mark it as non\nrequired. The transform method is then called dynamically by looking for the parameter values in\nthe input DataFrames and Options. Using this method you can avoid writing code to prepare\nDataFrames and Options from the corresponding Map parameters. It also allows the UI to display\ninput parameter details of your transformation.\n\nNote that the following options are passed by default to the transformation:\n- isExec: defined as `context.isExecPhase` - outputDataObjectId: defined as outputDataObject.id if transformation has only one output\nDataObject configured."
       },
       "ScalaClassSparkDsNTo1Transformer" : {
         "type" : "object",
@@ -6890,11 +6884,11 @@
           },
           "code" : {
             "type" : "string",
-            "description" : "Scala code for transformation. The scala code needs to be a function of type`fnTransformType`."
+            "description" : "Scala code for transformation. The Scala code needs to be a function of type`fnTransformType`."
           },
           "file" : {
             "type" : "string",
-            "description" : "File where scala code for transformation is loaded from. The scala code in the file needs to be a function of type`fnTransformType`."
+            "description" : "File where Scala code for transformation is loaded from. The Scala code in the file needs to be\na function of type`fnTransformType`."
           },
           "options" : {
             "type" : "object",
@@ -6908,13 +6902,13 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.  \nThe spark sql expressions are evaluated against an instance of`DefaultExpressionData`."
+            "description" : "optional tuples of [key, spark SQL expression] to be added as additional options when executing\ntransformation. The spark SQL expressions are evaluated against an instance of`DefaultExpressionData`."
           }
         },
         "title" : "ScalaCodeSparkDfsTransformer",
         "required" : [ "type" ],
         "additionalProperties" : false,
-        "description" : "Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m) as Scala code which is compiled at runtime.  \nDefine a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and has\nto return a map of output DataObjectIds with DataFrames. The scala code has to implement a function of type `fnTransformType`."
+        "description" : "Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs\n(n:m) as Scala code which is compiled at runtime. Define a transform function which receives a\nmap of input DataObjectIds with DataFrames and a map of options and has to return a map of output\nDataObjectIds with DataFrames. The Scala code has to implement a function of type `fnTransformType`."
       }
     }
   },
