@@ -28,6 +28,7 @@
     <modules>
         <module>sdl-core</module>
         <module>sdl-spark</module>
+        <module>sdl-sparkconnect</module>
         <module>sdl-kafka</module>
         <module>sdl-kafka/embedded-kafka-schema-registry-shaded</module>
         <module>sdl-deltalake</module>
@@ -1163,13 +1164,11 @@
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-impl</artifactId>
                 <version>${jjwt.version}</version>
-                <scope>${jjwt.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-jackson</artifactId>
                 <version>${jjwt.version}</version>
-                <scope>${jjwt.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>com.google.code.findbugs</groupId>
@@ -1463,13 +1462,11 @@
                 <groupId>org.apache.derby</groupId>
                 <artifactId>derby</artifactId>
                 <version>${derby.version}</version>
-                <scope>${derby.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.derby</groupId>
                 <artifactId>derbytools</artifactId>
                 <version>${derby.version}</version>
-                <scope>${derby.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>io.dropwizard.metrics</groupId>
@@ -2779,6 +2776,12 @@
             <dependency>
                 <groupId>org.apache.spark</groupId>
                 <artifactId>spark-catalyst_${scala.minor.version}</artifactId>
+                <version>${spark.version}</version>
+                <scope>${spark.deps.scope}</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-connect-client-jvm_${scala.minor.version}</artifactId>
                 <version>${spark.version}</version>
                 <scope>${spark.deps.scope}</scope>
             </dependency>

@@ -21,6 +21,7 @@ package io.smartdatalake.testutils
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
+import io.smartdatalake.testutils.plainScala.ScalaTestUtil.getCommonSubFeed
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.DeduplicateAction
 import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, SQLDfTransformer}
@@ -56,7 +57,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
     import helper.implicits._
 
     // prepare & start 1st load
@@ -118,13 +119,15 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+    val helper = DataFrameSubFeed.getCompanion(subFeedType)
     import helper._
     import helper.implicits._
 
     // prepare & start 1st load
+    // note: pass the actual subFeedType as subFeedTypeForValidation, as the default (SparkSubFeed) might not be on the classpath
     val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(LocalDateTime.now), phase = ExecutionPhase.Exec)
-    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, transformers = Seq(FilterTransformer(filterClause = "lastname='jonson'")))
+    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, transformers = Seq(FilterTransformer(filterClause = "lastname='jonson'", subFeedTypeForValidation = subFeedType.typeSymbol.fullName)))
     val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
 
     srcDO.writeDataFrame(l1, Seq())(context1)
@@ -152,7 +155,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
     import helper.implicits._
 
     // prepare & start 1st load
@@ -260,7 +263,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
     import helper.implicits._
 
     // prepare & start 1st load
@@ -351,7 +354,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
     import helper.implicits._
 
     // prepare & start 1st load
@@ -451,7 +454,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
     import helper.implicits._
 
     // prepare & start 1st load

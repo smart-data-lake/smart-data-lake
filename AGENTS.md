@@ -192,7 +192,8 @@ trait FooActionBehaviour extends GenericTestTool {
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     instanceRegistry.register(defaultEngineConnection)
     val srcDO = createSrcDataObject("src1", instanceRegistry)
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val tgtDO = createSrcDataObject("tgt1", instanceRegistry)
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
     import helper.implicits._          // generic toDF(...), not session.implicits._
     val df = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
     // ... exercise the Action using only the GenericDataFrame API (col, select, filter, collect[T], ...)

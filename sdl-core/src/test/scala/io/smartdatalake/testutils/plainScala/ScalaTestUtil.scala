@@ -27,10 +27,11 @@ import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.connection.{Connection, ScalaConnection}
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.file.FileRefDataObject
-import io.smartdatalake.workflow.dataobject.generic.TableDataObject
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame, TableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 
 import java.time.LocalDateTime
+import scala.reflect.runtime.universe.Type
 
 /**
  * Engine-agnostic subset of [[TestUtil]], usable without a Spark dependency.
@@ -69,5 +70,9 @@ object ScalaTestUtil extends SmartDataLakeLogger {
     }
     instanceRegistry.register(dataObject)
     dataObject
+  }
+
+  def getCommonSubFeed(srcDO: DataObject with CanCreateDataFrame, tgtDO: DataObject with CanWriteDataFrame): Type = {
+    srcDO.getSubFeedSupportedTypes.toSet.intersect(tgtDO.writeSubFeedSupportedTypes.toSet).head
   }
 }
