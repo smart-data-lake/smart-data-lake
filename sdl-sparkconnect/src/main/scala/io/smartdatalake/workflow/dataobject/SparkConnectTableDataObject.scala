@@ -24,16 +24,14 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.historization.Historization
-import io.smartdatalake.util.misc.{ProductUtil, SQLUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.SparkConnectConnection
 import io.smartdatalake.workflow.dataframe.sparkconnect.{SparkConnectDataFrame, SparkConnectSchema, SparkConnectSubFeed}
-import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame, GenericSchema}
+import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.generic.{CanEvolveSchema, CanHandlePartitions, CanMergeDataFrame, Table, TransactionalTableDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ProcessingLogicException}
-import org.apache.spark.sql.functions.{col, lit}
-import org.apache.spark.sql.{Column, DataFrame, DataFrameWriter, Row, SaveMode, SparkSession}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+import org.apache.spark.sql.{DataFrame, DataFrameWriter, Row, SaveMode, SparkSession}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
@@ -150,16 +148,7 @@ case class SparkConnectTableDataObject(override val id: DataObjectId,
             newDfWriter(targetDf).mode(SaveMode.Append).saveAsTable(table.fullName)
           } else {
             // dynamic partition overwrite: overwrite the partitions contained in the DataFrame
-            val overwriteModeIsDynamic = options.get("partitionOverwriteMode").orElse(session.conf.getOption("spark.sql.sources.partitionOverwriteMode")).contains("dynamic")
-            if (!overwriteModeIsDynamic) throw new ProcessingLogicException(s"($id) Overwrite without partition values is not allowed on a partitioned DataObject. This is a protection from unintentionally deleting all partition data. Set option.partitionOverwriteMode=dynamic on this SparkConnectTableDataObject to enable dynamic partition overwrite and get around this exception.")
-            // insertInto is position-based, reorder DataFrame columns to the columns of the existing table
-            val tableCols = session.table(table.fullName).columns.toSeq
-            // the partitionOverwriteMode needs to be set as session conf, as writer options are not honored by insertInto for all table formats
-            val previousOverwriteMode = session.conf.getOption("spark.sql.sources.partitionOverwriteMode")
-            session.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
-            try targetDf.select(tableCols.map(col): _*).write.options(options)
-              .mode(SaveMode.Overwrite).insertInto(table.fullName)
-            finally previousOverwriteMode.foreach(session.conf.set("spark.sql.sources.partitionOverwriteMode", _))
+            SparkConnectTableUtil.insertIntoDynamicPartitionOverwrite(session, targetDf, table, options, id, this.getClass.getSimpleName)
           }
         case _ =>
           newDfWriter(targetDf)
@@ -193,65 +182,15 @@ case class SparkConnectTableDataObject(override val id: DataObjectId,
    * Note that the table format needs to support row-level operations on the server side, e.g. delta or iceberg.
    */
   def mergeDataFrameByPrimaryKey(df: DataFrame, saveModeOptions: SaveModeMergeOptions)(implicit context: ActionPipelineContext): MetricsMap = {
-    assert(table.primaryKey.exists(_.nonEmpty), s"($id) table.primaryKey must be defined to use mergeDataFrameByPrimaryKey")
-    val tableName = table.name
-    val saveModeExpr = saveModeOptions.getExpressions(SparkConnectSubFeed.subFeedType, existingAliasReplacement = Some(tableName))
-    def toSpark(expr: GenericColumn): Column = expr.asInstanceOf[io.smartdatalake.workflow.dataframe.sparkconnect.SparkConnectColumn].inner
-    val insertCols = df.columns.diff(saveModeOptions.insertColumnsToIgnore)
-    val existingCols = session.table(table.fullName).columns
-    val additionalCols = insertCols.diff(existingCols)
-
-    // prepare join condition
-    val joinCondition = table.primaryKey.get.map(colName => col(s"new.$colName") === col(s"$tableName.$colName")).reduce(_ and _)
-    var mergeStmt = df.as("new")
-      .mergeInto(table.fullName, joinCondition and saveModeExpr.additionalMergePredicateExpr.map(toSpark).getOrElse(lit(true)))
-
-    // enable schema evolution
-    if (allowSchemaEvolution) {
-      mergeStmt = mergeStmt.withSchemaEvolution() // does not work in Spark 4.1
-      // workaround for delta: set this globally
-      session.conf.set(key = "spark.databricks.delta.schema.autoMerge.enabled", value = true)
-    }
-
-    // delete clause if configured
-    saveModeExpr.deleteConditionExpr.map(toSpark).foreach(c => mergeStmt = mergeStmt.whenMatched(c).delete())
-
-    // update clause
-    if (saveModeOptions.updateColumnsOpt.isDefined) {
-      val updateCols = saveModeOptions.updateColumnsOpt.getOrElse(df.columns.toSeq.diff(table.primaryKey.get))
-      mergeStmt = mergeStmt.whenMatched(saveModeExpr.updateConditionExpr.map(toSpark).getOrElse(lit(true))).update(updateCols.map(c => c -> col(s"new.$c")).toMap)
-    } else {
-      mergeStmt = mergeStmt.whenMatched(saveModeExpr.updateConditionExpr.map(toSpark).getOrElse(lit(true))).updateAll()
-    }
-
-    // update existing clause if configured
-    if (saveModeOptions.updateExistingCondition.isDefined) {
-      val updateCols = df.columns.toSeq.diff(Seq(Historization.historizeOperationColName)).diff(additionalCols)
-      mergeStmt = mergeStmt.whenMatched(saveModeExpr.updateExistingConditionExpr.map(toSpark).getOrElse(lit(true))).update(updateCols.map(c => c -> col(s"new.$c")).toMap)
-    }
-
-    // insert clause
-    if (saveModeOptions.insertColumnsToIgnore.nonEmpty || saveModeOptions.insertValuesOverride.nonEmpty) {
-      mergeStmt = mergeStmt.whenNotMatched(saveModeExpr.insertConditionExpr.map(toSpark).getOrElse(lit(true)))
-        .insert(insertCols.map(c => c -> saveModeOptions.insertValuesOverride.get(c).map(lit).getOrElse(col(s"new.$c"))).toMap)
-    } else {
-      mergeStmt = mergeStmt.whenNotMatched(saveModeExpr.insertConditionExpr.map(toSpark).getOrElse(lit(true))).insertAll()
-    }
-
-    // execute merge statement
-    logger.info(s"($id) executing merge statement with options: ${ProductUtil.attributesWithValuesForCaseClass(saveModeOptions).map(e => e._1 + "=" + e._2).mkString(" ")}")
-    mergeStmt.merge()
-    // Note: there is no QueryExecutionListener to collect metrics on the Spark Connect client side.
-    Map()
+    SparkConnectTableUtil.mergeDataFrameByPrimaryKey(session, df, table, saveModeOptions, allowSchemaEvolution, id)
   }
 
   /**
    * Listing partitions by a "select distinct partition-columns" query
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
-    if (partitions.nonEmpty && isTableExisting) {
-      PartitionValues.fromDataFrame(SparkConnectDataFrame(session.table(table.fullName).select(partitions.map(col): _*).distinct()))
-    } else Seq()
+    if (partitions.nonEmpty && isTableExisting) SparkConnectTableUtil.listPartitions(session, table, partitions)
+    else Seq()
   }
 
   /**
@@ -259,9 +198,7 @@ case class SparkConnectTableDataObject(override val id: DataObjectId,
    * Note that this needs a table format supporting row-level operations on the server side, e.g. delta or iceberg.
    */
   override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    if (partitionValues.nonEmpty) {
-      session.sql(SQLUtil.createDeletePartitionStatement(table.fullName, partitionValues, SQLUtil.sparkQuoteCaseSensitiveColumn(_))).collect()
-    }
+    SparkConnectTableUtil.deletePartitions(session, table, partitionValues)
   }
 
   /**
@@ -269,13 +206,7 @@ case class SparkConnectTableDataObject(override val id: DataObjectId,
    * Note that this needs a table format supporting row-level operations on the server side, e.g. delta or iceberg.
    */
   override def movePartitions(partitionValues: Seq[(PartitionValues, PartitionValues)])(implicit context: ActionPipelineContext): Unit = {
-    partitionValues.foreach {
-      case (pvExisting, pvNew) =>
-        val updateSpec = pvNew.elements.map { case (k, v) => s"${SQLUtil.sparkQuoteCaseSensitiveColumn(k)} = '${v.toString.replace("'", "''")}'" }.mkString(", ")
-        val filter = pvExisting.elements.map { case (k, v) => s"${SQLUtil.sparkQuoteCaseSensitiveColumn(k)} = '${v.toString.replace("'", "''")}'" }.mkString(" AND ")
-        session.sql(s"UPDATE ${table.fullName} SET $updateSpec WHERE $filter").collect()
-        logger.info(s"($id) Partition $pvExisting moved to $pvNew")
-    }
+    SparkConnectTableUtil.movePartitions(session, table, partitionValues, id)
   }
 
   // cache response to avoid remote catalog query.

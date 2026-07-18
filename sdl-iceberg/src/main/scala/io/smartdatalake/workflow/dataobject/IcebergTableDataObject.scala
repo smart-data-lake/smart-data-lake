@@ -696,7 +696,6 @@ case class IcebergTableDataObject(override val id: DataObjectId,
    * @param state Internal state of last increment. If None then the first increment (maybe a full increment) is delivered.
    */
   override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
-
     incrementalOutputExpr = state.orElse(Some("0"))
   }
 
