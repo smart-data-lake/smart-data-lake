@@ -21,16 +21,13 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
+import io.smartdatalake.testutils.{TableDataObjectBehaviour, TableDataObjectTestParams}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkHdfsUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.dataset.Equality
-import io.smartdatalake.workflow.action.{CopyAction, NoDataToProcessWarning}
-import io.smartdatalake.workflow.connection.{HadoopFileConnection, IcebergTableConnection}
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection, HadoopFileConnection, IcebergTableConnection}
 import io.smartdatalake.workflow.dataobject.generic.Table
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ProcessingLogicException}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.functions.lit
 import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
@@ -38,8 +35,12 @@ import org.slf4j.Logger
 
 import java.nio.file.Files
 
+/**
+ * Tests IcebergTableDataObject using the shared engine-agnostic TableDataObjectBehaviour,
+ * plus Iceberg-specific tests (create from parquet files, hadoop catalog, ...).
+ */
 class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
-  with SparkTestTool with Equality {
+  with SparkTestTool with TableDataObjectBehaviour {
   private implicit val implLogger: Logger = logger
 
   protected implicit val session: SparkSession = IcebergTestUtils.session
@@ -49,329 +50,86 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
   private val tempDir = Files.createTempDirectory("tempHadoopDO")
   private val tempPath = tempDir.toAbsolutePath.toString
 
+  // registry and context for the iceberg-specific tests, the behaviour methods use their own registry
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = context.copy(phase = ExecutionPhase.Exec)
+
+  override def defaultEngineConnection: Connection with EngineConnection = SparkTestUtil.defaultSparkConnection
 
   before {
     instanceRegistry.clear()
     instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
+  private def createSrcDataObject(id: String, registry: InstanceRegistry) = MockSparkDataObject(id)(registry)
+
+  private def createTableDataObject(id: String, params: TableDataObjectTestParams, registry: InstanceRegistry): IcebergTableDataObject = {
+    val table = Table(catalog = Some("iceberg1"), db = Some("default"), name = s"behaviour_$id", primaryKey = params.primaryKey)
+    IcebergTableDataObject(id, path = Some(tempPath + s"/${table.fullName}"), partitions = params.partitions,
+      options = params.options, table = table, constraints = params.constraints, expectations = params.expectations,
+      saveMode = params.saveMode, allowSchemaEvolution = params.allowSchemaEvolution)(registry)
+  }
+
   test("Write data") {
-
-    // setup DataObjects
-    val sourceDO = MockSparkDataObject(id="source").register
-    sourceDO.writeSparkDataFrame(
-      Seq((Some(0),"Foo!"),(Some(1),"Bar!")).toDF("num","text")
-    )
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "custom_df_copy", query = None)
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable)
-    instanceRegistry.register(targetDO)
-    targetDO.prepare
-
-    // prepare & start load
-    val testAction = CopyAction(id = s"load", inputId = sourceDO.id, outputId = targetDO.id)
-    val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
-    testAction.exec(Seq(srcSubFeed))(contextExec)
-
-    val expected = sourceDO.getSparkDataFrame()
-    val actual = targetDO.getSparkDataFrame()
-    val resultat = expected.equal(actual)
-    if (!resultat) printFailedTestResultDs("CustomDf2DeltaTable")(actual)(expected)
-    assert(resultat)
-
-    // check statistics
-    assert(targetDO.getStats().apply(TableStatsType.NumRows.toString) == 2)
-    val colStats = targetDO.getColumnStats()
-    assert(colStats.apply("num").get(ColumnStatsType.Max.toString).contains(1))
-    assert(colStats.apply("text").get(ColumnStatsType.Max.toString).contains("Foo!"))
+    testCopyLoad(createSrcDataObject, createTableDataObject)
   }
 
   test("Write data partitioned") {
-
-    // setup DataObjects
-    val sourceDO = MockSparkDataObject(id="source").register
-    sourceDO.writeSparkDataFrame(
-      Seq((Some(0),"Foo!"),(Some(1),"Bar!")).toDF("num","text")
-    )
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "custom_df_copy_partitioned", query = None)
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id = "target", partitions = Seq("num"), path = Some(targetTablePath), table = targetTable)
-    targetDO.dropTable
-    instanceRegistry.register(targetDO)
-
-    // prepare & start load
-    val testAction = CopyAction(id = s"load", inputId = sourceDO.id, outputId = targetDO.id)
-    val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
-    testAction.exec(Seq(srcSubFeed))(contextExec)
-
-    val expected = sourceDO.getSparkDataFrame()
-    val actual = targetDO.getSparkDataFrame()
-    val resultat: Boolean = actual.equal(expected)
-    if (!resultat) printFailedTestResultDs("CustomDf2DeltaTable_partitioned")(actual)(expected)
-    assert(resultat)
-    assert(targetDO.listPartitions.map(_.elements).toSet == Set(Map("num" -> "0"), Map("num" -> "1")))
+    // movePartitions is not implemented by IcebergTableDataObject
+    testCopyLoadPartitioned(createSrcDataObject, createTableDataObject, testMovePartitions = false)
   }
 
   test("SaveMode overwrite with different schema") {
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_overwrite", query = None)
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable, saveMode = SDLSaveMode.Overwrite, allowSchemaEvolution = true)
-    targetDO.dropTable
-
-    // first load
-    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df1)
-    val actual = targetDO.getSparkDataFrame()
-    val resultat: Boolean = df1.equal(actual)
-    if (!resultat) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
-    assert(resultat)
-
-    // 2nd load: overwrite all with different schema
-    val df2 = Seq(("ext", "doe", "john", 10, "test"), ("ext", "smith", "peter", 1, "test"))
-      .toDF("type", "lastname", "firstname", "rating2", "test")
-    targetDO.writeSparkDataFrame(df2)
-    val actual2 = targetDO.getSparkDataFrame()
-    val resultat2: Boolean = df2.equal(actual2)
-    if (!resultat2) printFailedTestResultDs("SaveMode overwrite")(actual2)(df2)
-    assert(resultat2)
+    testOverwriteWithDifferentSchema(createTableDataObject)
   }
 
   test("SaveMode append with different schema") {
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_append", query = None)
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable, saveMode = SDLSaveMode.Append, allowSchemaEvolution = true)
-    targetDO.dropTable
-
-    // first load
-    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df1)
-    val actual = targetDO.getSparkDataFrame()
-    val result = df1.equal(actual)
-    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
-    assert(result)
-
-    // 2nd load: append all with different schema
-    val df2 = Seq(("ext", "doe", "john", 10, "test"), ("ext", "smith", "peter", 1, "test"))
-      .toDF("type", "lastname", "firstname", "rating2", "test")
-    targetDO.initSparkDataFrame(df2, Seq()) // for applying schema evolution
-    targetDO.writeSparkDataFrame(df2)
-    val actual2 = targetDO.getSparkDataFrame().filter($"lastname" === "doe")
-    val result2 = actual2.count() == 2 && (df1.columns ++ df2.columns).toSet == actual2.columns.toSet
-    if (!result2) printFailedTestResultDs("SaveMode append with different schema")(actual2)(df2)
-    assert(result2)
+    testAppendWithDifferentSchema(createTableDataObject)
   }
 
   test("SaveMode overwrite and delete partition") {
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_overwrite", query = None)
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable, partitions = Seq("type")
-      , saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "static")
-    )
-    targetDO.dropTable
-
-    // first load
-    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df1)
-    val actual = targetDO.getSparkDataFrame()
-    val result = df1.equal(actual)
-    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
-    assert(result)
-
-    assert(targetDO.listPartitions.toSet == Set(PartitionValues(Map("type" -> "ext")), PartitionValues(Map("type" -> "int"))))
-
-    // 2nd load: overwrite partition type=ext
-    val df2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 1))
-      .toDF("type", "lastname", "firstname", "rating")
-    intercept[ProcessingLogicException](targetDO.writeSparkDataFrame(df2)) // not allowed to overwrite all partitions
-    targetDO.writeSparkDataFrame(df2, partitionValues = Seq(PartitionValues(Map("type" -> "ext"))))
-    val expected2 = df2.union(df1.where($"type" =!= "ext"))
-    val actual2 = targetDO.getSparkDataFrame()
-    val resul2 = expected2.equal(actual2)
-    if (!resul2) printFailedTestResultDs("SaveMode overwrite and delete partition")(actual2)(expected2)
-    assert(resul2)
-
-    // delete partition
-    targetDO.deletePartitions(Seq(PartitionValues(Map("type" -> "int"))))
-    assert(targetDO.listPartitions == Seq(PartitionValues(Map("type" -> "ext"))))
+    testOverwriteAndDeletePartition(createTableDataObject)
   }
 
   test("SaveMode overwrite partitions dynamically") {
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_overwrite_dynamic", query = None)
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable, partitions = Seq("type")
-      , saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "dynamic")
-    )
-    targetDO.dropTable
-
-    // first load
-    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df1)
-    val actual = targetDO.getSparkDataFrame()
-    val result = df1.equal(actual)
-    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
-    assert(result)
-
-    assert(targetDO.listPartitions.toSet == Set(PartitionValues(Map("type" -> "ext")), PartitionValues(Map("type" -> "int"))))
-
-    // 2nd load: dynamically overwrite partition type=ext
-    val df2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 1))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df2) // allowed overwriting partitions because of partitionOverwriteMode=dynamic
-    val expected2 = df2.union(df1.where($"type" =!= "ext"))
-    val actual2 = targetDO.getSparkDataFrame()
-    val resul2 = expected2.equal(actual2)
-    if (!resul2) printFailedTestResultDs("SaveMode overwrite partitions dynamically")(actual2)(expected2)
-    assert(resul2)
+    testOverwritePartitionsDynamically(createTableDataObject)
   }
 
   test("SaveMode append") {
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_append", query = None)
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable, saveMode = SDLSaveMode.Append)
-    targetDO.dropTable
-
-    // first load
-    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df1)
-    val actual = targetDO.getSparkDataFrame()
-    val result = df1.equal(actual)
-    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
-    assert(result)
-
-    // 2nd load: append data
-    val df2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 1))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df2)
-    val actual2 = targetDO.getSparkDataFrame()
-    val expected2 = df2.union(df1)
-    val resultat2: Boolean = expected2.equal(actual2)
-    if (!resultat2) printFailedTestResultDs("SaveMode append")(actual2)(expected2)
-    assert(resultat2)
+    testAppend(createTableDataObject)
   }
-
 
   test("throw NoDataToProcessWarning if no new snapshot created (no data)") {
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_nodata", query = None)
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    // Iceberg does not create a new snapshot if no data is written with dynamic partition mode
-    val targetDO = IcebergTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable, partitions = Seq("type"))
-    targetDO.dropTable
-
-    // first load
-    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df1)
-    val actual = targetDO.getSparkDataFrame()
-    val result = df1.equal(actual)
-    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
-    assert(result)
-
-    // 2nd load: no data -> NoDataToProcessWarning
-    val df2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 1))
-      .toDF("type", "lastname", "firstname", "rating")
-    Environment._enableSparkPlanNoDataCheck = Some(false) // disable triggering SparkPlanNoDataWarning, as this test is about another case
-    intercept[NoDataToProcessWarning](targetDO.writeSparkDataFrame(df2.where(lit(false))))
-    Environment._enableSparkPlanNoDataCheck = Some(true)
-
-    // 3rd load: write data
-    targetDO.writeSparkDataFrame(df2)
+    testNoDataToProcessWarningOnEmptyWrite(createTableDataObject)
   }
-
 
   test("SaveMode merge") {
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type", "lastname", "firstname")))
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable, saveMode = SDLSaveMode.Merge)
-    targetDO.dropTable
-
-    // first load
-    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df1)
-    val actual = targetDO.getSparkDataFrame()
-    val result = df1.equal(actual)
-    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
-    assert(result)
-
-    // 2nd load: merge data by primary key
-    val df2 = Seq(("ext", "doe", "john", 10), ("int", "emma", "brown", 7))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df2)
-    val actual2 = targetDO.getSparkDataFrame()
-    val expected2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
-      .toDF("type", "lastname", "firstname", "rating")
-    val result2 = expected2.equal(actual2)
-    if (!result2) printFailedTestResultDs("SaveMode merge")(actual2)(expected2)
-    assert(result2)
+    testMerge(createTableDataObject)
   }
-
 
   test("SaveMode merge with updateCols") {
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("type", "lastname", "firstname")))
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable, saveMode = SDLSaveMode.Merge)
-    targetDO.dropTable
-
-    // first load
-    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df1)
-    val actual = targetDO.getSparkDataFrame()
-    val result = df1.equal(actual)
-    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
-    assert(result)
-
-    // 2nd load: merge data by primary key
-    val df2 = Seq(("ext", "doe", "john", 10), ("int", "emma", "brown", 7))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df2, saveModeOptions = Some(SaveModeMergeOptions(updateColumns = Seq("rating"))))
-    val actual2 = targetDO.getSparkDataFrame()
-    val expected2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
-      .toDF("type", "lastname", "firstname", "rating")
-    val result2 = expected2.equal(actual2)
-    if (!result2) printFailedTestResultDs("SaveMode merge")(actual2)(expected2)
-    assert(result2)
+    testMergeWithUpdateColumns(createTableDataObject)
   }
 
-  // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt is not properly supported.
-  // We test for failure to be notified once it is working...
-  // Once this works again, also enable 3rd load in IcebergHistorizeWithMergeActionTest and IcebergDeduplicateWithMergeActionTest test cases again
   test("SaveMode merge with schema evolution") {
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_merge", query = None, primaryKey = Some(Seq("tpe", "lastname", "firstname")))
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject(id = "target", path = Some(targetTablePath), table = targetTable, saveMode = SDLSaveMode.Merge, allowSchemaEvolution = true)
-    targetDO.dropTable
+    testMergeWithSchemaEvolution(createTableDataObject)
+  }
 
-    // first load
-    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
-      .toDF("tpe", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df1)
-    val actual = targetDO.getSparkDataFrame()
-    val result = df1.equal(actual)
-    if (!result) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
-    assert(result)
+  test("write with different order of columns") {
+    testWriteWithDifferentColumnOrder(createTableDataObject)
+  }
 
-    // 2nd load: merge data by primary key with different schema
-    // - column 'rating' deleted -> existing records will keep column rating untouched (values are preserved and not set to null), new records will get new column rating set to null.
-    // - column 'rating2' added -> existing records will get new column rating2 set to null
-    val df2 = Seq(("ext", "doe", "john", 10), ("int", "emma", "brown", 7))
-      .toDF("tpe", "lastname", "firstname", "rating2")
-    targetDO.initSparkDataFrame(df2, Seq())
-    targetDO.writeSparkDataFrame(df2)
-    val actual2 = targetDO.getSparkDataFrame()
-    val expected2 = Seq(("ext", "doe", "john", Some(5), Some(10)), ("ext", "smith", "peter", Some(3), None), ("int", "emma", "brown", None, Some(7)))
-      .toDF("tpe", "lastname", "firstname", "rating", "rating2")
-    val result2 = expected2.equal(actual2)
-    if (!result2) printFailedTestResultDs("SaveMode merge")(actual2)(expected2)
-    assert(result2)
+  test("returns correct metrics") {
+    testWriteMetrics(createSrcDataObject, createTableDataObject)
+  }
+
+  test("copy load expectations test") {
+    testCopyLoadWithExpectations(createSrcDataObject, createTableDataObject)
+  }
+
+  test("constraints validation") {
+    testConstraints(createSrcDataObject, createTableDataObject)
   }
 
   // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt.insertExpr is not properly supported.
@@ -400,114 +158,22 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     intercept[AnalysisException](targetDO.writeSparkDataFrame(df2, saveModeOptions = Some(SaveModeMergeOptions(updateColumns = Seq("lastname", "firstname", "rating", "rating2")))))
   }
 
+  test("normal output mode") {
+    testNormalOutputModeWithoutCdc(createTableDataObject)
+  }
+
   test("incremental output mode with inserts") {
-
-    // create data object
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject("icebergDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append)
-    targetDO.dropTable
-    targetDO.setState(None) // initialize incremental output with empty state
-
-    // write test data 1
-    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
-    targetDO.prepare
-    targetDO.initSparkDataFrame(df1, Seq())
-    targetDO.writeSparkDataFrame(df1)
-    val newState1 = targetDO.getState
-
-    // test 1
-    targetDO.setState(newState1)
-    assert(targetDO.getSparkDataFrame()(contextExec).count() == 4)
-
-
-    // append test data 2
-    val df2 = Seq((5, "B", 5)).toDF("id", "p", "value")
-    targetDO.writeSparkDataFrame(df2)
-    val newState2 = targetDO.getState
-
-    // test 2
-    targetDO.setState(newState2)
-    assert(targetDO.getSparkDataFrame()(contextExec).count() == 1)
-
-    // append test data 3
-    val df3 = Seq((6, "T", 5), (7, "R", 7), (8, "T", 2)).toDF("id", "p", "value")
-    targetDO.writeSparkDataFrame(df3)
-    val newState3 = targetDO.getState
-
-    // test 3
-    targetDO.setState(newState3)
-    assert(targetDO.getSparkDataFrame()(contextExec).count() == 3)
-
-    targetDO.setState(None) // to get the full dataframe
-    assert(targetDO.getSparkDataFrame()(contextExec).count() == 8)
+    // iceberg snapshot ids used as state are not monotonically increasing
+    testIncrementalOutputModeWithInserts(createTableDataObject, stateIsOrdered = false)
   }
 
   test("incremental output mode without primary keys") {
-
-    // create data object
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_inc")
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject("icebergDO1", table = targetTable, path = Some(targetTablePath), saveMode = SDLSaveMode.Append)
-    targetDO.dropTable
-    targetDO.setState(None) // initialize incremental output with empty state
-
-    // write test data
-    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
-    targetDO.prepare
-    targetDO.initSparkDataFrame(df1, Seq())
-    targetDO.writeSparkDataFrame(df1)
-    val newState1 = targetDO.getState
-
-    // test
-    val thrown = intercept[IllegalArgumentException] {
-      targetDO.setState(newState1)
-      targetDO.getSparkDataFrame()(contextExec).count()
-    }
-
-    // check
-    assert(thrown.isInstanceOf[IllegalArgumentException])
-    assert(thrown.getMessage.contains(s"PrimaryKey for table"))
-
+    testIncrementalOutputModeWithoutPrimaryKey(createTableDataObject)
   }
 
   test("incremental output mode with updates and inserts") {
-
-    // create data object
-    val targetTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "test_inc", primaryKey = Some(Seq("id")))
-    val targetTablePath = tempPath + s"/${targetTable.fullName}"
-    val targetDO = IcebergTableDataObject("icebergDO1", table = targetTable, path = Some(targetTablePath))
-    targetDO.dropTable
-    targetDO.setState(None) // initialize incremental output with empty state
-
-    // write test data 1
-    val df1 = Seq((1, "A", 1), (2, "A", 2), (3, "B", 3), (4, "B", 4)).toDF("id", "p", "value")
-    targetDO.prepare
-    targetDO.initSparkDataFrame(df1, Seq())
-    targetDO.writeSparkDataFrame(df1)
-    val newState1 = targetDO.getState
-    targetDO.setState(newState1)
-    assert(targetDO.getSparkDataFrame()(contextExec).count() == 4)
-
-    // do updates and inserts
-    session.sql(s"INSERT INTO ${targetTable.fullName} VALUES (5, 'T', 7) ")
-    val newState2 = targetDO.getState
-    session.sql(s"INSERT INTO ${targetTable.fullName} VALUES (6, 'U', 3) ")
-    session.sql(s"UPDATE ${targetTable.fullName} SET p = 'Z', value = 8 WHERE id = 1")
-    session.sql(s"UPDATE ${targetTable.fullName} SET p = 'W', value = 1 WHERE id = 1")
-
-    // test
-    val resultDf = Seq((5, "T", 7), (6, "U", 3), (1, "W", 1)).toDF("id", "p", "value")
-
-    targetDO.setState(newState2)
-    val testDf = targetDO.getSparkDataFrame()(contextExec)
-
-    assert(testDf.count() == 3) // 2x new insert + 1x the latest update
-
-    testDf.collect() sameElements resultDf.collect()
-
+    testIncrementalOutputModeWithUpdatesAndInserts(createTableDataObject)
   }
-
 
   // TODO: addFilesParallelism > 1 results in Iceberg NotSerializableException, see https://github.com/apache/iceberg/issues/11147
   test("Create from parquet files") {
@@ -681,8 +347,8 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     targetDO.prepare
 
     // prepare & start load
-    val testAction = CopyAction(id = s"load", inputId = sourceDO.id, outputId = targetDO.id)
-    val srcSubFeed = SparkSubFeed(None, "source", partitionValues = Seq())
+    val testAction = io.smartdatalake.workflow.action.CopyAction(id = s"load", inputId = sourceDO.id, outputId = targetDO.id)
+    val srcSubFeed = io.smartdatalake.workflow.dataframe.spark.SparkSubFeed(None, "source", partitionValues = Seq())
     testAction.exec(Seq(srcSubFeed))(contextExec)
 
     val expected = sourceDO.getSparkDataFrame()
@@ -749,6 +415,5 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
       assert(icebergDO.listPartitions == Seq(PartitionValues(Map("tpe" -> "ext"))))
     }
   }
-
 
 }

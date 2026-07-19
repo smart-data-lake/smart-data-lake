@@ -67,15 +67,15 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfterAll
   private def createExternalTableDataObject(id: String, params: TableDataObjectTestParams, registry: InstanceRegistry): DeltaLakeTableDataObject = {
     val table = Table(db = Some(deltaDb), name = s"behaviour_$id", primaryKey = params.primaryKey)
     DeltaLakeTableDataObject(id, path = Some(tempPath + s"/${table.fullName}"), partitions = params.partitions,
-      options = params.options, table = table, expectations = params.expectations, saveMode = params.saveMode,
-      allowSchemaEvolution = params.allowSchemaEvolution)(registry)
+      options = params.options, table = table, constraints = params.constraints, expectations = params.expectations,
+      saveMode = params.saveMode, allowSchemaEvolution = params.allowSchemaEvolution)(registry)
   }
 
   /** creates a managed table (no path defined) */
   private def createManagedTableDataObject(id: String, params: TableDataObjectTestParams, registry: InstanceRegistry): DeltaLakeTableDataObject = {
     val table = Table(db = Some(deltaDb), name = s"behaviour_managed_$id", primaryKey = params.primaryKey)
     DeltaLakeTableDataObject(id, partitions = params.partitions, options = params.options, table = table,
-      expectations = params.expectations, saveMode = params.saveMode,
+      constraints = params.constraints, expectations = params.expectations, saveMode = params.saveMode,
       allowSchemaEvolution = params.allowSchemaEvolution)(registry)
   }
 
@@ -129,6 +129,21 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfterAll
 
   test("SaveMode merge with schema evolution") {
     testMergeWithSchemaEvolution(createExternalTableDataObject)
+  }
+
+  test("SaveMode merge with updateCols") {
+    testMergeWithUpdateColumns(createExternalTableDataObject)
+  }
+
+  test("write with different order of columns") {
+    testWriteWithDifferentColumnOrder(createExternalTableDataObject)
+  }
+
+  // Note: testNoDataToProcessWarningOnEmptyWrite is not applicable to DeltaLake, as delta commits a new (empty)
+  // table version even when writing an empty DataFrame, so the "no new version written" check never triggers.
+
+  test("constraints validation") {
+    testConstraints(createSrcDataObject, createExternalTableDataObject)
   }
 
   // Note that this is not possible with DeltaLake <= 3.2.0, as schema evolution with mergeStmt.insertExpr is not properly supported.
