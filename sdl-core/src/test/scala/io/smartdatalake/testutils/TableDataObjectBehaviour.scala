@@ -20,13 +20,13 @@ package io.smartdatalake.testutils
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.definitions.{ColumnStatsType, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
+import io.smartdatalake.definitions.{ColumnStatsType, Environment, SDLSaveMode, SaveModeMergeOptions, TableStatsType}
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil.getCommonSubFeed
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
-import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
+import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction, NoDataToProcessWarning, SDLExecutionId}
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import io.smartdatalake.workflow.dataobject.DataObject
@@ -46,7 +46,8 @@ case class TableDataObjectTestParams(
     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
     allowSchemaEvolution: Boolean = false,
     options: Map[String, String] = Map(),
-    expectations: Seq[Expectation] = Seq()
+    expectations: Seq[Expectation] = Seq(),
+    constraints: Seq[Constraint] = Seq()
 )
 
 /**
@@ -115,8 +116,9 @@ trait TableDataObjectBehaviour extends GenericTestTool {
 
   /**
    * Copy data to a partitioned table DataObject using CopyAction, then list and move partitions.
+   * @param testMovePartitions set to false for DataObjects not implementing movePartitions
    */
-  def testCopyLoadPartitioned(createSrcDataObject: SourceDataObjectFactory, createTgtDataObject: TableDataObjectFactory): Unit = {
+  def testCopyLoadPartitioned(createSrcDataObject: SourceDataObjectFactory, createTgtDataObject: TableDataObjectFactory, testMovePartitions: Boolean = true): Unit = {
     val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
     implicit val registry: InstanceRegistry = instanceRegistry
     implicit val context: ActionPipelineContext = contextInit
@@ -141,8 +143,10 @@ trait TableDataObjectBehaviour extends GenericTestTool {
 
     // move partition
     assert(tgtDO.listPartitions.map(_.elements).toSet == Set(Map("num" -> "0"), Map("num" -> "1")))
-    tgtDO.movePartitions(Seq((PartitionValues(Map("num" -> "0")), PartitionValues(Map("num" -> "2")))))
-    assert(tgtDO.listPartitions.map(_.elements).toSet == Set(Map("num" -> "1"), Map("num" -> "2")))
+    if (testMovePartitions) {
+      tgtDO.movePartitions(Seq((PartitionValues(Map("num" -> "0")), PartitionValues(Map("num" -> "2")))))
+      assert(tgtDO.listPartitions.map(_.elements).toSet == Set(Map("num" -> "1"), Map("num" -> "2")))
+    }
   }
 
   /**
@@ -391,6 +395,140 @@ trait TableDataObjectBehaviour extends GenericTestTool {
   }
 
   /**
+   * SaveMode merge with updateColumns: on the 2nd load only the listed columns of matched records are updated.
+   */
+  def testMergeWithUpdateColumns(createTgtDataObject: TableDataObjectFactory): Unit = {
+    val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
+    implicit val registry: InstanceRegistry = instanceRegistry
+    implicit val context: ActionPipelineContext = contextInit
+
+    val tgtDO = registerDataObject(createTgtDataObject("tgt1",
+      TableDataObjectTestParams(primaryKey = Some(Seq("type", "lastname", "firstname")), saveMode = SDLSaveMode.Merge), instanceRegistry))
+    val helper = DataFrameSubFeed.getCompanion(tgtDO.getSubFeedSupportedTypes.head)
+    import helper.implicits._
+
+    // first load
+    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
+      .toDF("type", "lastname", "firstname", "rating")
+    tgtDO.writeDataFrame(df1, Seq())(contextExec)
+    val actual = tgtDO.getDataFrame()(contextExec)
+    val resultat = df1.isEqual(actual)
+    if (!resultat) printFailedTestResultGdf("testMergeWithUpdateColumns 1st load", Seq())(actual)(df1)
+    assert(resultat)
+
+    // 2nd load: merge data by primary key, updating only column 'rating'
+    val df2 = Seq(("ext", "doe", "john", 10), ("int", "emma", "brown", 7))
+      .toDF("type", "lastname", "firstname", "rating")
+    tgtDO.writeDataFrame(df2, Seq(), saveModeOptions = Some(SaveModeMergeOptions(updateColumns = Seq("rating"))))(contextExec)
+    val actual2 = tgtDO.getDataFrame()(contextExec)
+    val expected2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
+      .toDF("type", "lastname", "firstname", "rating")
+    val resultat2 = expected2.isEqual(actual2)
+    if (!resultat2) printFailedTestResultGdf("testMergeWithUpdateColumns 2nd load", Seq())(actual2)(expected2)
+    assert(resultat2)
+  }
+
+  /**
+   * Writing a DataFrame with a different order of columns: columns are matched by name, not by position.
+   */
+  def testWriteWithDifferentColumnOrder(createTgtDataObject: TableDataObjectFactory): Unit = {
+    val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
+    implicit val registry: InstanceRegistry = instanceRegistry
+    implicit val context: ActionPipelineContext = contextInit
+
+    val tgtDO = registerDataObject(createTgtDataObject("tgt1", TableDataObjectTestParams(saveMode = SDLSaveMode.Overwrite), instanceRegistry))
+    val helper = DataFrameSubFeed.getCompanion(tgtDO.getSubFeedSupportedTypes.head)
+    import helper._
+    import helper.implicits._
+
+    // first load creates the table
+    val df = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
+      .toDF("type", "lastname", "firstname", "rating")
+    tgtDO.writeDataFrame(df, Seq())(contextExec)
+
+    // 2nd load: overwrite with the same data but a different order of columns
+    val dfSwitched = df.select(Seq("type", "rating", "firstname", "lastname").map(col))
+    tgtDO.writeDataFrame(dfSwitched, Seq())(contextExec)
+    val actual = tgtDO.getDataFrame()(contextExec)
+    val resultat = df.isEqual(actual)
+    if (!resultat) printFailedTestResultGdf("testWriteWithDifferentColumnOrder", Seq())(actual)(df)
+    assert(resultat)
+  }
+
+  /**
+   * Writing an empty DataFrame with dynamic partition overwrite creates no new table version/snapshot
+   * and must throw NoDataToProcessWarning.
+   */
+  def testNoDataToProcessWarningOnEmptyWrite(createTgtDataObject: TableDataObjectFactory): Unit = {
+    val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
+    implicit val registry: InstanceRegistry = instanceRegistry
+    implicit val context: ActionPipelineContext = contextInit
+
+    val tgtDO = registerDataObject(createTgtDataObject("tgt1",
+      TableDataObjectTestParams(partitions = Seq("type"), saveMode = SDLSaveMode.Overwrite, options = Map("partitionOverwriteMode" -> "dynamic")), instanceRegistry))
+    val helper = DataFrameSubFeed.getCompanion(tgtDO.getSubFeedSupportedTypes.head)
+    import helper._
+    import helper.implicits._
+
+    // first load
+    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
+      .toDF("type", "lastname", "firstname", "rating")
+    tgtDO.writeDataFrame(df1, Seq())(contextExec)
+    val actual = tgtDO.getDataFrame()(contextExec)
+    val resultat = df1.isEqual(actual)
+    if (!resultat) printFailedTestResultGdf("testNoDataToProcessWarningOnEmptyWrite 1st load", Seq())(actual)(df1)
+    assert(resultat)
+
+    // 2nd load: no data -> NoDataToProcessWarning
+    // use a new runId, so that implementations detecting "no new version written" can distinguish from the first load
+    val contextExec2 = contextExec.copy(executionId = SDLExecutionId(2))
+    val df2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 1))
+      .toDF("type", "lastname", "firstname", "rating")
+    val enableSparkPlanNoDataCheckOrig = Environment._enableSparkPlanNoDataCheck
+    Environment._enableSparkPlanNoDataCheck = Some(false) // disable triggering SparkPlanNoDataWarning, as this test is about the check on DataObject level
+    try {
+      intercept[NoDataToProcessWarning](tgtDO.writeDataFrame(df2.filter(lit(false)), Seq())(contextExec2))
+    } finally {
+      Environment._enableSparkPlanNoDataCheck = enableSparkPlanNoDataCheckOrig
+    }
+
+    // 3rd load: write data
+    tgtDO.writeDataFrame(df2, Seq())(contextExec2)
+  }
+
+  /**
+   * Copy data to the table DataObject with a row-level constraint defined:
+   * a load with valid data succeeds, a load with a violating record fails.
+   */
+  def testConstraints(createSrcDataObject: SourceDataObjectFactory, createTgtDataObject: TableDataObjectFactory): Unit = {
+    val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
+    implicit val registry: InstanceRegistry = instanceRegistry
+    implicit val context: ActionPipelineContext = contextInit
+
+    // setup DataObjects
+    val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
+    val tgtDO = registerDataObject(createTgtDataObject("tgt1",
+      TableDataObjectTestParams(primaryKey = Some(Seq("lastname", "firstname")),
+        constraints = Seq(Constraint("ratingRange", expression = "rating <= 5"))), instanceRegistry))
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+    import helper.implicits._
+
+    // first load: all records fulfill the constraint
+    srcDO.writeDataFrame(Seq(("doe", "john", 5), ("smith", "peter", 3)).toDF("lastname", "firstname", "rating"), Seq())(contextExec)
+    val action = CopyAction("ca", srcDO.id, tgtDO.id)
+    val srcSubFeed = ScalaSubFeed(None, srcDO.id, Seq())
+    action.exec(Seq(srcSubFeed))(contextExec.copy(currentAction = Some(action)))
+    assert(tgtDO.getDataFrame()(contextExec).count == 2)
+
+    // 2nd load: one record violates the constraint -> write fails
+    srcDO.writeDataFrame(Seq(("emma", "brown", 7)).toDF("lastname", "firstname", "rating"), Seq())(contextExec)
+    val thrown = intercept[Exception](action.exec(Seq(srcSubFeed))(contextExec.copy(currentAction = Some(action))))
+    val messages = Iterator.iterate(thrown: Throwable)(_.getCause).takeWhile(_ != null)
+      .flatMap(e => Option(e.getMessage)).mkString("\n")
+    assert(messages.contains("Constraint 'ratingRange' failed"), s"expected constraint validation error, but got: $messages")
+  }
+
+  /**
    * Check metrics returned by writing to the table DataObject with CopyAction.
    */
   def testWriteMetrics(createSrcDataObject: SourceDataObjectFactory, createTgtDataObject: TableDataObjectFactory): Unit = {
@@ -446,8 +584,9 @@ trait TableDataObjectBehaviour extends GenericTestTool {
 
   /**
    * Incremental output mode: only data written since the last state is returned.
+   * @param stateIsOrdered set to false for DataObjects whose state is not monotonically increasing (e.g. Iceberg snapshot ids)
    */
-  def testIncrementalOutputModeWithInserts(createTgtDataObject: TableDataObjectFactory): Unit = {
+  def testIncrementalOutputModeWithInserts(createTgtDataObject: TableDataObjectFactory, stateIsOrdered: Boolean = true): Unit = {
     val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
     implicit val registry: InstanceRegistry = instanceRegistry
     implicit val context: ActionPipelineContext = contextInit
@@ -487,8 +626,10 @@ trait TableDataObjectBehaviour extends GenericTestTool {
     tgtDO.setState(newState3)
     assert(tgtDO.getDataFrame()(contextExec).count == 3)
 
-    assert(newState1.get < newState2.get)
-    assert(newState2.get < newState3.get)
+    if (stateIsOrdered) {
+      assert(newState1.get < newState2.get)
+      assert(newState2.get < newState3.get)
+    }
 
     tgtDO.setState(None) // to get the full dataframe
     assert(tgtDO.getDataFrame()(contextInit).count == 8)

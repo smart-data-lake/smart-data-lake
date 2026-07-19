@@ -56,7 +56,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite
   private def createTableDataObject(id: String, params: TableDataObjectTestParams, registry: InstanceRegistry): DeltaLakeTableDataObject =
     DeltaLakeTableDataObject(id, partitions = params.partitions, options = params.options,
       table = Table(Some("default"), s"sdlb_tdo_behaviour_$id", primaryKey = params.primaryKey),
-      expectations = params.expectations, saveMode = params.saveMode,
+      constraints = params.constraints, expectations = params.expectations, saveMode = params.saveMode,
       allowSchemaEvolution = params.allowSchemaEvolution)(registry)
 
   test("CustomDf2DeltaTable") {
@@ -94,6 +94,21 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite
 
   test("SaveMode merge with schema evolution") {
     testMergeWithSchemaEvolution(createTableDataObject)
+  }
+
+  test("SaveMode merge with updateCols") {
+    testMergeWithUpdateColumns(createTableDataObject)
+  }
+
+  test("write with different order of columns") {
+    testWriteWithDifferentColumnOrder(createTableDataObject)
+  }
+
+  // Note: testNoDataToProcessWarningOnEmptyWrite is not applicable to DeltaLake, as delta commits a new (empty)
+  // table version even when writing an empty DataFrame, so the "no new version written" check never triggers.
+
+  test("constraints validation") {
+    testConstraints(createSrcDataObject, createTableDataObject)
   }
 
   test("returns correct metrics") {
