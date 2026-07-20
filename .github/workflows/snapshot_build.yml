@@ -1,0 +1,43 @@
+# Note: this is a dummy workflow so that snapshot_build can be manually triggered on spark4 branches
+
+name: Snapshot Build
+
+on:
+  push:
+    branches:
+      - 'develop-spark*'
+  pull_request:
+    branches:
+      - 'develop-spark*'
+    types: [ opened, synchronize ]
+  # allow for manual snapshot releases from bugfix & feature branches
+  # this extracts issue number from branch name as additional attribute in the created version, e.g. <mvnVersion>-<issueNb>-SNAPSHOT
+  workflow_dispatch:
+    branches:
+      - 'bugfix/*'
+      - 'feature/*'
+      - 'develop-spark*'
+    inputs:
+      skipBuild:
+        description: 'skip build job'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
+        settings-path: ${{ github.workspace }} # location for the settings.xml file
+        cache: 'maven'    
