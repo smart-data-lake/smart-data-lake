@@ -35,7 +35,8 @@ SPARK_DIST=spark-${SPARK_VERSION}-bin-hadoop3
 DELTA_VERSION=4.2.0
 
 if [ ! -d "$SPARK_DIST" ]; then
-  wget -q https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/${SPARK_DIST}.tgz
+  echo "downloading https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/${SPARK_DIST}.tgz"
+  wget -q --show-progress https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/${SPARK_DIST}.tgz
   tar -xzf ${SPARK_DIST}.tgz
   rm ${SPARK_DIST}.tgz
 fi
@@ -48,6 +49,7 @@ fi
 # Add delta lake jars to the server classpath. Note that using the --packages option instead does not work,
 # as jars submitted with --packages are not visible to the classloader loading the session catalog plugin.
 if [ ! -f "$SPARK_HOME/jars/delta-spark_4.1_2.13-${DELTA_VERSION}.jar" ]; then
+  echo "downloading delta-spark libraries"
   wget -q -P "$SPARK_HOME/jars" https://repo1.maven.org/maven2/io/delta/delta-spark_4.1_2.13/${DELTA_VERSION}/delta-spark_4.1_2.13-${DELTA_VERSION}.jar
   wget -q -P "$SPARK_HOME/jars" https://repo1.maven.org/maven2/io/delta/delta-storage/${DELTA_VERSION}/delta-storage-${DELTA_VERSION}.jar
 fi
@@ -57,6 +59,7 @@ fi
 # and block creating tables with the same name again.
 rm -rf spark-warehouse metastore_db derby.log
 
+echo $"starting Spark Connect server"
 "$SPARK_HOME/sbin/start-connect-server.sh" \
   --conf spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension \
   --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog
