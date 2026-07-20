@@ -18,6 +18,8 @@
  */
 package io.smartdatalake.util.misc
 
+import io.smartdatalake.config.ConfigUtil
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.workflow.dataframe._
 
 import scala.annotation.tailrec
@@ -143,25 +145,18 @@ object SchemaUtil {
   }
 
   /**
-   * Provider for Spark-specific schema reading. Set by sdl-spark at startup.
-   * If not set, schema reading always returns a LazyGenericSchema.
-   */
-  private[smartdatalake] var _schemaReaderProvider: Option[(String, Boolean) => GenericSchema] = None
-
-  private[smartdatalake] def registerSchemaProvider(provider: (String, Boolean) => GenericSchema): Unit = {
-    _schemaReaderProvider = Some(provider)
-  }
-
-  /**
-   * Parses a schema from a config value string by delegating to the registered schema provider.
-   * The schema provider is included in the configuration value as prefix terminated by '#'.
-   * When no provider is registered (e.g., when running without Spark), returns a LazyGenericSchema.
+   * Parses a schema from a config value string by delegating to a [[SchemaProvider]].
+   * The schema provider type is included in the configuration value as prefix terminated by '#', see [[SchemaProviderType]].
+   * The provider is selected among the implementations discovered on the classpath (see [[Environment.schemaProviders]])
+   * by checking which one supports the given schema config value.
+   * If no provider supports the value (e.g. when running without a suitable engine on the classpath, or when using
+   * a schema provider type that is not implemented by the active engine), a [[LazyGenericSchema]] is returned, which
+   * defers parsing to the point where the schema is actually used.
    */
   def readSchemaFromConfigValue(schemaConfig: String, lazyFileReading: Boolean = true): GenericSchema = {
-    _schemaReaderProvider match {
-      case Some(provider) => provider(schemaConfig, lazyFileReading)
-      case None => LazyGenericSchema(schemaConfig)
-    }
+    Environment.schemaProviders.find(_.supports(schemaConfig))
+      .map(_.readSchemaFromConfigValue(schemaConfig, lazyFileReading))
+      .getOrElse(LazyGenericSchema(schemaConfig))
   }
 }
 
@@ -234,5 +229,15 @@ object SchemaProviderType extends Enumeration {
    * - optional responseContentType, default is application/json
    */
   val OpenApi: SchemaProviderType.Value = Value("openapi")
+
+  /**
+   * Parse the [[SchemaProviderType]] from the prefix of a schema config value (prefix terminated by '#', defaulting to DDL).
+   * Returns None if the prefix does not correspond to a known SchemaProviderType.
+   * This does not throw, so it can be used by [[SchemaProvider.supports]] to decide whether a config value can be handled.
+   */
+  private[smartdatalake] def parse(schemaConfig: String): Option[SchemaProviderType.Value] = {
+    val (providerId, _) = ConfigUtil.parseProviderConfigValue(schemaConfig, Some(DDL.toString))
+    scala.util.Try(SchemaProviderType.withName(providerId.toLowerCase)).toOption
+  }
 
 }
