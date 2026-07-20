@@ -46,17 +46,24 @@ jobs:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
+      - name: Extract Spark version from pom.xml
+        id: get_spark_version
+        run: |
+          SPARK_VERSION=$(grep -oPm1 '(?<=<spark.version>)[^<]+' pom.xml)
+          echo "Found Spark Version $SPARK_VERSION"
+          echo "spark_version=$SPARK_VERSION" >> $GITHUB_OUTPUT
+          echo "SPARK_VERSION=$SPARK_VERSION" >> $GITHUB_ENV
       - name: Cache Maven
         uses: actions/cache@v5
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-
+          key: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}
       - name: Cache Spark distribution
         uses: actions/cache@v5
         with:
-          path: sdl-sparkconnect/spark-4.1.1-bin-hadoop3
-          key: ${{ runner.os }}-spark-4.1.1-bin-hadoop3
+          path: sdl-sparkconnect/spark-${{ steps.get_spark_version.outputs.spark_version }}-bin-hadoop3
+          key: ${{ runner.os }}-spark-${{ steps.get_spark_version.outputs.spark_version }}-bin
 
       - name: Build with Maven for Scala 2.13 and Sonar Cloud analysis
         env:
@@ -90,12 +97,18 @@ jobs:
           server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - name: Extract Spark version from pom.xml
+        id: get_spark_version
+        run: |
+          SPARK_VERSION=$(grep -oPm1 '(?<=<spark.version>)[^<]+' pom.xml)
+          echo "Found Spark Version $SPARK_VERSION"
+          echo "spark_version=$SPARK_VERSION" >> $GITHUB_OUTPUT
       - name: Cache Maven
         uses: actions/cache@v5
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven
+          key: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}
 
       - name: Update version for SNAPSHOT releases from feature/bugfix branches with issue number from branch name
         if: ${{ startsWith(github.ref_name, 'feature') || startsWith(github.ref_name, 'bugfix')}}
