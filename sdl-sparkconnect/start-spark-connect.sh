@@ -30,7 +30,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-SPARK_VERSION=4.1.1
+
+if [ -z "${SPARK_VERSION}" ]; then
+  export SPARK_VERSION=4.1.1
+fi
 SPARK_DIST=spark-${SPARK_VERSION}-bin-hadoop3
 DELTA_VERSION=4.2.0
 
