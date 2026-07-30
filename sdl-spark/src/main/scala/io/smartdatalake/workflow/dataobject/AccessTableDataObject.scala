@@ -41,7 +41,29 @@ import scala.jdk.CollectionConverters._
 
 /**
  * [[DataObject]] of type Microsoft Access.
- * Can read a table from a Microsoft Access DB.
+ * Can read a single table from a Microsoft Access database file (.mdb/.accdb) and expose it as a Spark DataFrame.
+ * The database file is read through the Hadoop filesystem layer, copied to a local temporary file and opened with
+ * the Jackcess library. Column types are mapped from JDBC types to Spark types, dates/times become Timestamps.
+ * Use this to ingest legacy Access files into the data lake; for a real database prefer [[JdbcTableDataObject]].
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-orders {
+ *     type = AccessTableDataObject
+ *     path = "~{env.basedir}/ext_orders/northwind.accdb"
+ *     table {
+ *       db = "northwind"
+ *       name = "Orders"
+ *       primaryKey = [OrderID]
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note read-only: writing and `dropTable` are not implemented. The whole table is materialized on the driver,
+ *       so this is not suited for very large Access tables.
+ * @see [[JdbcTableDataObject]]
  * @param path: the path to the access database file
  * @param table: the Access table to be read
  */

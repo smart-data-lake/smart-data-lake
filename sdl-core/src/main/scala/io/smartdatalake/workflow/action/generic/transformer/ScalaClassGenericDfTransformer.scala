@@ -32,6 +32,31 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * Define a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a
  * DataFrame. The Java/Scala class has to implement interface [[CustomGenericDfTransformer]].
  *
+ * The class is instantiated by reflection through its no-argument constructor, so it must be on the classpath of the
+ * SDLB job. Because it works on [[GenericDataFrame]] and receives the matching
+ * [[io.smartdatalake.workflow.dataframe.DataFrameFunctions]], the transformation stays engine independent.
+ * Use `options`/`runtimeOptions` to parameterize the code instead of hard-coding values.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     transformers = [{
+ *       type = ScalaClassGenericDfTransformer
+ *       className = com.sample.MyAirportsTransformer
+ *       options = { maxLatitude = "60" }
+ *       runtimeOptions = { runId = "runId" }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @see [[ScalaClassGenericDfsTransformer]] for the n:m variant, and [[SQLDfTransformer]] if the transformation can
+ *      be expressed in SQL.
+ *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param className      class name implementing trait [[CustomGenericDfTransformer]]

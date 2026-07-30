@@ -41,6 +41,32 @@ import org.apache.spark.sql.DataFrame
  * Provides details to access BigQuery Tables to an Action.
  * The object uses the official Spark-connector by Google see: [[https://github.com/GoogleCloudDataproc/spark-bigquery-connector]].
  * As of now, the only authentication mode supported is a Service Account Key.
+ *
+ * A [[io.smartdatalake.workflow.connection.BigQueryTableConnection]] is required, as it holds the service account key
+ * used to authenticate. The table can either be read directly (table.name/table.db) or through a SQL query
+ * (table.query), in which case viewsEnabled must be true and BigQuery materializes a temporary table.
+ *
+ * Example:
+ * {{{
+ * connections = {
+ *   google-playground {
+ *     type = BigQueryTableConnection
+ *     parentProject = "playground-223717"
+ *     authMode = { type = GCPCredentialsKeyAuth, serviceAccountKeyFile = "/secrets/playground-sa-key.json" }
+ *   }
+ * }
+ * dataObjects = {
+ *   int-test-table {
+ *     type = BigQueryTableDataObject
+ *     connectionId = google-playground
+ *     project = "playground-223717"
+ *     table = { db = "sdl_playground", name = "test_table" }
+ *     writeMethod = "indirect"
+ *     temporaryGcsBucket = "sdl-playground-tmp"
+ *   }
+ * }
+ * }}}
+ *
  * @param id unique name of this data object
  * @param table BigQuery table to by written by this output. BigQuery requires a table name and a dataset.
  * @param viewsEnabled Required if the table is being read with a query, as BigQuery will create a temporary table in the background.

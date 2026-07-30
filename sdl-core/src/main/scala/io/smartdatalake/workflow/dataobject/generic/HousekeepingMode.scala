@@ -34,18 +34,39 @@ trait HousekeepingMode extends ParsableFromConfig[HousekeepingMode] with ConfigH
 }
 
 /**
- * Keep partitions while retention condition is fulfilled, delete other partitions. Example: cleanup
- * partitions with partition layout dt=<yyyymmdd> after 90 days:
+ * Keep partitions while retention condition is fulfilled, delete other partitions.
+ *
+ * The condition is evaluated after every write against all existing partitions of the DataObject, and every
+ * partition for which it returns false is deleted. Use it to implement a rolling time window on a partitioned
+ * DataObject. Use [[PartitionArchiveMode]] instead if old data should be kept but consolidated into fewer
+ * partitions.
+ *
+ * Example: cleanup partitions with partition layout dt=<yyyymmdd> after 90 days:
  * {{{
- * housekeepingMode = {
- *   type = PartitionRetentionMode
- *   retentionCondition = "datediff(now(), to_date(elements['dt'], 'yyyyMMdd')) <= 90"
+ * dataObjects = {
+ *   int-departures {
+ *     type = ParquetFileDataObject
+ *     path = "~{env.basedir}/int_departures"
+ *     partitions = [dt]
+ *     housekeepingMode = {
+ *       type = PartitionRetentionMode
+ *       retentionCondition = "datediff(now(), to_date(elements['dt'], 'yyyyMMdd')) <= 90"
+ *     }
+ *   }
  * }
  * }}}
+ *
+ * @note Only supported for DataObjects implementing `CanHandlePartitions`; this is asserted in the prepare phase.
+ *       If such a DataObject has no partition column defined, a ConfigurationException is thrown when housekeeping
+ *       runs after the write.
+ * @see [[PartitionArchiveMode]]
  * @param retentionCondition
  *   Condition to decide if a partition should be kept. Define a spark sql expression working with
  *   the attributes of [[PartitionExpressionData]] returning a boolean with value true if the
  *   partition should be kept.
+ * @param description
+ *   Optional description of this housekeeping mode, e.g. to document the business rule behind the
+ *   retention condition. It is not interpreted by SDLB.
  */
 case class PartitionRetentionMode(retentionCondition: String, description: Option[String] = None) extends HousekeepingMode
     with SmartDataLakeLogger {
@@ -86,21 +107,43 @@ object PartitionRetentionMode extends FromConfigFactory[HousekeepingMode] {
 
 /**
  * Archive old partitions: Archive partition reduces the number of partitions in the past by moving
- * older partitions into special "archive partitions". Example: archive a table with partition
- * layout run_id=<integer>
- *   - archive partitions after 1000 partitions into "archive partition" equal to floor(run_id/1000)
- *     {{{
- * housekeepingMode = {
- *   type = PartitionArchiveCompactionMode
- *   archivePartitionExpression = "if( elements['run_id'] < runId - 1000, map('run_id', elements['run_id'] div 1000), elements)"
+ * older partitions into special "archive partitions".
+ *
+ * Use it to avoid an ever growing number of small partitions for a DataObject that is loaded frequently, while still
+ * keeping the historical data. In contrast to [[PartitionRetentionMode]] no data is deleted, but the partition column
+ * values of the archived records change to the archive partition value. Note that files are relocated as they are and
+ * not merged, so the number of files stays the same.
+ *
+ * Example: archive a table with partition layout run_id=<integer>, moving partitions older than 1000 runs into an
+ * "archive partition" equal to floor(run_id/1000):
+ * {{{
+ * dataObjects = {
+ *   int-departures {
+ *     type = ParquetFileDataObject
+ *     path = "~{env.basedir}/int_departures"
+ *     partitions = [run_id]
+ *     housekeepingMode = {
+ *       type = PartitionArchiveMode
+ *       archivePartitionExpression = "if( elements['run_id'] < runId - 1000, map('run_id', elements['run_id'] div 1000), elements)"
+ *     }
+ *   }
  * }
- *     }}}
+ * }}}
+ *
+ * @note Only supported for DataObjects implementing `CanHandlePartitions`; this is asserted in the prepare phase.
+ *       If such a DataObject has no partition column defined, a ConfigurationException is thrown when housekeeping
+ *       runs after the write.
+ * @see [[PartitionRetentionMode]]
  * @param archivePartitionExpression
  *   Expression to define the archive partition for a given partition. Define a spark sql expression
  *   working with the attributes of [[PartitionExpressionData]] returning archive partition values
  *   as Map[String,String]. If return value is the same as input elements, partition is not touched,
  *   otherwise all files of the partition are moved to the returned partition definition. Be aware
  *   that the value of the partition columns changes for these files/records.
+ *   If not defined, no partition is archived.
+ * @param description
+ *   Optional description of this housekeeping mode, e.g. to document the archiving strategy.
+ *   It is not interpreted by SDLB.
  */
 case class PartitionArchiveMode(
     archivePartitionExpression: Option[String] = None,

@@ -33,6 +33,27 @@ import io.smartdatalake.workflow.dataobject.generic.ExpectationValidation
  * Definition of an expectation based on counting how many rows match an expression vs the number of all rows.
  * The fraction of these two counts is compared against a given expectation.
  *
+ * Use it for share-based data quality rules, e.g. "at most 1% of the records may have an unknown status", where an
+ * absolute count would depend on the size of the increment. Optionally restrict both counts to a subset of the data
+ * with `globalConditionExpression`, e.g. to ignore records that are known to be incomplete.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-departures {
+ *     type = ParquetFileDataObject
+ *     path = "~{env.basedir}/int_departures"
+ *     expectations = [{
+ *       type = SQLFractionExpectation
+ *       name = "pctBob"
+ *       countConditionExpression = "firstname = 'bob'"
+ *       expectation = "= 0"
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @see [[SQLExpectation]] for an expectation on an arbitrary aggregate expression.
  * @param countConditionExpression SQL expression returning a boolean to match the rows to count for the fraction.
  * @param globalConditionExpression SQL expression returning a boolean used as global filter, e.g. fraction row count and total row count are filtered with global filter before counting.
  * @param expectation Optional SQL comparison operator and literal to define expected percentage for validation, e.g. '= 0.9".

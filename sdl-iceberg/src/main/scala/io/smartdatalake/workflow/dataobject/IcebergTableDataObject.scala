@@ -80,6 +80,25 @@ import scala.util.{Failure, Success, Try}
  * - [[CanEvolveSchema]] by using internal Iceberg API.
  * - Overwriting partitions is implemented by using DataFrameWriterV2.overwrite(condition) API in one transaction.
  *
+ * Pick this DataObject over a plain file DataObject if you need ACID transactions, merge (upsert), schema evolution
+ * or snapshot expiration on a table, and over DeltaLakeTableDataObject if your platform standardizes on Iceberg.
+ * Note that `partitions` are always mapped to Iceberg identity transforms; other Iceberg partition transforms
+ * (bucket, truncate, days, ...) cannot be configured from SDLB.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-airports {
+ *     type = IcebergTableDataObject
+ *     path = "~{env.basedir}/int_airports"
+ *     table = { db = "default", name = "int_airports", primaryKey = [ident] }
+ *     partitions = [country]
+ *     saveMode = Merge
+ *     allowSchemaEvolution = true
+ *   }
+ * }
+ * }}}
+ *
  * @param path                   hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.
  *                               If pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.
  *                               If Iceberg table is defined on a hadoop catalog, path must be None as it is defined through the catalog directory structure.
@@ -98,6 +117,10 @@ import scala.util.{Failure, Success, Try}
  *                               explicitly defined, the ones present in the configured "table" object are used.
  * @param postWriteSql           SQL-statement to be executed in exec phase after writing output table. If the catalog and/or schema are not
  *                               explicitly defined, the ones present in the configured "table" object are used.
+ *
+ * @note If the Iceberg table is defined on a hadoop catalog, `path` must not be set as it is derived from the catalog
+ *       directory structure.
+ * @see [[IcebergTableConnection]] to share catalog, db and path prefix between multiple Iceberg DataObjects.
  */
 case class IcebergTableDataObject(override val id: DataObjectId,
                                   path: Option[String] = None,

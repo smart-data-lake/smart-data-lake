@@ -23,7 +23,26 @@ import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 
 /**
- * Connection information for DeltaLake tables
+ * Connection information for Iceberg tables.
+ *
+ * It centralizes catalog, database and the base directory of the table files, so that IcebergTableDataObjects
+ * referencing it through `connectionId` do not need to repeat them. Catalog and db of the DataObjects `table` are
+ * taken from this connection, and the DataObjects `path` is resolved relative to `pathPrefix`. This keeps
+ * environment specific storage locations out of the DataObject definitions.
+ *
+ * Example:
+ * {{{
+ * connections {
+ *   iceberg-int {
+ *     type = IcebergTableConnection
+ *     db = "integration"
+ *     pathPrefix = "~{env.basedir}/iceberg"
+ *     addFilesParallelism = 8
+ *   }
+ * }
+ * }}}
+ *
+ * @note the database given in `db` must already exist; SDLB does not create it.
  *
  * @param id unique id of this connection
  * @param catalog optional catalog to be used for this connection

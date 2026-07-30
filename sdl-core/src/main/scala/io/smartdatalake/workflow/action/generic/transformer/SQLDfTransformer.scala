@@ -40,6 +40,26 @@ import org.apache.hadoop.fs.Path
  * It is therefore recommended to use special token `%{inputViewName}` or `%{inputViewName_<input name>}` that will be
  * replaced with the name of the temporary view at runtime.
  *
+ * Use SQLDfTransformer for 1:1 transformations that are easiest expressed in SQL. Exactly one of `code` or `file`
+ * must be defined. For transformations with multiple inputs or outputs use [[SQLDfsTransformer]] in a
+ * [[io.smartdatalake.workflow.action.CustomDataFrameAction]] instead.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   select-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     transformers = [{
+ *       type = SQLDfTransformer
+ *       code = "select ident, name, latitude_deg, longitude_deg from %{inputViewName} where type = '%{airportType}'"
+ *       options = { airportType = "large_airport" }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param file           File where SQL code for transformation is loaded from.

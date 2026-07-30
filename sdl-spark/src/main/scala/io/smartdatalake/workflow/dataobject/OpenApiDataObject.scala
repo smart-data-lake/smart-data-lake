@@ -58,6 +58,20 @@ import sttp.model.{MediaType, Uri}
  * Also note that the getDataFrame method is not lazy in Exec-Phase.
  * It will query the WebService before creating the DataFrame.
  *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-datasets {
+ *     type = OpenApiDataObject
+ *     baseUrl = "https://data.sbb.ch/api/explore/v2.1"
+ *     apiDocsUrl = "swagger.json"
+ *     operationId = getDatasets
+ *     urlParameters = { include_links = "true" }
+ *     pagingLinkJsonPath = "$._links[?(@.rel == 'next')].href"
+ *   }
+ * }
+ * }}}
+ *
  * @param id                        DataObject identifier
  * @param baseUrl                   the server url to use for querying the OpenApi specification and content
  * @param operationId               the operationId from the OpenApi specification to use to get data for this DataObject

@@ -35,10 +35,32 @@ import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
- * Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m)
+ * Configuration of a custom Snowpark-DataFrame transformation between many inputs and many outputs (n:m) as Java/Scala Class.
  * Define a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and as
  * to return a map of output DataObjectIds with DataFrames, see also trait [[CustomSnowparkDfsTransformer]].
  *
+ * Use this transformer to implement joins or splits between several Snowflake tables in Scala/Java code, which is
+ * pushed down to Snowflake and executed by Snowpark. If a single input and output is sufficient, prefer the simpler
+ * [[ScalaClassSnowparkDfTransformer]].
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   join-snowpark {
+ *     type = CustomDataFrameAction
+ *     inputIds = [sf-airports, sf-departures]
+ *     outputIds = [sf-departures-enriched]
+ *     transformers = [{
+ *       type = ScalaClassSnowparkDfsTransformer
+ *       className = com.company.transformer.JoinDeparturesSnowparkTransformer
+ *       options = { joinType = "left" }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note All input and output DataObjects must be of type SnowflakeTableDataObject, as the Snowpark session is taken
+ *       from the Action's first input. The returned map must be keyed by the output DataObject ids.
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param className      class name implementing trait [[CustomSnowparkDfsTransformer]]

@@ -42,6 +42,29 @@ import scala.jdk.CollectionConverters._
  * - `options`: Transformation options as Map[String,String]
  * Output DataFrames must be set with `setOutputDfs(dict)`.
  *
+ * `inputDfs` is a dict keyed by input DataObjectId, and the dict passed to `setOutputDfs` must be keyed by output
+ * DataObjectId. Either `code` (inline PySpark code) or `file` (a path to a `.py` file) must be defined. Use this
+ * transformer with [[io.smartdatalake.workflow.action.CustomDataFrameAction]]; for a single input and output prefer
+ * [[PythonCodeDfTransformer]].
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   join-flights {
+ *     type = CustomDataFrameAction
+ *     inputIds = [stg-airports, stg-departures]
+ *     outputIds = [int-departures]
+ *     transformers = [{
+ *       type = PythonCodeDfsTransformer
+ *       code = """
+ *         df = inputDfs['stg-departures'].join(inputDfs['stg-airports'], 'ident')
+ *         setOutputDfs({'int-departures': df})
+ *       """
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param file           Optional file with python code to use for python transformation. The python code can use variables inputDfs and options. The transformed DataFrames has to be set with setOutputDfs.

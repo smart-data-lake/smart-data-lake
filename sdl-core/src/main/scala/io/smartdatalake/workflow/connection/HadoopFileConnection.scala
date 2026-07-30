@@ -23,11 +23,30 @@ import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 
 /**
- * Connection information for files on hadoop
+ * Connection information for files on hadoop.
+ *
+ * It centralizes the schema, authority and base directory (`pathPrefix`) of a hadoop compatible filesystem
+ * (local filesystem, HDFS, ADLS, S3, ...). File based DataObjects referencing this connection through
+ * `connectionId` only configure a relative `path`, which is resolved against `pathPrefix`. Use it to keep
+ * environment specific storage locations out of the DataObject definitions, so the same DataObjects can be
+ * deployed to different environments by exchanging the connection only.
+ *
+ * Example:
+ * {{{
+ * connections {
+ *   cloud-staging {
+ *     type = HadoopFileConnection
+ *     pathPrefix = "abfs://staging@mystorage.dfs.core.windows.net/data"
+ *   }
+ * }
+ * }}}
  *
  * @param id unique id of this connection
  * @param pathPrefix schema, authority and base path for accessing files on hadoop
- * @param metadata
+ * @param sparkConnectionId optional id of a Spark engine connection (e.g. `SparkClassicConnection`).
+ *                          Note that this attribute is currently not evaluated by SDLB. The engine connection
+ *                          used is selected per Action through its `engineConnectionId`, which falls back to
+ *                          `Environment.defaultEngineConnectionId`.
  */
 case class HadoopFileConnection(override val id: ConnectionId,
                                 pathPrefix: String,

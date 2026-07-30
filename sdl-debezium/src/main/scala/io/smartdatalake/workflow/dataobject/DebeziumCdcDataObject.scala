@@ -50,26 +50,46 @@ import scala.jdk.CollectionConverters._
  * Provides details to access Change data over Debezium Engine.
  * Note that this implementation is not yet tested on production, and must therefore be seen as experimental.
  *
+ * The DataObject runs an embedded Debezium engine to read the change events of one database table. The returned
+ * DataFrame contains the columns of the changed row, followed by two SDLB metadata columns: `__commit_event`
+ * (create, update_preimage, update_postimage, delete or read) and `__event_timestamp`. Debezium's own envelope
+ * fields (before, after, source, op, ...) are not part of the result. Read offsets are stored in SDLBs state, so it
+ * supports incremental output and should be used together with DataObjectStateIncrementalMode. Reading stops once no
+ * more events arrive within `maxWaitTimeAfterLastBatchMilliSeconds`. If no event arrives at all, `schemaMin` is used
+ * as fallback schema for the empty DataFrame.
+ *
+ * Example:
+ * {{{
+ * connections = {
+ *   dbz-postgres {
+ *     type = DebeziumConnection
+ *     dbEngine = "postgresql"
+ *     hostname = "localhost"
+ *     port = 5432
+ *     db = "demo"
+ *     authMode = { type = BasicAuthMode, user = "###ENV#PG_USER###", password = "###ENV#PG_PWD###" }
+ *   }
+ * }
+ * dataObjects = {
+ *   src-test {
+ *     type = DebeziumCdcDataObject
+ *     connectionId = dbz-postgres
+ *     table = { db = "demo", name = "test" }
+ *     debeziumProperties = {
+ *       "plugin.name" = "pgoutput"
+ *       "schema.history.internal" = "io.debezium.storage.file.history.FileSchemaHistory"
+ *       "schema.history.internal.file.filename" = "/tmp/schemahistory.dat"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
  * @param id unique name of this data object
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.DebeziumConnection]]
  * @param table Source table to get change data from
  * @param debeziumProperties Properties for the specific Debezium connector
  * @param metadata (optional) data object metadata
  * @param maxWaitTimeAfterLastBatchMilliSeconds (optional) Waiting time interval for debezium to finish (when a batch arrived, the engine waits the defined interval for completion), default = 10 seconds
- *
- * Example config:
- *
- * Source {
- *	type = DebeziumCdcDataObject
- *	connectionId = "connection1"
- *	table = "Test"
- *	debeziumProperties = {
- *		"database.server.id" = "1234345345"
- *		"plugin.name" = "pgoutput"
- *		"schema.history.internal" = "io.debezium.storage.file.history.FileSchemaHistory"
- *		"schema.history.internal.file.filename" = "C://TEMP/schemahistory.dat"
- *	}
- * }
  */
 case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,

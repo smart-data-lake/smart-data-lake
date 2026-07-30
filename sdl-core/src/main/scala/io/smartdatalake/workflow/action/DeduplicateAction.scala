@@ -56,6 +56,19 @@ import scala.reflect.runtime.universe.Type
  * This can be achieved through adding a DeduplicateTransformer to transformers. Note that this is
  * not included by default in DeduplicateAction, as it is a performance intensive operation.
  *
+ * Example:
+ * {{{
+ * actions = {
+ *   dedup-airports {
+ *     type = DeduplicateAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     updateCapturedColumnOnlyWhenChanged = true
+ *     mergeModeAdditionalJoinPredicate = "existing.dl_ts_captured > current_date - interval 7 days"
+ *   }
+ * }
+ * }}}
+ *
  * @param inputId
  *   inputs DataObject
  * @param outputId

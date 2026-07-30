@@ -39,6 +39,34 @@ import org.slf4j.Logger
  * DataObjectId, a DataFrame and a map of options and has to return a DataFrame. The Scala code has
  * to implement a function of type [[fnTransformType]].
  *
+ * Use this transformer for ad-hoc DataFrame logic that should be kept next to the pipeline definition
+ * instead of in a separate jar. Exactly one of `code` or `file` must be defined. The code is compiled
+ * with the Scala compiler on job startup (or lazily, see `Environment.compileScalaCodeLazy`), so syntax
+ * errors surface in the prepare phase and not only when data is processed.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   increment-rating {
+ *     type = CopyAction
+ *     inputId = src1DO
+ *     outputId = tgt1DO
+ *     transformers = [{
+ *       type = ScalaCodeSparkDfTransformer
+ *       code = """
+ *         import org.apache.spark.sql.{DataFrame, SparkSession}
+ *         (session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) => {
+ *           df.withColumn("rating", df("rating") + 1)
+ *         }
+ *       """
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note Runtime compilation needs the Scala compiler on the classpath; for production pipelines a
+ *       compiled transformer ([[ScalaClassSparkDsTransformer]]) is usually preferable.
+ *
  * @param name
  *   name of the transformer
  * @param description

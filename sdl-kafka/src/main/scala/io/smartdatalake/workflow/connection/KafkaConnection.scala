@@ -31,7 +31,30 @@ import java.util.Properties
 import scala.jdk.CollectionConverters._
 
 /**
- * Connection information for kafka
+ * Connection information for kafka.
+ *
+ * It holds the bootstrap servers, the optional Confluent schema registry url and the authentication settings
+ * shared by all KafkaTopicDataObjects referencing it through `connectionId`. The authentication settings are used
+ * both for the Spark Kafka data source (options prefixed with `kafka.`) and for the Kafka AdminClient which SDLB
+ * uses to validate that a topic exists. Configure `schemaRegistry` if topics use Confluent Avro/Json
+ * schema-registry serialization.
+ *
+ * Example:
+ * {{{
+ * connections {
+ *   kafka-int {
+ *     type = KafkaConnection
+ *     brokers = "broker1.example.com:9092,broker2.example.com:9092"
+ *     schemaRegistry = "https://schemaregistry.example.com"
+ *     authMode = {
+ *       type = SASLSCRAMAuthMode
+ *       username = "###ENV#KAFKA_USER###"
+ *       password = "###ENV#KAFKA_PASSWORD###"
+ *       sslMechanism = "SCRAM-SHA-512"
+ *     }
+ *   }
+ * }
+ * }}}
  *
  * @param id
  *   unique id of this connection
@@ -42,7 +65,9 @@ import scala.jdk.CollectionConverters._
  * @param options
  *   Options for the Kafka stream reader (see
  *   https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)
- * @param metadata
+ * @param authMode
+ *   optional authentication information. Only SASLSCRAMAuthMode and SSLCertsAuthMode are supported; if not set,
+ *   an unauthenticated PLAINTEXT connection is used.
  */
 case class KafkaConnection(
     override val id: ConnectionId,

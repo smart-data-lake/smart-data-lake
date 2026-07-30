@@ -24,6 +24,28 @@ import io.smartdatalake.util.secrets.StringOrSecret
 
 /**
  * Validate by user and private/public key Private key is read from .ssh
+ *
+ * Only the user name is configured; the private key is taken from the default ssh location (~/.ssh) of the
+ * process running SDLB, and the corresponding public key must be registered on the server. Choose this over
+ * [[BasicAuthMode]] to avoid storing a password in the configuration. Currently supported by
+ * SFtpFileRefConnection only.
+ *
+ * Example:
+ * {{{
+ * connections = {
+ *   sftp-src {
+ *     type = SFtpFileRefConnection
+ *     host = "sftp.example.com"
+ *     authMode = {
+ *       type = PublicKeyAuthMode
+ *       user = "###ENV#SFTP_USER###"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @param user user to login with (supports secret providers). Although declared optional for configuration
+ *             parsing, it must be defined, otherwise a ConfigurationException is thrown.
  */
 case class PublicKeyAuthMode(private val user: Option[StringOrSecret]) extends AuthMode {
   private[smartdatalake] val userSecret: StringOrSecret = user

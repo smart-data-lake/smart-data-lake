@@ -41,6 +41,27 @@ import org.slf4j.Logger
  * Note that the following options are passed by default to the transformation:
  *   - isExec: defined as `context.isExecPhase`
  *
+ * Pick this transformer when the transformation logic is too complex for SQL and should live in compiled, unit-testable
+ * code. The class named by `className` must be on the classpath of the SDLB job and needs a constructor without
+ * arguments. For transformations with multiple inputs or outputs use [[ScalaClassSparkDfsTransformer]] instead.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   compute-departures {
+ *     type = CopyAction
+ *     inputId = stg-departures
+ *     outputId = int-departures
+ *     transformers = [{
+ *       type = ScalaClassSparkDfTransformer
+ *       className = com.sample.transformer.ComputeDistanceTransformer
+ *       options = { unit = "km" }
+ *       runtimeOptions = { runId = "runId" }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param name
  *   name of the transformer
  * @param description

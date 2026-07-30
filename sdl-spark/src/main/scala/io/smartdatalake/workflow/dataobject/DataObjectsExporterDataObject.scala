@@ -52,6 +52,13 @@ import org.apache.spark.sql.DataFrame
  * @see
  *   Refer to [[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration
  *   loading.
+ *
+ * @param id
+ *   unique name of this data object
+ * @param config
+ *   optional location of the config to export, either a configuration file or a directory containing
+ *   configuration files. Multiple locations can be given as a comma-separated list. If not defined,
+ *   the DataObjects registered in the current [[InstanceRegistry]] are exported.
  */
 case class DataObjectsExporterDataObject(
     id: DataObjectId,

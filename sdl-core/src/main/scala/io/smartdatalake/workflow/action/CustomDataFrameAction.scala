@@ -39,6 +39,29 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * The input DataFrames might be transformed using SQL or DataFrame transformations.
  * When chaining multiple transformers, output DataFrames of previous transformers are available as input DataFrames for later transformers by their corresponding name.
  *
+ * Use CustomDataFrameAction for joins, unions and fan-outs. For simple 1:1 copies prefer [[CopyAction]],
+ * which derives more accurate lineage. Note that a transformer must return a result for every outputId,
+ * keyed by the output DataObject id, otherwise the Action fails with a configuration error.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   join-departures-airports {
+ *     type = CustomDataFrameAction
+ *     inputIds = [stg-departures, int-airports]
+ *     outputIds = [btl-departures-arrivals-airports]
+ *     mainInputId = stg-departures
+ *     transformers = [{
+ *       type = SQLDfsTransformer
+ *       code = {
+ *         btl-departures-arrivals-airports = """select d.*, a.name from %{inputViewName_stg-departures} d
+ *           join %{inputViewName_int-airports} a on d.estdepartureairport = a.ident"""
+ *       }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param inputIds               input DataObject's
  * @param outputIds              output DataObject's
  * @param transformers list of transformations to apply. See [[spark.transformer]] for a list of included Transformers.

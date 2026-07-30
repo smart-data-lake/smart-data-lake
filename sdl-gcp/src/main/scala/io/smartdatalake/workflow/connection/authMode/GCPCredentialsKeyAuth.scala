@@ -26,6 +26,25 @@ import io.smartdatalake.util.secrets.StringOrSecret
  * Authorization parameters to access a GCP-ressource using Service Account Keys.
  * A Service Account Key can be either read as Base64-encoded JSON file (String),
  * or as a path containing the JSON-File with the key, as described by Google. Only one of the options should be provided.
+ *
+ * Exactly one of `serviceAccountKey` and `serviceAccountKeyFile` must be set. Configuring both is rejected with a
+ * ConfigurationException in the prepare phase, configuring none already fails while BigQueryTableConnection is
+ * instantiated during config parsing. Currently supported by BigQueryTableConnection only.
+ *
+ * Example:
+ * {{{
+ * connections = {
+ *   google-playground {
+ *     type = BigQueryTableConnection
+ *     parentProject = "playground-223717"
+ *     authMode = {
+ *       type = GCPCredentialsKeyAuth
+ *       serviceAccountKeyFile = "/etc/secrets/playground-223717-7baadcb4cfef.json"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
  * @param serviceAccountKey A String that represents the Service Account Key encoded in Base64.
  * @param serviceAccountKeyFile A path that represents the location of the JSON-file with the service account key.
  */

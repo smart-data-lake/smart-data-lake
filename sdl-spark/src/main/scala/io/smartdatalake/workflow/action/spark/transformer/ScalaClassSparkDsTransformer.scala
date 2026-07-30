@@ -39,6 +39,31 @@ private[smartdatalake] abstract class FakeProduct extends Product
  * Define a transform function which receives a SparkSession, a Dataset and a map of options and has to return a Dataset.
  * The Java/Scala class has to implement interface [[CustomDsTransformer]].
  *
+ * Pick this transformer when the transformation logic should live in your own jar as strongly typed
+ * code: input and output are converted to/from case classes, so the compiler checks the schema for you.
+ * Use [[ScalaCodeSparkDfTransformer]] instead if you prefer to inline untyped DataFrame code directly
+ * in the configuration file.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   double-rating {
+ *     type = CopyAction
+ *     inputId = src1DS
+ *     outputId = tgt1DS
+ *     transformers = [{
+ *       type = ScalaClassSparkDsTransformer
+ *       transformerClassName = com.sample.DoubleRatingDsTransformer
+ *       options = { factor = "2" }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note The class named by `transformerClassName` must be on the classpath of the SDLB job and needs a
+ *       no-argument constructor.
+ * @see [[CustomDsTransformer]]
+ *
  * @param name                 name of the transformer
  * @param description          Optional description of the transformer
  * @param transformerClassName class name implementing trait [[CustomDsTransformer]]

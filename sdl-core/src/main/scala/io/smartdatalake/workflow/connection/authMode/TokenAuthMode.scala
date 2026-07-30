@@ -38,8 +38,30 @@ trait TokenAuth {
  *
  * For HTTP Connections the token is used as Authorization header.
  *
+ * The header is built as "tokenType token", e.g. "Authorization: Bearer eyJ...". Use this for services
+ * accessed with a long-living personal access token or API key. If the token has to be requested and
+ * refreshed during the run, use [[OAuthMode]] instead; if the credential goes into a non-standard header,
+ * use [[AuthHeaderMode]].
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-departures {
+ *     type = WebserviceFileDataObject
+ *     url = "https://opensky-network.org/api/flights/departure"
+ *     authMode = {
+ *       type = TokenAuthMode
+ *       token = "###ENV#API_TOKEN###"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
  * @param tokenType
  *   token type to use in HTTP Authorization header. Default is "Bearer".
+ * @param token
+ *   token to authenticate with (supports secret providers). Although declared optional for configuration
+ *   parsing, it must be defined, otherwise a ConfigurationException is thrown.
  */
 case class TokenAuthMode(
     tokenType: String = "Bearer",

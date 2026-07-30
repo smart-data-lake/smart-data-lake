@@ -42,6 +42,27 @@ import org.apache.spark.sql.Row
  * A better implementation would be to observe files by a custom metric. Unfortunately there is a problem in Spark with that, see also [[CollectSetDeterministic]]
  * - Partition values preserved.
  *
+ * Use this mode for "process once and clean up" file pipelines, e.g. an inbound directory which is emptied by every
+ * run. No state needs to be persisted, because the presence of a file is the state. If there is no file to process,
+ * a NoDataToProcessWarning is raised and the following actions are skipped.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   transfer-airports {
+ *     type = FileTransferAction
+ *     inputId = ext-airports
+ *     outputId = stg-airports
+ *     executionMode = {
+ *       type = FileIncrementalMoveMode
+ *       archivePath = "_archive"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note Files are deleted after processing unless `archivePath` is set. Make sure the action really succeeded before
+ *       relying on this mode, as the source files are gone afterwards.
  * @param archivePath if an archive directory is configured, files are moved into that directory instead of deleted, preserving partition layout. See also `archiveInsidePartition` option.
  *                    If this is a relative path, e.g. "_archive", it is appended after the path of the DataObject.
  *                    If this is an absolute path it replaces the path of the DataObject.

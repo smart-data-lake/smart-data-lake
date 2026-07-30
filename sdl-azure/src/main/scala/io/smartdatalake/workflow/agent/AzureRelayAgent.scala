@@ -34,6 +34,34 @@ import java.nio.ByteBuffer
  *  [[Agent]] that communicates via a Azure Relay Service.
  * See the class SmartDataLakeBuilderAzureRelayAgentIT for an example.
  *
+ * An Agent lets a "main" SDLB instance delegate the execution of an Action to a remote SDLB instance, e.g. to read
+ * data from an on-premise source that the main instance cannot reach. AzureRelayAgent uses an Azure Relay Hybrid
+ * Connection, so the remote instance does not need an inbound port open: both sides connect outbound to the relay.
+ * Prefer this over [[JettyAgent]] (development only) and [[StorageAgent]] (file based) when the remote instance
+ * sits behind a firewall.
+ *
+ * Actions are delegated to the agent by setting `agentId` on the Action. The `connections` defined on the agent
+ * override the connections with the same id on the remote instance, but only if the agent server is started with
+ * `useOnlyLocalConnectionConfig=false`. With the default `true` the agent server uses its own local connection
+ * configuration only and the connections defined here are ignored.
+ *
+ * Example:
+ * {{{
+ * agents = {
+ *   agent-onprem {
+ *     type = AzureRelayAgent
+ *     url = "Endpoint=sb://my-relay.servicebus.windows.net/;SharedAccessKeyName=my-policy;EntityPath=my-connection;SharedAccessKey="${SharedAccessKey}
+ *     connections {
+ *       remoteFile { id = remoteFile, type = HadoopFileConnection, pathPrefix = "/data/remote" }
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note Requires the sdl-azure module on the classpath and a running SDLB agent server listening on the same
+ *       Azure Relay hybrid connection.
+ * @note The `connections` block of the example is only taken into account if the agent server is started with
+ *       `useOnlyLocalConnectionConfig=false`, which is not the default for security reasons.
  * @param url         Connection URL on how the agent can be reached. See io.smartdatalake.app.SmartDataLakeBuilderAzureRelayAgentIT#azureRelayUrl for an example.
  */
 case class AzureRelayAgent(override val id: AgentId, url: String, override val connections: Map[String, Connection] = Map())

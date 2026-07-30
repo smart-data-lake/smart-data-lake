@@ -38,6 +38,26 @@ import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
  * synchronously in the DAG by using triggerType=Once, or asynchronously as Streaming Query with
  * triggerType = ProcessingTime or Continuous.
  *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-departures {
+ *     type = CopyAction
+ *     inputId = stg-departures
+ *     outputId = int-departures
+ *     executionMode = {
+ *       type = SparkStreamingMode
+ *       checkpointLocation = "~{env.basedir}/checkpoints/copy-departures"
+ *       triggerType = ProcessingTime
+ *       triggerTime = "10 seconds"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note The checkpoint location holds the streaming state. Deleting it makes the query restart from the source's
+ *       configured starting position (which for some sources, e.g. Kafka with startingOffsets=latest, skips data
+ *       instead of reprocessing it); two actions must never share the same location.
  * @param checkpointLocation
  *   location for checkpoints of streaming query to keep state
  * @param triggerType
@@ -53,6 +73,10 @@ import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
  * @param outputOptions
  *   additional option to apply when writing to streaming sink. This overwrites options set by the
  *   DataObjects.
+ * @param outputMode
+ *   output mode of the streaming query. Possible values are append (default), complete and update.
+ *   See [[OutputMode]] for details. Note that complete and update are only supported by sinks and
+ *   queries which can handle them, e.g. an aggregation query writing to a Delta Lake table.
  */
 case class SparkStreamingMode(
     checkpointLocation: String,

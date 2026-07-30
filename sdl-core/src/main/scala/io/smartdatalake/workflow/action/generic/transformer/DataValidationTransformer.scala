@@ -26,7 +26,35 @@ import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, G
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**
- * Apply validation rules to a DataFrame and collect potential violation error messages in a new column.
+ * Apply a list of validation rules to a DataFrame and collect the error messages of all violated rules in
+ * a new array column, instead of failing the Action.
+ * No rows are removed: the errors column stays empty for records that satisfy all rules. This allows to
+ * keep bad records for reporting, or to split them off with a subsequent [[FilterTransformer]] on the
+ * errors column. If the job should rather fail on bad data, use [[io.smartdatalake.workflow.dataobject.generic.Constraint]]
+ * or an Expectation like [[io.smartdatalake.workflow.dataobject.expectation.SQLExpectation]] on the output DataObject.
+ *
+ * The rule expressions are already parsed when the configuration is read, so syntax errors are detected
+ * before the pipeline is started.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   validate-ratings {
+ *     type = CopyAction
+ *     inputId = stg-ratings
+ *     outputId = int-ratings
+ *     transformers = [{
+ *       type = DataValidationTransformer
+ *       errorsColumn = validation_errors
+ *       rules = [
+ *         { type = RowLevelValidationRule, condition = "rating is not null", errorMsg = "rating should not be empty" }
+ *         { type = RowLevelValidationRule, condition = "rating between 1 and 5" }
+ *       ]
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
  * @param rules        list of validation rules to apply to the DataFrame
@@ -58,6 +86,26 @@ sealed trait ValidationRule {
 
 /**
  * Definition for a row level data validation rule.
+ * The condition is evaluated for every row on its own, so it can only reference columns of the current
+ * record. Aggregations over the whole DataFrame are not possible, use an Expectation on the output
+ * DataObject for that.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   validate-ratings {
+ *     type = CopyAction
+ *     inputId = stg-ratings
+ *     outputId = int-ratings
+ *     transformers = [{
+ *       type = DataValidationTransformer
+ *       rules = [
+ *         { type = RowLevelValidationRule, condition = "rating between 1 and 5", errorMsg = "rating must be between 1 and 5" }
+ *       ]
+ *     }]
+ *   }
+ * }
+ * }}}
  *
  * @param condition an SQL expression defining the condition to be tested. The condition should return true if the condition is satisfied.
  * @param errorMsg  Optional error msg to be create if the condition fails. Default is to use a text representation of the condition.

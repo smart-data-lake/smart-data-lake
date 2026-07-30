@@ -33,6 +33,30 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFe
  * Compares max entry in "compare column" between mainOutput and mainInput and incrementally loads the delta.
  * This mode works only with SparkSubFeeds. The filter is not propagated to following actions.
  *
+ * Pick this mode for non-partitioned sources which have a monotonically increasing column, e.g. a technical
+ * timestamp or a sequence-based id: the mode reads `max(compareCol)` from the output and adds a filter
+ * `compareCol > <lastValue>` on the input. If the output is still empty all records are selected.
+ * If input and output are on the same value, a NoDataToProcessWarning is thrown and following actions are skipped.
+ * `compareCol` must exist in both main input and main output and be of a sortable type.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     executionMode = {
+ *       type = DataFrameIncrementalMode
+ *       compareCol = "dl_ts_captured"
+ *       applyCondition = { expression = "isStartNode" }
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @see [[PartitionDiffMode]] if the input DataObject is partitioned, [[DataObjectStateIncrementalMode]] if the
+ *      input DataObject can remember its own state.
  * @param compareCol          a comparable column name existing in mainInput and mainOutput used to identify the delta. Column content should be bigger for newer records.
  * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
  *                            It can be used to ensure processing all partitions over multiple actions in case of errors.

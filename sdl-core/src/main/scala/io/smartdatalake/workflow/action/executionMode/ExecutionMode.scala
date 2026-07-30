@@ -133,6 +133,31 @@ trait ExecutionModeWithMainInputOutput {
 /**
  * An execution mode which just validates that partition values are given.
  * Note: For start nodes of the DAG partition values can be defined by command line, for subsequent nodes partition values are passed on from previous nodes.
+ *
+ * Use it as a guard on actions which must never process a full load by accident: if the main input SubFeed has no
+ * partition values, the action fails with an IllegalStateException instead of reading everything.
+ * It selects no data itself and has no configuration attributes. In dry-run mode the check is skipped.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-departures {
+ *     type = ParquetFileDataObject
+ *     path = "~{env.basedir}/int_departures"
+ *     partitions = [dt]
+ *   }
+ * }
+ * actions = {
+ *   copy-departures {
+ *     type = CopyAction
+ *     inputId = int-departures
+ *     outputId = btl-departures
+ *     executionMode = { type = FailIfNoPartitionValuesMode }
+ *   }
+ * }
+ * }}}
+ *
+ * @see [[PartitionDiffMode]] to select the missing partitions automatically instead of failing.
  */
 case class FailIfNoPartitionValuesMode() extends ExecutionMode {
   override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
@@ -155,6 +180,30 @@ object FailIfNoPartitionValuesMode extends FromConfigFactory[ExecutionMode] {
 
 /**
  * An execution mode which forces processing all data from its inputs.
+ *
+ * It resets the partition values and data filter received from the preceding action, so the action always reads the
+ * full content of its inputs. Typical use case is an action which needs the complete history of a predecessor's output
+ * (e.g. a full aggregation or a deduplication), combined with an `executionCondition` of "true" to also run it when
+ * the predecessor was skipped because it had no new data. It has no configuration attributes.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   agg-departures {
+ *     type = CustomDataFrameAction
+ *     inputIds = [int-departures]
+ *     outputIds = [btl-departures-agg]
+ *     transformers = [{
+ *       type = SQLDfsTransformer
+ *       code = {
+ *         btl-departures-agg = "select estdepartureairport, count(*) as cnt from %{inputViewName_int-departures} group by estdepartureairport"
+ *       }
+ *     }]
+ *     executionMode = { type = ProcessAllMode }
+ *     executionCondition = { expression = "true" }
+ *   }
+ * }
+ * }}}
  */
 case class ProcessAllMode() extends ExecutionMode {
   override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed

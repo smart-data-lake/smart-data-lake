@@ -38,12 +38,37 @@ import java.sql.Timestamp
  * This mode needs mainInput/Output DataObjects which CanHandlePartitions to list partitions.
  * Partition values are passed to following actions for partition columns which they have in common.
  *
+ * This is the standard mode for incremental loading of partitioned DataObjects: it needs no state to be persisted,
+ * as the partitions still missing in the output define the increment. By default it is only applied if no partition
+ * values are given on the command line or by the preceding action. If no partition is missing, a
+ * NoDataToProcessWarning is raised and the following actions are skipped.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-departures {
+ *     type = CopyAction
+ *     inputId = stg-departures
+ *     outputId = int-departures
+ *     executionMode = {
+ *       type = PartitionDiffMode
+ *       partitionColNb = 1
+ *       nbOfPartitionValuesPerRun = 10
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @see [[DataFrameIncrementalMode]] for non-partitioned DataObjects, [[CustomPartitionMode]] for custom partition
+ *      selection logic.
  * @param partitionColNb                  optional number of partition columns to use as a common 'init'.
  * @param alternativeOutputId             optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
  *                                        It can be used to ensure processing all partitions over multiple actions in case of errors.
  * @param nbOfPartitionValuesPerRun       optional restriction of the number of partition values per run.
  * @param applyCondition                  Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of [[DefaultExecutionModeExpressionData]] returning a boolean.
  *                                        Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are empty.
+ * @param failCondition                   optional single condition to fail application of execution mode if true. Define as spark sql expression working with attributes of [[PartitionDiffModeExpressionData]] returning a boolean.
+ *                                        This is a shortcut for `failConditions` with one entry and without description. It is evaluated in addition to `failConditions`.
  * @param failConditions                  List of conditions to fail application of execution mode if true. Define as spark sql expressions working with attributes of [[PartitionDiffModeExpressionData]] returning a boolean.
  *                                        Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.
  *                                        Multiple conditions are evaluated individually and every condition may fail the execution mode (or-logic)

@@ -27,7 +27,33 @@ import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**
- * Apply a column blacklist to a DataFrame.
+ * Apply a column blacklist to a DataFrame: every column listed in `columnBlacklist` is dropped, all
+ * remaining columns are passed through unchanged.
+ * Use this if a source delivers many columns and only a few need to be removed, e.g. to strip technical
+ * or sensitive attributes before writing them to the target DataObject.
+ * Use [[WhitelistTransformer]] instead if it is easier to enumerate the columns to keep.
+ *
+ * Column names are matched case-insensitively, unless case sensitivity is enabled globally by setting
+ * `global.environment.caseSensitive = true`. Blacklisted columns that do not exist in the DataFrame do not
+ * fail the Action, they are logged as a warning and ignored.
+ * Note that the original column order is only preserved in the default case-insensitive mode; with case
+ * sensitivity enabled the order of the remaining columns is undefined.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   load-orders {
+ *     type = CopyAction
+ *     inputId = stg-orders
+ *     outputId = int-orders
+ *     transformers = [{
+ *       type = BlacklistTransformer
+ *       columnBlacklist = [dl_load_ts, source_system, customer_email]
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
  * @param columnBlacklist List of columns to exclude from DataFrame

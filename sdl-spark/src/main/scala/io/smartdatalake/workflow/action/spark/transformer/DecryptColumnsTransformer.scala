@@ -31,11 +31,36 @@ import org.apache.spark.sql.DataFrame
 /**
  * Decryption of specified columns using AES/GCM algorithm.
  *
+ * Use this transformer to read back data that was written with [[EncryptColumnsTransformer]]. The listed columns are
+ * decrypted in place, keeping name and position; all other columns are passed through unchanged. The columns must be of
+ * type string and contain the cipher text produced by the same algorithm and the same key, otherwise decryption fails
+ * or returns garbage.
+ *
+ * Note that the key should not be written into the configuration in clear text, but referenced as a secret, e.g.
+ * `###ENV#CRYPT_KEY###`. See [[EncryptColumnsTransformer]] for the write side.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   dec-customers {
+ *     type = CopyAction
+ *     inputId = enc-customers
+ *     outputId = int-customers
+ *     transformers = [{
+ *       type = DecryptColumnsTransformer
+ *       decryptColumns = ["email", "phone"]
+ *       key = "###ENV#CRYPT_KEY###"
+ *       algorithm = "GCM"
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param decryptColumns List of columns [columnA, columnB] to be encrypted
- * @param key            contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
- *                       e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY
+ * @param key            contains the id of the provider and the name of the secret with format ###<PROVIDERID>#<SECRETNAME>###,
+ *                       e.g. ###ENV#<ENV_VARIABLE_NAME>### to get a secret from an environment variable OR ###CLEAR#mYsEcReTkeY###
  * @param algorithm      Specify: "GCM" (AES/GCM/NoPadding), "ECB" (AES/ECB/PKCS5Padding),
  *                       alternatively a class name extending trait EncryptDecrypt can be provided. DEFAULT: GCM
  */

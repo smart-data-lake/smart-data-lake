@@ -31,6 +31,32 @@ import java.sql.Timestamp
 
 /**
  * A special incremental execution mode for Kafka Inputs, remembering the state from the last increment through the Kafka Consumer, e.g. committed offsets.
+ *
+ * The state is not kept in the SDLB run state but as committed consumer group offsets in Kafka itself, so no state
+ * store is needed and the Action can be run without `--state-path`. Offsets are only committed after the Action
+ * succeeded, so a failed run is re-read on the next attempt. Pick this over
+ * [[io.smartdatalake.workflow.action.executionMode.DataFrameIncrementalMode]] whenever the input is a
+ * [[io.smartdatalake.workflow.dataobject.KafkaTopicDataObject]], as it avoids reading a comparison value from the output.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-departures {
+ *     type = CopyAction
+ *     inputId = ext-departures-kafka
+ *     outputId = stg-departures
+ *     executionMode = {
+ *       type = KafkaStateIncrementalMode
+ *       delayedMaxTimestampExpr = "timestamp_seconds(unix_seconds(now()) - 10)"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note At least one input DataObject of the Action must be a
+ *       [[io.smartdatalake.workflow.dataobject.KafkaTopicDataObject]], otherwise initialization fails.
+ *       The input KafkaTopicDataObject must set the `groupIdPrefix` option, as it is used as prefix for the Kafka
+ *       consumer group id in which the offsets are committed.
  * @param delayedMaxTimestampExpr Optional expression to define a delay to read latest offsets from Kafka. The expression has to return a timestamp which is used to select ending offsets to read from Kafka.
  *                                Define a spark sql expression working with the attributes of [[DefaultExpressionData]] returning a timestamp.
  *                                Default is to read latest offsets existing in Kafka.

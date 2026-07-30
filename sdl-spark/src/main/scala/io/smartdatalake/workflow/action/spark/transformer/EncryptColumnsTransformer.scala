@@ -31,11 +31,40 @@ import org.apache.spark.sql.DataFrame
 /**
  * Encryption of specified columns using AES/GCM algorithm.
  *
+ * Use this transformer to pseudonymize sensitive attributes before they are persisted. The listed columns are replaced
+ * by their cipher text at the same position and get data type String, all other columns are passed through unchanged.
+ * The original data type is remembered in the column metadata, so that [[DecryptColumnsTransformer]] can restore it on
+ * read. Note that this only works if the output format preserves column metadata (Parquet, Hive, Delta, Iceberg); with
+ * formats like CSV the original data type is lost and the decrypted columns stay String.
+ * Choose "GCM" (randomized, recommended) unless you need deterministic cipher text for joins or deduplication, in which
+ * case use "ECB".
+ *
+ * Note that the key should not be written into the configuration in clear text, but referenced as a secret, e.g.
+ * `###ENV#CRYPT_KEY###`. The same key and algorithm are needed to read the data back, see
+ * [[DecryptColumnsTransformer]].
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   enc-customers {
+ *     type = CopyAction
+ *     inputId = stg-customers
+ *     outputId = enc-customers
+ *     transformers = [{
+ *       type = EncryptColumnsTransformer
+ *       encryptColumns = ["email", "phone"]
+ *       key = "###ENV#CRYPT_KEY###"
+ *       algorithm = "GCM"
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param encryptColumns List of columns [columnA, columnB] to be encrypted
- * @param key            contains the id of the provider and the name of the secret with format <PROVIDERID>#<SECRETNAME>,
- *                       e.g. ENV#<ENV_VARIABLE_NAME> to get a secret from an environment variable OR CLEAR#mYsEcReTkeY
+ * @param key            contains the id of the provider and the name of the secret with format ###<PROVIDERID>#<SECRETNAME>###,
+ *                       e.g. ###ENV#<ENV_VARIABLE_NAME>### to get a secret from an environment variable OR ###CLEAR#mYsEcReTkeY###
  * @param algorithm      Specify: "GCM" (AES/GCM/NoPadding), "ECB" (AES/ECB/PKCS5Padding),
  *                       alternatively a class name extending trait EncryptDecrypt can be provided. DEFAULT: GCM
  */

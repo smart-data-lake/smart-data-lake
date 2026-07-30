@@ -50,18 +50,36 @@ import org.apache.spark.sql.types.{DateType, StringType}
  * option is disabled (default) in `csvOptions`, then all column types are set to String and the
  * first row of the CSV file is read to determine the column names and the number of fields.
  *
- * If the `header` option is disabled (default) in `csvOptions`, then the header is defined as "_c#"
- * for each column where "#" is the column index. Otherwise the first row of the CSV file is not
- * included in the DataFrame content and its entries are used as the column names for the schema.
+ * If the `header` option is disabled in `csvOptions` (it is enabled by default, see note below),
+ * then the header is defined as "_c#" for each column where "#" is the column index. Otherwise the
+ * first row of the CSV file is not included in the DataFrame content and its entries are used as
+ * the column names for the schema.
  *
  * If a data object schema is not defined via the `schema` attribute and `inferSchema` is enabled in
  * `csvOptions`, then the `samplingRatio` (default: 1.0) option in `csvOptions` is used to extract a
  * sample from the CSV file in order to determine the input schema automatically.
  *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   stg-airports {
+ *     type = CsvFileDataObject
+ *     path = "~{env.basedir}/stg_airports"
+ *     csvOptions {
+ *       delimiter = ";"
+ *       inferSchema = true
+ *     }
+ *     partitions = [dt]
+ *     saveMode = Append
+ *   }
+ * }
+ * }}}
+ *
  * @note
- *   This data object sets the following default values for `csvOptions`: delimiter = "|", quote =
- *   null, header = false, and inferSchema = false. All other `csvOption` default to the values
- *   defined by Apache Spark.
+ *   This data object sets the following default values for `csvOptions`: header = true,
+ *   inferSchema = false, delimiter = ",", and quote = null. All other `csvOption` default to the
+ *   values defined by Apache Spark. Note that either `header` or `inferSchema` must be enabled in
+ *   `csvOptions`, or an explicit `schema` must be defined.
  *
  * @see
  *   [[org.apache.spark.sql.DataFrameReader]]
@@ -72,7 +90,9 @@ import org.apache.spark.sql.types.{DateType, StringType}
  *   Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
  *   [[org.apache.spark.sql.DataFrameWriter]].
  * @param dateColumnType
- *   Specifies the string format used for writing date typed data.
+ *   how to convert columns of Spark type date before writing (default: date). With `date` they are
+ *   cast to timestamp, with `string` they are cast to string. See
+ *   [[io.smartdatalake.definitions.DateColumnType]].
  */
 case class CsvFileDataObject(
     override val id: DataObjectId,

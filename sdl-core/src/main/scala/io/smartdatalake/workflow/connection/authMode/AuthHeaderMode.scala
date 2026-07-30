@@ -24,6 +24,30 @@ import io.smartdatalake.util.secrets.StringOrSecret
 
 /**
  * Authenticate using a custom HTTP header.
+ *
+ * Use this when the webservice expects its credential in a proprietary header like `X-API-KEY` instead of
+ * the standard `Authorization` header. The secret is sent verbatim as header value, so a scheme prefix such
+ * as "Basic " or "Bearer " must be part of the secret itself. Only usable for HTTP based connections and
+ * DataObjects.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-departures {
+ *     type = WebserviceFileDataObject
+ *     url = "https://opensky-network.org/api/flights/departure"
+ *     authMode = {
+ *       type = AuthHeaderMode
+ *       headerName = "X-API-KEY"
+ *       secret = "###ENV#API_KEY###"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @param headerName name of the HTTP header to set, e.g. "X-API-KEY"
+ * @param secret     value to set as header content (supports secret providers)
+ * @see [[BasicAuthMode]] and [[TokenAuthMode]] for the standard `Authorization` header variants.
  */
 case class AuthHeaderMode(
     headerName: String,

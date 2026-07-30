@@ -54,6 +54,23 @@ case class WebservicePartitionDefinition(name: String, values: Seq[String])
  * Query parameter (partitions) and possible values can be configured through `partitionDefs` attribute.
  * If no values are given for a query parameter, the values are taken from the partition values of the input SubFeed, e.g. the command line if it is the first Action in the DAG.
  *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-departures {
+ *     type = WebserviceFileDataObject
+ *     url = "https://opensky-network.org/api/flights/departure"
+ *     authMode = { type = BasicAuthMode, user = "###ENV#API_USER###", password = "###ENV#API_PWD###" }
+ *     followRedirects = true
+ *     retries = 3
+ *     partitionDefs = [
+ *       { name = airport, values = [LSZB, EDDF] }
+ *     ]
+ *     partitionLayout = "?airport=%airport%"
+ *   }
+ * }
+ * }}}
+ *
  * @param url URL of the webservice
  * @param additionalHeaders Additional headers to pass with the http request
  * @param timeouts optional configuration of HTTP timeouts

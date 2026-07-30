@@ -27,6 +27,27 @@ import io.smartdatalake.util.secrets.StringOrSecret
 /**
  * Connect with custom HTTP-header based authentication
  *
+ * The configured class implements [[CustomHttpAuthModeLogic]] and returns the HTTP headers to add to every
+ * request; `options` are handed over once in the prepare phase, e.g. to acquire a token.
+ *
+ * Deprecated since 2.7.1: implement [[HttpAuthMode]] (or [[AuthMode]]) directly instead, which gives access
+ * to typed configuration attributes rather than an untyped option map.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-departures {
+ *     type = WebserviceFileDataObject
+ *     url = "https://opensky-network.org/api/flights/departure"
+ *     authMode = {
+ *       type = CustomHttpAuthMode
+ *       className = "com.example.auth.MyCustomHttpAuthMode"
+ *       options = { apiKey = "###ENV#API_KEY###" }
+ *     }
+ *   }
+ * }
+ * }}}
+ *
  * @param className class name implementing trait [[CustomHttpAuthModeLogic]]
  * @param options   Options to pass to the custom auth mode logic in prepare function.
  */

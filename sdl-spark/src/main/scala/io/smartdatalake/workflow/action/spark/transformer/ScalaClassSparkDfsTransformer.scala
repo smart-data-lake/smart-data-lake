@@ -57,6 +57,28 @@ import org.slf4j.Logger
  *   - outputDataObjectId: defined as outputDataObject.id if transformation has only one output
  *     DataObject configured.
  *
+ * The class named by `className` must be on the classpath of the SDLB job and needs a constructor without arguments.
+ * Input and output DataFrames are matched by DataObjectId; use `renamedInputIds`/`renamedOutputIds` to write generic
+ * transformers whose names are independent of the configured DataObjectIds. For a single input and output,
+ * [[ScalaClassSparkDfTransformer]] is simpler.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   join-departures {
+ *     type = CustomDataFrameAction
+ *     inputIds = [stg-airports, stg-departures]
+ *     outputIds = [int-departures]
+ *     transformers = [{
+ *       type = ScalaClassSparkDfsTransformer
+ *       className = com.sample.transformer.JoinDeparturesTransformer
+ *       options = { country = "CH" }
+ *       renamedInputIds = { stg-airports = airports }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param name
  *   name of the transformer
  * @param description

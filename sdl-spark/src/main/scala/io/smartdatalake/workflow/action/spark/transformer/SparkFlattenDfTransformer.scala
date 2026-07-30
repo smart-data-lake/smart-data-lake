@@ -45,6 +45,31 @@ import scala.annotation.tailrec
  * |---parent_child1
  *
  * |---parent_child2
+ *
+ * Nesting is resolved recursively, so deeply nested structs end up as a single flat level of columns
+ * named by their full path joined with "_". This is typically used right after reading semi-structured
+ * sources (JSON, XML, webservice payloads) to obtain a table-like schema that can be written to a
+ * relational or file DataObject. With `enableExplode = true` array columns are exploded as well, which
+ * multiplies rows instead of columns; the transformer needs no column list and adapts to schema changes.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   flatten-departures {
+ *     type = CopyAction
+ *     inputId = stg-departures
+ *     outputId = int-departures
+ *     transformers = [{
+ *       type = SparkFlattenDfTransformer
+ *       enableExplode = true
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note Exploding arrays changes the cardinality of the DataFrame - primary keys of the input are no
+ *       longer unique in the output.
+ *
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
  * @param enableExplode Enables exploding Arrays in the Dataframe, therefore potentially increasing the number of rows. Default is set to "false"

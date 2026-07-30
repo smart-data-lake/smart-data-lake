@@ -32,6 +32,28 @@ import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, Expe
  * Definition of expectation on transfer rate.
  * Transfer rate is calculated as the fraction of main output count over main input count.
  *
+ * Use this Action level expectation to detect records unintentionally lost (or multiplied) by the transformation of an Action,
+ * e.g. by a join that does not match, or a filter that is too restrictive. In contrast to [[CompletenessExpectation]],
+ * which always compares the count of the whole table (scope `All`), the transfer rate compares the number of records
+ * processed by the current job, e.g. only the incrementally loaded records.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     expectations = [
+ *       { type = TransferRateExpectation, expectation = "> 0.95", failedSeverity = Warn }
+ *     ]
+ *   }
+ * }
+ * }}}
+ *
+ * @note The metric is only available for Actions with a main input and a main output, e.g. [[io.smartdatalake.workflow.action.CopyAction]]
+ *       or [[io.smartdatalake.workflow.action.CustomDataFrameAction]].
+ * @see [[CompletenessExpectation]]
  * @param expectation Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1".
  *                    Together with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.
  *                    If no expectation is defined, the aggExpression evaluation result is just recorded in metrics.

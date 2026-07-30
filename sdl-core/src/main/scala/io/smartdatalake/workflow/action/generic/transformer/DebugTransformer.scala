@@ -32,6 +32,27 @@ import org.slf4j.event.Level
  * Log schema, sample data and plan of DataFrame to transform.
  * This transformer can be used to log debug output between different transformers.
  * It's not intended for production use.
+ * The DataFrame is returned unchanged, so the transformer can be inserted at any position in the
+ * `transformers` list of an Action without influencing its result.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   load-ratings {
+ *     type = CopyAction
+ *     inputId = stg-ratings
+ *     outputId = int-ratings
+ *     transformers = [{
+ *       type = DebugTransformer
+ *       show = true
+ *       showOptions = { numRows = "20", vertical = "true" }
+ *       explain = true
+ *       explainOptions = { mode = "extended" }
+ *       logLevel = debug
+ *     }]
+ *   }
+ * }
+ * }}}
  *
  * @param name         name of the transformer
  * @param description  Optional description of the transformer

@@ -27,6 +27,27 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataObjectState, SubFee
 
 /**
  * An execution mode for incremental processing by remembering DataObjects state from last increment.
+ *
+ * In contrast to [[DataFrameIncrementalMode]] the state is not derived by comparing input and output, but kept by the
+ * input DataObject itself and persisted in the SDLB run state. Choose this mode for sources which can create an
+ * increment on their own, e.g. Airbyte, OData, Debezium CDC or JDBC sources with an incremental cursor.
+ * It has no configuration attributes.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = ext-airports
+ *     outputId = stg-airports
+ *     executionMode = { type = DataObjectStateIncrementalMode }
+ *   }
+ * }
+ * }}}
+ *
+ * @note SmartDataLakeBuilder must be started with a state path (command line option `--state-path`), otherwise the
+ *       mode fails in the init phase. At least one input DataObject must implement `CanCreateIncrementalOutput`.
+ * @see [[DataFrameIncrementalMode]], [[PartitionDiffMode]]
  */
 case class DataObjectStateIncrementalMode() extends ExecutionMode {
   private var inputsWithIncrementalOutput: Seq[DataObject with CanCreateIncrementalOutput] = Seq()

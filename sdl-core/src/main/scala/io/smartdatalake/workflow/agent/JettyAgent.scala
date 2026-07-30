@@ -34,6 +34,29 @@ import java.net.URI
  * Simple, unsecured SDLB Remote [[Agent]] for development use that communicates via a plain Jetty Websocket.
  * See the class SmartDataLakeBuilderAgentTest for an example.
  *
+ * An Agent lets a "main" SDLB instance delegate the execution of an Action to a remote SDLB instance, e.g. to read
+ * data from a source only the remote instance can reach. Actions are delegated by setting `agentId` on the Action.
+ * The `connections` defined on the agent override the connections with the same id on the remote instance, but only
+ * if the agent server is started with `useOnlyLocalConnectionConfig=false`. With the default `true` the agent server
+ * uses its own local connection configuration only and the connections defined here are ignored.
+ *
+ * Example:
+ * {{{
+ * agents = {
+ *   jetty-agent1 {
+ *     type = JettyAgent
+ *     url = "ws://localhost:4441/ws/"
+ *     connections {
+ *       remoteFile { id = remoteFile, type = HadoopFileConnection, pathPrefix = "target/remote" }
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note The websocket connection is neither encrypted nor authenticated, so use this only for local development
+ *       and tests. For productive setups use [[StorageAgent]] or the AzureRelayAgent of the sdl-azure module.
+ * @note The `connections` block of the example is only taken into account if the agent server is started with
+ *       `useOnlyLocalConnectionConfig=false`, which is not the default for security reasons.
  * @param url Connection URL on how the agent can be reached, example: "ws://localhost:4441/ws/"
  */
 case class JettyAgent(override val id: AgentId, url: String, override val connections: Map[String, Connection] = Map())

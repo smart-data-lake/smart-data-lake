@@ -40,6 +40,34 @@ import org.slf4j.Logger
  * DataObjectIds with DataFrames. The Scala code has to implement a function of type
  * [[fnTransformType]].
  *
+ * Use this transformer inside a `CustomDataFrameAction` whenever a transformation needs more than one
+ * input DataFrame (joins, unions) or produces more than one output DataFrame. The returned map must
+ * contain an entry for every output DataObject id of the action. Exactly one of `code` or `file` must
+ * be defined; the code is compiled at job startup so errors surface in the prepare phase.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   join-departures-airports {
+ *     type = CustomDataFrameAction
+ *     inputIds = [stg-departures, int-airports]
+ *     outputIds = [btl-departures-arrivals-airports]
+ *     transformers = [{
+ *       type = ScalaCodeSparkDfsTransformer
+ *       code = """
+ *         import org.apache.spark.sql.{DataFrame, SparkSession}
+ *         (session: SparkSession, options: Map[String,String], dfs: Map[String,DataFrame]) => {
+ *           val df = dfs("stg-departures").join(dfs("int-airports"), Seq("ident"))
+ *           Map("btl-departures-arrivals-airports" -> df)
+ *         }
+ *       """
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @see [[ScalaCodeSparkDfTransformer]] for the 1:1 case
+ *
  * @param name
  *   name of the transformer
  * @param description

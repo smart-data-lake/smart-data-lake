@@ -39,6 +39,30 @@ import scala.util.Using
  * The transformation is executed in distributed mode on Spark executors.
  * A custom file transformer must be given, which reads a file from Hadoop and writes it back to Hadoop.
  *
+ * Use this Action if files must be processed as files (byte or line streams), e.g. to unzip, decrypt or repair a file
+ * format Spark can not read. The list of files to transfer is created on the driver and then distributed to the
+ * executors, where the transformer gets the input stream and the output stream of one file at a time. If the content
+ * can be read as a DataFrame, prefer [[CopyAction]], if the files only need to be moved unchanged prefer
+ * [[FileTransferAction]].
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   transform-airports {
+ *     type = CustomFileAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     transformer = {
+ *       className = com.company.transformer.CutColumnsFileTransformer
+ *       options = { delimiter = "," }
+ *     }
+ *     filesPerPartition = 5
+ *   }
+ * }
+ * }}}
+ *
+ * @note inputId must be a HadoopFileDataObject and outputId a SparkFileDataObject, and the transformer code must be
+ *       serializable as it is shipped to the Spark executors.
  * @param inputId inputs DataObject
  * @param outputId output DataObject
  * @param transformer a custom file transformer, which reads a file from HadoopFileDataObject and writes it back to another HadoopFileDataObject

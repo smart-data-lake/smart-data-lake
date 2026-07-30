@@ -58,6 +58,27 @@ import scala.util.{Failure, Success, Try}
  * - [[CanEvolveSchema]] by generating corresponding alter table DDL statements.
  * - Overwriting partitions is implemented by using SQL delete and insert statement embedded in one transaction.
  *
+ * Requires a [[JdbcTableConnection]] referenced by `connectionId`, which holds url, driver and credentials.
+ *
+ * Example:
+ * {{{
+ * connections = {
+ *   jdbc-dwh {
+ *     type = JdbcTableConnection
+ *     url = "jdbc:postgresql://dwh:5432/mydb"
+ *     driver = org.postgresql.Driver
+ *   }
+ * }
+ * dataObjects = {
+ *   int-airports {
+ *     type = JdbcTableDataObject
+ *     connectionId = jdbc-dwh
+ *     table = { db = public, name = airports, primaryKey = [ident] }
+ *     saveMode = Merge
+ *   }
+ * }
+ * }}}
+ *
  * @param id unique name of this data object
  * @param createSql DDL-statement to be executed in prepare phase, using output jdbc connection.
  *                  Note that it is also possible to let Spark create the table in Init-phase. See jdbcOptions to customize column data types for auto-created DDL-statement.
@@ -71,7 +92,8 @@ import scala.util.{Failure, Success, Try}
  *                   Use tokens with syntax %{<spark sql expression>} to substitute with values from [[DefaultExpressionData]].
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
- * @param saveMode [[SDLSaveMode]] to use when writing table, default is "Overwrite". Only "Append" and "Overwrite" supported.
+ * @param saveMode [[SDLSaveMode]] to use when writing table, default is "Overwrite". Only "Append", "Overwrite" and "Merge" are supported.
+ *                 "Merge" requires a primary key to be defined on `table`.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
  * @param table The jdbc table to be read
  * @param jdbcFetchSize Number of rows to be fetched together by the Jdbc driver
