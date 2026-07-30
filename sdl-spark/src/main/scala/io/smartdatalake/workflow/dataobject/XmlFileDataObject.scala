@@ -45,6 +45,21 @@ import org.apache.spark.sql.DataFrame
  * the [[https://github.com/databricks/spark-xml databricks spark-xml]] project.
  * Note that writing XML-file partitioned is not supported by spark-xml.
  *
+ * The most important entry in `xmlOptions` is `rowTag`, which selects the XML element that is mapped to one row of the
+ * resulting DataFrame. Nested elements become structs and arrays, so a transformer is normally needed to flatten them.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   stg-airports {
+ *     type = XmlFileDataObject
+ *     path = "~{env.basedir}/stg_airports"
+ *     xmlOptions { rowTag = "entry", dateFormat = "yyyy-MM-dd" }
+ *     schema = "ident string, name string, elevation_ft integer"
+ *   }
+ * }
+ * }}}
+ *
  * @param xmlOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
  */
 case class XmlFileDataObject(override val id: DataObjectId,

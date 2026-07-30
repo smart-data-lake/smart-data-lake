@@ -104,7 +104,29 @@ private object TemporalQueries {
  *
  * Support incremental output and use with DataObjectStateIncrementalMode.
  *
+ * Example:
+ * {{{
+ * connections = {
+ *   kafka-con {
+ *     type = KafkaConnection
+ *     brokers = "localhost:9092"
+ *     schemaRegistry = "http://localhost:8081"
+ *   }
+ * }
+ * dataObjects = {
+ *   stg-departures {
+ *     type = KafkaTopicDataObject
+ *     topicName = "departures"
+ *     connectionId = kafka-con
+ *     valueType = AvroSchemaRegistry
+ *     selectCols = ["value.*", "timestamp"]
+ *   }
+ * }
+ * }}}
+ *
  * @param topicName The name of the topic to read
+ * @param connectionId id of the [[io.smartdatalake.workflow.connection.KafkaConnection]] defining brokers, schema registry and authentication.
+ *                     A schemaRegistry must be configured in the connection if keyType or valueType is set to Json/AvroSchemaRegistry.
  * @param keyType    Optional type the key column should be converted to. If none is given it will be interpreted as string.
  * @param keySchema  An optional schema for parsing the key column. This can be used if keyType = JSON or Avro to parse the corresponding content.
  *                   Define the schema by using one of the schema providers DDL, jsonSchemaFile, avroSchemaFile, xsdFile or caseClassName.

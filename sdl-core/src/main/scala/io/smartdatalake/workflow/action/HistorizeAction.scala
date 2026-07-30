@@ -62,6 +62,19 @@ import scala.reflect.runtime.universe.Type
  * If you still have a legacy full historization table, migration to incremental historization should happen
  * automatically. The missing hash column is detected and added to existing data.
  *
+ * Example:
+ * {{{
+ * actions = {
+ *   historize-airports {
+ *     type = HistorizeAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     timeAxisUnit = 1d
+ *     historizeBlacklist = [last_updated]
+ *   }
+ * }
+ * }}}
+ *
  * @param inputId
  *   inputs DataObject
  * @param outputId

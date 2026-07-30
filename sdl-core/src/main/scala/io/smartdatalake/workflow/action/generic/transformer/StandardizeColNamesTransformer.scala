@@ -29,6 +29,31 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 /**
  * Standardizes column names to be used without quoting by using camelCase to lower_case_with_underscore rule (default), and further cleanup rules for special characters (default).
  * Parameters below can be used to disable specific rules if needed.
+ *
+ * Add it as first transformer when reading from sources with inconsistent or unsafe column names (Excel sheets, CSV
+ * exports, JSON APIs), so that all downstream SQL can reference columns without quoting.
+ * With the default settings `testColumn` becomes `test_column` and `c?olumnN[ä]me` becomes `column_naeme`.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     transformers = [{
+ *       type = StandardizeColNamesTransformer
+ *       camelCaseToLower = true
+ *       normalizeToAscii = true
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note `removeNonStandardSQLNameChars` and `replaceNonStandardSQLNameCharsWithUnderscores` are mutually exclusive;
+ *       enabling both fails at runtime. To get underscores instead of removed characters, disable the former and
+ *       enable the latter.
+ *
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
  * @param camelCaseToLower If selected, converts Camel case names to lower case  with underscores, i.e. TestString -> test_string, testABCtest -> test_ABCtest

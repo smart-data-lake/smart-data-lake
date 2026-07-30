@@ -38,6 +38,29 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * Define a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a
  * DataFrame. The Java/Scala class has to implement interface [[CustomSnowparkDfTransformer]].
  *
+ * The transformation is pushed down to Snowflake and executed by Snowpark, so no data is transferred to the Spark
+ * driver or executors. It can be combined in the same `transformers` list with generic transformers like
+ * SQLDfTransformer or ColumnsTransformer, as long as input and output DataObjects are Snowflake tables.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-snowpark {
+ *     type = CopyAction
+ *     inputId = sf-airports-stg
+ *     outputId = sf-airports
+ *     transformers = [{
+ *       type = ScalaClassSnowparkDfTransformer
+ *       className = com.company.transformer.CleanAirportsSnowparkTransformer
+ *       options = { minRating = "3" }
+ *       runtimeOptions = { appName = "application" }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note Input and output DataObject must be of type SnowflakeTableDataObject, as the Snowpark session is taken from
+ *       the Action's first input. The class given in `className` must be on the classpath of the SDLB job.
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param className      class name implementing trait [[CustomSnowparkDfTransformer]]

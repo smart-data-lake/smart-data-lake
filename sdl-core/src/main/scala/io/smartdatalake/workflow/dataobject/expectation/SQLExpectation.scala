@@ -30,6 +30,32 @@ import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.Expe
 /**
  * Definition of expectation based on a SQL aggregate expression to evaluate on dataset-level.
  *
+ * This is the most generic [[Expectation]]: any SQL aggregate function supported by the calculation engine can be used.
+ * Its result is recorded as a metric named after the expectation, and validated against `expectation` if that is defined.
+ * Use it when none of the specialized expectations like [[SQLFractionExpectation]] or [[UniqueKeyExpectation]] fits.
+ * If the aggregate cannot be expressed as a single expression, use [[SQLQueryExpectation]] instead.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-departures {
+ *     type = ParquetFileDataObject
+ *     path = "~{env.basedir}/int_departures"
+ *     expectations = [{
+ *       type = SQLExpectation
+ *       name = "avgRatingGt1"
+ *       description = "avg rating should be bigger than 1"
+ *       aggExpression = "avg(rating)"
+ *       expectation = "> 1"
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note The expression is evaluated as a DataFrame observation for the default `scope = Job`, so it must be a valid
+ *       aggregate expression over the columns of the DataObject.
+ * @see [[SQLFractionExpectation]]
+ * @see [[SQLQueryExpectation]]
  * @param aggExpression SQL aggregate expression to evaluate on dataset, e.g. count(*).
  * @param expectation Optional SQL comparison operator and literal to define expected value for validation, e.g. '= 0".
  *                    Together with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.

@@ -46,6 +46,31 @@ import scala.util.{Failure, Success, Try}
  * -> user/pwd authentication: user and password is taken from two variables set as parameters.
  *                             These variables could come from clear text (CLEAR), a file (FILE) or an environment variable (ENV)
  *
+ * Host, port and credentials are not configured here but in the referenced [[SFtpFileRefConnection]], so that they can
+ * be shared between multiple DataObjects. Files are only referenced, not parsed - use a FileTransferAction to copy
+ * them to/from another FileRefDataObject.
+ *
+ * Example:
+ * {{{
+ * connections = {
+ *   sftp-src {
+ *     type = SFtpFileRefConnection
+ *     host = "sftp.example.com"
+ *     authMode = { type = BasicAuthMode, user = "###ENV#SFTP_USER###", password = "###ENV#SFTP_PWD###" }
+ *   }
+ * }
+ * dataObjects = {
+ *   ext-airports {
+ *     type = SFtpFileRefDataObject
+ *     path = "/data/airports"
+ *     connectionId = sftp-src
+ *     partitions = [year]
+ *     partitionLayout = "%year%/"
+ *   }
+ * }
+ * }}}
+ *
+ * @param connectionId id of the [[SFtpFileRefConnection]] defining host, port and authentication mode
  * @param partitionLayout partition layout defines how partition values can be extracted from the path.
  *                        Use "%<colname>%" as token to extract the value for a partition column.
  *                        As partition layout extracts partition from the path of individual files, it can also be used to extract partitions from the file name.

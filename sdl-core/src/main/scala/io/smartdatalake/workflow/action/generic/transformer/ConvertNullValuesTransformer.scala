@@ -26,7 +26,35 @@ import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSimpleDataT
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**
- * Convert null values in a dataframe
+ * Replace null values in a DataFrame by a configurable placeholder value, so that downstream joins,
+ * comparisons and primary keys do not have to deal with nulls.
+ * String columns are filled with `valueForString` and numeric columns with `valueForNumber`; in both cases
+ * the placeholder is cast to the data type of the column. Columns of any other data type (date, timestamp,
+ * boolean, struct, array, ...) are left untouched.
+ *
+ * By default all columns of the DataFrame are converted. Limit the scope with either `includeColumns` or
+ * `excludeColumns` - the two are mutually exclusive and configuring both fails the transformation.
+ * All column names listed must exist in the DataFrame, otherwise the transformation fails.
+ * Column names are matched case-insensitively, unless case sensitivity is enabled globally by setting
+ * `global.environment.caseSensitive = true`.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   load-ratings {
+ *     type = CopyAction
+ *     inputId = stg-ratings
+ *     outputId = int-ratings
+ *     transformers = [{
+ *       type = ConvertNullValuesTransformer
+ *       excludeColumns = [comment]
+ *       valueForString = "n/a"
+ *       valueForNumber = 0
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param name              Name of the transformer
  * @param description       Optional description of the transformer
  * @param includeColumns   Optional list of columns to include into the transformation

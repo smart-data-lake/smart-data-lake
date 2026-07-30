@@ -40,6 +40,31 @@ import java.sql.{Connection => SqlConnection, DatabaseMetaData, DriverManager, R
  * Connection information for JDBC tables. If authentication is needed, user and password must be
  * provided.
  *
+ * It holds url, driver and credentials shared by all JdbcTableDataObjects referencing it through `connectionId`,
+ * and maintains a small JDBC connection pool which SDLB uses for metadata and DDL statements (checking table
+ * existence, creating tables, pre/postSQL, constraints). Note that Spark opens its own connections for reading
+ * and writing data, so `maxParallelConnections` limits SDLB's own connections only. A database specific
+ * [[JdbcCatalog]] is derived from `driver` to run catalog queries in the correct dialect.
+ *
+ * Example:
+ * {{{
+ * connections {
+ *   jdbc-dwh {
+ *     type = JdbcTableConnection
+ *     url = "jdbc:postgresql://dwh.example.com:5432/dwh"
+ *     driver = "org.postgresql.Driver"
+ *     db = "public"
+ *     authMode = {
+ *       type = BasicAuthMode
+ *       user = "###ENV#JDBC_USER###"
+ *       password = "###ENV#JDBC_PASSWORD###"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note the JDBC driver named in `driver` must be on the classpath; only BasicAuthMode is supported as authMode.
+ *
  * @param id
  *   unique id of this connection
  * @param url
@@ -65,6 +90,9 @@ import java.sql.{Connection => SqlConnection, DatabaseMetaData, DriverManager, R
  *   will write data first into a temporary table, and then use a "DELETE" + "INSERT INTO SELECT"
  *   statement to overwrite data in the target table within one transaction. Also note that
  *   SDLSaveMode.Merge always creates a temporary table.
+ * @param connectionPool
+ *   fine tuning of the JDBC connection pool used by SDLB, see [[ConnectionPoolConfig]], e.g. idle timeout and
+ *   connection validation. Default is [[ConnectionPoolConfig]] with its default values.
  */
 case class JdbcTableConnection(
     override val id: ConnectionId,

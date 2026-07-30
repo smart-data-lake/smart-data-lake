@@ -29,9 +29,31 @@ import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
 
 /**
  * Execution mode to create custom partition execution mode logic.
+ * Implement trait [[CustomPartitionModeLogic]] in a class on the classpath and reference it by `className`.
+ * The implementation receives the main input & output DataObject together with the given partition values and
+ * returns the partition values to process as `Seq[Map[String,String]]`.
+ * Use this if the partition selection of [[PartitionDiffMode]] is not sufficient, e.g. if you need to reprocess
+ * the last n partitions or select partitions by an external trigger table.
+ * Both main input and main output DataObject must support partitions (CanHandlePartitions), otherwise the action fails.
  *
- * Define a function which receives main input&output DataObject and returns partition values to process as `Seq[Map[String,String]]`
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     executionMode = {
+ *       type = CustomPartitionMode
+ *       className = "com.company.dataPipeline.SelectLastDaysPartitionMode"
+ *       options = { nbOfDays = "3" }
+ *     }
+ *   }
+ * }
+ * }}}
  *
+ * @see [[PartitionDiffMode]] for the built-in partition comparison, [[CustomMode]] for full control over the
+ *      [[ExecutionModeResult]].
  * @param className           class name implementing trait [[CustomPartitionModeLogic]]
  * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
  *                            It can be used to ensure processing all partitions over multiple actions in case of errors.

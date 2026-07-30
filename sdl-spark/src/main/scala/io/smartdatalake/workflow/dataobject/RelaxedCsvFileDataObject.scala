@@ -58,6 +58,20 @@ import scala.reflect.runtime.universe.typeOf
  * CSV files are read by Spark as whole text files and then parsed manually with Sparks CSV parser class. You can therefore use the
  * normal CSV options of spark, but some properties are fixed, e.g. header=true, inferSchema=false, enforceSchema (ignored).
  *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   stg-airports {
+ *     type = RelaxedCsvFileDataObject
+ *     path = "~{env.basedir}/stg_airports"
+ *     schema = "ident string, name string, elevation_ft integer, _corrupt_record string, _corrupt_record_msg string"
+ *     csvOptions { delimiter = ";" }
+ *     treatMissingColumnsAsCorrupt = true
+ *     treatSuperfluousColumnsAsCorrupt = true
+ *   }
+ * }
+ * }}}
+ *
  * @note This data object sets the following default values for `csvOptions`: delimiter = ",", quote = null
  *       All other `csvOption` default to the values defined by Apache Spark.
  * @see [[org.apache.spark.sql.DataFrameReader]]
@@ -67,7 +81,9 @@ import scala.reflect.runtime.universe.typeOf
  * RelaxCsvFileDataObject also supports getting an error msg by adding "<options.columnNameOfCorruptRecord>_msg" as field to the schema.
  *
  * @param csvOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
- * @param dateColumnType Specifies the string format used for writing date typed data.
+ * @param dateColumnType how to convert columns of Spark type date before writing (default: date). With `date` they are
+ *                       cast to timestamp, with `string` they are cast to string.
+ *                       See [[io.smartdatalake.definitions.DateColumnType]].
  * @param treatMissingColumnsAsCorrupt If set to true records from files with missing columns in its header are treated as corrupt (default=false).
  *                                   Corrupt records are handled according to options.mode (default=permissive).
  * @param treatSuperfluousColumnsAsCorrupt If set to true records from files with superfluous columns in its header are treated as corrupt (default=false).

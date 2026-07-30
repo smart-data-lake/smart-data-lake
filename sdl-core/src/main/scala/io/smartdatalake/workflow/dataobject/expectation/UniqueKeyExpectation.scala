@@ -35,6 +35,29 @@ import io.smartdatalake.workflow.dataobject.generic.TableDataObject
  * Uniqueness is calculated as the fraction of output count distinct on key columns over output count.
  * It supports scope Job and All, but not JobPartition.
  *
+ * Use it to assert that a primary key or business key has no duplicates. If `key` is left empty, the
+ * `table.primaryKey` of the DataObject is used, which requires the DataObject to be a `TableDataObject`
+ * with a primary key defined. Set `scope = All` to check uniqueness over the whole table instead of only
+ * the records written by the current job.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-airports {
+ *     type = DeltaLakeTableDataObject
+ *     path = "~{env.basedir}/int_airports"
+ *     table = { db = "default", name = "int_airports", primaryKey = [ident] }
+ *     expectations = [{
+ *       type = UniqueKeyExpectation
+ *       name = "primaryKeyTest"
+ *       scope = All
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note `scope = JobPartition` is not supported and fails on initialization.
+ *       The fraction is rounded down (floor), so any duplicate is detected aggressively.
  * @param key Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present.
  * @param expectation Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.
  *                    Together with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.

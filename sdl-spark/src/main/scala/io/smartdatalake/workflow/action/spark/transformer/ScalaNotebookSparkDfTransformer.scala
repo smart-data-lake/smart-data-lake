@@ -43,6 +43,32 @@ import scala.util.{Failure, Success}
  * map of options and has to return a DataFrame, see also ([[fnTransformType]]). Notebook-cells
  * starting with "//!IGNORE" will be ignored.
  *
+ * Use this transformer to move a transformation prototyped interactively in a notebook into a pipeline
+ * without copying the code: SDLB downloads the notebook from `url`, concatenates all Scala code cells
+ * and compiles the function named `functionName`. Cells containing only exploratory code (test data,
+ * `show()` calls) should be marked with a leading "//!IGNORE" comment so they are skipped.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   increment-rating {
+ *     type = CopyAction
+ *     inputId = src1DO
+ *     outputId = tgt1DO
+ *     transformers = [{
+ *       type = ScalaNotebookSparkDfTransformer
+ *       url = "http://my-notebook-server:8192/notebook/Test.ipynb?download=true"
+ *       functionName = testTransform
+ *       authMode = { type = BasicAuthMode, user = "notebook-user", password = "###ENV#NOTEBOOK_PWD###" }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note The notebook is downloaded on every job start, so the pipeline result depends on the current
+ *       notebook content. Prefer [[ScalaCodeSparkDfTransformer]] or [[ScalaClassSparkDsTransformer]]
+ *       for reproducible production pipelines.
+ *
  * @param name
  *   name of the transformer
  * @param description

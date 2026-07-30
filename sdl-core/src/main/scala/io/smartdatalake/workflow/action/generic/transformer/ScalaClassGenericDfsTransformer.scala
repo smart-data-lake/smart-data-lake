@@ -32,6 +32,27 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * Define a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and as
  * to return a map of output DataObjectIds with DataFrames, see also trait [[CustomGenericDfsTransformer]].
  *
+ * Use this transformer inside a [[io.smartdatalake.workflow.action.CustomDataFrameAction]] whenever a join, union or
+ * fan-out is easier to implement in Scala/Java than in SQL. The class is instantiated by reflection through its
+ * no-argument constructor and must be on the classpath of the SDLB job. If this is the last transformer of the chain,
+ * the returned map must contain an entry for every outputId of the Action.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   join-departures-airports {
+ *     type = CustomDataFrameAction
+ *     inputIds = [stg-departures, int-airports]
+ *     outputIds = [btl-departures-airports]
+ *     transformers = [{
+ *       type = ScalaClassGenericDfsTransformer
+ *       className = com.sample.MyJoinTransformer
+ *       options = { joinType = "left" }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param className      class name implementing trait [[CustomGenericDfsTransformer]]

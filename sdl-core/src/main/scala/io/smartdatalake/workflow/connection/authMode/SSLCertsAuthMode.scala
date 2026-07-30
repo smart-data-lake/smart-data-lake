@@ -26,6 +26,37 @@ import io.smartdatalake.util.secrets.StringOrSecret
  * Authenticate using SSL Certificates.
  *
  * Configuration needed are a Java keystore and truststore.
+ *
+ * Sets Kafka `security.protocol=SSL` and configures mutual TLS: the keystore holds the client certificate and
+ * private key presented to the broker, the truststore holds the CA certificate used to verify the broker.
+ * Pick this over [[SASLSCRAMAuthMode]] if the broker authenticates clients by certificate instead of
+ * user/password. Currently supported by KafkaConnection only.
+ *
+ * Example:
+ * {{{
+ * connections = {
+ *   kafka-con {
+ *     type = KafkaConnection
+ *     brokers = "kafka-broker-1:9093,kafka-broker-2:9093"
+ *     authMode = {
+ *       type = SSLCertsAuthMode
+ *       keystorePath = "/etc/kafka/secrets/kafka.keystore.jks"
+ *       keystorePass = "###ENV#KAFKA_KEYSTORE_PWD###"
+ *       truststorePath = "/etc/kafka/secrets/kafka.truststore.jks"
+ *       truststorePass = "###ENV#KAFKA_TRUSTSTORE_PWD###"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @param keystorePath   path to the Java keystore containing the client certificate and private key
+ * @param keystoreType   type of the keystore, e.g. "JKS" or "PKCS12" (default: "JKS")
+ * @param keystorePass   password of the keystore (supports secret providers). Although declared optional for
+ *                       configuration parsing, it must be defined, otherwise a ConfigurationException is thrown.
+ * @param truststorePath path to the Java truststore containing the CA certificate of the server
+ * @param truststoreType type of the truststore, e.g. "JKS" or "PKCS12" (default: "JKS")
+ * @param truststorePass password of the truststore (supports secret providers). Although declared optional for
+ *                       configuration parsing, it must be defined, otherwise a ConfigurationException is thrown.
  */
 case class SSLCertsAuthMode(
     keystorePath: String,

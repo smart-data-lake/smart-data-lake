@@ -28,8 +28,33 @@ import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import org.apache.spark.sql.DataFrame
 
 /**
- * Repartition DataFrame
- * For detailled description about repartitioning DataFrames see also [[SparkRepartitionDef]]
+ * Repartition a Spark DataFrame in the middle of a transformation chain, controlling how many Spark
+ * tasks - and therefore how many output files per partition value - the following steps work with.
+ * Use it to avoid the small-files problem when writing many small partitions, or to increase
+ * parallelism before an expensive transformation. Repartitioning triggers a shuffle, so apply it
+ * deliberately.
+ *
+ * For a detailled description about repartitioning DataFrames see also [[SparkRepartitionDef]].
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-departures {
+ *     type = CopyAction
+ *     inputId = stg-departures
+ *     outputId = int-departures
+ *     transformers = [{
+ *       type = SparkRepartitionTransformer
+ *       numberOfTasksPerPartition = 10
+ *       keyCols = [icao24]
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note If the output DataObject already defines `sparkRepartition`, prefer configuring it there;
+ *       this transformer is for repartitioning between transformation steps.
+ *
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
  * @param numberOfTasksPerPartition Number of Spark tasks to create per partition value by repartitioning the DataFrame.

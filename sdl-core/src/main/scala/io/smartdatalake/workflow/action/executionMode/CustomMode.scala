@@ -27,9 +27,32 @@ import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
 
 /**
- * Execution mode to create custom execution mode logic.
- * Define a function which receives main input&output DataObject and returns execution mode result
+ * Execution mode to create custom execution mode logic in Scala/Java code.
+ * Implement trait [[CustomModeLogic]] in a class on the classpath and reference it by `className`.
+ * The implementation receives the main input & output DataObject together with the given partition values and
+ * returns an [[ExecutionModeResult]], so it can freely select partition values, a data filter or file references.
+ * Use this only if none of the built-in modes ([[PartitionDiffMode]], [[DataFrameIncrementalMode]],
+ * [[CustomPartitionMode]], ...) fits your selection logic.
  *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     executionMode = {
+ *       type = CustomMode
+ *       className = "com.company.dataPipeline.SelectLatestPartitionMode"
+ *       options = { lookbackDays = "7" }
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note Deprecated since 2.8.2. Implement [[ExecutionMode]] directly and use your class name as `type` in the
+ *       configuration instead.
+ * @see [[CustomPartitionMode]] for the variant which only selects partition values.
  * @param className           class name implementing trait [[CustomModeLogic]]
  * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
  *                            It can be used to ensure processing over multiple actions in case of errors.

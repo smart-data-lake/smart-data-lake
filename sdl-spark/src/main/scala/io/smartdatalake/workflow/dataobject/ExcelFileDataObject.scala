@@ -53,6 +53,25 @@ import org.apache.spark.sql.DataFrame
  * (excluding the first).
  * When no schema is provided and `inferSchema` is disabled, all columns are assumed to be of string type.
  *
+ * Column names read from the header are cleaned up on read: blanks, dashes and dots become underscores, all other
+ * non-alphanumeric characters are dropped and camel case is converted to lower case with underscores.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-airports {
+ *     type = ExcelFileDataObject
+ *     path = "~{env.basedir}/ext_airports"
+ *     excelOptions {
+ *       sheetName = "airports"
+ *       maxRowsInMemory = 20000
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note The Excel data source cannot read a whole directory at once, so files are read one by one.
+ *       `numLinesToSkip` and `startColumn` are read-only options and must not be set when writing.
  * @param excelOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
  */
 case class ExcelFileDataObject(override val id: DataObjectId,

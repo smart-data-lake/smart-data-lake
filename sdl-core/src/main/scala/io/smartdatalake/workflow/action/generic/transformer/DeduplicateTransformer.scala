@@ -33,6 +33,26 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  *
  * If primaryKeyColumns is left empty, the primaryKey of the Actions output DataObject must be defined.
  *
+ * With a rankingExpression the record with the largest value of that expression is kept per primary key
+ * (the ranking is applied in descending order), which is the usual way to keep the most recent version of
+ * a record. Without it an arbitrary record per primary key is kept.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   dedup-ratings {
+ *     type = CopyAction
+ *     inputId = stg-ratings
+ *     outputId = int-ratings
+ *     transformers = [{
+ *       type = DeduplicateTransformer
+ *       primaryKeyColumns = [id]
+ *       rankingExpression = "coalesce(updated_at, created_at)"
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param name              Name of the transformer
  * @param description       Optional description of the transformer
  * @param rankingExpression Optional ranking expression to choose the record to keep if there are duplicates.

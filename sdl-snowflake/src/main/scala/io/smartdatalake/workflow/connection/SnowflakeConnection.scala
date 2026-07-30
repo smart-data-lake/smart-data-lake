@@ -37,6 +37,30 @@ import java.sql.{Connection => SqlConnection}
  * The connection can be used for SnowflakeTableDataObjects
  * If multiple SnowflakeTableDataObjects share a connection, they share the same Snowpark session
  *
+ * Beside the Snowpark session it also maintains a JDBC connection pool used for metadata and DDL queries
+ * (e.g. checking table existence, pre/postSQL). The schema is not part of the connection - it is taken from
+ * `table.db` of the referencing SnowflakeTableDataObject, so one connection can serve multiple schemas.
+ * Authentication is supported with BasicAuthMode (user/password) or OAuthMode; any other AuthMode is rejected
+ * on instantiation.
+ *
+ * Example:
+ * {{{
+ * connections {
+ *   sfCon {
+ *     type = SnowflakeConnection
+ *     url = "https://myaccount.snowflakecomputing.com"
+ *     warehouse = "COMPUTE_WH"
+ *     database = "TEST_DB"
+ *     role = "SDLB_ROLE"
+ *     authMode = {
+ *       type = BasicAuthMode
+ *       user = "###ENV#SNOWFLAKE_USER###"
+ *       password = "###ENV#SNOWFLAKE_PASSWORD###"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
  * @param id        unique id of this connection
  * @param url       Snowflake connection url
  * @param warehouse Snowflake namespace
@@ -45,7 +69,6 @@ import java.sql.{Connection => SqlConnection}
  * @param authMode  optional authentication information: for now BasicAuthMode is supported.
  * @param proxy     optional HTTP Proxy for Snowflake connection (Jdbc & Snowpark)
  * @param sparkOptions Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options.
- * @param metadata  Connection metadata
  */
 case class SnowflakeConnection(override val id: ConnectionId,
                                url: String,

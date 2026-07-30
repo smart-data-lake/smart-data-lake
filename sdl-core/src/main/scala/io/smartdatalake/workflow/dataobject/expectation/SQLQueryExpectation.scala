@@ -35,6 +35,29 @@ import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.Expe
  * The SQL query will be evaluated in a separate Spark job against the DataFrame.
  * It supports scope Job and All, but not JobPartition.
  *
+ * Use it when the check cannot be written as a single aggregate expression, e.g. because it needs a subquery,
+ * a `group by ... having`, or a join. Note that this costs an additional Spark job over the data, so prefer
+ * [[SQLExpectation]] whenever a plain aggregate expression is sufficient.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-departures {
+ *     type = ParquetFileDataObject
+ *     path = "~{env.basedir}/int_departures"
+ *     expectations = [{
+ *       type = SQLQueryExpectation
+ *       name = "countOfPartitionsWith1Record"
+ *       code = "select count(*) from (select lastname from %{inputViewName} group by lastname having count(*) = 1)"
+ *       scope = All
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note `scope = JobPartition` is not supported and fails on initialization.
+ * @see [[SQLExpectation]]
+ * @see [[SQLFractionExpectation]]
  * @param code a SQL query returning a single row. All column will be added as metrics.
  *             If there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.
  *             The special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query.

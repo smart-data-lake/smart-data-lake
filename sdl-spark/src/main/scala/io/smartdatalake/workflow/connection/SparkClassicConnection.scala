@@ -41,8 +41,33 @@ import scala.util.Try
 /**
  * Connection information for a classic Spark session.
  *
+ * This is the [[EngineConnection]] for the Spark DataFrame engine: it creates and configures the SparkSession
+ * shared by all Actions using it, including spark options, Kryo classes, Hive support and user defined functions.
+ * Actions select an engine connection with their `engineConnectionId` attribute; if none is given the connection
+ * with id `default-engine` is used (configurable through the SDLB parameter `defaultEngineConnectionId`).
+ * Leave `master` unset to attach to an existing Spark session provided by the environment (e.g. Databricks,
+ * EMR, spark-submit); set it (e.g. `local`, `yarn`) to let SDLB create the session itself.
+ *
+ * Example:
+ * {{{
+ * connections {
+ *   default-engine {
+ *     type = SparkClassicConnection
+ *     master = "local[*]"
+ *     enableHive = false
+ *     sparkOptions {
+ *       "spark.sql.shuffle.partitions" = "8"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note with `master = "yarn"` the environment variable SPARK_HOME must be set.
+ *
  * @param master
  *  master URL for the Spark session. If not set, it will try to get an existing Spark session from the environment.
+ * @param deployMode
+ *   Spark deploy mode ("client" or "cluster"), passed on to the Spark session builder as "deploy-mode" configuration.
  * @param enableHive
  *   enable hive for spark session
  * @param sparkOptions

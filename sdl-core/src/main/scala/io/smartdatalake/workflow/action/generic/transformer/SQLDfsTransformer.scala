@@ -44,6 +44,27 @@ import org.apache.hadoop.fs.Path
  * Note that you can access arbitrary tables from the metastore in the SQL code, but this is against the principle of SDLB
  * to access data through DataObjects. Accessing tables directly in SQL code has a negative impact on the maintainability of the project.
  *
+ * Use SQLDfsTransformer inside a [[io.smartdatalake.workflow.action.CustomDataFrameAction]] for joins, unions and
+ * fan-outs expressed in SQL. Either `code` or `files` must be non empty, and per output name only one of them may
+ * be defined. If this is the last transformer of the chain, its output names must match the Action's outputIds.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   join-departures-airports {
+ *     type = CustomDataFrameAction
+ *     inputIds = [stg-departures, int-airports]
+ *     outputIds = [btl-departures-airports]
+ *     transformers = [{
+ *       type = SQLDfsTransformer
+ *       code = {
+ *         btl-departures-airports = "select d.*, a.name from %{inputViewName_stg-departures} d join %{inputViewName_int-airports} a on d.estdepartureairport = a.ident"
+ *       }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param files          Map of output names to corresponding Files where SQL code for transformation is loaded from for transformation.

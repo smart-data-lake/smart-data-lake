@@ -40,6 +40,26 @@ import scala.reflect.runtime.universe.Type
  * DataFrame might be transformed using SQL or DataFrame transformations. Then the output
  * DataObjects writes the DataFrame to the output according to its definition.
  *
+ * CopyAction is the standard 1:1 Action. Use it whenever exactly one input should be written to
+ * exactly one output. Choose [[CustomDataFrameAction]] instead if you need multiple inputs or
+ * outputs, and [[FileTransferAction]] if the data should be moved byte-by-byte without being read
+ * into a DataFrame.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     transformers = [{
+ *       type = SQLDfTransformer
+ *       code = "select ident, name, latitude_deg, longitude_deg from %{inputViewName}"
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param inputId
  *   inputs DataObject
  * @param outputId

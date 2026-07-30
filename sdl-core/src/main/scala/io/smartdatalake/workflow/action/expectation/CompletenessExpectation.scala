@@ -31,7 +31,28 @@ import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, Expe
 
 /**
  * Definition of expectation on comparing count all records of input and output table.
- * Completness is calculated as the fraction of main output count-all over main input count-all.
+ * Completeness is calculated as the fraction of main output count-all over main input count-all.
+ *
+ * Use it to detect unintended record loss in an Action, e.g. rows dropped by a join or a filter.
+ * As it needs a main input and a main output to compare, it can only be configured as `expectations`
+ * of an Action (see [[ActionExpectation]]), not on a DataObject. The scope is fixed to the whole
+ * table, and the fraction is rounded down, so an incomplete result is detected aggressively.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   join-departures-airports {
+ *     type = CustomDataFrameAction
+ *     inputIds = [stg-departures, int-airports]
+ *     outputIds = [btl-departures-arrivals-airports]
+ *     mainInputId = stg-departures
+ *     expectations = [{
+ *       type = CompletenessExpectation
+ *       expectation = "> 0.95"
+ *     }]
+ *   }
+ * }
+ * }}}
  *
  * @param expectation Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1".
  *                    Together with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.

@@ -23,13 +23,33 @@ import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 
 /**
- * Connection information for DeltaLake tables
+ * Connection information for DeltaLake tables.
+ *
+ * It centralizes catalog, database and the base directory of the table files, so that DeltaLakeTableDataObjects
+ * referencing it through `connectionId` do not need to repeat them. Catalog and db of the DataObjects `table` are
+ * taken from this connection, and the DataObjects `path` is resolved relative to `pathPrefix`. This keeps
+ * environment specific storage locations out of the DataObject definitions.
+ *
+ * Example:
+ * {{{
+ * connections {
+ *   deltalake-int {
+ *     type = DeltaLakeTableConnection
+ *     db = "integration"
+ *     pathPrefix = "~{env.basedir}/deltalake"
+ *   }
+ * }
+ * }}}
+ *
+ * @note the database given in `db` must already exist; SDLB does not create it.
  *
  * @param id unique id of this connection
  * @param catalog optional catalog to be used for this connection
  * @param db hive db
  * @param pathPrefix schema, authority and base path for tables directory on hadoop
- * @param metadata
+ * @param checkDeltaLakeSparkOptions if true (default) it is verified on prepare that the Spark session registers
+ *                                   `io.delta.sql.DeltaSparkSessionExtension` in `spark.sql.extensions`.
+ *                                   Set to false to skip this check. The check is skipped automatically on Databricks.
  */
 case class DeltaLakeTableConnection(override val id: ConnectionId,
                                     catalog: Option[String] = None,

@@ -28,6 +28,30 @@ import java.util.Base64
  * Authenticate using basic user/pwd authentication.
  *
  * For http connection this will create a basic authentication header.
+ *
+ * This is the most commonly used authentication mode. It is the only AuthMode supported by JdbcTableConnection and
+ * DebeziumConnection, and one of the supported modes of SFtpFileRefConnection, SnowflakeConnection and HTTP based
+ * DataObjects. Note that no connection falls back to it implicitly - authMode has to be configured explicitly.
+ * Both user and password support secret providers, so credentials do not have to be stored in clear text in the
+ * configuration.
+ *
+ * Example:
+ * {{{
+ * connections = {
+ *   sftp-src {
+ *     type = SFtpFileRefConnection
+ *     host = "sftp.example.com"
+ *     authMode = {
+ *       type = BasicAuthMode
+ *       user = "###ENV#SFTP_USER###"
+ *       password = "###ENV#SFTP_PWD###"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @param user     user to login with (supports secret providers, e.g. "###ENV#SFTP_USER###")
+ * @param password password to login with (supports secret providers)
  */
 case class BasicAuthMode(
     private val user: StringOrSecret,

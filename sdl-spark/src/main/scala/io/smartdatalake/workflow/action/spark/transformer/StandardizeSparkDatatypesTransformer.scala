@@ -28,7 +28,28 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * Standardize datatypes of a Spark-DataFrame.
- * Current implementation converts all decimal datatypes to a corresponding integral or float datatype
+ * Current implementation converts all decimal datatypes to a corresponding integral or float datatype.
+ *
+ * Decimal columns are common when reading from JDBC sources or Parquet files written by other tools, but
+ * they are inconvenient downstream: they compare and serialize differently and often carry an unnecessarily
+ * wide precision. Adding this transformer as the first entry of a transformation chain gives all Actions a
+ * uniform, narrow numeric type per column without listing columns explicitly. The transformer takes no
+ * configuration attributes beyond the common `name`/`description`.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-departures {
+ *     type = CopyAction
+ *     inputId = stg-departures
+ *     outputId = int-departures
+ *     transformers = [{ type = StandardizeSparkDatatypesTransformer }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note The conversion is lossy if a decimal column holds values that do not fit the derived integral or
+ *       float type; check precision and scale of the source schema before enabling it.
  *
  * @param name         name of the transformer
  * @param description  Optional description of the transformer

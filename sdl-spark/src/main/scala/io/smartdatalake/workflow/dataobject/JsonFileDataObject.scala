@@ -40,6 +40,21 @@ import org.apache.spark.sql.DataFrame
  * Reading and writing details are delegated to Apache Spark [[org.apache.spark.sql.DataFrameReader]]
  * and [[org.apache.spark.sql.DataFrameWriter]] respectively.
  *
+ * Use this DataObject for semi-structured, nested data. As JSON carries no fixed schema, Spark infers it from the data
+ * unless an explicit `schema` is configured - configuring a schema is recommended for stable pipelines.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   stg-airports {
+ *     type = JsonFileDataObject
+ *     path = "~{env.basedir}/stg_airports"
+ *     jsonOptions { multiLine = false }
+ *     saveMode = Overwrite
+ *   }
+ * }
+ * }}}
+ *
  * @param stringify Set the data type for all values to string. Use action/transformers instead.
  * @param jsonOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
  *                    [[org.apache.spark.sql.DataFrameWriter]].

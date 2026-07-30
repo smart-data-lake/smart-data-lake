@@ -34,6 +34,29 @@ import java.nio.file.{FileSystems, Paths}
  * - 'dockerParam' will be added as parameter for the docker command, e.g. before the image name in the docker run command, sorted by their key.
  * This allows to customize execution behaviour through Actions or DataObjects using CmdScript.
  *
+ * A typical use case is launching an Airbyte connector image with AirbyteDataObject, but it can be used wherever a
+ * script definition is expected, e.g. in the `scripts` attribute of a CustomScriptAction.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-postgres {
+ *     type = AirbyteDataObject
+ *     streamName = "airports"
+ *     cmd = {
+ *       type = DockerRunScript
+ *       image = "airbyte/source-postgres:1.0.17"
+ *       localDataDirToMount = "data"
+ *     }
+ *     # the entries of config are connector specific, see the documentation of the connector used
+ *     config = { host = "localhost", port = 5432, database = "airports", username = "sdlb", password = "###" }
+ *   }
+ * }
+ * }}}
+ *
+ * @note Docker must be installed and callable on the machine running the SDLB job (the driver). The container runs
+ *       locally, it is not distributed to Spark executors.
+ * @see [[CmdScript]] to execute a plain command line instead.
  * @param name                name of the transformer
  * @param description         Optional description of the transformer
  * @param image               Docker image to run

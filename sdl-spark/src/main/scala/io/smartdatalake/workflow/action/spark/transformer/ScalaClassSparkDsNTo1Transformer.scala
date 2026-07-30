@@ -44,8 +44,31 @@ import scala.reflect.runtime.universe.typeOf
  * Define a transform function that receives a SparkSession, a map of options and as many DataSets as you want, and that has to return one Dataset.
  * The Java/Scala class has to implement interface [[CustomDsNto1Transformer]].
  *
+ * Compared to [[ScalaClassSparkDfsTransformer]] the input DataFrames are converted to typed Datasets of your case
+ * classes, so the transform method is checked against the input schemas and reads like normal Scala code. Each Dataset
+ * parameter is matched to an input by parameter name, or by the order of the Actions `inputIds` when
+ * `parameterResolution = DataObjectOrdering`. Matching by name compares case-insensitive and without `-` and `_`, and a
+ * leading lowercase `ds` is stripped from the parameter name beforehand (so `dsAirports` matches input `airports`, but
+ * `DsAirports` does not). Note that the transformer name is fixed to `className` and cannot be configured.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   double_rating {
+ *     type = CustomDataFrameAction
+ *     inputIds = [src1Ds, src2Ds]
+ *     outputIds = [tgt1Ds]
+ *     transformers = [{
+ *       type = ScalaClassSparkDsNTo1Transformer
+ *       className = com.sample.transformer.DoubleRatingDs2To1Transformer
+ *       parameterResolution = DataObjectOrdering
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param description                Optional description of the transformer
- * @param className                  Class name implementing trait [[CustomDfsTransformer]]
+ * @param className                  Class name implementing trait [[CustomDsNto1Transformer]]
  * @param options                    Options to pass to the transformation
  * @param runtimeOptions             Optional tuples of [key, spark SQL expression] to be added as additional options when executing transformation.
  *                                   The spark SQL expressions are evaluated against an instance of [[DefaultExpressionData]].

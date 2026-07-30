@@ -43,6 +43,24 @@ import org.apache.spark.sql.DataFrame
  * and [[org.apache.spark.sql.DataFrameWriter]] respectively. The reader and writer implementations are provided by
  * the [[https://github.com/databricks/spark-avro databricks spark-avro]] project.
  *
+ * Avro files carry their own schema. If the `schema` attribute is defined, it is not pushed to the reader but applied
+ * afterwards to select and cast the content to the target schema.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   stg-airports {
+ *     type = AvroFileDataObject
+ *     path = "~{env.basedir}/stg_airports"
+ *     partitions = [dt]
+ *     saveMode = Append
+ *     avroOptions {
+ *       compression = "snappy"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
  * @param avroOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
  *                    [[org.apache.spark.sql.DataFrameWriter]].
  *

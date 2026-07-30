@@ -34,13 +34,33 @@ import scala.collection.mutable
  * If return value is not zero an exception is thrown.
  *
  * Note about internal implementation: on execution value of parameter map entries where key starts with
- * - 'param' will be added as parameter after the docker run command, sorted by key.
+ * - 'param' will be added as parameter after the command, sorted by key.
  * This allows to customize execution behaviour through Actions or DataObjects using CmdScript.
  *
+ * Example:
+ * {{{
+ * actions = {
+ *   export-airports {
+ *     type = CustomScriptAction
+ *     inputIds = [int-airports]
+ *     outputIds = [ext-airports]
+ *     scripts = [{
+ *       type = CmdScript
+ *       linuxCmd = "sh ./scripts/export_airports.sh"
+ *       winCmd = "wsl sh ./scripts/export_airports.sh"
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note Only the command for the current operating system needs to be defined, but the job will fail on startup
+ *       if the command for the operating system it is running on is missing.
+ * @see [[DockerRunScript]] to run the command inside a docker container instead.
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
  * @param winCmd       Cmd to execute on Windows operating systems - note that it is executed with "cmd /C" prefixed
- * @param linuxCmd     Cmd to execute on Linux operating systems - note that it is executed with "sh -c" prefixed.
+ * @param linuxCmd     Cmd to execute on Linux operating systems - note that it is executed directly and not through a
+ *                     shell, so an interpreter must be part of the command if needed, e.g. "sh ./scripts/export.sh".
  */
 case class CmdScript(override val name: String = "cmd", override val description: Option[String] = None, winCmd: Option[String] = None, linuxCmd: Option[String] = None) extends CmdScriptBase {
   if (EnvironmentUtil.isWindowsOS) assert(winCmd.isDefined, s"($name) winCmd must be defined when running on Windows")

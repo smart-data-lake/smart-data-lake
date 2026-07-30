@@ -29,6 +29,33 @@ import io.smartdatalake.workflow.dataframe.GenericDataFrame
  * A Transformer to use single DataFrame Transformers as multiple DataFrame Transformers.
  * This works by selecting the SubFeeds (DataFrames) the single DataFrame Transformer should be applied to.
  * All other SubFeeds will be passed through without transformation.
+ * Use it in Actions working on many DataFrames at once, like CustomDataFrameAction, to reuse a
+ * one-DataFrame transformer such as [[FilterTransformer]], [[BlacklistTransformer]] or
+ * [[DebugTransformer]] there. The transformation is applied to each selected SubFeed separately.
+ * The name and description of this transformer are taken over from the wrapped transformer.
+ * The Action fails if a name in `subFeedsToApply` does not match one of the SubFeeds handed to this transformer.
+ * These are the input DataObject ids if this is the first transformer of the chain, otherwise the output names
+ * of the preceding transformer.
+ *
+ * Example: filter one of the input SubFeeds before joining them with a SQL transformation.
+ * {{{
+ * actions = {
+ *   join-ratings {
+ *     type = CustomDataFrameAction
+ *     inputIds = [stg-ratings, stg-airports]
+ *     outputIds = [int-ratings]
+ *     transformers = [{
+ *       type = DfTransformerWrapperDfsTransformer
+ *       subFeedsToApply = [stg-ratings]
+ *       transformer = { type = FilterTransformer, filterClause = "rating is not null" }
+ *     },{
+ *       type = SQLDfsTransformer
+ *       code = { int-ratings = "select * from %{inputViewName_stg-ratings} join %{inputViewName_stg-airports} using (airport_id)" }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param transformer Configuration for a GenericDfTransformerDef to be applied
  * @param subFeedsToApply Names of SubFeeds the transformation should be applied to. Default is an empty list,
  *                        which will apply the transformation to all subfeeds.

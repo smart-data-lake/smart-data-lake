@@ -24,30 +24,41 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 
 /**
- * Connection information for debezium connection
+ * Connection information for a Debezium change-data-capture (CDC) source database.
+ *
+ * It describes the source database server which the embedded Debezium engine connects to in order to read its
+ * transaction log. Use it together with `DebeziumCdcDataObject` to stream inserts/updates/deletes out of an
+ * operational database instead of repeatedly reading full tables over JDBC. The Debezium connector class is
+ * derived from `dbEngine` when the connector properties are assembled, e.g. when a `DebeziumCdcDataObject`
+ * starts reading. The connector must then be on the classpath, otherwise a `ClassNotFoundException` is thrown -
+ * add the corresponding optional maven dependency of the sdl-debezium module (e.g.
+ * `io.debezium:debezium-connector-postgres` for postgresql, `io.smartdatalake:debezium-connector-mysql-shaded`
+ * for mysql).
+ *
+ * Example:
+ * {{{
+ * connections {
+ *   dbzCon {
+ *     type = DebeziumConnection
+ *     dbEngine = "postgresql"
+ *     hostname = "localhost"
+ *     port = 5432
+ *     db = "test"
+ *     authMode = {
+ *       type = BasicAuthMode
+ *       user = "###ENV#POSTGRES_USER###"
+ *       password = "###ENV#POSTGRES_PW###"
+ *     }
+ *   }
+ * }
+ * }}}
  *
  * @param id unique id of this connection
- * @param dbEngine what database engine to use, currently supported engines: mysql, postgresql, oracle, mariadb, mongodb, sqlserver, db2, vitess, spanner
+ * @param dbEngine what database engine to use, currently supported engines: mysql, postgresql, oracle, mariadb, sqlserver, db2.
  * @param hostname database server
- * @param db database to read data from
- * @param port
+ * @param db database to read data from. Optional, as some engines (e.g. mysql) do not need it.
+ * @param port port the database server listens on, e.g. 5432 for postgresql
  * @param authMode authentication information: for now BasicAuthMode is supported.
- * @param metadata optional connection metadata
- *
- *  Example config:
- *
- *  dbzCon {
- *  type = DebeziumConnection
- *  dbEngine = "postgresql"
- *  hostname = "localhost"
- *  db = "test"
- *  port = 5432
- *  authMode {
- *    type = BasicAuthMode
- *    userVariable = "ENV#POSTGRES_USER"
- *    passwordVariable  = "ENV#POSTGRES_PW"
- *   }
- *  }
  */
 case class DebeziumConnection(override val id: ConnectionId,
                               dbEngine: String,

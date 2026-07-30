@@ -37,6 +37,35 @@ import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
  *
  * By specifying customFormat, binary or text files can read with Spark.
  *
+ * Use this DataObject to move files around without interpreting their content, e.g. with a FileTransferAction, or to
+ * ingest formats SDLB has no dedicated DataObject for. Without customFormat this DataObject can only be used by
+ * file based Actions; reading or writing it with Spark then fails with a configuration exception.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   stg-documents {
+ *     type = RawFileDataObject
+ *     path = "~{env.basedir}/stg_documents"
+ *     customFormat = binaryFile
+ *     partitions = [year]
+ *   }
+ * }
+ * }}}
+ *
+ * Note that customPartitionLayout is only supported by file based Actions, not by Spark:
+ * {{{
+ * dataObjects = {
+ *   stg-documents-files {
+ *     type = RawFileDataObject
+ *     path = "~{env.basedir}/stg_documents"
+ *     fileName = "*.pdf"
+ *     partitions = [year]
+ *     customPartitionLayout = "%year%/"
+ *   }
+ * }
+ * }}}
+ *
  * @param customFormat Custom Spark data source format, e.g. binaryFile or text.
  *                     Only needed if you want to read/write this DataObject with Spark.
  * @param customPartitionLayout Define a different partition layout than the default Hadoop directory partitioning.

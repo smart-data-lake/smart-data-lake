@@ -27,7 +27,33 @@ import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**
- * Apply a column whitelist to a DataFrame.
+ * Apply a column whitelist to a DataFrame: only the columns listed in `columnWhitelist` are kept, all others are
+ * dropped. Use it to project a wide source down to the attributes a pipeline really needs, e.g. to exclude
+ * confidential columns, without writing a SQL select statement.
+ *
+ * Column names are matched case-insensitively unless case sensitivity is enabled globally
+ * (`global.environment.caseSensitive`). In the default case-insensitive mode the output keeps the column order
+ * of the input DataFrame; with case sensitivity enabled the order of the selected columns is undefined.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     transformers = [{
+ *       type = WhitelistTransformer
+ *       columnWhitelist = [ident, name, latitude_deg, longitude_deg]
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note Names in `columnWhitelist` which do not exist in the input DataFrame are logged as warning and ignored,
+ *       they do not fail the Action.
+ * @see [[BlacklistTransformer]] to instead drop a list of columns and keep the rest.
+ *
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
  * @param columnWhitelist List of columns to keep from DataFrame

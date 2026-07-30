@@ -41,6 +41,29 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * - `dataObjectId`: Id of input dataObject as String
  * Output DataFrame must be set with `setOutputDf(df)`.
  *
+ * Either `code` (inline PySpark code, best for a few lines) or `file` (a path to a `.py` file, best for longer logic
+ * and unit-testable code) must be defined. Prefer [[ScalaClassSparkDfTransformer]] or an SQL transformer if you do not
+ * specifically need Python libraries, as starting the Python gateway adds overhead per Action.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   select-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     transformers = [{
+ *       type = PythonCodeDfTransformer
+ *       code = """
+ *         from pyspark.sql.functions import col
+ *         setOutputDf(inputDf.where(col('country') == options['country']))
+ *       """
+ *       options = { country = "CH" }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param file           Optional file with python code to use for python transformation. The python code can use variables inputDf, dataObjectId and options. The transformed DataFrame has to be set with setOutputDf.

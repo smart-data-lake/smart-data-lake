@@ -28,7 +28,30 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataF
 import scala.util.{Failure, Success, Try}
 
 /**
- * Apply a filter condition to a DataFrame.
+ * Apply a filter condition to a DataFrame, keeping only the rows for which `filterClause` evaluates to true.
+ * This is the simplest way to reduce data inside an Action, e.g. to drop technically invalid or irrelevant records
+ * before writing them to the output DataObject.
+ *
+ * The filter expression is parsed already when the configuration is read, so a syntax error is reported as
+ * ConfigurationException at startup and not only when the Action is executed.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     transformers = [{
+ *       type = FilterTransformer
+ *       filterClause = "type in ('large_airport','medium_airport') and ident is not null"
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note Filtering rows does not remove columns. Use [[WhitelistTransformer]] or [[BlacklistTransformer]] to
+ *       select columns, and [[ColumnsTransformer]] to add or rename them.
  *
  * @param name         name of the transformer
  * @param description  Optional description of the transformer

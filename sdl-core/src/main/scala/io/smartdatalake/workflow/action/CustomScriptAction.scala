@@ -32,6 +32,30 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ScriptSubFeed}
  *
  * Note that this action can also be used to give your data pipeline additional structure, e.g. adding a decision point after several actions have been executed.
  *
+ * No data is read or written by this Action: the input DataObjects are only used as dependencies to order the DAG,
+ * and the output DataObjects just receive a notification once all scripts succeeded. The last line of a script's
+ * standard output is parsed as `key=value` pairs and passed on as parameters to the next script and output SubFeeds.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   refresh-dashboard {
+ *     type = CustomScriptAction
+ *     inputIds = [int-airports]
+ *     outputIds = [ext-dashboard]
+ *     scripts = [{
+ *       type = CmdScript
+ *       linuxCmd = "./scripts/refresh-dashboard.sh"
+ *       winCmd = "scripts\\refresh-dashboard.cmd"
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note Output DataObjects must implement [[io.smartdatalake.workflow.dataobject.script.CanReceiveScriptNotification]]
+ *       to be able to receive the notification. No DataObject shipped with SDLB implements it yet, so `outputIds`
+ *       normally references a custom DataObject implementation. Otherwise the Action fails with a
+ *       ConfigurationException when the configuration is parsed.
  * @param inputIds               input DataObject's
  * @param outputIds              output DataObject's
  * @param scripts                definition of scripts to execute

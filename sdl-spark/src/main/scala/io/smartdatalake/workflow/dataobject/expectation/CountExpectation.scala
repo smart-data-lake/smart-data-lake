@@ -34,6 +34,28 @@ import org.apache.spark.sql.Column
 /**
  * Definition of an expectation based on the number of records.
  *
+ * This is the cheapest expectation: for the default `name = "count"` and `scope = Job` the record count is measured
+ * anyway, so no additional aggregation is added. Use it as a basic sanity check that an Action did not produce an empty
+ * or unexpectedly small result. Define multiple CountExpectations with different names to check several scopes at once,
+ * e.g. the records of the current job and the total number of records in the table.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-departures {
+ *     type = ParquetFileDataObject
+ *     path = "~{env.basedir}/int_departures"
+ *     expectations = [
+ *       { type = CountExpectation, expectation = ">= 1" },
+ *       { type = CountExpectation, name = "countAll", expectation = "> 100000", scope = All }
+ *     ]
+ *   }
+ * }
+ * }}}
+ *
+ * @note If several CountExpectations are configured on the same DataObject, all but one must be given a distinct `name`,
+ *       as the name is used as metric name.
+ * @see [[AvgCountPerPartitionExpectation]] if the number of partitions processed varies between runs.
  * @param expectation Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000".
  *                    If no expectation is defined, the result value is is just recorded in metrics.
  * @param scope The aggregation scope used to evaluate the aggregate expression.

@@ -199,6 +199,34 @@ class ODataIOC {
 /**
  * [[DataObject]] of type OData.
  *
+ * Reads one entity set (table) of an OData v4 REST service, e.g. Microsoft Dynamics 365 / Dataverse, into a Spark
+ * DataFrame. The requested columns are derived from the configured `schema`, which is mandatory - the service is
+ * queried with a corresponding OData `select` system query option, optionally narrowed by `sourceFilters`. This
+ * DataObject is read-only (there is no write support) and requests are executed on the driver, not distributed to
+ * executors. Responses are collected in a memory buffer that spills to temporary files once it grows too large, see
+ * `responseBufferSetup`.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-tasks {
+ *     type = ODataDataObject
+ *     baseUrl = "https://myorg.crm4.dynamics.com/api/data/v9.2/"
+ *     tableName = "tasks"
+ *     schema = "activityid string, subject string, modifiedon string"
+ *     sourceFilters = "statecode eq 0"
+ *     incrementalOutputExpr = "modifiedon"
+ *     authMode = {
+ *       type = AzureADClientGrantAuthMode
+ *       authority = "https://login.microsoftonline.com/{tenant-guid}/"
+ *       applicationId = "###ENV#AZURE_CLIENT_ID###"
+ *       clientSecret = "###ENV#AZURE_CLIENT_SECRET###"
+ *       scope = "https://myorg.crm4.dynamics.com/.default"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
  * @param schema
  *   Schema of the expected output. It can be provided as a string in the form of <<array< struct<
  *   columnA:string, columnB: integer ... >>, as ddl-File, caseClass, java Bean, XSD-File,
@@ -213,11 +241,16 @@ class ODataIOC {
  *   "objecttypecode eq 'task' and createdon ge 2024-01-01T00:00:00.000Z"
  * @param timeouts
  *   Optional. Timeout settings of type [[HttpTimeoutConfig]]
+ * @param proxy
+ *   Optional. HTTP proxy configuration of type [[HttpProxyConfig]] used to make the HTTP-connection.
  * @param authMode
  *   Optional configuration of webservice authentication. Supported `AuthMode`s are all
  *   HttpAuthModes, e.g. BasicAuthMode, OAuthMode, CustomHttpAuthMode. CustomHttpAuthMode can be
  *   used to implement a custom authentication protocol, e.g. AzureADClientGrantAuthMode in
  *   sdl-azure module.
+ * @param followRedirects
+ *   Optional. If HTTP redirects should be followed when creating the HTTP-connection, default = false because of
+ *   security concerns.
  * @param incrementalOutputExpr:
  *   Optional. Name of the column which will be used to read incrementally (like "modifiedon"). The
  *   column must be part of the schema. If this column is originally of datatype Timestamp in the

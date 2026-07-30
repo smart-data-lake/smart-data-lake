@@ -30,16 +30,21 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * Add, Rename or Drop columns from the Input DataFrame. The order of execution of the operations is the same as the parameters of the transformer: (1. add context info, 2. add custom sql, 3. rename, 4. drop).
  * Note that you can mix and match these operations to your liking and reference the same column from a previous operation if needed.
  *
- * Example Config:
+ * Example:
  * {{{
- * multiply {
- *   type = CopyAction
- *   inputId = src1DO
- *   outputId = tgt1DO
- *   metadata.feed = test_feed_name
- *   transformers = [
- *     {type = ColumnsTransformer, additionalDerivedColumns = {rating_doubled = "rating * 2"}, renamedColumns = {rating_doubled = rating_doubled_renamed}, droppedColumns = [name]}
- *   ]
+ * actions = {
+ *   multiply {
+ *     type = CopyAction
+ *     inputId = stg-ratings
+ *     outputId = int-ratings
+ *     transformers = [{
+ *       type = ColumnsTransformer
+ *       additionalColumns = {dl_run_id = "runId"}
+ *       additionalDerivedColumns = {rating_doubled = "rating * 2"}
+ *       renamedColumns = {rating_doubled = rating_doubled_renamed}
+ *       droppedColumns = [name]
+ *     }]
+ *   }
  * }
  * }}}
  *

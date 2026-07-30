@@ -62,6 +62,22 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * Note 3: case-insensitive column names are all uppercase in Snowflake tables. This is opposite from Spark when Spark is in case-insensitive mode (see also `Environment.caseSensitive`)
  * If `Environment.caseSensitive=false` then SDLB converts all case-insensitive column names to lowercase when reading from Snowflake with Spark Connector.
  *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   tgt-airports {
+ *     type = SnowflakeTableDataObject
+ *     connectionId = sf-con
+ *     table {
+ *       db = "test_schema"
+ *       name = "airports"
+ *     }
+ *     virtualPartitions = [dt]
+ *     saveMode = Append
+ *   }
+ * }
+ * }}}
+ *
  * @param id           unique name of this data object
  * @param table        Snowflake table to be written by this output
  * @param constraints  List of row-level [[Constraint]]s to enforce when writing to this data object.

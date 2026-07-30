@@ -58,8 +58,32 @@ import scala.reflect.{ClassTag, classTag}
  *
  * Also note that the getDataFrame method is not lazy in Exec-Phase. It will query the Airbyte Connector before creating the DataFrame.
  *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-users {
+ *     type = AirbyteDataObject
+ *     streamName = "users"
+ *     # the entries of config are connector specific, see the documentation of the connector used
+ *     config {
+ *       host = "db.example.com"
+ *       port = 5432
+ *       database = "postgres"
+ *       username = "sdlb"
+ *       password = "###"
+ *     }
+ *     cmd {
+ *       type = DockerRunScript
+ *       image = "airbyte/source-postgres:latest"
+ *     }
+ *     incrementalCursorFields = ["updated_at"]
+ *   }
+ * }
+ * }}}
+ *
  * @param id DataObject identifier
- * @param config Configuration for the source
+ * @param config Configuration for the source. Its entries are connector specific and are validated against the
+ *               specification reported by the connector itself in prepare phase.
  * @param streamName The stream name to read. Must match an entry of the catalog of the source.
  * @param incrementalCursorFields Some sources need a specification of the cursor field for incremental mode
  * @param maxRecordsPerPartition Maximum number of records to put into one Spark partition.

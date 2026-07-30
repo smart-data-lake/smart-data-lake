@@ -40,17 +40,20 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * Example:
  * {{{
  * dataObjects = {
- *  ...
- *  primarykey-violations {
- *    type = PKViolatorsDataObject
- *    config = path/to/myconfiguration.conf
- *  }
- *  ...
+ *   primarykey-violations {
+ *     type = PKViolatorsDataObject
+ *     config = "path/to/myconfiguration.conf"
+ *     flattenOutput = true
+ *   }
  * }
  * }}}
  *
+ * @param id: unique name of this data object
  * @param config: The config value can point to a configuration file or a directory containing configuration files.
- * @param flattenOutput: if true, key and data column are converted from type map<k,v> to string (default).
+ *                Multiple locations can be given as comma separated list. If not defined, the DataObjects of the
+ *                current run's [[InstanceRegistry]] are checked.
+ * @param flattenOutput: if true, the key and data column are cast from their default type
+ *                       `array<struct<name,value>>` to string (default: false).
  *
  * @see Refer to [[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading.
  */

@@ -34,6 +34,30 @@ import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.Expe
  *
  * Note that the scope for evaluating this expectation is fixed to Job.
  *
+ * The result is the `count` of the current job divided by the number of partition values processed. Note that it is
+ * reported as metric `countAvgPerPartition` and not under the name of the expectation. Use it instead of
+ * [[CountExpectation]] when a job may process a varying number of partitions, so that a fixed total count would
+ * produce false alarms.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-departures {
+ *     type = ParquetFileDataObject
+ *     path = "~{env.basedir}/int_departures"
+ *     partitions = [dt]
+ *     expectations = [{
+ *       type = AvgCountPerPartitionExpectation
+ *       name = "avgCountPerDay"
+ *       expectation = "> 100000"
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note The expectation can only be evaluated if the job processes partition values. If there are none, a warning
+ *       is logged and the expectation is skipped.
+ * @see [[CountExpectation]]
  * @param expectation Optional SQL comparison operator and literal to define expected value for validation, e.g. '> 100000".
  *                    If no expectation is defined, the result value is just recorded in metrics.
  */

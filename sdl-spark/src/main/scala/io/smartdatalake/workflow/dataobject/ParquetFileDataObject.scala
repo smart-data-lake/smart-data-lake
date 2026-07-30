@@ -35,13 +35,29 @@ import org.apache.spark.sql.DataFrame
 
 /**
  *
- * A [[io.smartdatalake.workflow.dataobject.DataObject]] backed by an Apache Hive data source.
+ * A [[io.smartdatalake.workflow.dataobject.DataObject]] backed by an Apache Parquet data source.
  *
  * It manages read and write access and configurations required for [[io.smartdatalake.workflow.action.Action]]s to
  * work on Parquet formatted files.
  *
  * Reading and writing details are delegated to Apache Spark [[org.apache.spark.sql.DataFrameReader]]
  * and [[org.apache.spark.sql.DataFrameWriter]] respectively.
+ *
+ * This is the default choice for storing intermediate and integration layer data in a data lake: it is columnar,
+ * compressed and carries its schema, so no `schema` needs to be configured for reading. If a `schema` is configured
+ * it is applied after reading to select and cast the given columns, see also [[NestedColumnUtil]].
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-airports {
+ *     type = ParquetFileDataObject
+ *     path = "~{env.basedir}/int_airports"
+ *     partitions = [year, month]
+ *     saveMode = Overwrite
+ *   }
+ * }
+ * }}}
  *
  * @see [[org.apache.spark.sql.DataFrameReader]]
  * @see [[org.apache.spark.sql.DataFrameWriter]]

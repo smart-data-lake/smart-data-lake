@@ -25,6 +25,27 @@ import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
 
+/**
+ * Engine connection for the plain Scala execution engine.
+ *
+ * An [[EngineConnection]] declares which DataFrame engine an Action uses; this one selects the lightweight,
+ * Spark-free engine working on `ScalaSubFeed`. Pick it over `SparkClassicConnection` for small pipelines and
+ * unit tests where starting a Spark session is unnecessary overhead. Actions select an engine connection with
+ * their `engineConnectionId` attribute; if none is given the connection with id `default-engine` is used
+ * (configurable through the SDLB parameter `defaultEngineConnectionId`).
+ *
+ * Example:
+ * {{{
+ * connections {
+ *   default-engine {
+ *     type = ScalaConnection
+ *   }
+ * }
+ * }}}
+ *
+ * @param id unique id of this connection, e.g. `default-engine`
+ * @param metadata additional metadata for this connection (name, description, layer, ...)
+ */
 case class ScalaConnection (
                              id: SdlConfigObject.ConnectionId,
                              metadata: Option[ConnectionMetadata] = None
