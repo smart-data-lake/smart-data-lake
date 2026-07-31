@@ -419,10 +419,9 @@
         <jetty.deps.scope>compile</jetty.deps.scope>
         <scala.minor.version>2.13</scala.minor.version>
         <scala.version>${scala.minor.version}.12</scala.version>
-        <spark.version>4.1.1
-        </spark.version><!-- delta-lake 3.3.2 is not yet compatible with Spark 3.5.6 because of https://github.com/delta-io/delta/issues/4671 -->
-        <spark-extensions.version>4.1.0-SNAPSHOT
-        </spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
+        <spark.version>4.1.1</spark.version>
+        <!-- this sdl-specific extensions should match the minor version of property spark.version -->
+        <spark-extensions.version>4.1.0-SNAPSHOT</spark-extensions.version>
         <spark.minor.version>4.1</spark.minor.version>
 
         <!-- SPARK-PARENT start: properties copied from spark-parent pom version for spark-parent import in dependencyManagement -->

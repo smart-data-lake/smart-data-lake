@@ -39,7 +39,7 @@ DELTA_VERSION=4.2.0
 
 if [ ! -d "$SPARK_DIST" ]; then
   echo "downloading https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/${SPARK_DIST}.tgz"
-  wget -q --show-progress https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/${SPARK_DIST}.tgz
+  wget -nv --progress=dot:giga https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/${SPARK_DIST}.tgz
   tar -xzf ${SPARK_DIST}.tgz
   rm ${SPARK_DIST}.tgz
 fi
