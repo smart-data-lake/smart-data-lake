@@ -58,8 +58,22 @@ import scala.util.Try
  * - [[CanEvolveSchema]] by using mergeSchema option.
  * - Overwriting partitions is implemented by replaceWhere option in one transaction.
  *
- * The engine-specific implementation (e.g. classic Spark or Spark Connect) is discovered on the classpath,
- * see [[DeltaLakeTableEngine]]. Add module sdl-deltalake for classic Spark, or sdl-sparkconnect for Spark Connect.
+ * Use this DataObject instead of a plain file DataObject if you need ACID transactions, merge (upsert) or schema
+ * evolution on a table.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-airports {
+ *     type = DeltaLakeTableDataObject
+ *     path = "~{env.basedir}/int_airports"
+ *     table = { db = "default", name = "int_airports", primaryKey = [ident] }
+ *     saveMode = Merge
+ *     allowSchemaEvolution = true
+ *     retentionPeriod = 168
+ *   }
+ * }
+ * }}}
  *
  * @param id unique name of this data object
  * @param path Optional hadoop directory for this table. If path is not defined, table is handled as a managed table.
@@ -95,9 +109,16 @@ import scala.util.Try
  * @param housekeepingMode Optional definition of a housekeeping mode applied after every write.
  *                         E.g. it can be used to clean up, archive and compact partitions.
  *                         See HousekeepingMode for available implementations. Default is None.
- * @param connectionId optional id of [[io.smartdatalake.workflow.connection.DeltaLakeTableConnection]]
+ * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
  * @param metadata metadata of the table. NOTE: if the value metadata.description is set, the table.db and the table.catalog
  *                  attributes are required as the pipeline will try to add the description to the catalog.
+ *
+ * @note DeltaLake needs the spark properties spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension and
+ *       spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog. They are added automatically
+ *       by DeltaLakeModulePlugin when SDLB creates the SparkSession (except on Databricks, where they are preset),
+ *       so normally no manual configuration is needed.
+ * @see [[io.smartdatalake.workflow.connection.DeltaLakeTableConnection]] to share catalog, db and path prefix between
+ *      multiple DeltaLake DataObjects.
  */
 case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     path: Option[String] = None,
