@@ -1,0 +1,723 @@
+{
+  "id" : 1,
+  "name" : "Name",
+  "description" : "Description",
+  "lastModifiedDate" : "2024-02-20T21:59:03Z",
+  "lastModifiedAgent" : "structurizr-javascript",
+  "properties" : {
+    "structurizr.dsl" : "d29ya3NwYWNlIHsKCiAgICBtb2RlbCB7CiAgICAgICAgdXNlciA9IHBlcnNvbiAiVXNlciBvciBTeXN0ZW0iCiAgICAgICAgY29uZmlnID0gZWxlbWVudCAiQ29uZmlnIEZpbGVzIiAiSG9jb24iICJNYWluIGFuZCBFbnZpcm9ubWVudCBjb25maWcgZmlsZXMiICJmb2xkZXIiCiAgICAgICAgcGFyc2VkQ29uZmlnID0gZWxlbWVudCAiQ29uZmlnIEV4cG9ydCIgIkpzb24iICJQYXJzZWQgYW5kIHJlc29sdmVkIENvbmZpZyBhcyBvbmUgSnNvbi1maWxlIiAiZmlsZSIKICAgICAgICBzdGF0ZSA9IGVsZW1lbnQgIlN0YXRlIEZpbGVzIiAiSnNvbiIgIlN0YXRlIG9mIFNETEIgSm9icyBzdG9yZWQgYXMgSnNvbiBGaWxlcyIgImZvbGRlciIKICAgICAgICBkYXRhID0gZWxlbWVudCAiRGF0YSIgIk1hbnkgZm9ybWF0cyBhbmQgdGVjaG5vbG9naWVzIiAiRGF0YSB0aGF0IGlzIHJlYWQgYW5kIHdyaXR0ZW4gYnkgU0RMQiBKb2JzLCBhY2Nlc3NlZCB0aHJvdWdoIERhdGFPYmplY3RzIiAiZGF0YWJhc2UiCiAgICAgICAgc2NoZW1hcyA9IGVsZW1lbnQgIlNjaGVtYXMgYW5kIFN0YXRpc3RpY3MiICJKc29uIiAiQ29sbGVjdGlvbiBvZiBTY2hlbWFzIGFuZCBTdGF0aXN0aWNzIGFib3V0IERhdGFPYmplY3RzIiAiZm9sZGVyIgogICAgICAgIHNkbGIgPSBzb2Z0d2FyZVN5c3RlbSAiU21hcnREYXRhTGFrZUJ1aWxkZXIiIHsKICAgICAgICAgICAgc2RsYkpvYiA9IGNvbnRhaW5lciAiU0RMQiBKb2IiICIiICJKYXZhLCBTcGFyayIgewogICAgICAgICAgICAgICAgY29uZmlnUGFyc2VyID0gY29tcG9uZW50ICJDb25maWcgUGFyc2VyIiAiaXMgcmVzcG9uc2libGUgdG8gcGFyc2UgdGhlIGNvbmZpZyBmaWxlcyBhbmQgdHJhbnNsYXRlIHRoZW0gaW50byBTY2FsYSBjYXNlIGNsYXNzZXMuIgogICAgICAgICAgICAgICAgY29uZmlnT2JqZWN0cyA9IGdyb3VwICJUb3AtbGV2ZWwgQ29uZmlndXJhdGlvbiBPYmplY3RzIiB7CiAgICAgICAgICAgICAgICAgICAgYWN0aW9ucyA9IGNvbXBvbmVudCAiQWN0aW9ucyIgImRlZmluZSB0aGUgdHJhbnNmb3JtYXRpb24gYmV0d2VlbiBEYXRhT2JqZWN0cyIgIiIgImV4dGVuZGFibGUiCiAgICAgICAgICAgICAgICAgICAgZGF0YU9iamVjdHMgPSBjb21wb25lbnQgIkRhdGFPYmplY3RzIiAiZGVmaW5lIHRoZSBsb2NhdGlvbiBhbmQgZm9ybWF0IG9mIGRhdGEiICIiICJleHRlbmRhYmxlIgogICAgICAgICAgICAgICAgICAgIGNvbm5lY3Rpb25zID0gY29tcG9uZW50ICJDb25uZWN0aW9ucyIgIlNvbWUgRGF0YU9iamVjdHMgcmVxdWlyZSBhIENvbm5lY3Rpb24gdG8gYWNjZXNzIHJlbW90ZSBkYXRhIiAiIiAiZXh0ZW5kYWJsZSIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIGdyb3VwICJDb25jZXB0cyIgewogICAgICAgICAgICAgICAgICAgIGRhZyA9IGNvbXBvbmVudCAiREFHIiAiRXhlY3V0ZXMgYSBzZXQgb2YgQWN0aW9ucyBhcyBhIGBEaXJlY3RlZCBBY3ljbGljIEdyYXBoYCwgd2hpY2ggaXMgZXhlY3V0ZWQgYnkgdGhlIFNETEIgSm9iLiBJbmRlcGVuZGVudCBBY3Rpb25zIGFyZSBleGVjdXRlZCBpbiBwYXJhbGxlbCBhY2NvcmRpbmcgdG8gdGhlIGBwYXJhbGxlbGlzbWAgY21kIGxpbmUgb3B0aW9uLiIKICAgICAgICAgICAgICAgICAgICBleGVjdXRpb25Nb2RlID0gY29tcG9uZW50ICJFeGVjdXRpb24gTW9kZSIgImFyZSByZXNwb25zaWJsZSB0byBzZWxlY3QgdGhlIGRhdGEgdG8gYmUgcHJvY2Vzc2VkIGJ5IHRoZSBTRExCIEpvYiIgIiIgImV4dGVuZGFibGUiCiAgICAgICAgICAgICAgICAgICAgYXV0aE1vZGUgPSBjb21wb25lbnQgIkF1dGhlbnRpY2F0aW9uIE1vZGUiICJhcmUgcmVzcG9uc2libGUgdG8gYXV0aGVudGljYXRlIHdpdGggZXh0ZXJuYWwgcmVzc291cmNlcyIgIiIgImV4dGVuZGFibGUiCiAgICAgICAgICAgICAgICAgICAgY29uc3RyYWludHNFeHBlY3RhdGlvbnMgPSBjb21wb25lbnQgIkNvbnN0cmFpbnRzIGFuZCBFeHBlY3RhdGlvbnMiICJjYW4gYmUgdXNlZCB0byBlbnN1cmUgRGF0YSBRdWFsaXR5IiAiIiAiZXh0ZW5kYWJsZSIKICAgICAgICAgICAgICAgICAgICBzZWNyZXRQcm92aWRlcnMgPSBjb21wb25lbnQgIlNlY3JldCBQcm92aWRlcnMiICJhcmUgcmVzcG9uc2libGUgdG8gcmVwbGFjZSBzZWNyZXQgdmFsdWVzIGluIHRoZSBjb25maWd1cmF0aW9uIHVzaW5nIGRpZmZlcmVudCBrZXkgc3RvcmVzLiIgIiIgImV4dGVuZGFibGUiCiAgICAgICAgICAgICAgICAgICAgaG91c2VrZWVwaW5nTW9kZSA9IGNvbXBvbmVudCAiSG91c2VrZWVwaW5nIE1vZGUiICJpcyByZXNwb25zaWJsZSB0byBjbGVhbnVwIG9yIGFyY2hpdmUgb3V0ZGF0ZWQgZGF0YSIgIiIgImV4dGVuZGFibGUiCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBncm91cCAiTW9kdWxlcyIgewogICAgICAgICAgICAgICAgICAgIGNvbXBvbmVudCAiQXp1cmUiICJwcm92aWRpbmcgaGVscGVycyB0byBhY2Nlc3MgQXp1cmUgcmVzc291cmNlcyBsaWtlIExvZ0FuYWx5dGljcyIKICAgICAgICAgICAgICAgICAgICBjb21wb25lbnQgIkRlbHRhIExha2UiICJwcm92aWRpbmcgRGVsdGFMYWtlVGFibGVEYXRhT2JqZWN0IgogICAgICAgICAgICAgICAgICAgIGNvbXBvbmVudCAiSWNlYmVyZyIgInByb3ZpZGluZyBJY2ViZXJnVGFibGVEYXRhT2JqZWN0IgogICAgICAgICAgICAgICAgICAgIGNvbXBvbmVudCAiS2Fma2EiICJwcm92aWRpbmcgS2Fma2FUb3BpY0RhdGFPYmplY3QiCiAgICAgICAgICAgICAgICAgICAgY29tcG9uZW50ICJTbm93Zmxha2UiICJwcm92aWRpbmcgU25vd2ZsYWtlVGFibGVEYXRhT2JqZWN0IGFuZCBTbm93cGFyayBpbnRlZ3JhdGlvbiAoRXhlY3V0aW9uIEVuZ2luZSkiCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBncm91cCAiQ3VzdG9taXphdGlvbiBIb29rcyIgewogICAgICAgICAgICAgICAgICAgIGluaXRQbHVnaW4gPSBjb21wb25lbnQgIkluaXQgUGx1Z2luIiAiaXMgYSBob29rIHRvIGFkZCBhZGRpdGlvbmFsIHN0YXJ0dXAgb3Igc2h1dGRvd24gbG9naWMsIGxpa2UgZHluYW1pYyBsb2cgY29uZmlndXJhdGlvbi4iICIiICJleHRlbmRhYmxlIgogICAgICAgICAgICAgICAgICAgIHN0YXRlTGlzdGVuZXIgPSBjb21wb25lbnQgIlN0YXRlIExpc3RlbmVycyIgImlzIGEgaG9vayB0byByZWNpZXZlIGFuZCBkaXN0cmlidXRlIHN0YXRlIHVwZGF0ZXMsIGUuZy4gd3JpdGluZyBpdCB0byBzZXBhcmF0ZSB0YWJsZXMgZm9yIHJlcG9ydGluZy4iICIiICJleHRlbmRhYmxlIgogICAgICAgICAgICAgICAgICAgIC8vIHN0YXRlTGlzdGVuZXIKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIGFjdGlvbnMgLT4gZGF0YU9iamVjdHMgInJlYWQvd3JpdGUiCiAgICAgICAgICAgICAgICBkYXRhT2JqZWN0cyAtPiBjb25uZWN0aW9ucyAidXNlIgogICAgICAgICAgICAgICAgZGF0YU9iamVjdHMgLT4gY29uc3RyYWludHNFeHBlY3RhdGlvbnMgInZhbGlkYXRlcyIKICAgICAgICAgICAgICAgIGRhdGFPYmplY3RzIC0+IGhvdXNla2VlcGluZ01vZGUgImFwcGxpZXMiCiAgICAgICAgICAgICAgICBhY3Rpb25zIC0+IGV4ZWN1dGlvbk1vZGUgImFwcGxpZXMiCiAgICAgICAgICAgICAgICBjb25uZWN0aW9ucyAtPiBhdXRoTW9kZSAidXNlIgogICAgICAgICAgICAgICAgZGFnIC0+IGFjdGlvbnMgImV4ZWN1dGVzIgogICAgICAgICAgICAgICAgY29uZmlnUGFyc2VyIC0+IHNlY3JldFByb3ZpZGVycyAidXNlcyIKICAgICAgICAgICAgfQogICAgICAgICAgICBjb25maWdFeHBvcnRlciA9IGNvbnRhaW5lciAiQ29uZmlnIEV4cG9ydGVyIiAiSGVscGVyIGNvbW1hbmQgbGluZSB0b29sIHRvIHBhcnNlIGFuZCBleHBvcnQgYSBnaXZlbiBjb25maWd1cmF0aW9uIiAiIiAiaGVscGVyIgogICAgICAgICAgICBzY2hlbWFFeHBvcnRlciA9IGNvbnRhaW5lciAiU2NoZW1hIEV4cG9ydGVyIiAiSGVscGVyIGNvbW1hbmQgbGluZSB0b29sIHRvIGV4cG9ydCBEYXRhT2JqZWN0IHNjaGVtYXMgYW5kIHN0YXRpc3RpY3MiICIiICJoZWxwZXIiCiAgICAgICAgfQoKICAgICAgICB1c2VyIC0+IHNkbGJKb2IgImxhdW5jaGVzIgogICAgICAgIHVzZXIgLT4gY29uZmlnRXhwb3J0ZXIgImxhdW5jaGVzIgogICAgICAgIHVzZXIgLT4gc2NoZW1hRXhwb3J0ZXIgImxhdW5jaGVzIgogICAgICAgIGNvbmZpZ1BhcnNlciAtPiBjb25maWcgInJlYWRzIgogICAgICAgIGRhZyAtPiBzdGF0ZSAidXNlcyIKICAgICAgICBkYXRhT2JqZWN0cyAtPiBkYXRhICJyZWFkcy93cml0ZXMiCiAgICAgICAgY29uZmlnRXhwb3J0ZXIgLT4gY29uZmlnICJyZWFkcyIKICAgICAgICBjb25maWdFeHBvcnRlciAtPiBwYXJzZWRDb25maWcgIndyaXRlIgogICAgICAgIHNjaGVtYUV4cG9ydGVyIC0+IGNvbmZpZyAicmVhZHMiCiAgICAgICAgc2NoZW1hRXhwb3J0ZXIgLT4gc2NoZW1hcyAid3JpdGUiCiAgICB9CgogICAgdmlld3MgewogICAgICAgIGNvbnRhaW5lciBzZGxiIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIHRpdGxlICJDb250ZXh0IgogICAgICAgICAgICBkZXNjcmlwdGlvbiAiIgogICAgICAgIH0KCiAgICAgICAgY29tcG9uZW50IHNkbGJKb2IgewogICAgICAgICAgICBpbmNsdWRlICoKICAgICAgICAgICAgdGl0bGUgIkNvbXBvbmVudHMgb2YgYW4gU0RMQiBKb2IiCiAgICAgICAgICAgIGRlc2NyaXB0aW9uICIiCiAgICAgICAgfQoKICAgICAgICBzdHlsZXMgewogICAgICAgICAgICBlbGVtZW50ICJoZWxwZXIiIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgIzZiYzRlYgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgImZvbGRlciIgewogICAgICAgICAgICAgICAgc2hhcGUgIkZvbGRlciIKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJmaWxlIiB7CiAgICAgICAgICAgICAgICBzaGFwZSAiRm9sZGVyIgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgImRhdGFiYXNlIiB7CiAgICAgICAgICAgICAgICBzaGFwZSAiQ3lsaW5kZXIiCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZWxlbWVudCAiZXh0ZW5kYWJsZSIgewogICAgICAgICAgICAgICAgaWNvbiAiZXh0ZW5zaW9uLnBuZyIKICAgICAgICAgICAgfQogICAgICAgIH0KCiAgICAgICAgdGhlbWUgZGVmYXVsdAogICAgfQoKfQo="
+  },
+  "configuration" : { },
+  "model" : {
+    "people" : [ {
+      "id" : "1",
+      "tags" : "Element,Person",
+      "properties" : {
+        "structurizr.dsl.identifier" : "user"
+      },
+      "name" : "User or System",
+      "relationships" : [ {
+        "id" : "37",
+        "sourceId" : "1",
+        "destinationId" : "7",
+        "description" : "launches",
+        "linkedRelationshipId" : "36"
+      }, {
+        "id" : "39",
+        "tags" : "Relationship",
+        "properties" : {
+          "structurizr.dsl.identifier" : "070f4b3a-7fbe-4340-817b-4387b0dd35d0"
+        },
+        "sourceId" : "1",
+        "destinationId" : "35",
+        "description" : "launches"
+      }, {
+        "id" : "38",
+        "tags" : "Relationship",
+        "properties" : {
+          "structurizr.dsl.identifier" : "e7eb3a55-e461-43e6-9f7d-bf14af56614c"
+        },
+        "sourceId" : "1",
+        "destinationId" : "34",
+        "description" : "launches"
+      }, {
+        "id" : "36",
+        "tags" : "Relationship",
+        "properties" : {
+          "structurizr.dsl.identifier" : "425e2c11-2473-4046-ac83-0dcd22bea057"
+        },
+        "sourceId" : "1",
+        "destinationId" : "8",
+        "description" : "launches"
+      } ],
+      "location" : "Unspecified"
+    } ],
+    "softwareSystems" : [ {
+      "id" : "7",
+      "tags" : "Element,Software System",
+      "properties" : {
+        "structurizr.dsl.identifier" : "sdlb"
+      },
+      "name" : "SmartDataLakeBuilder",
+      "relationships" : [ {
+        "id" : "42",
+        "sourceId" : "7",
+        "destinationId" : "2",
+        "description" : "reads",
+        "linkedRelationshipId" : "40"
+      }, {
+        "id" : "51",
+        "sourceId" : "7",
+        "destinationId" : "3",
+        "description" : "write",
+        "linkedRelationshipId" : "50"
+      }, {
+        "id" : "54",
+        "sourceId" : "7",
+        "destinationId" : "6",
+        "description" : "write",
+        "linkedRelationshipId" : "53"
+      }, {
+        "id" : "48",
+        "sourceId" : "7",
+        "destinationId" : "5",
+        "description" : "reads/writes",
+        "linkedRelationshipId" : "46"
+      }, {
+        "id" : "45",
+        "sourceId" : "7",
+        "destinationId" : "4",
+        "description" : "uses",
+        "linkedRelationshipId" : "43"
+      } ],
+      "location" : "Unspecified",
+      "containers" : [ {
+        "id" : "8",
+        "tags" : "Element,Container",
+        "properties" : {
+          "structurizr.dsl.identifier" : "sdlbjob"
+        },
+        "name" : "SDLB Job",
+        "relationships" : [ {
+          "id" : "47",
+          "sourceId" : "8",
+          "destinationId" : "5",
+          "description" : "reads/writes",
+          "linkedRelationshipId" : "46"
+        }, {
+          "id" : "44",
+          "sourceId" : "8",
+          "destinationId" : "4",
+          "description" : "uses",
+          "linkedRelationshipId" : "43"
+        }, {
+          "id" : "41",
+          "sourceId" : "8",
+          "destinationId" : "2",
+          "description" : "reads",
+          "linkedRelationshipId" : "40"
+        } ],
+        "technology" : "Java, Spark",
+        "components" : [ {
+          "id" : "10",
+          "tags" : "Element,Component,extendable",
+          "properties" : {
+            "structurizr.dsl.identifier" : "actions"
+          },
+          "name" : "Actions",
+          "description" : "define the transformation between DataObjects",
+          "relationships" : [ {
+            "id" : "30",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "b34bc7fc-7aa1-4da9-adaa-8c338393fe1b"
+            },
+            "sourceId" : "10",
+            "destinationId" : "14",
+            "description" : "applies"
+          }, {
+            "id" : "26",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "1ef1f9c5-accb-4631-af2c-22ce1177dd0f"
+            },
+            "sourceId" : "10",
+            "destinationId" : "11",
+            "description" : "read/write"
+          } ],
+          "group" : "Top-level Configuration Objects",
+          "documentation" : { }
+        }, {
+          "id" : "17",
+          "tags" : "Element,Component,extendable",
+          "properties" : {
+            "structurizr.dsl.identifier" : "secretproviders"
+          },
+          "name" : "Secret Providers",
+          "description" : "are responsible to replace secret values in the configuration using different key stores.",
+          "group" : "Concepts",
+          "documentation" : { }
+        }, {
+          "id" : "9",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "configparser"
+          },
+          "name" : "Config Parser",
+          "description" : "is responsible to parse the config files and translate them into Scala case classes.",
+          "relationships" : [ {
+            "id" : "40",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "1d935421-7faa-4329-9e8a-da9e65589890"
+            },
+            "sourceId" : "9",
+            "destinationId" : "2",
+            "description" : "reads"
+          }, {
+            "id" : "33",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "48e496d0-8a7d-4288-b66a-6f3d94c05c9a"
+            },
+            "sourceId" : "9",
+            "destinationId" : "17",
+            "description" : "uses"
+          } ],
+          "documentation" : { }
+        }, {
+          "id" : "11",
+          "tags" : "Element,Component,extendable",
+          "properties" : {
+            "structurizr.dsl.identifier" : "dataobjects"
+          },
+          "name" : "DataObjects",
+          "description" : "define the location and format of data",
+          "relationships" : [ {
+            "id" : "46",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "9b80bb56-65d9-4ce8-b701-0337f6d07655"
+            },
+            "sourceId" : "11",
+            "destinationId" : "5",
+            "description" : "reads/writes"
+          }, {
+            "id" : "27",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "0148ccaa-0045-4f84-b4f7-1274558bb5b5"
+            },
+            "sourceId" : "11",
+            "destinationId" : "12",
+            "description" : "use"
+          }, {
+            "id" : "28",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "5e6826c6-bf51-4736-99f1-66d3e87c3f64"
+            },
+            "sourceId" : "11",
+            "destinationId" : "16",
+            "description" : "validates"
+          }, {
+            "id" : "29",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "49b74321-ec4d-465d-ba59-3c3284e32595"
+            },
+            "sourceId" : "11",
+            "destinationId" : "18",
+            "description" : "applies"
+          } ],
+          "group" : "Top-level Configuration Objects",
+          "documentation" : { }
+        }, {
+          "id" : "13",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "dag"
+          },
+          "name" : "DAG",
+          "description" : "Executes a set of Actions as a `Directed Acyclic Graph`, which is executed by the SDLB Job. Independent Actions are executed in parallel according to the `parallelism` cmd line option.",
+          "relationships" : [ {
+            "id" : "43",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "b84024f1-f627-41cc-9fc9-f40fedfcfb34"
+            },
+            "sourceId" : "13",
+            "destinationId" : "4",
+            "description" : "uses"
+          }, {
+            "id" : "32",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "5ea2b042-e29c-41f6-a9a7-a8ec6c569d15"
+            },
+            "sourceId" : "13",
+            "destinationId" : "10",
+            "description" : "executes"
+          } ],
+          "group" : "Concepts",
+          "documentation" : { }
+        }, {
+          "id" : "16",
+          "tags" : "Element,Component,extendable",
+          "properties" : {
+            "structurizr.dsl.identifier" : "constraintsexpectations"
+          },
+          "name" : "Constraints and Expectations",
+          "description" : "can be used to ensure Data Quality",
+          "group" : "Concepts",
+          "documentation" : { }
+        }, {
+          "id" : "22",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "2b57487e-b93d-4c1d-85ef-5e6624299725"
+          },
+          "name" : "Kafka",
+          "description" : "providing KafkaTopicDataObject",
+          "group" : "Modules",
+          "documentation" : { }
+        }, {
+          "id" : "12",
+          "tags" : "Element,Component,extendable",
+          "properties" : {
+            "structurizr.dsl.identifier" : "connections"
+          },
+          "name" : "Connections",
+          "description" : "Some DataObjects require a Connection to access remote data",
+          "relationships" : [ {
+            "id" : "31",
+            "tags" : "Relationship",
+            "properties" : {
+              "structurizr.dsl.identifier" : "28c87289-7443-40d7-8947-98e9f01566ef"
+            },
+            "sourceId" : "12",
+            "destinationId" : "15",
+            "description" : "use"
+          } ],
+          "group" : "Top-level Configuration Objects",
+          "documentation" : { }
+        }, {
+          "id" : "18",
+          "tags" : "Element,Component,extendable",
+          "properties" : {
+            "structurizr.dsl.identifier" : "housekeepingmode"
+          },
+          "name" : "Housekeeping Mode",
+          "description" : "is responsible to cleanup or archive outdated data",
+          "group" : "Concepts",
+          "documentation" : { }
+        }, {
+          "id" : "20",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "76e12684-142d-4b05-a23f-16546f34bcc5"
+          },
+          "name" : "Delta Lake",
+          "description" : "providing DeltaLakeTableDataObject",
+          "group" : "Modules",
+          "documentation" : { }
+        }, {
+          "id" : "23",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "89b61bea-7886-4ca0-8998-de6c922a8193"
+          },
+          "name" : "Snowflake",
+          "description" : "providing SnowflakeTableDataObject and Snowpark integration (Execution Engine)",
+          "group" : "Modules",
+          "documentation" : { }
+        }, {
+          "id" : "25",
+          "tags" : "Element,Component,extendable",
+          "properties" : {
+            "structurizr.dsl.identifier" : "statelistener"
+          },
+          "name" : "State Listeners",
+          "description" : "is a hook to recieve and distribute state updates, e.g. writing it to separate tables for reporting.",
+          "group" : "Customization Hooks",
+          "documentation" : { }
+        }, {
+          "id" : "24",
+          "tags" : "Element,Component,extendable",
+          "properties" : {
+            "structurizr.dsl.identifier" : "initplugin"
+          },
+          "name" : "Init Plugin",
+          "description" : "is a hook to add additional startup or shutdown logic, like dynamic log configuration.",
+          "group" : "Customization Hooks",
+          "documentation" : { }
+        }, {
+          "id" : "19",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "9a434021-a525-49e8-9c87-97412a7e43fa"
+          },
+          "name" : "Azure",
+          "description" : "providing helpers to access Azure ressources like LogAnalytics",
+          "group" : "Modules",
+          "documentation" : { }
+        }, {
+          "id" : "15",
+          "tags" : "Element,Component,extendable",
+          "properties" : {
+            "structurizr.dsl.identifier" : "authmode"
+          },
+          "name" : "Authentication Mode",
+          "description" : "are responsible to authenticate with external ressources",
+          "group" : "Concepts",
+          "documentation" : { }
+        }, {
+          "id" : "14",
+          "tags" : "Element,Component,extendable",
+          "properties" : {
+            "structurizr.dsl.identifier" : "executionmode"
+          },
+          "name" : "Execution Mode",
+          "description" : "are responsible to select the data to be processed by the SDLB Job",
+          "group" : "Concepts",
+          "documentation" : { }
+        }, {
+          "id" : "21",
+          "tags" : "Element,Component",
+          "properties" : {
+            "structurizr.dsl.identifier" : "f29f32b1-ce7e-4797-8f43-4b626319db60"
+          },
+          "name" : "Iceberg",
+          "description" : "providing IcebergTableDataObject",
+          "group" : "Modules",
+          "documentation" : { }
+        } ],
+        "documentation" : { }
+      }, {
+        "id" : "35",
+        "tags" : "Element,Container,helper",
+        "properties" : {
+          "structurizr.dsl.identifier" : "schemaexporter"
+        },
+        "name" : "Schema Exporter",
+        "description" : "Helper command line tool to export DataObject schemas and statistics",
+        "relationships" : [ {
+          "id" : "53",
+          "tags" : "Relationship",
+          "properties" : {
+            "structurizr.dsl.identifier" : "f3fc04da-62cc-4248-bcc1-1812e90b1025"
+          },
+          "sourceId" : "35",
+          "destinationId" : "6",
+          "description" : "write"
+        }, {
+          "id" : "52",
+          "tags" : "Relationship",
+          "properties" : {
+            "structurizr.dsl.identifier" : "41aa2be3-5109-4466-a68e-f8ac3e3d87b2"
+          },
+          "sourceId" : "35",
+          "destinationId" : "2",
+          "description" : "reads"
+        } ],
+        "documentation" : { }
+      }, {
+        "id" : "34",
+        "tags" : "Element,Container,helper",
+        "properties" : {
+          "structurizr.dsl.identifier" : "configexporter"
+        },
+        "name" : "Config Exporter",
+        "description" : "Helper command line tool to parse and export a given configuration",
+        "relationships" : [ {
+          "id" : "49",
+          "tags" : "Relationship",
+          "properties" : {
+            "structurizr.dsl.identifier" : "59d060de-2496-4450-b08b-b76fd3612dab"
+          },
+          "sourceId" : "34",
+          "destinationId" : "2",
+          "description" : "reads"
+        }, {
+          "id" : "50",
+          "tags" : "Relationship",
+          "properties" : {
+            "structurizr.dsl.identifier" : "71d4fae2-d6e7-47dc-a6d2-4ba70532706a"
+          },
+          "sourceId" : "34",
+          "destinationId" : "3",
+          "description" : "write"
+        } ],
+        "documentation" : { }
+      } ],
+      "documentation" : { }
+    } ],
+    "customElements" : [ {
+      "id" : "3",
+      "tags" : "Element,file",
+      "properties" : {
+        "structurizr.dsl.identifier" : "parsedconfig"
+      },
+      "name" : "Config Export",
+      "description" : "Parsed and resolved Config as one Json-file",
+      "metadata" : "Json"
+    }, {
+      "id" : "2",
+      "tags" : "Element,folder",
+      "properties" : {
+        "structurizr.dsl.identifier" : "config"
+      },
+      "name" : "Config Files",
+      "description" : "Main and Environment config files",
+      "metadata" : "Hocon"
+    }, {
+      "id" : "4",
+      "tags" : "Element,folder",
+      "properties" : {
+        "structurizr.dsl.identifier" : "state"
+      },
+      "name" : "State Files",
+      "description" : "State of SDLB Jobs stored as Json Files",
+      "metadata" : "Json"
+    }, {
+      "id" : "5",
+      "tags" : "Element,database",
+      "properties" : {
+        "structurizr.dsl.identifier" : "data"
+      },
+      "name" : "Data",
+      "description" : "Data that is read and written by SDLB Jobs, accessed through DataObjects",
+      "metadata" : "Many formats and technologies"
+    }, {
+      "id" : "6",
+      "tags" : "Element,folder",
+      "properties" : {
+        "structurizr.dsl.identifier" : "schemas"
+      },
+      "name" : "Schemas and Statistics",
+      "description" : "Collection of Schemas and Statistics about DataObjects",
+      "metadata" : "Json"
+    } ]
+  },
+  "documentation" : { },
+  "views" : {
+    "containerViews" : [ {
+      "key" : "Container-001",
+      "order" : 1,
+      "title" : "Context",
+      "softwareSystemId" : "7",
+      "paperSize" : "A3_Landscape",
+      "dimensions" : {
+        "width" : 3866,
+        "height" : 1916
+      },
+      "externalSoftwareSystemBoundariesVisible" : true,
+      "elements" : [ {
+        "id" : "1",
+        "x" : 887,
+        "y" : 195
+      }, {
+        "id" : "34",
+        "x" : 1574,
+        "y" : 805
+      }, {
+        "id" : "35",
+        "x" : 2286,
+        "y" : 805
+      }, {
+        "id" : "2",
+        "x" : 1574,
+        "y" : 1355
+      }, {
+        "id" : "3",
+        "x" : 2286,
+        "y" : 1355
+      }, {
+        "id" : "4",
+        "x" : 150,
+        "y" : 1355
+      }, {
+        "id" : "5",
+        "x" : 862,
+        "y" : 1355
+      }, {
+        "id" : "6",
+        "x" : 3000,
+        "y" : 1355
+      }, {
+        "id" : "8",
+        "x" : 862,
+        "y" : 805
+      } ],
+      "relationships" : [ {
+        "id" : "50",
+        "vertices" : [ {
+          "x" : 2510,
+          "y" : 1305
+        } ]
+      }, {
+        "id" : "36"
+      }, {
+        "id" : "52"
+      }, {
+        "id" : "41"
+      }, {
+        "id" : "53"
+      }, {
+        "id" : "44"
+      }, {
+        "id" : "47"
+      }, {
+        "id" : "49"
+      }, {
+        "id" : "38"
+      }, {
+        "id" : "39"
+      } ]
+    } ],
+    "componentViews" : [ {
+      "key" : "Component-001",
+      "order" : 2,
+      "title" : "Components of an SDLB Job",
+      "dimensions" : {
+        "width" : 4211,
+        "height" : 2859
+      },
+      "containerId" : "8",
+      "externalContainerBoundariesVisible" : true,
+      "elements" : [ {
+        "id" : "22",
+        "x" : 1955,
+        "y" : 1748
+      }, {
+        "id" : "11",
+        "x" : 2475,
+        "y" : 714
+      }, {
+        "id" : "23",
+        "x" : 2996,
+        "y" : 1748
+      }, {
+        "id" : "12",
+        "x" : 3521,
+        "y" : 694
+      }, {
+        "id" : "13",
+        "x" : 1415,
+        "y" : 1229
+      }, {
+        "id" : "24",
+        "x" : 1415,
+        "y" : 2193
+      }, {
+        "id" : "14",
+        "x" : 1955,
+        "y" : 1229
+      }, {
+        "id" : "25",
+        "x" : 870,
+        "y" : 2193
+      }, {
+        "id" : "15",
+        "x" : 3521,
+        "y" : 1229
+      }, {
+        "id" : "16",
+        "x" : 2475,
+        "y" : 1229
+      }, {
+        "id" : "17",
+        "x" : 870,
+        "y" : 1229
+      }, {
+        "id" : "18",
+        "x" : 2996,
+        "y" : 1229
+      }, {
+        "id" : "19",
+        "x" : 2475,
+        "y" : 1748
+      }, {
+        "id" : "2",
+        "x" : 200,
+        "y" : 694
+      }, {
+        "id" : "4",
+        "x" : 200,
+        "y" : 1519
+      }, {
+        "id" : "5",
+        "x" : 2475,
+        "y" : 199
+      }, {
+        "id" : "9",
+        "x" : 870,
+        "y" : 694
+      }, {
+        "id" : "20",
+        "x" : 1415,
+        "y" : 1748
+      }, {
+        "id" : "21",
+        "x" : 870,
+        "y" : 1748
+      }, {
+        "id" : "10",
+        "x" : 1415,
+        "y" : 694
+      } ],
+      "relationships" : [ {
+        "id" : "29"
+      }, {
+        "id" : "28"
+      }, {
+        "id" : "27"
+      }, {
+        "id" : "26"
+      }, {
+        "id" : "40"
+      }, {
+        "id" : "43",
+        "vertices" : [ {
+          "x" : 1069,
+          "y" : 1659
+        } ]
+      }, {
+        "id" : "33"
+      }, {
+        "id" : "32"
+      }, {
+        "id" : "31"
+      }, {
+        "id" : "30"
+      }, {
+        "id" : "46"
+      } ]
+    } ],
+    "configuration" : {
+      "branding" : { },
+      "styles" : {
+        "elements" : [ {
+          "tag" : "helper",
+          "background" : "#6bc4eb"
+        }, {
+          "tag" : "folder",
+          "shape" : "Folder"
+        }, {
+          "tag" : "file",
+          "shape" : "Folder"
+        }, {
+          "tag" : "database",
+          "shape" : "Cylinder"
+        }, {
+          "tag" : "extendable",
+          "icon" : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAQAAABKfvVzAAAAqklEQVR4Xr1TQQqDMBCcN/gAv6NPFmzxA/birfRQ0B/UiwHBGishu2MiobQz5LIzQ5LdBPgaOS4Y15VrIYQay8ZaCyFMe2DSQggfu2UEBQbPqDmg1IEnmSR7HZjJovn3wBU3GDJFAhYZKrL5NDz97GSXg+nfySL5kvbEHZLu0KR2SYoGD4pHAtV6OD5gMGA2u4VsgULvhM6rdq5Kr7V0/6H1qu1eO/gPv8QbKcUXn/QX54YAAAAASUVORK5CYII="
+        } ]
+      },
+      "themes" : [ "https://static.structurizr.com/themes/default/theme.json" ],
+      "terminology" : { },
+      "metadataSymbols" : "SquareBrackets",
+      "lastSavedView" : "Component-001"
+    }
+  }
+}

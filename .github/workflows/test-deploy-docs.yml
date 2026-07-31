@@ -1,0 +1,32 @@
+name: Test documentation deployment
+
+# Validates that the documentation site still builds, without publishing it.
+# Runs on pull requests that touch sdl-docs/, so a doc change is verified in the
+# same PR as the code change it documents.
+on:
+  pull_request:
+    branches: [develop-spark4, master-spark4]
+    paths:
+      - 'sdl-docs/**'
+      - '.github/workflows/test-deploy-docs.yml'
+
+defaults:
+  run:
+    # see deploy-docs.yml: create-schema-index.js is working-directory dependent
+    working-directory: sdl-docs
+
+jobs:
+  test-deploy:
+    name: Test deployment
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Test build
+        run: |
+          yarn install --frozen-lockfile
+          yarn build
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}

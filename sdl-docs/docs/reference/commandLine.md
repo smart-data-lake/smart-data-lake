@@ -1,0 +1,134 @@
+---
+id: commandLine
+title: Command Line
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Launch Java application using Spark-Submit
+SmartDataLakeBuilder is a java application. 
+To run on a cluster with spark-submit, use **DefaultSmartDataLakeBuilder** application.
+It can be started with the following command line options (for details, see [YARN](deployYarn.md)).
+
+```bash
+spark-submit --master yarn --deploy-mode client --class io.smartdatalake.app.DefaultSmartDataLakeBuilder target/smartdatalake_2.12-2.5.1-jar-with-dependencies.jar [arguments]
+```
+and takes the following arguments:
+```
+Usage: DefaultSmartDataLakeBuilder [options]
+SparkSmartDataLakeBuilder appVersion: develop, sdlbVersion: unknown
+Usage:  [options]
+  -f, --feed-sel <operation?><prefix:?><regex>[,<operation?><prefix:?><regex>...]
+                           Select actions to execute by one or multiple expressions separated by comma (,). Results from multiple expressions are combined from left to right.
+                           Operations:
+                           - pipe symbol (|): the two sets are combined by union operation (default)
+                           - ampersand symbol (&): the two sets are combined by intersection operation
+                           - minus symbol (-): the second set is subtracted from the first set
+                           Prefixes:
+                           - 'feeds': select actions where metadata.feed is matched by regex pattern (default)
+                           - 'names': select actions where metadata.name is matched by regex pattern
+                           - 'ids': select actions where id is matched by regex pattern
+                           - 'layers': select actions where metadata.layer of all output DataObjects is matched by regex pattern
+                           - 'startFromActionIds': select actions which with id is matched by regex pattern and any dependent action (=successors)
+                           - 'endWithActionIds': select actions which with id is matched by regex pattern and their predecessors
+                           - 'startFromDataObjectIds': select actions which have an input DataObject with id is matched by regex pattern and any dependent action (=successors)
+                           - 'endWithDataObjectIds': select actions which have an output DataObject with id is matched by regex pattern and their predecessors
+                           All matching is done case-insensitive.
+                           Example: to filter action 'A' and its successors but only in layer L1 and L2, use the following pattern: "startFromActionIds:a,&layers:(l1|l2)"
+  -n, --name <value>       Optional name of the application. If not specified feed-sel is used.
+  -c, --config <file1>[,<file2>...]
+                           One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme "cp" which is treated as classpath entry.
+  -o, --config-value-overwrite <nested.key>=<value>
+                           Overwrite configuration value at given nested key. Note that it is not recommended to overwrite array values. Use overwrite together with hocon substitution for this.
+  -p, --partition-values <partitionColName>=<partitionValue>[,<partitionValue>,...]
+                           Partition values to process for one single partition column.
+  -m, --multi-partition-values <partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>[;(<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>;...]
+                           Partition values to process for multiple partition columns.
+  -s, --streaming          Enable streaming mode for continuous processing.
+  --parallelism <int>      Max number of parallel executed SDLB actions.
+  --state-path <path>      Hadoop path to save run state files. Must be set to enable recovery in case of failures.
+  --test <config|dry-run>  Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage
+  --help                   Display the help text.
+  --version                Display version information.
+```
+
+The **DefaultSmartDataLakeBuilder** class should be fine in most situations. 
+It tries to use an existing Spark session of the environment, e.g. Databricks Cluster. It will not create a new Spark session. See SparkSmartDataLakeBuilder below to create a new Spark session.
+
+There are two additional, adapted application versions you can use:
+
+- **SparkSmartDataLakeBuilder** is used to create a new Spark session.
+Allows to explicitly override master and deploy-mode settings of Spark using the command-line.
+It should be used when there is no existing Spark session from the environment where SDLB is running, and you want to create a new Spark session, e. g. when working locally on your laptop or in an isolated container.
+
+SparkSmartDataLakeBuilder has the following additional arguments:
+- `--master <spark-master-url>`: configuration of the Spark sessions master Url, default is `local[*]`
+- `--deploy-mode <client|cluster>`: configuration of the Spark sessions deploy-mode. The default used by Spark is `client`.
+
+See [Submitting Spark Applications](https://spark.apache.org/docs/3.5.3/submitting-applications.html) for details.
+
+- **GlueSmartDataLakeBuilder**:
+For running SDLB on AWS Glue.
+Background: Glue passes many additional job parameters (command line arguments) down to the application. GlueSmartDataLakeBuilder removes the Glue specific ones, in order to allow proper command line validation by SDLB afterwards..
+
+# Launching SDL container
+Depending on the container definition, especially the entrypoint the arguments may vary. Furthermore, we distinguish starting the container using *docker* or *podman*. 
+
+In general a container launch would look like:
+
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run [docker-args] sdl-spark --config [config-file] --feed-sel [feed] [further-SDL-args]
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run [docker-args] sdl-spark --config [config-file] --feed-sel [feed] [further-SDL-args]
+```
+
+</TabItem>
+</Tabs>
+
+These could also include mounted directories for configurations, additional Scala Classes, data directories, etc.
+
+<Tabs groupId = "docker-podman-switch"
+defaultValue="docker"
+values={[
+{label: 'Docker', value: 'docker'},
+{label: 'Podman', value: 'podman'},
+]}>
+<TabItem value="docker">
+
+```jsx
+docker run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
+```
+
+</TabItem>
+<TabItem value="podman">
+
+```jsx
+podman run --rm -v ${PWD}/data:/mnt/data -v ${PWD}/target:/mnt/lib -v ${PWD}/config:/mnt/config sdl-spark:latest --config /mnt/config --feed-sel download
+```
+
+</TabItem>
+</Tabs>
+
+
+## Pods with Podman
+When interacting between multiple containers, e.g. SDL container and a metastore container, pods are utilized to manage the container and especially the network. A set of containers is launched using podman-compose.sh.
+
+Assuming an existing pod `mypod` is running, another container can be started within this pod using the additional podman arguments `--pod mypod --hostname myhost --add-host myhost:127.0.0.1`. 
+The hostname specification fixes an issue in resolving the own localhost.
+
+
+

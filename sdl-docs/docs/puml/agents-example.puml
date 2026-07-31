@@ -1,0 +1,39 @@
+' This code can be rendered on plantuml.com
+@startuml
+package "Internet" {
+cloud {
+  [Azure Relay Connection]
+}
+}
+
+package "Cloud" {
+
+[Scheduler] -> [SDLB Main Instance] :1
+  [SDLB Main Instance] -> [Azure Relay Connection] :2
+  [Azure Relay Connection] --> [SDLB Main Instance] : 7
+
+database "Cloud Data Source" {
+[Cloud Staging] -[#blue,thickness=2]--> [SDLB Main Instance] :8
+[SDLB Main Instance] -[#blue,thickness=2]-> [Cloud Datalake] :9
+}
+
+}
+package "On Premise" {
+ [SDLB Agent]
+database "On-Premise Data Source" {
+    [On Prem Data]  -[#blue,thickness=2]--> [SDLB Agent] :4
+
+[Azure Relay Connection]
+[SDLB Agent] --> [Azure Relay Connection] :6
+   [Azure Relay Connection] --> [SDLB Agent]  :3
+
+[SDLB Agent] -[#blue,thickness=2]> [Cloud Staging] : 5
+}
+}
+
+legend right
+    |Color | Type |
+    |<#blue> | Data Flow|
+    |<#black> | Control Flow|
+endlegend
+@enduml
