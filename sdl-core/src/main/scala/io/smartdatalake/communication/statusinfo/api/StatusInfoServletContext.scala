@@ -18,9 +18,8 @@
  */
 package io.smartdatalake.communication.statusinfo.api
 
+import jakarta.servlet.ServletContext
 import org.eclipse.jetty.server.handler.ContextHandler
-
-import javax.servlet.ServletContext
 
 /**
  * Singleton Object that provides the "glue" between :
