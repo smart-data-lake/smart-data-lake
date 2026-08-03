@@ -273,6 +273,15 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
 
   override def recommendedParallelism: Option[Int] = Some(connection.maxParallelConnections)
 
+  /**
+   * Helper to manually explore files on FTP directory
+   */
+  def listFiles(subPath: String, parentPath: Option[String] = None)(implicit context: ActionPipelineContext): Seq[String] = {
+    connection.execWithSFtpClient {
+      sftp => SshUtil.sftpListFiles(s"${parentPath.getOrElse(getPath)}$separator$fileName")(sftp)
+    }
+  }
+
   override def factory: FromConfigFactory[DataObject] = SFtpFileRefDataObject
 }
 
