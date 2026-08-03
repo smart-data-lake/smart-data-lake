@@ -22,7 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import com.typesafe.config.Config
 import io.smartdatalake.config.ConfigLoader
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.ProductUtil
+import io.smartdatalake.util.misc.{ProductUtil, StringUtil}
 import io.smartdatalake.workflow.HadoopFileActionDAGRunStateStore
 import org.apache.hadoop.conf.Configuration
 
@@ -74,6 +74,12 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
     assert(configuration.nonEmpty, "Configuration files are empty")
     assert(statePath.isEmpty || applicationName.isDefined, "application name must be defined if state path is set")
     assert(!streaming || statePath.isDefined, "state path must be set if streaming is enabled")
+  }
+
+  def sanitizeApplicationName(name: String): String = {
+    StringUtil.normalizeToAscii(name)
+      .replace(HadoopFileActionDAGRunStateStore.fileNamePartSeparator, "_")
+      .replaceAll("\\s", "-")
   }
 
   val appName: String = applicationName.getOrElse(feedSel)

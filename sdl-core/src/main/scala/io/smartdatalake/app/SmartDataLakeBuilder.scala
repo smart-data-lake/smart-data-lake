@@ -129,10 +129,10 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val requiredFeedselParser = nonRequiredFeedselParser.required()
 
     OParser.sequence(
-      head(appType, s"$appVersion"),
+      head(appType, appVersion),
       if (feedSelRequired) requiredFeedselParser else nonRequiredFeedselParser,
       opt[String]('n', "name")
-        .action((arg, config) => config.withApplicationName(Some(arg)))
+        .action((arg, config) => config.withApplicationName(Some(config.sanitizeApplicationName(arg))))
         .text("Optional name of the application. If not specified feed-sel is used."),
       opt[Seq[String]]('c', "config")
         .action((arg, config) => config.addConfiguration(arg.map(_.trim)))
