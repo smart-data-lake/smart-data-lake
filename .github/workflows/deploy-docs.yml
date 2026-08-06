@@ -44,7 +44,9 @@ jobs:
           node-version: 24
       - name: Build website
         run: |
-          yarn install --frozen-lockfile
+          # --ignore-scripts: do not run dependency lifecycle scripts, so a
+          # compromised package cannot execute code in the deploy job (Sonar S6505)
+          yarn install --frozen-lockfile --ignore-scripts
           yarn build
         env:
           # required by sdl-docs/.npmrc to read @smart-data-lake/sdlb-schema-viewer
