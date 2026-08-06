@@ -13,14 +13,6 @@ on:
   # allow for manual releases of the documentation
   workflow_dispatch:
 
-# Deployment via actions/deploy-pages requires an OIDC token (id-token) and
-# write access to the Pages deployment API. No write access to repository
-# contents is needed anymore, since nothing is pushed to a gh-pages branch.
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 # Two concurrent runs would both publish to the same Pages site. Serialize them
 # and let the newer run win rather than cancelling mid-publish.
 concurrency:
@@ -70,8 +62,16 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    # Deployment via actions/deploy-pages requires an OIDC token (id-token) and
+    # write access to the Pages deployment API. No write access to repository
+    # contents is needed anymore, since nothing is pushed to a gh-pages branch.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     steps:
       # Docs: https://github.com/actions/deploy-pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
