@@ -29,6 +29,8 @@ import org.slf4j.event.Level
 import java.net.URI
 import java.sql.Timestamp
 import java.time.LocalDateTime
+import scala.jdk.CollectionConverters._
+import scala.util.Try
 
 /**
  * Environment dependent configurations.
@@ -70,6 +72,37 @@ object Environment extends SmartDataLakeLogger {
   }
 
   var _expressionEvaluatorFactory: Option[ExpressionEvaluatorFactory] = None
+
+  /**
+   * SchemaProviders parse schema definitions given as configuration values, see
+   * [[io.smartdatalake.util.misc.SchemaUtil.readSchemaFromConfigValue]].
+   *
+   * By default all [[SchemaProvider]] implementations are discovered on the classpath (package io.smartdatalake),
+   * similar to [[io.smartdatalake.app.ModulePlugin]] and [[io.smartdatalake.workflow.dataobject.generic.DataObjectEngine]].
+   * Normally there is exactly one engine (and thus one provider) on the classpath, but more than one is supported.
+   *
+   * Alternatively a single concrete implementation can be enforced by setting the global option `schemaProvider` to
+   * its class name (the companion object), similar to [[expressionEvaluatorFactory]].
+   */
+  def schemaProviders: Seq[SchemaProvider] = {
+    if (_schemaProviders.isEmpty) {
+      _schemaProviders = Some(
+        EnvironmentUtil.getSdlParameter("schemaProvider")
+          .map(className => Seq(ScalaUtil.companionOf[SchemaProvider](className)))
+          .getOrElse {
+            val providerClasses = ReflectionUtil.getReflections("io.smartdatalake")
+              .getSubTypesOf(classOf[SchemaProvider]).asScala.toSeq
+            // implementations are expected to be Scala objects, resolve their companion instance and skip anything that isn't
+            val providers = providerClasses.flatMap(c => Try(ScalaUtil.companionOf[SchemaProvider](c.getName.stripSuffix("$"))).toOption)
+            logger.info(s"Discovered ${providers.size} SchemaProvider(s) on classpath: ${providers.map(_.getClass.getName).mkString(", ")}")
+            providers
+          }
+      )
+    }
+    _schemaProviders.get
+  }
+
+  var _schemaProviders: Option[Seq[SchemaProvider]] = None
 
   /**
    * Set basedir explicitly.

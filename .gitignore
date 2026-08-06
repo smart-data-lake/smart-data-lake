@@ -11,6 +11,10 @@ venv
 /sdl-core/test_enc.parquet/
 spark-warehouse
 **/spark-warehouse
+# local Spark distribution and Spark Connect server artifacts, see sdl-sparkconnect/start-spark-connect.sh
+spark-*-bin-hadoop*/
+metastore_db
+**/metastore_db
 *.versionsBackup
 **/dependency-reduced-pom.xml
 **/pom.xml.versionsBackup

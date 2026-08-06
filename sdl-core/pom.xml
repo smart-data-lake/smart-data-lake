@@ -90,6 +90,19 @@
                     <groupId>org.eclipse.jetty.websocket</groupId>
                     <artifactId>websocket-client</artifactId>
                 </exclusion>
+                <!-- exclude unneeded hadoop features like mapreduce and yarn-->
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-mapreduce-client-jobclient</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-yarn-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-yarn-client</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
 

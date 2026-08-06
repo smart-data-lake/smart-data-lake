@@ -89,8 +89,6 @@ case class SparkRepartitionDef(numberOfTasksPerPartition: Int,
 }
 
 object SparkRepartitionDef extends SmartDataLakeLogger {
-  implicit val configReader: ConfigReader[SparkRepartitionDef] = ConfigReader.derive[SparkRepartitionDef]
-
 
   def repartitionDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues], configObjectId: ConfigObjectId, keyCols: Seq[String], numberOfTasksPerPartition: Int): DataFrame = {
     val partitions = partitionValues.flatMap(_.keys)

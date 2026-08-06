@@ -38,7 +38,7 @@ class ConfigJsonExporterTest extends AnyFunSuite {
     val actualJsonOutput = JsonMethods.parse(actualOutput)
     assert((actualJsonOutput \ "actions").children.size === 8)
     assert((actualJsonOutput \ "dataObjects").children.size === 15)
-    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "lineNumber" === JInt(107))
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "lineNumber" === JInt(112))
     assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "endLineNumber" === JNothing)
     assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "path" === JString("dagexporterTest.conf"))
     assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" \ "a" === JString("Beschreibung A"))

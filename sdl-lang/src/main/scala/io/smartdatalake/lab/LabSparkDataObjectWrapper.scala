@@ -19,12 +19,14 @@
 package io.smartdatalake.lab
 
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
+import io.smartdatalake.lab.LabCatalogGenerator.canCreateSparkDataFrame
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataframe.{DataFrameWrapper, GenericDataFrame}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.file.{FileRefDataObject, HadoopFileDataObject}
-import io.smartdatalake.workflow.dataobject.generic.{CanHandlePartitions, TableDataObject}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanHandlePartitions, TableDataObject}
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
@@ -35,9 +37,11 @@ import java.util.TimeZone
 /**
  * A wrapper around a Spark DataObject simplifying the interface for interactive use.
  */
-case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFrame](dataObject: T, context: ActionPipelineContext) {
+case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateDataFrame](dataObject: T, context: ActionPipelineContext) {
   def get(): DataFrame = {
-    dataObject.getSparkDataFrame()(context)
+    dataObject.getDataFrame(subFeedType = dataObject.getSubFeedSupportedTypes.find(canCreateSparkDataFrame).get)(context)
+      .asInstanceOf[GenericDataFrame with DataFrameWrapper]
+      .inner.asInstanceOf[DataFrame]
   }
   def get(topLevelPartitions: Seq[String]): DataFrame = {
     if(partitionColumns.isEmpty) throw NotSupportedException(dataObject.id, s"DataObject is not partitioned but called get(...) with topLevelPartitions ${topLevelPartitions.mkString(",")}")
@@ -128,8 +132,8 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateSparkDataFram
         .map(s => (o.extractPartitionValuesFromDirPath(s.getPath.toString)(context), LocalDateTime.ofInstant(Instant.ofEpochMilli(s.getModificationTime), timezoneId)))
     case _ => throw NotSupportedException(dataObject.id, "is not partitioned or has no hadoop directory layout")
   }
-  def schema: StructType = dataObject.getSparkDataFrame()(context).schema
-  def printSchema(): Unit = dataObject.getSparkDataFrame()(context).printSchema()
+  def schema: StructType = get().schema
+  def printSchema(): Unit = get().printSchema()
   def refresh(): Unit = {
     dataObject match {
       case o: TableDataObject =>

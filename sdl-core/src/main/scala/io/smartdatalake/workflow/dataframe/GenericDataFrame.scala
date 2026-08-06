@@ -285,6 +285,13 @@ trait GenericDataFrame extends GenericTypedObject {
 }
 
 /**
+ * An interface to get generic access to wrapped DataFrame for Spark or Snowflake
+ */
+trait DataFrameWrapper {
+  def inner: Any
+}
+
+/**
  * Interface for the result of a df.groupBy on a GenericDataFrame
  */
 trait GenericGroupedDataFrame extends GenericTypedObject {

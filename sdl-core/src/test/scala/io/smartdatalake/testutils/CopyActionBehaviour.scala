@@ -22,6 +22,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.exporter.ExportWriter.formatSchema
 import io.smartdatalake.config.exporter.HadoopExportWriter
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
+import io.smartdatalake.testutils.plainScala.ScalaTestUtil.getCommonSubFeed
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTransformer
@@ -57,7 +58,7 @@ trait CopyActionBehaviour {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
     import helper.implicits._
 
     // prepare schema export

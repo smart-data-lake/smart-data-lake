@@ -22,6 +22,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
+import io.smartdatalake.testutils.plainScala.ScalaTestUtil.getCommonSubFeed
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.executionMode.DataFrameIncrementalMode
@@ -69,7 +70,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // setup DataObjects
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
       import helper.implicits._
 
       // prepare & start 1st load
@@ -163,7 +164,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // setup DataObjects
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
       import helper.implicits._
 
       // prepare & start 1st load
@@ -262,7 +263,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // setup DataObjects
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("id")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
       import helper.implicits._
 
       // prepare & start 1st load
@@ -333,7 +334,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgt1DO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
       val tgt2DO = registerDataObject(createTgtDataObject("tgt2", Some(Seq("lastname", "firstname")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgt1DO))
       import helper.implicits._
 
       // define DAG
@@ -399,7 +400,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // setup DataObjects
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("id")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
       import helper.col
       import helper.implicits._
 

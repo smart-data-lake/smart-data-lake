@@ -22,6 +22,7 @@ import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderCo
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.{Condition, Environment}
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
+import io.smartdatalake.testutils.plainScala.ScalaTestUtil.getCommonSubFeed
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -114,7 +115,7 @@ trait SmartDataLakeBuilderBehaviour extends Assertions {
     val tgt1DO = createMockDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname")))
     // second table has partition columns dt only (reduced)
     val tgt2DO = createMockDataObject("tgt2", partitions = Seq("dt"), primaryKey = Some(Seq("lastname", "firstname")))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgt1DO))
     import helper._
     import helper.implicits._
 
@@ -207,7 +208,7 @@ trait SmartDataLakeBuilderBehaviour extends Assertions {
     val tgt1DO = createMockDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname")))
     // second table has partition columns dt only (reduced)
     val tgt2DO = createMockDataObject("tgt2", partitions = Seq("dt"), primaryKey = Some(Seq("lastname", "firstname")))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgt1DO))
     import helper.implicits._
 
     // prepare data
@@ -280,7 +281,7 @@ trait SmartDataLakeBuilderBehaviour extends Assertions {
     val tgt2DO = createMockDataObject("tgt2", partitions = Seq("dt"))
     val tgt3DO = createMockDataObject("tgt3", partitions = Seq("dt"))
     val tgt4DO = createMockDataObject("tgt4", partitions = Seq("dt"))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgt1DO))
     import helper.implicits._
 
     // prepare data
@@ -373,7 +374,7 @@ trait SmartDataLakeBuilderBehaviour extends Assertions {
     val srcDO = createMockDataObject("src1", partitions = Seq("dt"))
     val tgt1DO = createMockDataObject("tgt1", partitions = Seq("dt"))
     val tgt2DO = createMockDataObject("tgt2", partitions = Seq("dt"))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgt1DO))
     import helper.implicits._
 
     // prepare data
@@ -423,7 +424,8 @@ trait SmartDataLakeBuilderBehaviour extends Assertions {
     val srcDO = createMockDataObject("src1", partitions = Seq("dt"))
     val tgt1DO = createMockDataObject("tgt1", partitions = Seq("dt"))
     val tgt2DO = createMockDataObject("tgt2", partitions = Seq("dt"))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val subFeedType = getCommonSubFeed(srcDO, tgt1DO)
+    val helper = DataFrameSubFeed.getCompanion(subFeedType)
     import helper.implicits._
 
     // prepare data
@@ -436,7 +438,7 @@ trait SmartDataLakeBuilderBehaviour extends Assertions {
     instanceRegistry.register(action1.copy())
     // action2 skipped (no data)
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
-      , transformers = Seq(FilterTransformer(filterClause = "false", subFeedTypeForValidation = srcDO.getSubFeedSupportedTypes.head.typeSymbol.fullName)) // force no data, so that the Action gets skipped
+      , transformers = Seq(FilterTransformer(filterClause = "false", subFeedTypeForValidation = subFeedType.typeSymbol.fullName)) // force no data, so that the Action gets skipped
     )
     instanceRegistry.register(action2.copy())
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
@@ -537,7 +539,7 @@ trait SmartDataLakeBuilderBehaviour extends Assertions {
     val srcDO = createMockDataObject("src1", partitions = Seq("dt", "type"))
     // first table has partitions columns dt and type (same as source)
     val tgt1DO = createMockDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname")))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgt1DO))
     import helper._
     import helper.implicits._
 
@@ -623,7 +625,7 @@ trait SmartDataLakeBuilderBehaviour extends Assertions {
     // first table has partitions columns dt and type (same as source)
     val tgt1DO = createMockDataObject("tgt1", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname")))
     val tgt2DO = createMockDataObject("tgt2", partitions = Seq("dt", "type"), primaryKey = Some(Seq("lastname", "firstname")))
-    val helper = DataFrameSubFeed.getCompanion(srcDO.getSubFeedSupportedTypes.head)
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgt1DO))
     import helper._
     import helper.implicits._
 

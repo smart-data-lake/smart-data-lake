@@ -39,7 +39,7 @@ import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
 
-case class SparkDataFrame(inner: DataFrame) extends GenericDataFrame {
+case class SparkDataFrame(override val inner: DataFrame) extends GenericDataFrame with DataFrameWrapper {
   override def subFeedType: universe.Type = typeOf[SparkSubFeed]
 
   override def schema: SparkSchema = SparkSchema(inner.schema)

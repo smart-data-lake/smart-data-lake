@@ -22,9 +22,8 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.spark.evolution.TypeEvolutionUtil
-import io.smartdatalake.util.spark.{DummyStreamProvider, NullAwareMurmur3HashExpr, SparkSchemaUtil, dataset}
+import io.smartdatalake.util.spark.{DummyStreamProvider, NullAwareMurmur3HashExpr, dataset}
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
@@ -480,9 +479,6 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
 
   // This is for testing/lab only: define a default spark connection
   private[smartdatalake] var _defaultSparkSession: Option[SparkSession] = None
-
-  // Register Spark schema provider so SchemaUtil.readSchemaFromConfigValue uses Spark-backed parsing
-  SchemaUtil.registerSchemaProvider(SparkSchemaUtil.readSchemaFromConfigValue)
 
   // Register exception wrapper to simplify ExtendedAnalysisException output in task failure messages
   TaskFailedException.registerExceptionWrapper {

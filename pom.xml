@@ -28,6 +28,7 @@
     <modules>
         <module>sdl-core</module>
         <module>sdl-spark</module>
+        <module>sdl-sparkconnect</module>
         <module>sdl-kafka</module>
         <module>sdl-kafka/embedded-kafka-schema-registry-shaded</module>
         <module>sdl-deltalake</module>
@@ -90,7 +91,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-shade-plugin</artifactId>
-                        <version>3.9.12</version>
+                        <version>3.6.2</version>
                         <executions>
                             <execution>
                                 <id>shade-jar-with-dependencies</id>
@@ -168,7 +169,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-shade-plugin</artifactId>
-                        <version>3.6.0</version>
+                        <version>3.6.2</version>
                         <executions>
                             <execution>
                                 <id>shade-jar-with-dependencies</id>
@@ -418,10 +419,9 @@
         <jetty.deps.scope>compile</jetty.deps.scope>
         <scala.minor.version>2.13</scala.minor.version>
         <scala.version>${scala.minor.version}.12</scala.version>
-        <spark.version>4.1.1
-        </spark.version><!-- delta-lake 3.3.2 is not yet compatible with Spark 3.5.6 because of https://github.com/delta-io/delta/issues/4671 -->
-        <spark-extensions.version>4.1.0-SNAPSHOT
-        </spark-extensions.version> <!-- this sdl-specific extensions should match the minor version of property spark.version -->
+        <spark.version>4.1.1</spark.version>
+        <!-- this sdl-specific extensions should match the minor version of property spark.version -->
+        <spark-extensions.version>4.1.0-SNAPSHOT</spark-extensions.version>
         <spark.minor.version>4.1</spark.minor.version>
 
         <!-- SPARK-PARENT start: properties copied from spark-parent pom version for spark-parent import in dependencyManagement -->
@@ -1163,13 +1163,11 @@
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-impl</artifactId>
                 <version>${jjwt.version}</version>
-                <scope>${jjwt.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>io.jsonwebtoken</groupId>
                 <artifactId>jjwt-jackson</artifactId>
                 <version>${jjwt.version}</version>
-                <scope>${jjwt.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>com.google.code.findbugs</groupId>
@@ -1463,13 +1461,11 @@
                 <groupId>org.apache.derby</groupId>
                 <artifactId>derby</artifactId>
                 <version>${derby.version}</version>
-                <scope>${derby.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.derby</groupId>
                 <artifactId>derbytools</artifactId>
                 <version>${derby.version}</version>
-                <scope>${derby.deps.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>io.dropwizard.metrics</groupId>
@@ -2779,6 +2775,12 @@
             <dependency>
                 <groupId>org.apache.spark</groupId>
                 <artifactId>spark-catalyst_${scala.minor.version}</artifactId>
+                <version>${spark.version}</version>
+                <scope>${spark.deps.scope}</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-connect-client-jvm_${scala.minor.version}</artifactId>
                 <version>${spark.version}</version>
                 <scope>${spark.deps.scope}</scope>
             </dependency>
