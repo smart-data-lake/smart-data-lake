@@ -353,6 +353,8 @@
                                     <goal>doc-jar</goal>
                                 </goals>
                                 <configuration>
+                                    <!-- scaladoc is skipped for snapshot deployments, see maven.scaladoc.skip -->
+                                    <skip>${maven.scaladoc.skip}</skip>
                                     <args>
                                         <arg>-no-link-warnings</arg>
                                     </args>
