@@ -37,7 +37,7 @@ import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with SmartDataLakeLogger {
+case class SnowparkDataFrame(override val inner: DataFrame) extends GenericDataFrame with DataFrameWrapper with SmartDataLakeLogger {
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
   override def schema: SnowparkSchema = SnowparkSchema(inner.schema)
 

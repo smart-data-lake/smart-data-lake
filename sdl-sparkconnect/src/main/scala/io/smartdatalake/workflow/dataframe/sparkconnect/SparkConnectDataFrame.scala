@@ -38,7 +38,7 @@ import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.typeOf
 
-case class SparkConnectDataFrame(inner: DataFrame) extends GenericDataFrame {
+case class SparkConnectDataFrame(override val inner: DataFrame) extends GenericDataFrame with DataFrameWrapper {
   override def subFeedType: universe.Type = typeOf[SparkConnectSubFeed]
 
   override def schema: SparkConnectSchema = SparkConnectSchema(inner.schema)

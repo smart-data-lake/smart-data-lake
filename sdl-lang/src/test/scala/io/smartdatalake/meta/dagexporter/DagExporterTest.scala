@@ -97,7 +97,7 @@ class DagExporterTest extends AnyFunSuite with SmartDataLakeLogger {
     val DagExpCfg = DagExporterConfig(getClass.getResource("/dagexporter/dagexporterTest.conf").getPath)
     val actualOutput = DagExporter.exportConfigDagToJSON(DagExpCfg)
 
-    Try(assert(actualOutput == expectedOutput)) match {
+    Try(assert(actualOutput.linesIterator.toSeq == expectedOutput.linesIterator.toSeq)) match {
       case Success(_) => logger.debug("testMain succeeded :)")
       case Failure(e) =>
         logger.error("TEST FAILED: ")

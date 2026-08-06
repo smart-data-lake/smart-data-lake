@@ -22,13 +22,17 @@ import io.smartdatalake.config.{ConfigToolbox, ConfigurationException, InstanceR
 import io.smartdatalake.util.misc.StringUtil.strToLowerCamelCase
 import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.{Action, CustomDataFrameAction, DataFrameOneToOneActionImpl}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.dataframe.sparkconnect.SparkConnectSubFeed
 import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.CanCreateDataFrame
 import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import org.apache.commons.io.FileUtils
 import scopt.OptionParser
 
 import java.io.File
 import java.nio.file.{Files, Paths, StandardOpenOption}
+import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
  * Configuration for the LabCatalogGenerator
@@ -193,7 +197,7 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
 
   def generateDataObjectCatalogClass(packageName: String, className: String, registry: InstanceRegistry): String = {
     val entries = registry.getDataObjects.sortBy(_.id.id).flatMap {
-      case x: DataObject with CanCreateSparkDataFrame =>
+      case x: DataObject with CanCreateDataFrame if x.getSubFeedSupportedTypes.exists(canCreateSparkDataFrame) =>
         Some(s"""lazy val ${strToLowerCamelCase(
             x.id.id
           )} = LabSparkDataObjectWrapper(registry.get[${x.getClass.getName}](DataObjectId("${x.id.id}")), context)""")
@@ -217,11 +221,11 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
 
   def generateActionCatalogClass(packageName: String, className: String, registry: InstanceRegistry): String = {
     val entries = registry.getActions.sortBy(_.id.id).flatMap {
-      case x: Action with CustomDataFrameAction =>
+      case x: Action with CustomDataFrameAction if canCreateSparkDataFrame(x.subFeedType) =>
         Some(s"""lazy val ${strToLowerCamelCase(
             x.id.id
           )} = LabSparkDfsActionWrapper(registry.get[${x.getClass.getName}](ActionId("${x.id.id}")), context)""")
-      case x: Action with DataFrameOneToOneActionImpl =>
+      case x: Action with DataFrameOneToOneActionImpl if canCreateSparkDataFrame(x.subFeedType) =>
         Some(s"""lazy val ${strToLowerCamelCase(
             x.id.id
           )} = LabSparkDfActionWrapper(registry.get[${x.getClass.getName}](ActionId("${x.id.id}")), context)""")
@@ -242,5 +246,12 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
        |${entries.map("  " + _).mkString("\n")}
        |}
     """.stripMargin
+  }
+
+  /**
+   * SparkSubFeed and SparkConnectSubFeed can create Spark DataFrames.
+   */
+  def canCreateSparkDataFrame(subFeedType: Type): Boolean = {
+    subFeedType == typeOf[SparkSubFeed] || subFeedType == typeOf[SparkConnectSubFeed]
   }
 }
