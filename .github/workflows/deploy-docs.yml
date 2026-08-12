@@ -1,0 +1,18 @@
+name: Deploy documentation to GitHub Pages
+
+# Dummy workflow to enable manual testing of deploy-docs workflow on other branches
+# manual workflow start only works if the corresponding workflow is present on the main branch.
+on:
+
+  # allow for manual releases of the documentation
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
