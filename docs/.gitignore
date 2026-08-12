@@ -1,0 +1,35 @@
+# The repository root .gitignore excludes *.js and *.html globally (they are
+# build artefacts elsewhere in this project). For the documentation site they
+# are sources, so re-include them here. Without this, a newly added Docusaurus
+# component or page is silently skipped by "git add".
+!*.js
+!*.html
+
+# Dependencies
+/node_modules
+
+# Production
+/build
+
+# Generated files
+.docusaurus
+.cache-loader
+/static/json-schema-viewer/schemas/index.json
+
+# Misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+.idea*
+
+id_ed25519*
+
+
+/docs/structurizr/.structurizr/
