@@ -67,3 +67,5 @@ If you are looking for commercial support, please contact us at smartdatalake@el
 ![ELCA](images/ELCA_logo.png)  
 [www.elca.ch](http://www.elca.ch) : Did the comprehensive revision and provision as open source project
 
+
+Note: deployed by deploy-docs.yml
