@@ -613,6 +613,8 @@
                 "$ref" : "#/definitions/Connection/SnowflakeConnection"
               }, {
                 "$ref" : "#/definitions/Connection/SparkClassicConnection"
+              }, {
+                "$ref" : "#/definitions/Connection/SparkConnectConnection"
               } ]
             },
             "description" : "Optional Map of private connections that this agent has access to.\n\nIf an Agent has no own Hocon connection configuration in the remote location, connections can be defined here\nand they will override connections defined in the global connections section for execution on the Agent.  \nThis allows the Agent to use some connections that are only accessible in the Agent's environment.\n\nNote that Agent Servers need to be started with useOnlyLocalConnectionConfig=false to use this feature for security reasons."
@@ -658,6 +660,8 @@
                 "$ref" : "#/definitions/Connection/SnowflakeConnection"
               }, {
                 "$ref" : "#/definitions/Connection/SparkClassicConnection"
+              }, {
+                "$ref" : "#/definitions/Connection/SparkConnectConnection"
               } ]
             },
             "description" : "Optional Map of private connections that this agent has access to.\n\nIf an Agent has no own Hocon connection configuration in the remote location, connections can be defined here\nand they will override connections defined in the global connections section for execution on the Agent.  \nThis allows the Agent to use some connections that are only accessible in the Agent's environment.\n\nNote that Agent Servers need to be started with useOnlyLocalConnectionConfig=false to use this feature for security reasons."
@@ -711,6 +715,8 @@
                 "$ref" : "#/definitions/Connection/SnowflakeConnection"
               }, {
                 "$ref" : "#/definitions/Connection/SparkClassicConnection"
+              }, {
+                "$ref" : "#/definitions/Connection/SparkConnectConnection"
               } ]
             },
             "description" : "Optional Map of private connections that this agent has access to.\n\nIf an Agent has no own Hocon connection configuration in the remote location, connections can be defined here\nand they will override connections defined in the global connections section for execution on the Agent.  \nThis allows the Agent to use some connections that are only accessible in the Agent's environment.\n\nNote that Agent Servers need to be started with useOnlyLocalConnectionConfig=false to use this feature for security reasons."
@@ -3127,6 +3133,81 @@
         "additionalProperties" : false,
         "description" : "`DataObject` of type SnowflakeTableDataObject.  \nProvides details to access Snowflake tables via an action\nCan be used both for interacting with Snowflake through Spark with JDBC,\nas well as for actions written in the Snowpark API that run directly on Snowflake\n\nNote 1: Snowflake does not support partitioning.  \nBut SDLB emulates partitions through the `virtualPartitions` attribute.\n\nNote 2: Snowflake is tricky with Datatypes.  \nAs Integral types like Long, Int, Short don't exist in Snowflake, they all become a Decimal(38,0) by default.  \nSDLB improves the default by automatically converting Integral types to Decimals with accurate precision on write, e.g. Int => Decimal(10,0).  \nFor adapting types on read, use the `readTransformer` attribute.\n\nNote 3: case-insensitive column names are all uppercase in Snowflake tables. This is opposite from Spark when Spark is in case-insensitive mode (see also `Environment.caseSensitive` )\nIf `Environment.caseSensitive=false` then SDLB converts all case-insensitive column names to lowercase when reading from Snowflake with Spark Connector. Example:\n```\ndataObjects = {\n  tgt-airports {\n    type = SnowflakeTableDataObject\n    connectionId = sf-con\n    table {\n      db = \"test_schema\"\n      name = \"airports\"\n    }\n    virtualPartitions = [dt]\n    saveMode = Append\n  }\n}\n```\n"
       },
+      "SparkConnectTableDataObject" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "SparkConnectTableDataObject"
+          },
+          "table" : {
+            "$ref" : "#/definitions/Others/Table",
+            "description" : "table to be read/written by this data object"
+          },
+          "schemaMin" : {
+            "type" : "string",
+            "description" : "An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing."
+          },
+          "partitions" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "partition columns for this data object"
+          },
+          "saveMode" : {
+            "type" : "string",
+            "description" : "`SDLSaveMode` to use when writing the table, default is \"Overwrite\"",
+            "enum" : [ "Merge", "OverwriteOptimized", "OverwritePreserveDirectories", "Ignore", "ErrorIfExists", "Append", "Overwrite" ]
+          },
+          "format" : {
+            "type" : "string",
+            "description" : "Optional table format used when creating the table, e.g. parquet or delta. Default is the servers default table format."
+          },
+          "allowSchemaEvolution" : {
+            "type" : "boolean",
+            "description" : "If set to true schema evolution will automatically occur when writing to this DataObject with different schema.  \nNote that this needs a table format supporting schema evolution on the server side, e.g. delta."
+          },
+          "options" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Options for the Spark DataFrameReader/DataFrameWriter, e.g. format specific options."
+          },
+          "connectionId" : {
+            "type" : "string",
+            "description" : "The SparkConnectConnection to use. If not defined, the default engine connection is used."
+          },
+          "preReadSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase before reading input table."
+          },
+          "postReadSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase after reading input table and before action is finished."
+          },
+          "preWriteSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase before writing output table."
+          },
+          "postWriteSql" : {
+            "type" : "string",
+            "description" : "SQL-statement to be executed in exec phase after writing output table."
+          },
+          "expectedPartitionsCondition" : {
+            "type" : "string",
+            "description" : "Optional definition of partitions expected to exist.  \nDefine a Spark SQL expression that is evaluated against a`PartitionValues` instance and returns true or false\nDefault is to expect all partitions to exist."
+          },
+          "metadata" : {
+            "$ref" : "#/definitions/Others/DataObjectMetadata",
+            "description" : "meta data"
+          }
+        },
+        "title" : "SparkConnectTableDataObject",
+        "required" : [ "type", "table", "connectionId" ],
+        "additionalProperties" : false,
+        "description" : "`DataObject` of type SparkConnectTableDataObject.  \nProvides access to tables of the catalog of a remote Spark Connect server through the normal Spark Table API,\ne.g. spark.read.table and DataFrame.write.saveAsTable.\n\nNote that data is only accessed through the Spark Connect session - there is no Hadoop FileSystem access\nto the underlying data from the SDLB client.\n\nNote that SDLSaveMode.Merge needs a table format supporting row-level operations on the server side, e.g. delta or iceberg."
+      },
       "WebserviceFileDataObject" : {
         "type" : "object",
         "properties" : {
@@ -5305,6 +5386,34 @@
         "required" : [ "type" ],
         "additionalProperties" : false,
         "description" : "Connection information for a classic Spark session.\n\nThis is the `EngineConnection` for the Spark DataFrame engine: it creates and configures the SparkSession\nshared by all Actions using it, including spark options, Kryo classes, Hive support and user defined functions.  \nActions select an engine connection with their `engineConnectionId` attribute; if none is given the connection\nwith id `default-engine` is used (configurable through the SDLB parameter `defaultEngineConnectionId` ).  \nLeave `master` unset to attach to an existing Spark session provided by the environment (e.g. Databricks,\nEMR, spark-submit); set it (e.g. `local` , `yarn` ) to let SDLB create the session itself. Example:\n```\nconnections {\n  default-engine {\n    type = SparkClassicConnection\n    master = \"local[*]\"\n    enableHive = false\n    sparkOptions {\n      \"spark.sql.shuffle.partitions\" = \"8\"\n    }\n  }\n}\n```\n\n\nNOTE: with `master = \"yarn\"` the environment variable SPARK_HOME must be set."
+      },
+      "SparkConnectConnection" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "SparkConnectConnection"
+          },
+          "url" : {
+            "type" : "string",
+            "description" : "remote URL of the Spark Connect server, e.g. \"sc://localhost:15002\".  \nAdditional parameters like tokens can be appended according to the Spark Connect connection string spec,\ne.g. \"sc://host:port/;token=ABCDEFG;user_id=user\"."
+          },
+          "sparkOptions" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string",
+              "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+            },
+            "description" : "spark options to set on the session builder\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+          },
+          "metadata" : {
+            "$ref" : "#/definitions/Others/ConnectionMetadata",
+            "description" : "Additional metadata for the Connection"
+          }
+        },
+        "title" : "SparkConnectConnection",
+        "required" : [ "type", "url" ],
+        "additionalProperties" : false,
+        "description" : "Connection information for a Spark Connect session.\n\nNote that a Spark Connect session is a thin client connected to a remote Spark Connect server.  \nThere is no Hadoop FileSystem API available to access remote data - all data access happens through\nspark.read/write on the server side."
       }
     },
     "SaveModeOptions" : {
@@ -7209,6 +7318,8 @@
           "$ref" : "#/definitions/Connection/SnowflakeConnection"
         }, {
           "$ref" : "#/definitions/Connection/SparkClassicConnection"
+        }, {
+          "$ref" : "#/definitions/Connection/SparkConnectConnection"
         } ],
         "description" : "Map of Connection name and definition"
       }
@@ -7260,6 +7371,8 @@
           "$ref" : "#/definitions/DataObject/SFtpFileRefDataObject"
         }, {
           "$ref" : "#/definitions/DataObject/SnowflakeTableDataObject"
+        }, {
+          "$ref" : "#/definitions/DataObject/SparkConnectTableDataObject"
         }, {
           "$ref" : "#/definitions/DataObject/WebserviceFileDataObject"
         }, {
