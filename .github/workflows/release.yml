@@ -82,13 +82,13 @@ jobs:
 
     - name: Push sdl-schema.json to documentation site
       run: |
-        # The documentation site lives in sdl-docs/ on this same branch, so no
+        # The documentation site lives in docs/ on this same branch, so no
         # cross-branch checkout is needed. Pushing with PAT_ACTIONS triggers
         # deploy-docs.yml, which republishes the site including the new schema.
         # note that sdl-schema.json should be available in the location below from the previous maven build.
-        mv sdl-lang/target/classes/sdl-schema.json sdl-docs/static/json-schema-viewer/schemas/sdl-schema-${MVN_RELEASE_VERSION}.json
-        git add sdl-docs/static/json-schema-viewer/schemas/sdl-schema-${MVN_RELEASE_VERSION}.json
-        git rm --ignore-unmatch sdl-docs/static/json-schema-viewer/schemas/sdl-schema-${MVN_RELEASE_VERSION}-SNAPSHOT.json
+        mv sdl-lang/target/classes/sdl-schema.json docs/static/json-schema-viewer/schemas/sdl-schema-${MVN_RELEASE_VERSION}.json
+        git add docs/static/json-schema-viewer/schemas/sdl-schema-${MVN_RELEASE_VERSION}.json
+        git rm --ignore-unmatch docs/static/json-schema-viewer/schemas/sdl-schema-${MVN_RELEASE_VERSION}-SNAPSHOT.json
         git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_RELEASE_VERSION}.json" # only if there is something to commit
         git push
 

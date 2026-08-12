@@ -23,12 +23,12 @@ const config = {
           sidebarPath: require.resolve('./sidebars.js'),
           // Points at the development branch (where doc changes are contributed),
           // not the branch the site is deployed from. The path relative to this
-          // site directory is appended, hence the /sdl-docs suffix.
-          editUrl: 'https://github.com/smart-data-lake/smart-data-lake/tree/develop-spark4/sdl-docs',
+          // site directory is appended, hence the /docs suffix.
+          editUrl: 'https://github.com/smart-data-lake/smart-data-lake/tree/develop-spark4/docs',
         },
         blog: {
           showReadingTime: true,
-          editUrl: 'https://github.com/smart-data-lake/smart-data-lake/tree/develop-spark4/sdl-docs',
+          editUrl: 'https://github.com/smart-data-lake/smart-data-lake/tree/develop-spark4/docs',
           onInlineAuthors: 'ignore'
         },
         theme: {

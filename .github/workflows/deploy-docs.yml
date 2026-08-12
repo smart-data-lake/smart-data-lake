@@ -1,13 +1,13 @@
 name: Deploy documentation to GitHub Pages
 
-# The documentation site lives in sdl-docs/ and is developed on develop-spark4.
+# The documentation site lives in docs/ and is developed on develop-spark4.
 # It is published only from master-spark4, so that the public site always reflects
 # the released state and no two branches race to publish the same site.
 on:
   push:
     branches: [master-spark4]
     paths:
-      - 'sdl-docs/**'
+      - 'docs/**'
       - '.github/workflows/deploy-docs.yml'
 
   # allow for manual releases of the documentation
@@ -22,8 +22,8 @@ concurrency:
 defaults:
   run:
     # create-schema-index.js resolves static/json-schema-viewer/schemas/ relative
-    # to the working directory, so the build has to run inside sdl-docs.
-    working-directory: sdl-docs
+    # to the working directory, so the build has to run inside docs.
+    working-directory: docs
 
 jobs:
   build:
@@ -41,7 +41,7 @@ jobs:
           yarn install --frozen-lockfile --ignore-scripts
           yarn build
         env:
-          # required by sdl-docs/.npmrc to read @smart-data-lake/sdlb-schema-viewer
+          # required by docs/.npmrc to read @smart-data-lake/sdlb-schema-viewer
           # from the GitHub package registry
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -50,8 +50,8 @@ jobs:
         with:
           # Build output to publish.
           # NOTE: defaults.run.working-directory does not apply to `uses:` steps,
-          # so this path is relative to the workspace root and must include sdl-docs.
-          path: ./sdl-docs/build
+          # so this path is relative to the workspace root and must include docs.
+          path: ./docs/build
 
   deploy:
     name: Deploy to GitHub Pages

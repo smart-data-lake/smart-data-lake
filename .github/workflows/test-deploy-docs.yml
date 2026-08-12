@@ -1,19 +1,19 @@
 name: Test documentation deployment
 
 # Validates that the documentation site still builds, without publishing it.
-# Runs on pull requests that touch sdl-docs/, so a doc change is verified in the
+# Runs on pull requests that touch docs/, so a doc change is verified in the
 # same PR as the code change it documents.
 on:
   pull_request:
     branches: [develop-spark4, master-spark4]
     paths:
-      - 'sdl-docs/**'
+      - 'docs/**'
       - '.github/workflows/test-deploy-docs.yml'
 
 defaults:
   run:
     # see deploy-docs.yml: create-schema-index.js is working-directory dependent
-    working-directory: sdl-docs
+    working-directory: docs
 
 jobs:
   test-deploy:

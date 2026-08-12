@@ -115,10 +115,10 @@ jobs:
       - name: Push new sdl-schema.json to documentation site
         if: ${{ contains(github.base_ref, 'develop-spark') || contains(github.ref, 'develop-spark')}}
         run: |
-          # The documentation site lives in sdl-docs/ on this same branch, so no
+          # The documentation site lives in docs/ on this same branch, so no
           # cross-branch checkout is needed. Guarded because branches that do not
           # carry the documentation site (e.g. develop-spark3) would otherwise fail.
-          SCHEMA_DIR=sdl-docs/static/json-schema-viewer/schemas
+          SCHEMA_DIR=docs/static/json-schema-viewer/schemas
           if [ ! -d "$SCHEMA_DIR" ]; then
             echo "$SCHEMA_DIR not present on this branch - skipping schema publication"
             exit 0
