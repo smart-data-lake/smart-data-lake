@@ -19,7 +19,8 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.definitions.SaveModeMergeOptions
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
+import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.{ProductUtil, SQLUtil, SmartDataLakeLogger}
@@ -28,8 +29,8 @@ import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe.GenericColumn
 import io.smartdatalake.workflow.dataframe.sparkconnect.{SparkConnectColumn, SparkConnectDataFrame, SparkConnectSubFeed}
 import io.smartdatalake.workflow.dataobject.generic.Table
-import org.apache.spark.sql.functions.{col, lit}
-import org.apache.spark.sql.{Column, DataFrame, SaveMode, SparkSession}
+import org.apache.spark.sql.functions.{col, expr, lit}
+import org.apache.spark.sql.{Column, DataFrame, DataFrameWriterV2, Row, SaveMode, SparkSession}
 
 /**
  * Shared logic for table operations through a Spark Connect session,
@@ -126,6 +127,23 @@ private[smartdatalake] object SparkConnectTableUtil extends SmartDataLakeLogger 
         val filter = pvExisting.elements.map { case (k, v) => s"${SQLUtil.sparkQuoteCaseSensitiveColumn(k)} = '${v.toString.replace("'", "''")}'" }.mkString(" AND ")
         session.sql(s"UPDATE ${table.fullName} SET $updateSpec WHERE $filter").collect()
         logger.info(s"($id) Partition $pvExisting moved to $pvNew")
+    }
+  }
+
+  /**
+   * Execute a write with the DataFrameWriterV2 API according to the given [[SDLSaveMode]].
+   * This is the Spark Connect twin of [[io.smartdatalake.definitions.SparkSaveModeUtil.execV2]],
+   * which is typed on the classic DataFrameWriterV2.
+   * Note that this needs a table format supporting the DSv2 write API on the server side, e.g. iceberg.
+   */
+  def execV2(saveMode: SDLSaveMode, writer: DataFrameWriterV2[Row], partitionValues: Seq[PartitionValues], partitionOverwriteModeDynamic: Boolean = false): Unit = {
+    saveMode match {
+      case SDLSaveMode.Append => writer.append()
+      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.nonEmpty =>
+        val filterSql = partitionValues.map(_.getFilterExprSql).mkString("(", ") OR (", ")")
+        writer.overwrite(expr(filterSql))
+      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty && partitionOverwriteModeDynamic => writer.overwritePartitions()
+      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty => writer.replace()
     }
   }
 

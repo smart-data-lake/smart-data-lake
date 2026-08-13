@@ -323,28 +323,8 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     incrementalOutputExpr
   }
 
-  /**
-   * Execute a SQL statement, prefixed by USE CATALOG/USE SCHEMA statements based on the configured table.
-   * Preserves the semantics of SparkQueryUtil.executeSqlStatementBasedOnTable.
-   */
-  private[smartdatalake] def execSqlBasedOnTable(stmt: String)(implicit context: ActionPipelineContext): Unit = {
-    try {
-      val newStmt = Seq(
-        table.catalog.map(cat => s"USE CATALOG $cat"),
-        table.db.map(db => s"USE SCHEMA $db"),
-        Some(stmt)
-      ).flatten
-      logger.info(s"Executing SQL statements: ${newStmt.mkString(";")}")
-      newStmt.foreach(engine.sql(_))
-    } catch {
-      case e: Exception =>
-        logger.warn(s"Error in SQL statement '$stmt':\n${e.getMessage}")
-        throw e
-    }
-  }
-
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
-    sqlOpt.foreach(stmt => execSqlBasedOnTable(stmt))
+    sqlOpt.foreach(stmt => SQLUtil.execSqlBasedOnTable(stmt, table, engine.sql, s"($id) "))
   }
 
   def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] = {
@@ -364,25 +344,24 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit = {
     val query = f"ALTER TABLE $tableName DROP CONSTRAINT $constraintName".toLowerCase
-    execSqlBasedOnTable(query)
+    SQLUtil.execSqlBasedOnTable(query, table, engine.sql, s"($id) ")
   }
 
   def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
     val query = f"ALTER TABLE $tableName ADD CONSTRAINT $constraintName PRIMARY KEY (${cols.mkString(",")}) RELY"
-    execSqlBasedOnTable(query)
+    SQLUtil.execSqlBasedOnTable(query, table, engine.sql, s"($id) ")
   }
 
   def addTableComment(comment: String)(implicit context: ActionPipelineContext): Unit = {
     val query = f"ALTER TABLE ${table.name} SET TBLPROPERTIES ('comment' = '$comment');"
-    execSqlBasedOnTable(query)
+    SQLUtil.execSqlBasedOnTable(query, table, engine.sql, s"($id) ")
   }
 
   def updateExistingColumnComments(comments: Map[String, String])(implicit context: ActionPipelineContext): Unit = {
     comments.foreach( comment => {
       val query = f"ALTER TABLE ${table.name} ALTER COLUMN ${comment._1} COMMENT '${comment._2}';"
-      execSqlBasedOnTable(query)
-    }
-    )
+      SQLUtil.execSqlBasedOnTable(query, table, engine.sql, s"($id) ")
+    })
   }
 }
 

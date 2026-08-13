@@ -24,18 +24,21 @@
 # Exports SPARK_HOME to $GITHUB_ENV if running in GitHub Actions.
 # Note that the sdl-sparkconnect tests can also start the server themselves if only SPARK_HOME is set,
 # see SparkConnectTestUtil.
-# The server is started with delta lake support, as SDLSaveMode.Merge and deleting partitions need
-# a table format supporting row-level operations.
+# The server is started with delta lake and Iceberg support.
+# Iceberg tables are created in the additional catalog "iceberg1".
 
 set -euo pipefail
 cd "$(dirname "$0")"
 
 
-if [ -z "${SPARK_VERSION}" ]; then
+if [ -z "${SPARK_VERSION:-}" ]; then
   export SPARK_VERSION=4.1.1
 fi
 SPARK_DIST=spark-${SPARK_VERSION}-bin-hadoop3
+SPARK_MINOR_VERSION=${SPARK_VERSION%.*}
 DELTA_VERSION=4.2.0
+ICEBERG_VERSION=1.11.0
+ICEBERG_WAREHOUSE=$(pwd)/iceberg-warehouse
 
 if [ ! -d "$SPARK_DIST" ]; then
   echo "downloading https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/${SPARK_DIST}.tgz"
@@ -57,15 +60,25 @@ if [ ! -f "$SPARK_HOME/jars/delta-spark_4.1_2.13-${DELTA_VERSION}.jar" ]; then
   wget -q -P "$SPARK_HOME/jars" https://repo1.maven.org/maven2/io/delta/delta-storage/${DELTA_VERSION}/delta-storage-${DELTA_VERSION}.jar
 fi
 
+# Add the Iceberg spark runtime to the server classpath, see comment on delta lake jars above.
+ICEBERG_RUNTIME_JAR=iceberg-spark-runtime-${SPARK_MINOR_VERSION}_2.13-${ICEBERG_VERSION}.jar
+if [ ! -f "$SPARK_HOME/jars/${ICEBERG_RUNTIME_JAR}" ]; then
+  echo "downloading iceberg-spark-runtime library"
+  wget -q -P "$SPARK_HOME/jars" https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-${SPARK_MINOR_VERSION}_2.13/${ICEBERG_VERSION}/${ICEBERG_RUNTIME_JAR}
+fi
+
 # Remove state of previous server runs, so that the test server starts with a fresh catalog.
 # Note that the default in-memory catalog forgets tables on restart, but their warehouse directories would persist
 # and block creating tables with the same name again.
-rm -rf spark-warehouse metastore_db derby.log
+rm -rf spark-warehouse metastore_db derby.log "$ICEBERG_WAREHOUSE"
 
 echo $"starting Spark Connect server"
 "$SPARK_HOME/sbin/start-connect-server.sh" \
-  --conf spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension \
-  --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog
+  --conf spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension,org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+  --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog \
+  --conf spark.sql.catalog.iceberg1=org.apache.iceberg.spark.SparkCatalog \
+  --conf spark.sql.catalog.iceberg1.type=hadoop \
+  --conf spark.sql.catalog.iceberg1.warehouse="$ICEBERG_WAREHOUSE"
 
 # wait for the server to accept connections
 for i in $(seq 1 60); do

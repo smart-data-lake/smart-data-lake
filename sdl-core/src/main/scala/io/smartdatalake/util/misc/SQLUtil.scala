@@ -22,9 +22,10 @@ import io.smartdatalake.definitions.{Environment, SaveModeMergeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataobject.generic.Table
+import io.smartdatalake.workflow.dataobject.generic.{DataObjectEngine, Table}
+import org.slf4j.Logger
 
-object SQLUtil {
+object SQLUtil extends SmartDataLakeLogger {
 
   /**
    * Create a SQL delete statement for given partition values.
@@ -106,5 +107,25 @@ object SQLUtil {
    */
   def sparkQuoteSQLIdentifier(column: String): String = {
     s"`$column`"
+  }
+
+  /**
+   * Execute a SQL statement, prefixed by USE CATALOG/USE SCHEMA statements based on the configured table.
+   * Preserves the semantics of SparkQueryUtil.executeSqlStatementBasedOnTable.
+   */
+  def execSqlBasedOnTable(stmt: String, table: Table, execSql: String => Unit, loggerContext: String)(implicit context: ActionPipelineContext): Unit = {
+    try {
+      val newStmt = Seq(
+        table.catalog.map(cat => s"USE CATALOG $cat"),
+        table.db.map(db => s"USE SCHEMA $db"),
+        Some(stmt)
+      ).flatten
+      logger.info(s"${loggerContext}Executing SQL statements: ${newStmt.mkString("; ")}")
+      newStmt.foreach(execSql(_))
+    } catch {
+      case e: Exception =>
+        logger.warn(s"${loggerContext}Error in SQL statement '$stmt':\n${e.getMessage}")
+        throw e
+    }
   }
 }
