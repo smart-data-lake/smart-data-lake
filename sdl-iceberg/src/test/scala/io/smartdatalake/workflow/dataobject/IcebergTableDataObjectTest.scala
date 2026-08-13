@@ -25,6 +25,7 @@ import io.smartdatalake.testutils.{TableDataObjectBehaviour, TableDataObjectTest
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkHdfsUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection, HadoopFileConnection, IcebergTableConnection}
+import io.smartdatalake.workflow.dataobject.spark.SparkDataObjectOps._
 import io.smartdatalake.workflow.dataobject.generic.Table
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.fs.Path
@@ -361,6 +362,9 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     // Setup Iceberg table
     val icebergTable = Table(catalog = Some("iceberg_hadoop"), db = Some("default"), name = "parquet_to_iceberg")
     val icebergDO = IcebergTableDataObject(id = "iceberg", table = icebergTable)
+    // the hadoop catalog warehouse is persisted in the target directory. Drop a table left over by a previous test run,
+    // otherwise writing the parquet files below would delete its metadata behind the back of the catalog.
+    icebergDO.dropTable
 
     // Create parquet files
     val parquetDO = ParquetFileDataObject(id = "parquet", path = icebergDO.hadoopPath.toString)
@@ -390,6 +394,8 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     // Setup Iceberg table
     val icebergTable = Table(catalog = Some("iceberg_hadoop"), db = Some("default"), name = "parquet_to_iceberg_partitioned")
     val icebergDO = IcebergTableDataObject(id = "iceberg", table = icebergTable, partitions = Seq("tpe"))
+    // drop a table left over by a previous test run, see comment in the test above
+    icebergDO.dropTable
 
     // Create parquet files
     val parquetDO = ParquetFileDataObject(id = "parquet", path = icebergDO.hadoopPath.toString, partitions = Seq("tpe"))

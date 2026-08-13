@@ -13,6 +13,8 @@ spark-warehouse
 **/spark-warehouse
 # local Spark distribution and Spark Connect server artifacts, see sdl-sparkconnect/start-spark-connect.sh
 spark-*-bin-hadoop*/
+iceberg-warehouse
+**/iceberg-warehouse
 metastore_db
 **/metastore_db
 *.versionsBackup

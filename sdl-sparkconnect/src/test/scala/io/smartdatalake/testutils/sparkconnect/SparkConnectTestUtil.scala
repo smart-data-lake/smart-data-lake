@@ -88,6 +88,21 @@ object SparkConnectTestUtil extends SmartDataLakeLogger {
       .conf.getOption("spark.sql.extensions").exists(_.contains("DeltaSparkSessionExtension"))
   }.getOrElse(false)
 
+  /**
+   * Name of the Iceberg catalog configured on the test server, see [[icebergAvailable]] and start-spark-connect.sh.
+   */
+  val icebergCatalog: String = "iceberg1"
+
+  /**
+   * True if a Spark Connect server is available and has Iceberg support, i.e. the Iceberg session extensions
+   * are registered and the catalog [[icebergCatalog]] is configured. See also start-spark-connect.sh.
+   */
+  lazy val icebergAvailable: Boolean = serverAvailable && Try {
+    val session = SparkSession.builder().remote(url).getOrCreate()
+    session.conf.getOption("spark.sql.extensions").exists(_.contains("IcebergSparkSessionExtensions")) &&
+      session.conf.getOption(s"spark.sql.catalog.$icebergCatalog").isDefined
+  }.getOrElse(false)
+
   private def isPortOpen(timeoutMs: Int = 2000): Boolean = Try {
     val socket = new Socket()
     try socket.connect(new InetSocketAddress(host, port), timeoutMs)
