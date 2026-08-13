@@ -1,4 +1,4 @@
-name: Test documentation deployment
+name: Test deploy documentation
 
 # Validates that the documentation site still builds, without publishing it.
 # Runs on pull requests that touch docs/, so a doc change is verified in the
@@ -16,7 +16,7 @@ defaults:
     working-directory: docs
 
 jobs:
-  test-deploy:
+  test-build:
     name: Test deployment
     runs-on: ubuntu-latest
     steps:
@@ -24,10 +24,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Test build
+      - name: Build website
         run: |
-          # see deploy-docs.yml: --ignore-scripts blocks dependency lifecycle
-          # scripts from executing in CI (Sonar S6505)
+          # --ignore-scripts: do not run dependency lifecycle scripts, so a
+          # compromised package cannot execute code in the deploy job (Sonar S6505)
           yarn install --frozen-lockfile --ignore-scripts
           yarn build
         env:
