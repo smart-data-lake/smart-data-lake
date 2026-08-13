@@ -38,6 +38,9 @@
     <file url="file://$PROJECT_DIR$/sdl-spark" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sdl-spark/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sdl-spark/src/main/scala" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sdl-sparkconnect" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sdl-sparkconnect/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sdl-sparkconnect/src/main/scala" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sdl-splunk" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sdl-splunk/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sdl-splunk/src/main/scala" charset="UTF-8" />
