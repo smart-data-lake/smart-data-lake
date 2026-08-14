@@ -588,9 +588,5 @@ trait Transform extends Serializable {
       }.select(curryMapColumn)
     }
 
-    def breakLineageIfNotExecPhase(isExec: Boolean): DataFrame =
-      if (!isExec) getEmptyDataFrame(ds.schema)(ds.sparkSession)
-      else ds.toDF()
-
   }
 }

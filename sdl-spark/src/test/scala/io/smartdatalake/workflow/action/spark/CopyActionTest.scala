@@ -501,7 +501,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
     val expectedPartitionValues = Seq(PartitionValues(Map("mt" -> "201001")))
     assert(tgtSubFeed.partitionValues == expectedPartitionValues)
-    assert(tgtSubFeed.dataFrame.get.schema.columns.contains("mt"))
+    assert(tgtSubFeed.schema.columns.contains("mt")) // init phase transports only the schema
 
     // run
     action1.preExec(Seq(srcSubFeed))(contextExec)

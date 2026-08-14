@@ -101,7 +101,7 @@ case class DeduplicateAction(
     ignoreOldDeletedNestedColumns: Boolean = true,
     updateCapturedColumnOnlyWhenChanged: Boolean = false,
     mergeModeAdditionalJoinPredicate: Option[String] = None,
-    override val breakDataFrameLineage: Boolean = false,
+    override val cacheOutput: Boolean = false,
     override val persist: Boolean = false,
     override val executionMode: Option[ExecutionMode] = None,
     override val executionCondition: Option[Condition] = None,
@@ -138,7 +138,6 @@ case class DeduplicateAction(
   private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
 
   // DataFrame created by DeduplicateAction should not be passed on to the next Action, but must be recreated from the DataObject.
-  override val breakDataFrameOutputLineage: Boolean = true
 
   // check preconditions
   require(output.table.primaryKey.isDefined, s"($id) Primary key must be defined for output DataObject")

@@ -48,24 +48,20 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   override def recursiveInputs: Seq[DataObject with CanCreateDataFrame] = Seq()
 
   /**
-   * Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.
-   * This can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.
-   * The new DataFrame will be initialized according to the SubFeed's partitionValues.
+   * Cache the output DataFrame of this Action, so that subsequent Actions can reuse it instead of reading the output
+   * DataObject again. This saves reading the data again, at the cost of materializing it in the engine.
+   *
+   * By default the DataFrame is not propagated to subsequent Actions, they get a fresh DataFrame from the output
+   * DataObject according to the SubFeed's partition values.
+   *
+   * Note that on Snowflake this materializes a temporary table which is only released when the session is closed.
    */
-  def breakDataFrameLineage: Boolean
+  def cacheOutput: Boolean
 
   /**
-   * Stop propagating output DataFrame through action. The next action should get a fresh DataFrame from the DataObject according to the partition values.
-   * This is needed for Actions which create a specific DataFrame to implement the logic needed, e.g. Deduplicate- and HistorizeAction
-   */
-  def breakDataFrameOutputLineage: Boolean = false
-
-  /**
-   * Force persisting input DataFrame's on Disk.
-   * This improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point
-   * in case a task gets lost.
-   * Note that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this
-   * behaviour set breakDataFrameLineage=false.
+   * Force materializing input DataFrame's.
+   * This improves performance if the input DataFrame is used multiple times in the transformation of this Action
+   * and can serve as a recovery point in case a task gets lost.
    */
   def persist: Boolean
 
@@ -164,16 +160,17 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     assert(phase != ExecutionPhase.Prepare, "Strangely enrichSubFeedDataFrame got called in phase prepare. It should only be called in Init and Exec.")
     executionMode match {
       case Some(m: DataFrameStreamingExecutionMode) if !context.simulation =>
-        val refreshDataFrame = subFeed.dataFrame.isEmpty || phase == ExecutionPhase.Exec
+        // Note: a SubFeed which transports only a schema must not refresh the DataFrame in init phase,
+        // as the streaming source might not yet exist. It gets a dummy streaming DataFrame instead.
+        val refreshDataFrame = phase == ExecutionPhase.Exec || subFeed.schemaOpt.isEmpty
         m.enrichSubFeedForStreamingInput(input, subFeed, phase, refreshDataFrame)
       case _ =>
-        // count reuse of subFeed.dataFrame for caching/release in exec phase
-        if (phase == ExecutionPhase.Init && subFeed.hasReusableDataFrame && Environment.enableAutomaticDataFrameCaching)
-          context.rememberDataFrameReuse(subFeed.dataObjectId, subFeed.partitionValues, id)
+        // remember that this Action reads the DataFrame, so a cache created by the producing Action can be released again
+        if (phase == ExecutionPhase.Init) context.cacheRegistry.registerConsumer(subFeed.dataObjectId, id)
         // process subfeed
         if (phase == ExecutionPhase.Exec || context.simulation) {
           // check if dataFrame must be created
-          if (subFeed.dataFrame.isEmpty || subFeed.isDummy || subFeed.isStreaming.contains(true)) {
+          if (subFeed.dataFrame.isEmpty || subFeed.isStreamingDataFrame) {
             // validate partition values existing for input
             input match {
               case partitionedInput: DataObject with CanHandlePartitions => validatePartitionValuesExisting(partitionedInput, subFeed)
@@ -207,13 +204,17 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         } else {
           // phase != exec
           if (subFeed.dataFrame.isEmpty) {
-            // create a dummy subFeed, as we are not in exec phase
-            subFeed.withDataFrame(Some(createEmptyDataFrame(input)))
+            // The Action needs a DataFrame to run its transformations for schema validation, but we are not in exec
+            // phase. Create an empty DataFrame from the schema transported by the SubFeed, and only ask the
+            // DataObject if the schema is not yet known (SubFeeds at the start of the DAG).
+            val emptyDf = subFeed.schemaOpt
+              .map(_.getEmptyDataFrame(subFeed.dataObjectId))
+              .getOrElse(createEmptyDataFrame(input))
+            subFeed.withDataFrame(Some(emptyDf))
               .applyFilter // check that filter is working
-              .asDummy()
-          } else if (subFeed.isStreaming.contains(true)) {
+          } else if (subFeed.isStreamingDataFrame) {
             // convert to empty normal DataFrame
-            subFeed.withDataFrame(subFeed.schema.map(x => x.getEmptyDataFrame(subFeed.dataObjectId)))
+            subFeed.withDataFrame(subFeed.schemaOpt.map(x => x.getEmptyDataFrame(subFeed.dataObjectId)))
           } else subFeed
         }
     }
@@ -221,15 +222,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
 
   def createEmptyDataFrame(dataObject: DataObject with CanCreateDataFrame)
                           (implicit context: ActionPipelineContext): GenericDataFrame = {
-    val schema = dataObject match {
-      case input: UserDefinedSchema if input.schema.isDefined => input.schema
-      case input: SchemaValidation if input.schemaMin.isDefined => input.schemaMin
-      case _ if context.globalConfig.dataObjectsSchemaSource.isDefined && !context.isExecPhase =>
-        context.globalConfig.getSchemaFromSource(dataObject.id)(context.hadoopConf)
-      case _ => None
-    }
-    val readSchema = schema.map(dataObject.createReadSchema)
-    readSchema
+    subFeedHelper.getDeclaredDataObjectSchema(dataObject)
       .map(s => subFeedHelper.getEmptyDataFrame(s, dataObject.id))
       .getOrElse(dataObject.getDataFrame(Seq(), subFeedType).filter(subFeedHelper.lit(false)))
   }
@@ -241,28 +234,26 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     logger.debug(s"($id) preprocessInputSubFeedCustomized: subFeed = $subFeed, ignoreFilters = $ignoreFilters, , isRecursive = $isRecursive")
     val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
     val input = inputMap(subFeed.dataObjectId)
-    // persist if requested
-    var preparedSubFeed = if (persist) subFeed.persist else subFeed
-    // create dummy DataFrame if read schema is different from write schema on this DataObject
-    val writeSchema = preparedSubFeed.schema
+    var preparedSubFeed = subFeed
+    // drop the DataFrame and pass on only the read schema, if it is different from the write schema on this DataObject
+    val writeSchema = preparedSubFeed.schemaOpt
     val readSchema = writeSchema.map(schema => input.createReadSchema(schema))
     val schemaChanges = writeSchema != readSchema
     require(!context.simulation || !schemaChanges,
-      s"($id) write & read schema is not the same for ${input.id}. Need to create a dummy DataFrame, but this is not allowed in simulation!")
-    preparedSubFeed = if (schemaChanges) {
-      if (subFeed.isStreaming.getOrElse(false)) {
-        subFeed.withDataFrame(readSchema.map(subFeedHelper.getEmptyStreamingDataFrame)).asDummy()
-      } else {
-        subFeed.withDataFrame(readSchema.map(s => subFeedHelper.getEmptyDataFrame(s, subFeed.dataObjectId))).asDummy()
-      }
-    } else preparedSubFeed
+      s"($id) write & read schema is not the same for ${input.id}. Need to drop the DataFrame and pass on only the schema, but this is not allowed in simulation!")
+    preparedSubFeed = if (schemaChanges) preparedSubFeed.withSchema(readSchema) else preparedSubFeed
     // remove potential filter and partition values added by execution mode
     if (ignoreFilters) preparedSubFeed = preparedSubFeed.breakLineage.clearFilter().clearPartitionValues().clearSkipped().asInstanceOf[DataFrameSubFeed]
-    // break lineage if requested or if it's a streaming DataFrame or if a filter expression is set
-    if (breakDataFrameLineage || preparedSubFeed.isStreaming.contains(true) || preparedSubFeed.filter.isDefined) preparedSubFeed = preparedSubFeed.breakLineage
+    // break lineage if a filter expression is set, as the cached DataFrame does not contain the filter
+    if (preparedSubFeed.filter.isDefined) preparedSubFeed = preparedSubFeed.breakLineage
     // enrich with fresh DataFrame if needed
     preparedSubFeed = enrichSubFeedDataFrame(input = input, subFeed = preparedSubFeed,
       phase = context.phase, isRecursive = isRecursive)
+    // materialize input DataFrame if requested. Only needed in exec phase, as init phase works on empty DataFrames.
+    if (persist && context.isExecPhase && subFeedHelper.canCacheDataFrame && !preparedSubFeed.isStreamingDataFrame) {
+      preparedSubFeed = preparedSubFeed.cache
+      context.cacheRegistry.register(preparedSubFeed)
+    }
     // add observations on input DataFrame
     if (Environment.enableInputDataObjectCount) {
       input match {
@@ -329,10 +320,14 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     }
   }
 
-  override protected def convertToOutputSubFeed(subFeed: DataFrameSubFeed): DataFrameSubFeed = {
-    subFeed.dataFrame.flatMap(df =>
+  override protected def convertToOutputSubFeed(subFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    val converted = subFeed.dataFrame.flatMap(df =>
       saveModeOptions.map(options => subFeed.withDataFrame(Some(options.convertToTargetSchema(df))))
     ).getOrElse(subFeed)
+    // Drop the DataFrame if it is not cached, so that the init phase behaves like the exec phase and
+    // subsequent Actions validate against a DataFrame read from the output DataObject.
+    // Note that a simulation run passes the data through in memory without writing it, so the DataFrame must be kept.
+    if (cacheOutput || context.simulation) converted else converted.withDataFrame(None)
   }
 
   override protected def writeSubFeed(subFeed: DataFrameSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
@@ -341,7 +336,9 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     val output = outputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
     var outputSubFeed = writeSubFeed(subFeed, output, isRecursive)
     context.engineConnection.foreach(_.activate(None))
-    if (breakDataFrameOutputLineage) outputSubFeed = outputSubFeed.breakLineage
+    // the DataFrame is only propagated to subsequent Actions if it has been cached, otherwise they read it
+    // again from the output DataObject
+    if (!cacheOutput && !context.simulation) outputSubFeed = outputSubFeed.withDataFrame(None)
     val isMainOutput = mainOutput.id == output.id
     // get expectations metrics and check violations
     outputSubFeed = output match {
@@ -431,22 +428,23 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
    * writes subfeed to output respecting given execution mode
    */
   def writeSubFeed(subFeed: DataFrameSubFeed, output: DataObject with CanWriteDataFrame, isRecursiveInput: Boolean = false)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
-    assert(!subFeed.isDummy, s"($id) Can not write dummy DataFrame to ${output.id}")
+    assert(subFeed.dataFrame.isDefined, s"($id) Can not write SubFeed without DataFrame to ${output.id}")
     // write
     executionMode match {
       case Some(m: DataFrameStreamingExecutionMode) =>
-        assert(subFeed.isStreaming.getOrElse(false), s"($id) ExecutionMode ${m.getClass.getSimpleName} needs streaming DataFrame in SubFeed")
+        assert(subFeed.isStreamingDataFrame, s"($id) ExecutionMode ${m.getClass.getSimpleName} needs streaming DataFrame in SubFeed")
         m.writeSubFeedStreaming(this, subFeed, output, getStreamingQueryName(output.id))
       case _ =>
-        // Auto persist if dataFrame is reused later
-        val preparedSubFeed = if (context.dataFrameReuseStatistics.contains((output.id, subFeed.partitionValues))) {
-          val partitionValuesStr = if (subFeed.partitionValues.nonEmpty) s" and partitionValues ${subFeed.partitionValues.mkString(", ")}" else ""
-          logger.info(s"($id) Caching dataframe for ${output.id}$partitionValuesStr")
-          subFeed.persist
+        // cache the output DataFrame if requested and if it is reused by a subsequent Action
+        val preparedSubFeed = if (cacheOutput && subFeedHelper.canCacheDataFrame && context.cacheRegistry.isReused(output.id)) {
+          logger.info(s"($id) Caching dataframe for ${output.id}")
+          val cachedSubFeed = subFeed.cache
+          context.cacheRegistry.register(cachedSubFeed)
+          cachedSubFeed
         } else subFeed
         // Write in batch mode
-        assert(!preparedSubFeed.isStreaming.getOrElse(false), s"($id) Input from ${preparedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode does not support streaming")
-        assert(!preparedSubFeed.isDummy, s"($id) Input from ${preparedSubFeed.dataObjectId} is a dummy. Cannot write dummy DataFrame.")
+        assert(!preparedSubFeed.isStreamingDataFrame, s"($id) Input from ${preparedSubFeed.dataObjectId} is a streaming DataFrame, but executionMode does not support streaming")
+        assert(preparedSubFeed.dataFrame.isDefined, s"($id) Input from ${preparedSubFeed.dataObjectId} has no DataFrame. Cannot write.")
         assert(!preparedSubFeed.isSkipped, s"($id) Input from ${preparedSubFeed.dataObjectId} is a skipped. Cannot write skipped DataFrame.")
         val df = preparedSubFeed.dataFrame.get
         val metrics = output.writeDataFrame(df, preparedSubFeed.partitionValues, isRecursiveInput, saveModeOptions)
@@ -525,15 +523,9 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
 
   override def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     super.postExec(inputSubFeeds, outputSubFeeds)
-    // auto-unpersist DataFrames no longer needed
+    // release cached DataFrames which are not needed anymore
     inputSubFeeds
       .collect { case subFeed: DataFrameSubFeed => subFeed }
-      .foreach { subFeed =>
-        if (context.forgetDataFrameReuse(subFeed.dataObjectId, subFeed.partitionValues, id).contains(0)) {
-          val partitionValuesLog = if (subFeed.partitionValues.nonEmpty) s" and partitionValues=${subFeed.partitionValues.mkString(", ")}" else ""
-          logger.info(s"($id) Removing cached DataFrame for ${subFeed.dataObjectId}$partitionValuesLog")
-          subFeed.unpersist
-        }
-      }
+      .foreach(subFeed => context.cacheRegistry.releaseConsumer(subFeed.dataObjectId, id))
   }
 }

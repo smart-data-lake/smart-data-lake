@@ -70,7 +70,7 @@ case class AgentServerController(
 
             val resultingSubfeeds = sdlb.agentExec(appConfig = sdlbConfig, phase = agentInstruction.phase)
             val resultingDataObjectIdToSchema = resultingSubfeeds.flatMap {
-              case subFeed: DataFrameSubFeed => subFeed.schema.map(schema => DataObjectId(subFeed.dataObjectId.id) -> schema.sql)
+              case subFeed: DataFrameSubFeed => subFeed.schemaOpt.map(schema => DataObjectId(subFeed.dataObjectId.id) -> schema.sql)
               case _ => None
             }.toMap
 

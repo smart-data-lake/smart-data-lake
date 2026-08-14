@@ -80,7 +80,7 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
     action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(context1).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
-    assert(tgtSubFeed.asInstanceOf[SparkSubFeed].isDummy) // should return a dummy DataFrame as breakDataFrameOutputLineage is set to true
+    assert(tgtSubFeed.asInstanceOf[SparkSubFeed].dataFrame.isEmpty) // should transport only the schema, as cacheOutput is false by default
     println("********* srcDO")
     srcDO.getSparkDataFrame()(context1).show(false)
 

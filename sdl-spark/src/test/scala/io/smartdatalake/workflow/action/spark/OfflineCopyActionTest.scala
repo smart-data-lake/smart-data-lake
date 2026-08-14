@@ -48,6 +48,6 @@ class OfflineCopyActionTest extends AnyFunSuite with SmartDataLakeLogger with Co
     )
 
     // Verify that the filename column is included in the target schema
-    assert(tgtSubFeed.dataFrame.get.columns.contains("_filename"))
+    assert(tgtSubFeed.schema.columns.contains("_filename")) // dry-run transports only the schema
   }
 }

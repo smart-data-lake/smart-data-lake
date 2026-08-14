@@ -196,19 +196,6 @@ object Environment extends SmartDataLakeLogger {
   var _schemaValidationDeepComarison: Option[Boolean] = None
 
   /**
-   * Set to true if you want to enable automatic caching of DataFrames that are used multiple times (default=true).
-   */
-  def enableAutomaticDataFrameCaching: Boolean = {
-    if (_enableAutomaticDataFrameCaching.isEmpty) {
-      _enableAutomaticDataFrameCaching = Some(
-        EnvironmentUtil.getSdlParameter("enableAutomaticDataFrameCaching").forall(_.toBoolean)
-      )
-    }
-    _enableAutomaticDataFrameCaching.get
-  }
-  var _enableAutomaticDataFrameCaching: Option[Boolean] = None
-
-  /**
    * Set to true if you want to enable workaround to overwrite unpartitioned SparkFileDataObject on Azure ADLSv2 (default=false).
    */
   def enableOverwriteUnpartitionedSparkFileDataObjectAdls: Boolean = {

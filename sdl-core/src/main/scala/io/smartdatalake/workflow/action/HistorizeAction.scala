@@ -136,7 +136,7 @@ case class HistorizeAction(
     mergeModeCDCDeletedValue: Option[String] = None,
     checkInputUnique: Boolean = false,
     timeAxisUnit: Duration = Duration.ofMillis(1),
-    override val breakDataFrameLineage: Boolean = false,
+    override val cacheOutput: Boolean = false,
     override val persist: Boolean = false,
     override val executionMode: Option[ExecutionMode] = None,
     override val executionCondition: Option[Condition] = None,
@@ -223,7 +223,6 @@ case class HistorizeAction(
 
   // DataFrame created by HistorizeAction should not be passed on to the next Action,
   // but must be recreated from the DataObject.
-  override val breakDataFrameOutputLineage: Boolean = true
 
   // historize black/white list
   require(historizeWhitelist.isEmpty || historizeBlacklist.isEmpty,

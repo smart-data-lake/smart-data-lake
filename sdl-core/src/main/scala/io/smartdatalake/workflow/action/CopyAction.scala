@@ -76,7 +76,7 @@ case class CopyAction(
     outputId: DataObjectId,
     deleteDataAfterRead: Boolean = false,
     transformers: Seq[GenericDfTransformer] = Seq(),
-    override val breakDataFrameLineage: Boolean = false,
+    override val cacheOutput: Boolean = false,
     override val persist: Boolean = false,
     override val executionMode: Option[ExecutionMode] = None,
     override val executionCondition: Option[Condition] = None,

@@ -111,8 +111,8 @@ case class ActionsExporterDataObject(id: DataObjectId,
           getOptionalFieldData[Seq[String]](action, "columnBlacklist").map(_.mkString(listElementsSeparator)),
           // columnWhitelist
           getOptionalFieldData[Seq[String]](action, "columnWhitelist").map(_.mkString(listElementsSeparator)),
-          // breakDataFrameLineage
-          getFieldData[Boolean](action, "breakDataFrameLineage").map(_.toString),
+          // cacheOutput
+          getFieldData[Boolean](action, "cacheOutput").map(_.toString),
           // persist
           getFieldData[Boolean](action, "persist").map(_.toString)
         )
@@ -131,7 +131,7 @@ case class ActionsExporterDataObject(id: DataObjectId,
       "transformer",
       "columnBlacklist",
       "columnWhitelist",
-      "breakDataFrameLineage",
+      "cacheOutput",
       "persist"
     )
   }

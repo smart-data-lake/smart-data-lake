@@ -3562,13 +3562,13 @@
             },
             "description" : "optional list of transformations to apply. See`spark.transformer` for a list of included\nTransformers. The transformations are applied according to the lists ordering."
           },
-          "breakDataFrameLineage" : {
+          "cacheOutput" : {
             "type" : "boolean",
-            "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.  \nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.  \nThe new DataFrame will be initialized according to the SubFeed's partitionValues."
+            "description" : "Cache the output DataFrame of this Action, so that subsequent Actions can reuse it instead of reading the output\nDataObject again. This saves reading the data again, at the cost of materializing it in the engine.\n\nBy default the DataFrame is not propagated to subsequent Actions, they get a fresh DataFrame from the output\nDataObject according to the SubFeed's partition values.\n\nNote that on Snowflake this materializes a temporary table which is only released when the session is closed."
           },
           "persist" : {
             "type" : "boolean",
-            "description" : "Force persisting input DataFrame's on Disk.  \nThis improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point\nin case a task gets lost.  \nNote that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this\nbehaviour set breakDataFrameLineage=false."
+            "description" : "Force materializing input DataFrame's.  \nThis improves performance if the input DataFrame is used multiple times in the transformation of this Action\nand can serve as a recovery point in case a task gets lost."
           },
           "executionMode" : {
             "oneOf" : [ {
@@ -3746,13 +3746,13 @@
             },
             "description" : "list of transformations to apply. See`spark.transformer` for a list of included Transformers.  \nThe transformations are applied according to the ordering of the list.  \nNote that all outputs of previous transformers are kept as input for next transformer,\nbut in the end only outputs of the last transformer are mapped to output DataObjects."
           },
-          "breakDataFrameLineage" : {
+          "cacheOutput" : {
             "type" : "boolean",
-            "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.  \nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.  \nThe new DataFrame will be initialized according to the SubFeed's partitionValues."
+            "description" : "Cache the output DataFrame of this Action, so that subsequent Actions can reuse it instead of reading the output\nDataObject again. This saves reading the data again, at the cost of materializing it in the engine.\n\nBy default the DataFrame is not propagated to subsequent Actions, they get a fresh DataFrame from the output\nDataObject according to the SubFeed's partition values.\n\nNote that on Snowflake this materializes a temporary table which is only released when the session is closed."
           },
           "persist" : {
             "type" : "boolean",
-            "description" : "Force persisting input DataFrame's on Disk.  \nThis improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point\nin case a task gets lost.  \nNote that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this\nbehaviour set breakDataFrameLineage=false."
+            "description" : "Force materializing input DataFrame's.  \nThis improves performance if the input DataFrame is used multiple times in the transformation of this Action\nand can serve as a recovery point in case a task gets lost."
           },
           "mainInputId" : {
             "type" : "string",
@@ -4145,13 +4145,13 @@
             "type" : "string",
             "description" : "To optimize performance it might be interesting to limit the records read from the existing\ntable data, e.g. it might be sufficient to use only the last 7 days. Specify a condition to\nselect existing data to be used in transformation as Spark SQL expression. Use table alias\n'existing' to reference columns of the existing table data."
           },
-          "breakDataFrameLineage" : {
+          "cacheOutput" : {
             "type" : "boolean",
-            "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.  \nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.  \nThe new DataFrame will be initialized according to the SubFeed's partitionValues."
+            "description" : "Cache the output DataFrame of this Action, so that subsequent Actions can reuse it instead of reading the output\nDataObject again. This saves reading the data again, at the cost of materializing it in the engine.\n\nBy default the DataFrame is not propagated to subsequent Actions, they get a fresh DataFrame from the output\nDataObject according to the SubFeed's partition values.\n\nNote that on Snowflake this materializes a temporary table which is only released when the session is closed."
           },
           "persist" : {
             "type" : "boolean",
-            "description" : "Force persisting input DataFrame's on Disk.  \nThis improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point\nin case a task gets lost.  \nNote that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this\nbehaviour set breakDataFrameLineage=false."
+            "description" : "Force materializing input DataFrame's.  \nThis improves performance if the input DataFrame is used multiple times in the transformation of this Action\nand can serve as a recovery point in case a task gets lost."
           },
           "executionMode" : {
             "oneOf" : [ {
@@ -4409,13 +4409,13 @@
             "description" : "Time between ticks on the time axis. Used to create valid to timestamp for existing/old\nrecords. Set to 0 to create a history with half-open intervals (e.g. valid to timestamp is\nexclusive). Format is`x(ns|us|ms|s|m|h|d)` , e.g. 1d. Default is 1ms.",
             "existingJavaType" : "java.time.Duration"
           },
-          "breakDataFrameLineage" : {
+          "cacheOutput" : {
             "type" : "boolean",
-            "description" : "Stop propagating input DataFrame through action and instead get a new DataFrame from DataObject.  \nThis can help to save memory and performance if the input DataFrame includes many transformations from previous Actions.  \nThe new DataFrame will be initialized according to the SubFeed's partitionValues."
+            "description" : "Cache the output DataFrame of this Action, so that subsequent Actions can reuse it instead of reading the output\nDataObject again. This saves reading the data again, at the cost of materializing it in the engine.\n\nBy default the DataFrame is not propagated to subsequent Actions, they get a fresh DataFrame from the output\nDataObject according to the SubFeed's partition values.\n\nNote that on Snowflake this materializes a temporary table which is only released when the session is closed."
           },
           "persist" : {
             "type" : "boolean",
-            "description" : "Force persisting input DataFrame's on Disk.  \nThis improves performance if dataFrame is used multiple times in the transformation and can serve as a recovery point\nin case a task gets lost.  \nNote that DataFrames are persisted automatically by the previous Action if later Actions need the same data. To avoid this\nbehaviour set breakDataFrameLineage=false."
+            "description" : "Force materializing input DataFrame's.  \nThis improves performance if the input DataFrame is used multiple times in the transformation of this Action\nand can serve as a recovery point in case a task gets lost."
           },
           "executionMode" : {
             "oneOf" : [ {

@@ -170,8 +170,9 @@ case class SparkDataFrame(override val inner: DataFrame) extends GenericDataFram
     // Some Spark data sources do not execute observations, e.g. jdbc. The generic observation can be forced for these cases.
     if (forceGenericObservation) {
       val observation = GenericCalculatedObservation(this, aggregateColumns.toIndexedSeq: _*)
-      // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
-      (this.cache, observation)
+      // Cache the DataFrame to avoid duplicate calculation, but only in exec phase: in init phase the DataFrame is
+    // empty and materializing it would be pure overhead (on Snowpark it even creates a temporary table).
+      (if (isExecPhase) this.cache else this, observation)
     } else {
       val observation = new SparkObservation(name)
       val sparkAggregatedColumns = aggregateColumns.map(_.asInstanceOf[SparkColumn].inner)

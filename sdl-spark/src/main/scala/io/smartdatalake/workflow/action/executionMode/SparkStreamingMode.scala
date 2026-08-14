@@ -23,12 +23,14 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.spark.{DummyStreamProvider, SparkStreamingMetrics, SparkStreamingQueryListener}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow.action.DataFrameActionImpl
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
+import io.smartdatalake.workflow.dataframe.SchemaConverter
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame}
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateStreamingDataFrame, CanWriteSparkDataFrame, DataStreamWriterOptions}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
 
 /**
@@ -115,18 +117,21 @@ case class SparkStreamingMode(
   )(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     val sparkSubFeed = subFeed.asInstanceOf[SparkSubFeed]
     implicit val sparkSession: SparkSession = SparkSubFeed.getSparkSession(context)
+    // the schema is transported by the SubFeed, independently of whether it also holds a DataFrame
+    def sparkSchema: Option[StructType] = sparkSubFeed.schemaOpt
+      .map(s => SchemaConverter.convert(s, SparkSubFeed.subFeedType).asInstanceOf[SparkSchema].inner)
     if (refreshDataFrame) {
       assert(
         input.isInstanceOf[CanCreateStreamingDataFrame],
         s"DataObject ${input.id} doesn't implement CanCreateStreamingDataFrame. Cannot create StreamingDataFrame for SparkStreamingMode"
       )
       val df =
-        input.asInstanceOf[CanCreateStreamingDataFrame].getStreamingDataFrame(inputOptions, sparkSubFeed.dataFrame.map(_.schema.inner))
-      sparkSubFeed.copy(dataFrame = Some(SparkDataFrame(df)), partitionValues = Seq()) // remove partition values for streaming
-    } else if (sparkSubFeed.isStreaming.contains(false)) {
-      // convert to dummy streaming DataFrame
-      val emptyStreamingDataFrame = sparkSubFeed.dataFrame.map(df => DummyStreamProvider.getDummyDf(df.schema.inner))
-      sparkSubFeed.copy(dataFrame = emptyStreamingDataFrame.map(SparkDataFrame), partitionValues = Seq())
+        input.asInstanceOf[CanCreateStreamingDataFrame].getStreamingDataFrame(inputOptions, sparkSchema)
+      sparkSubFeed.copy(dataFrame = Some(SparkDataFrame(df)), keptSchema = None, partitionValues = Seq()) // remove partition values for streaming
+    } else if (!sparkSubFeed.isStreamingDataFrame) {
+      // convert to dummy streaming DataFrame, also if the SubFeed transports only a schema
+      val emptyStreamingDataFrame = sparkSchema.map(s => DummyStreamProvider.getDummyDf(s))
+      sparkSubFeed.copy(dataFrame = emptyStreamingDataFrame.map(SparkDataFrame), keptSchema = None, partitionValues = Seq())
     } else sparkSubFeed
   }
 

@@ -66,7 +66,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
     contextInit = SparkTestUtil.getDefaultActionPipelineContext
     contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
-    contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
+    contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that the DataFrameCacheRegistry is shared between contextInit & contextExec like this!
   }
 
   test("action dag with 2 actions in sequence with state") {
@@ -92,9 +92,9 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // exec dag
     dag.prepare(contextPrep)
     dag.init(contextInit)
-    assert(contextInit.dataFrameReuseStatistics((tgt1DO.id, Seq())).size == 1)
+    assert(contextInit.cacheRegistry.consumerCount(tgt1DO.id) == 1)
     dag.exec(contextExec)
-    assert(contextExec.dataFrameReuseStatistics.forall(_._2.isEmpty))
+    assert(contextExec.cacheRegistry.consumerCount(tgt1DO.id) == 0)
 
     // check result
     val r1 = tgt2DO.getSparkDataFrame()
@@ -135,16 +135,16 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
     val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id)
-    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, breakDataFrameLineage = true)
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
     val actions: Seq[DataFrameOneToOneActionImpl] = Seq(action1, action2)
     val dag: ActionDAGRun = ActionDAGRun(actions)
 
     // exec dag
     dag.prepare(contextPrep)
     dag.init(contextInit)
-    assert(!contextInit.dataFrameReuseStatistics.contains((tgt1DO.id, Seq()))) // no reuse because of breakDataframeLineage
+    assert(!contextInit.cacheRegistry.isCached(tgt1DO.id)) // not cached, so action b reads tgt1 again
     dag.exec(contextExec)
-    assert(!contextExec.dataFrameReuseStatistics.contains((tgt1DO.id, Seq())))
+    assert(!contextExec.cacheRegistry.isCached(tgt1DO.id))
 
     // check result
     val r1 = tgt2DO.getSparkDataFrame()
@@ -182,9 +182,9 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // exec dag
     dag.prepare(contextPrep)
     dag.init(contextInit)
-    assert(!contextInit.dataFrameReuseStatistics.contains((tgt1DO.id, Seq()))) // no reuse because of different schema
+    assert(!contextInit.cacheRegistry.isCached(tgt1DO.id)) // not cached, so action b reads tgt1 again with its read schema
     dag.exec(contextExec)
-    assert(!contextInit.dataFrameReuseStatistics.contains((tgt1DO.id, Seq())))
+    assert(!contextInit.cacheRegistry.isCached(tgt1DO.id))
 
     // check result
     val dfR1 = tgt2DO.getSparkDataFrame()
@@ -318,11 +318,11 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // exec dag
     dag.prepare(contextPrep)
     dag.init(contextInit)
-    assert(contextInit.dataFrameReuseStatistics((tgtADO.id, Seq())).size == 2)
-    assert(contextInit.dataFrameReuseStatistics((tgtBDO.id, Seq())).size == 1)
-    assert(contextInit.dataFrameReuseStatistics((tgtCDO.id, Seq())).size == 1)
+    assert(contextInit.cacheRegistry.consumerCount(tgtADO.id) == 2)
+    assert(contextInit.cacheRegistry.consumerCount(tgtBDO.id) == 1)
+    assert(contextInit.cacheRegistry.consumerCount(tgtCDO.id) == 1)
     dag.exec(contextExec)
-    assert(contextExec.dataFrameReuseStatistics.forall(_._2.isEmpty))
+    assert(Seq(tgtADO.id, tgtBDO.id, tgtCDO.id).forall(contextExec.cacheRegistry.consumerCount(_) == 0))
 
     val r1 = tgtBDO.getSparkDataFrame()
       .select($"rating")
@@ -1239,13 +1239,13 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     Environment._globalConfig = Environment._globalConfig.copy(allowAsRecursiveInput = Seq())
   }
 
-  test("dataFrameReuseStatistics shared between ActionPipelineContext when cloning") {
+  test("DataFrameCacheRegistry shared between ActionPipelineContext when cloning") {
     val context1 = SparkTestUtil.getDefaultActionPipelineContext
-    context1.dataFrameReuseStatistics.update(("test", Seq()), Seq("action1"))
+    context1.cacheRegistry.registerConsumer("test", "action1")
     val context2 = context1.copy(phase = ExecutionPhase.Init)
-    assert(context2.dataFrameReuseStatistics.apply(("test", Seq())).size == 1)
-    context2.dataFrameReuseStatistics.update(("test", Seq()), Seq("action1", "action2"))
-    assert(context1.dataFrameReuseStatistics.apply(("test", Seq())).size == 2)
+    assert(context2.cacheRegistry.consumerCount("test") == 1)
+    context2.cacheRegistry.registerConsumer("test", "action2")
+    assert(context1.cacheRegistry.consumerCount("test") == 2)
   }
 
 }

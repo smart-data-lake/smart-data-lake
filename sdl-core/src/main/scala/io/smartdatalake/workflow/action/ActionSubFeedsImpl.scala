@@ -146,7 +146,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     }
   }
 
-  protected def convertToOutputSubFeed(subFeed: S): S = subFeed
+  protected def convertToOutputSubFeed(subFeed: S)(implicit context: ActionPipelineContext): S = subFeed
 
   def writeOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
     // write and collect all SubFeeds until there is a TaskFailedException, then collect SubFeed without writing.
@@ -214,7 +214,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
     // update partition values to output's partition columns and update dataObjectId
     outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds, inputSubFeeds)
-      .map(convertToOutputSubFeed) // replay transformations that will be done in exec phase writeOutputSubFeeds
+      .map(convertToOutputSubFeed(_)) // replay transformations that will be done in exec phase writeOutputSubFeeds
     // return
     outputSubFeeds
   } catch {

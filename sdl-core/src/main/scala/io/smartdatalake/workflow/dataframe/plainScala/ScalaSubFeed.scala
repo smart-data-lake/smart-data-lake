@@ -41,45 +41,39 @@ case class ScalaSubFeed(@transient override val dataFrame: Option[ScalaDataFrame
                         override val partitionValues: Seq[PartitionValues] = Seq(),
                         override val isDAGStart: Boolean = false,
                         override val isSkipped: Boolean = false,
-                        override val isDummy: Boolean = false,
                         override val filter: Option[String] = None,
                         @transient override val observation: Option[DataFrameObservation] = None,
                         override val metrics: Option[MetricsMap] = None,
-                        override val isStreaming: Option[Boolean] = Some(false)
+                        @transient override val keptSchema: Option[GenericSchema] = None
                        ) extends DataFrameSubFeed {
   @transient override def tpe: Type = typeOf[ScalaSubFeed]
 
-  override def persist: ScalaSubFeed = this
+  override def withDataFrame(dataFrame: Option[GenericDataFrame]): ScalaSubFeed = this.copy(
+    dataFrame = dataFrame.map(_.asInstanceOf[ScalaDataFrame]),
+    keptSchema = if (dataFrame.isDefined) None else this.schemaOpt
+  )
 
-  override def unpersist: ScalaSubFeed = this
+  override def withSchema(schema: Option[GenericSchema]): ScalaSubFeed = this.copy(dataFrame = None, keptSchema = schema)
 
-  override def hasReusableDataFrame: Boolean = dataFrame.isDefined && !isDummy && !isStreaming.getOrElse(false)
-
-  override def withDataFrame(dataFrame: Option[GenericDataFrame]): ScalaSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[ScalaDataFrame]))
-
-  override def toOutput(dataObjectId: SdlConfigObject.DataObjectId): ScalaSubFeed = this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId, observation = None, metrics = None)
+  override def toOutput(dataObjectId: SdlConfigObject.DataObjectId): ScalaSubFeed = this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None)
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): ScalaSubFeed = {
-
-    val (dataFrame, dummy) = other match {
+    val (dataFrame, schema) = other match {
       // both subfeeds have a DataFrame to reuse -> union DataFrames
-      case scalaSubFeed: ScalaSubFeed if this.hasReusableDataFrame && scalaSubFeed.hasReusableDataFrame =>
-        (this.dataFrame.map(_.unionByName(scalaSubFeed.dataFrame.get)), false)
-      // both subfeeds have DataFrames, but they are not reusable, e.g. they just transport the schema
-      case scalaSubFeed: ScalaSubFeed if this.dataFrame.isDefined || scalaSubFeed.dataFrame.isDefined =>
-        (this.dataFrame.orElse(scalaSubFeed.dataFrame), true) // if only one subfeed is defined, we need to get a fresh DataFrame and convert this to a dummy
-      // otherwise no dataframe
+      case scalaSubFeed: ScalaSubFeed if this.dataFrame.isDefined && scalaSubFeed.dataFrame.isDefined =>
+        (this.dataFrame.map(_.unionByName(scalaSubFeed.dataFrame.get)), None)
+      // at least one subfeed can not be reused -> transport only the schema, the DataFrame is read again from the DataObject
+      case scalaSubFeed: ScalaSubFeed =>
+        (None, this.schemaOpt.orElse(scalaSubFeed.schemaOpt))
       case _ =>
-        (None, false)
+        (None, this.schemaOpt)
     }
-    var resultSubfeed: ScalaSubFeed = this.copy(dataFrame = dataFrame
+    this.copy(dataFrame = dataFrame
+      , keptSchema = if (dataFrame.isDefined) None else schema
       , partitionValues = unionPartitionValues(other.partitionValues)
       , isDAGStart = this.isDAGStart || other.isDAGStart
       , isSkipped = this.isSkipped && other.isSkipped
     )
-    if (dummy && dataFrame.isDefined) resultSubfeed = this.copy(dataFrame = Some(ScalaDataFrame.returnEmpty(dataFrame.get.schema)), isDummy = true)
-    // return
-    resultSubfeed
   }
 
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: SdlConfigObject.DataObjectId)(implicit context: ActionPipelineContext): ScalaSubFeed = {
@@ -90,11 +84,11 @@ case class ScalaSubFeed(@transient override val dataFrame: Option[ScalaDataFrame
   }
 
   def applyExecutionModeResultForOutput(result: ExecutionModeResult): ScalaSubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None)
+    this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None)
   }
 
   def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): ScalaSubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None)
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None)
   }
 }
 
@@ -120,6 +114,10 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
   def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = schema match {
     case ss: ScalaSchema => ScalaDataFrame.returnEmpty(ss)
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
+  }
+
+  override def getSchemaSubFeed(dataObjectId: DataObjectId, schema: GenericSchema, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    ScalaSubFeed(None, dataObjectId, partitionValues, keptSchema = Some(schema))
   }
 
   // Members declared in io.smartdatalake.workflow.SubFeedConverter
