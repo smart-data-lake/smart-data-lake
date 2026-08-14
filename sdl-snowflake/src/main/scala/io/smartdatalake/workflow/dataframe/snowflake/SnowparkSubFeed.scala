@@ -38,66 +38,53 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
                            override val partitionValues: Seq[PartitionValues],
                            override val isDAGStart: Boolean = false,
                            override val isSkipped: Boolean = false,
-                           override val isDummy: Boolean = false,
                            override val filter: Option[String] = None,
                            @transient override val observation: Option[DataFrameObservation] = None,
-                           override val metrics: Option[MetricsMap] = None
+                           override val metrics: Option[MetricsMap] = None,
+                           @transient override val keptSchema: Option[GenericSchema] = None
                           )
   extends DataFrameSubFeed {
   @transient
   override val tpe: Type = typeOf[SnowparkSubFeed]
 
   override def toOutput(dataObjectId: DataObjectId): SnowparkSubFeed = {
-    this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId, observation = None, metrics = None)
+    this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None)
   }
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
-    val (dataFrame, dummy) = other match {
+    val (dataFrame, schema) = other match {
       // both subfeeds have a DataFrame to reuse -> union DataFrames
-      case sparkSubFeed: SnowparkSubFeed if this.hasReusableDataFrame && sparkSubFeed.hasReusableDataFrame =>
-        (this.dataFrame.map(_.unionByName(sparkSubFeed.dataFrame.get)), false)
-      // both subfeeds have DataFrames, but they are not reusable, e.g. they just transport the schema
-      case sparkSubFeed: SnowparkSubFeed if this.dataFrame.isDefined || sparkSubFeed.dataFrame.isDefined =>
-        (this.dataFrame.orElse(sparkSubFeed.dataFrame), true) // if only one subfeed is defined, we need to get a fresh DataFrame and convert this to a dummy
-      // otherwise no dataframe
+      case snowparkSubFeed: SnowparkSubFeed if this.dataFrame.isDefined && snowparkSubFeed.dataFrame.isDefined =>
+        (this.dataFrame.map(_.unionByName(snowparkSubFeed.dataFrame.get)), None)
+      // at least one subfeed can not be reused -> transport only the schema, the DataFrame is read again from the DataObject
+      case snowparkSubFeed: SnowparkSubFeed =>
+        (None, this.schemaOpt.orElse(snowparkSubFeed.schemaOpt))
       case _ =>
-        (None, false)
+        (None, this.schemaOpt)
     }
-    var resultSubfeed = this.copy(dataFrame = dataFrame
+    this.copy(dataFrame = dataFrame
+      , keptSchema = if (dataFrame.isDefined) None else schema
       , partitionValues = unionPartitionValues(other.partitionValues)
       , isDAGStart = this.isDAGStart || other.isDAGStart
       , isSkipped = this.isSkipped && other.isSkipped
     )
-    if (dummy) resultSubfeed = resultSubfeed.convertToDummy(dataFrame.get.schema)
-    // return
-    resultSubfeed
   }
 
-  override def persist: SnowparkSubFeed = {
-    logger.warn("Persist is not implemented by Snowpark")
-    // TODO: should we use "dataFrame.map(_.inner.cacheResult())"
-    this
-  }
 
-  override def unpersist: DataFrameSubFeed = this // not implemented, see persist
-
-  override def hasReusableDataFrame: Boolean = dataFrame.isDefined && !isDummy && !isStreaming.getOrElse(false)
-
-  private[smartdatalake] def convertToDummy(schema: SnowparkSchema)(implicit context: ActionPipelineContext): SnowparkSubFeed = {
-    val dummyDf = dataFrame.map(_ => schema.getEmptyDataFrame(dataObjectId))
-    this.copy(dataFrame = dummyDf, isDummy = true)
-  }
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SnowparkSubFeed = {
     // apply input filter
     val inputFilter = if (this.dataObjectId == mainInputId) result.filter else None
-    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage // breaklineage keeps DataFrame schema without content
+    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage // breaklineage keeps the schema without the DataFrame
       .asInstanceOf[SnowparkSubFeed]
   }
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SnowparkSubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None)
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None)
   }
-  override def withDataFrame(dataFrame: Option[GenericDataFrame]): SnowparkSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[SnowparkDataFrame]))
-  override def isStreaming: Option[Boolean] = Some(false) // no spark streaming with Snowpark
+  override def withDataFrame(dataFrame: Option[GenericDataFrame]): SnowparkSubFeed = this.copy(
+    dataFrame = dataFrame.map(_.asInstanceOf[SnowparkDataFrame]),
+    keptSchema = if (dataFrame.isDefined) None else this.schemaOpt
+  )
+  override def withSchema(schema: Option[GenericSchema]): SnowparkSubFeed = this.copy(dataFrame = None, keptSchema = schema)
 }
 
 object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogger {
@@ -105,12 +92,17 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
     subFeed match {
       case snowparkSubFeed: SnowparkSubFeed => snowparkSubFeed
       case dataFrameSubFeed: DataFrameSubFeed =>
-        val convertedSchema = dataFrameSubFeed.schema.map(_.convert(subFeedType))
-        SnowparkSubFeed(convertedSchema.map(s => getEmptyDataFrame(s, subFeed.dataObjectId)), subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped, isDummy = convertedSchema.isDefined)
+        // transport only the schema, the DataFrame is read again from the DataObject where it is needed
+        SnowparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped,
+          keptSchema = dataFrameSubFeed.schemaOpt.map(_.convert(subFeedType)))
       case _ => SnowparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
+  // Snowpark cacheResult() materializes eagerly into a temporary table.
+  // The table can only be released by closing the session, so it can not be uncached.
+  override def canCacheDataFrame: Boolean = true
+  override def canUncacheDataFrame: Boolean = false
   override def col(colName: String): SnowparkColumn = {
     SnowparkColumn(functions.col(colName))
   }
@@ -186,6 +178,9 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
       case snowparkDf: SnowparkDataFrame => SnowparkSubFeed(Some(snowparkDf), dataObjectId, partitionValues)
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(df)
     }
+  }
+  override def getSchemaSubFeed(dataObjectId: DataObjectId, schema: GenericSchema, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): SnowparkSubFeed = {
+    SnowparkSubFeed(None, dataObjectId, partitionValues, keptSchema = Some(schema))
   }
   override def stringType: SnowparkDataType = SnowparkDataType(StringType)
 

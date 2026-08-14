@@ -53,6 +53,40 @@ such as show, count, write... See [this spark tutorial for more on Spark Actions
 This is how in the Init Phase SDLB is able to check your lineage for Spark Actions. Basically, it relies on Spark to check the execution DAG under the hood.
 If you add Spark-Actions in your Custom Transformers (which is considered bad practice in most cases), you basically break that mechanism.
 
+#### How data is passed between Actions
+
+A SubFeed passed from one Action to the next transports the **schema** of the data, not the data itself.
+Each Action reads a fresh DataFrame from its input DataObject, which the previous Action has just written.
+
+If a subsequent Action should reuse the DataFrame instead of reading the DataObject again,
+set `cacheOutput = true` on the *producing* Action. The DataFrame is then materialized by the engine
+(Spark `persist`, Snowflake `cacheResult`) and released again once no Action needs it anymore.
+
+```
+actions {
+  compute-expensive-result {
+    type = CopyAction
+    inputId = stg-data
+    outputId = int-data
+    cacheOutput = true   # subsequent Actions reuse this DataFrame instead of reading int-data again
+  }
+}
+```
+
+:::caution Changed in 3.0.0
+Up to version 2.x the DataFrame of an Action was passed on to subsequent Actions by default, and
+`breakDataFrameLineage = true` was used to prevent that. This is inverted now: the DataFrame is no longer
+passed on by default, and `cacheOutput = true` enables it. `breakDataFrameLineage` has been removed.
+
+This changes results for pipelines writing with `saveMode = Append` or `Merge` to an *unpartitioned* output:
+a subsequent Action now reads the whole output DataObject, whereas before it received only the records
+written by this run. Set `cacheOutput = true` on the producing Action to keep the previous behaviour.
+Pipelines overwriting their output, which is the default for most DataObjects, are not affected.
+
+Automatic caching of DataFrames used by multiple Actions has been replaced by this explicit setting.
+The environment variable `enableAutomaticDataFrameCaching` has been removed.
+:::
+
 #### Watch the log output
 The stages are also clearly marked in the log output.
 Here is the sample output of [part-3 of the gettings-started guide](../getting-started/part-3/custom-webservice.md) again with a few things removed:

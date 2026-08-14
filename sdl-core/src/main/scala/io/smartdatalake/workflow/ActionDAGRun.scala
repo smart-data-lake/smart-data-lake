@@ -128,6 +128,8 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
   def init(context: ActionPipelineContext): Seq[SubFeed] = {
     implicit val phaseContext: ActionPipelineContext = context.copy(phase = ExecutionPhase.Init)
+    // reset cached DataFrames of a previous run, e.g. the previous iteration in streaming mode
+    phaseContext.cacheRegistry.reset()
     // initialize state listeners
     stateListeners.foreach(_.init(phaseContext))
     // run init for every node
@@ -165,7 +167,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
   def exec(context: ActionPipelineContext): Seq[SubFeed] = {
     // run exec for every node
-    val result = {
+    val result = try {
       implicit val phaseContext: ActionPipelineContext = context.copy(phase = ExecutionPhase.Exec)
       run[SubFeed](phaseContext.phase, parallelism) {
         case (node: InitDAGNode, _) =>
@@ -190,6 +192,9 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
           resultSubFeeds
         case x => throw new IllegalStateException(s"Unmatched case $x")
       }
+    } finally {
+      // release remaining cached DataFrames, also if the dag failed and consumers never ran
+      context.cacheRegistry.releaseAll()
     }
     // log dag execution
     ActionDAGRun.logDag(s"exec SUCCEEDED for dag ${executionId.runId}", dag, Some(executionId))

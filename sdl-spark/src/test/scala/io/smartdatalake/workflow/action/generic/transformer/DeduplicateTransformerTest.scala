@@ -35,7 +35,7 @@ class DeduplicateTransformerTest extends AnyFunSuite with BeforeAndAfter with De
 
   override def subFeedType: Type = typeOf[SparkSubFeed]
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between phases like this!
+  implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec) // note that the DataFrameCacheRegistry is shared between phases like this!
 
   before {
     instanceRegistry.clear()

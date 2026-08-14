@@ -49,7 +49,7 @@ class IcebergCustomDataFrameTest extends AnyFunSuite with BeforeAndAfter {
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   private val contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
-  private val contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
+  private val contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that the DataFrameCacheRegistry is shared between contextInit & contextExec like this!
   Environment._globalConfig = GlobalConfig()
 
   before {

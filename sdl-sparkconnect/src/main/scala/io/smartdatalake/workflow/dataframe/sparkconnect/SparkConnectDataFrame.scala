@@ -168,7 +168,7 @@ case class SparkConnectDataFrame(override val inner: DataFrame) extends GenericD
     // Spark Connect has no QueryExecutionListener on the client side. Metrics are calculated with a separate query on the cached DataFrame.
     val observation = GenericCalculatedObservation(this, aggregateColumns.toIndexedSeq: _*)
     // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
-    (this.cache, observation)
+    (if (isExecPhase) this.cache else this, observation)
   }
 
   def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = {

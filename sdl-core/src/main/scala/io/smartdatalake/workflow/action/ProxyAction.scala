@@ -88,10 +88,8 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
 
   def convertToEmptySubFeed(dataObjectId: DataObjectId, schemaDdl: String, subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     val companion = DataFrameSubFeed.getCompanion(subFeedType)
-    val schema = companion.createSchemaFromDdl(schemaDdl)
-    val emptyDF = companion.getEmptyDataFrame(schema, dataObjectId)
-    companion.getSubFeed(dataFrame = emptyDF, dataObjectId = dataObjectId, Seq())
-      .asDummy()
+    // the remote agent only returns the schema, the DataFrame is read from the DataObject where it is needed
+    companion.getSchemaSubFeed(dataObjectId, companion.createSchemaFromDdl(schemaDdl))
   }
 }
 

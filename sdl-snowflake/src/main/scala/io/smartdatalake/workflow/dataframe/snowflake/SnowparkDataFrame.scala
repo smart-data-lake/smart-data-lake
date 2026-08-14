@@ -144,8 +144,9 @@ case class SnowparkDataFrame(override val inner: DataFrame) extends GenericDataF
   override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
     // Snowpark has no method to observe metrics. They need to be calculated.
     val observation = GenericCalculatedObservation(this, aggregateColumns:_*)
-    // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
-    (this.cache, observation)
+    // Cache the DataFrame to avoid duplicate calculation, but only in exec phase: in init phase the DataFrame is
+    // empty and materializing it would be pure overhead (on Snowpark it even creates a temporary table).
+    (if (isExecPhase) this.cache else this, observation)
   }
   override def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = {
     throw new NotImplementedError("Can not create observation '$name'. Observing DataFrames is not supported in Snowpark.")

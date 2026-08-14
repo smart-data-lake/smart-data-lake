@@ -20,29 +20,10 @@ package io.smartdatalake.util.spark
 
 import org.apache.spark.sql.types.{DataType, DecimalType, StructType}
 import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
-import org.apache.spark.storage.StorageLevel
 
 import scala.jdk.CollectionConverters._
 
 package object dataset {
-
-  /**
-   * Persists a [[DataFrame]] with [[StorageLevel.MEMORY_AND_DISK_SER]] returning the persisted.
-   */
-  private def defaultPersistDf[T](ds: Dataset[T]): Dataset[T] = ds.persist(StorageLevel.MEMORY_AND_DISK_SER)
-
-  /**
-   * Persists a  [[Dataset]] with given storage level [[StorageLevel.MEMORY_AND_DISK_SER]] if persisting is allowed.
-   *
-   * @param ds           [[Dataset[T]]] to persist
-   * @param doPersist    Allowed to persist?
-   * @param storageLevel [[StorageLevel]] to use
-   * @return persisted [[Dataset[T]]]
-   */
-  def persistDfIfPossible[T](ds: Dataset[T], doPersist: Boolean,
-                             storageLevel: Option[StorageLevel] = None): Dataset[T] = if (doPersist) {
-    if (storageLevel.isDefined) ds.persist(storageLevel.get) else defaultPersistDf(ds)
-  } else ds
 
   def getDecimalPrecisionScale(t: DataType): Option[(Int, Int)] = t match {
     case DecimalType() => Some((t.asInstanceOf[DecimalType].precision,

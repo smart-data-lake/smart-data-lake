@@ -688,8 +688,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
                 context
               }
 
-              // remove spark caches so that new data is read in next iteration
-              // TODO: in the future it might be interesting to keep some DataFrames cached for performance reason...
+              // Note: cached DataFrames are released by ActionDAGRun.exec and reset by ActionDAGRun.init,
+              // so that new data is read in the next iteration.
               // TODO: add additional method actionDAGRun.finalizeIteration or similar, which can be used to do some finalization tasks at the end of an iteration, for all connections
               // iterate execution
               // note that this re-executes also asynchronous actions - they have to handle by themself that they are already started

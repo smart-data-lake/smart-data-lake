@@ -45,73 +45,56 @@ import scala.util.Try
  * @param partitionValues Values of Partitions transported by this SubFeed
  * @param isDAGStart true if this subfeed is a start node of the dag
  * @param isSkipped true if this subfeed is the result of a skipped action
- * @param isDummy true if this subfeed only contains a dummy DataFrame. Dummy DataFrames can be used for validating the lineage in init phase, but not for the exec phase.
  * @param filter a spark SQL filter expression. This is used by DataFrameIncrementalMode.
+ * @param keptSchema schema transported by this SubFeed if it holds no DataFrame. Use `schema`/`schemaOpt` to read it.
  */
 case class SparkConnectSubFeed(@transient override val dataFrame: Option[SparkConnectDataFrame],
                                override val dataObjectId: DataObjectId,
                                override val partitionValues: Seq[PartitionValues],
                                override val isDAGStart: Boolean = false,
                                override val isSkipped: Boolean = false,
-                               override val isDummy: Boolean = false,
                                override val filter: Option[String] = None,
                                @transient override val observation: Option[DataFrameObservation] = None,
-                               override val metrics: Option[MetricsMap] = None
+                               override val metrics: Option[MetricsMap] = None,
+                               @transient override val keptSchema: Option[GenericSchema] = None
                               )
   extends DataFrameSubFeed {
   @transient override val tpe: Type = typeOf[SparkConnectSubFeed]
   override def toOutput(dataObjectId: DataObjectId): SparkConnectSubFeed = {
-    this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId, observation = None, metrics = None)
+    this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None)
   }
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
-    val (dataFrame, dummy) = other match {
+    val (dataFrame, schema) = other match {
       // both subfeeds have a DataFrame to reuse -> union DataFrames
-      case subFeed: SparkConnectSubFeed if this.hasReusableDataFrame && subFeed.hasReusableDataFrame =>
-        (this.dataFrame.map(_.unionByName(subFeed.dataFrame.get)), false)
-      // both subfeeds have DataFrames, but they are not reusable, e.g. they just transport the schema
-      case subFeed: SparkConnectSubFeed if this.dataFrame.isDefined || subFeed.dataFrame.isDefined =>
-        (this.dataFrame.orElse(subFeed.dataFrame), true) // if only one subfeed is defined, we need to get a fresh DataFrame and convert this to a dummy
-      // otherwise no dataframe
+      case subFeed: SparkConnectSubFeed if this.dataFrame.isDefined && subFeed.dataFrame.isDefined =>
+        (this.dataFrame.map(_.unionByName(subFeed.dataFrame.get)), None)
+      // at least one subfeed can not be reused -> transport only the schema, the DataFrame is read again from the DataObject
+      case subFeed: SparkConnectSubFeed =>
+        (None, this.schemaOpt.orElse(subFeed.schemaOpt))
       case _ =>
-        (None, false)
+        (None, this.schemaOpt)
     }
-    var resultSubfeed = this.copy( dataFrame = dataFrame
+    this.copy( dataFrame = dataFrame
+      , keptSchema = if (dataFrame.isDefined) None else schema
       , partitionValues = unionPartitionValues(other.partitionValues)
       , isDAGStart = this.isDAGStart || other.isDAGStart
       , isSkipped = this.isSkipped && other.isSkipped
     )
-    if (dummy) resultSubfeed = resultSubfeed.convertToDummy(dataFrame.get.schema)
-    // return
-    resultSubfeed
-  }
-  override def persist: SparkConnectSubFeed = {
-    this.dataFrame.foreach(_.inner.persist()) // Spark's persist & cache can be called without referencing the resulting DataFrame
-    this
-  }
-  override def unpersist: SparkConnectSubFeed = {
-    this.dataFrame.foreach(_.inner.unpersist()) // Spark's unpersist can be called without referencing the resulting DataFrame
-    this
-  }
-  override def isStreaming: Option[Boolean] = dataFrame.map(_.inner.isStreaming)
-  override def hasReusableDataFrame: Boolean = dataFrame.isDefined && !isDummy && !isStreaming.getOrElse(false)
-  private[smartdatalake] def convertToDummy(schema: SparkConnectSchema)(implicit context: ActionPipelineContext): SparkConnectSubFeed = {
-    val dummyDf = dataFrame.map {
-      dataFrame =>
-        if (dataFrame.inner.isStreaming) throw new NotImplementedError("Streaming DataFrames are not yet supported by SparkConnectSubFeed")
-        else schema.getEmptyDataFrame(dataObjectId)
-    }
-    this.copy(dataFrame = dummyDf, isDummy = true)
   }
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SparkConnectSubFeed = {
     // apply input filter
     val inputFilter = if (this.dataObjectId == mainInputId) result.filter else None
-    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage // breaklineage keeps DataFrame schema without content
+    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage // breaklineage keeps the schema without the DataFrame
       .asInstanceOf[SparkConnectSubFeed]
   }
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SparkConnectSubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None)
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None)
   }
-  override def withDataFrame(dataFrame: Option[GenericDataFrame]): SparkConnectSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[SparkConnectDataFrame]))
+  override def withDataFrame(dataFrame: Option[GenericDataFrame]): SparkConnectSubFeed = this.copy(
+    dataFrame = dataFrame.map(_.asInstanceOf[SparkConnectDataFrame]),
+    keptSchema = if (dataFrame.isDefined) None else this.schemaOpt
+  )
+  override def withSchema(schema: Option[GenericSchema]): SparkConnectSubFeed = this.copy(dataFrame = None, keptSchema = schema)
 }
 
 object SparkConnectSubFeed extends DataFrameSubFeedCompanion {
@@ -125,6 +108,8 @@ object SparkConnectSubFeed extends DataFrameSubFeedCompanion {
     }
   }
   @transient override def subFeedType: universe.Type = typeOf[SparkConnectSubFeed]
+  override def canCacheDataFrame: Boolean = true
+  override def canUncacheDataFrame: Boolean = true
   override def col(colName: String): GenericColumn = {
     SparkConnectColumn(functions.col(colName))
   }
@@ -210,6 +195,9 @@ object SparkConnectSubFeed extends DataFrameSubFeedCompanion {
       case sparkDf: SparkConnectDataFrame => SparkConnectSubFeed(Some(sparkDf), dataObjectId, partitionValues)
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(df)
     }
+  }
+  override def getSchemaSubFeed(dataObjectId: DataObjectId, schema: GenericSchema, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    SparkConnectSubFeed(None, dataObjectId, partitionValues, keptSchema = Some(schema))
   }
   override def stringType: GenericDataType = SparkConnectDataType(StringType)
 

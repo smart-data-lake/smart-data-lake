@@ -38,14 +38,54 @@ trait DataFrameSubFeed extends SubFeed {
   @transient
   def tpe: Type // concrete type of this DataFrameSubFeed
   implicit lazy val companion: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(tpe)
+  /**
+   * DataFrame transported by this SubFeed.
+   * It is only defined if the producing Action cached it (cacheOutput=true), otherwise the consuming Action
+   * reads a fresh DataFrame from the DataObject.
+   */
   def dataFrame: Option[GenericDataFrame]
   def observation: Option[DataFrameObservation]
-  def persist: DataFrameSubFeed
-  def unpersist: DataFrameSubFeed
-  def schema: Option[GenericSchema] = dataFrame.map(_.schema)
-  def hasReusableDataFrame: Boolean
-  def isDummy: Boolean
+
+  /**
+   * Materialize the DataFrame of this SubFeed, so that reading it again does not recompute it.
+   *
+   * Note that the returned SubFeed must be used: engines materializing eagerly (e.g. Snowpark `cacheResult`)
+   * return a *new* DataFrame and leave the receiver unchanged.
+   */
+  def cache: DataFrameSubFeed = withDataFrame(dataFrame.map(_.cache))
+
+  /**
+   * Release a DataFrame materialized by [[cache]]. Not all engines support this, see [[DataFrameSubFeedCompanion.canUncacheDataFrame]].
+   */
+  def uncache: DataFrameSubFeed = withDataFrame(dataFrame.map(_.uncache))
+
+  /**
+   * Schema kept when this SubFeed transports no DataFrame, e.g. after breakLineage or when crossing
+   * an engine boundary. Do not read this directly, use [[schema]] or [[schemaOpt]] instead.
+   * Note: implementations must declare this @transient, so it is not written to the run state.
+   */
+  private[smartdatalake] def keptSchema: Option[GenericSchema]
+
+  /**
+   * Schema of the data transported by this SubFeed, if it is already known.
+   * It is only unknown for SubFeeds at the start of the DAG which did not yet enter an Action.
+   */
+  def schemaOpt: Option[GenericSchema] = dataFrame.map(_.schema).orElse(keptSchema)
+
+  /**
+   * Schema of the data transported by this SubFeed.
+   * This is always defined once the SubFeed has been enriched with a DataFrame by its Action,
+   * see DataFrameActionImpl.enrichSubFeedDataFrame. Use [[schemaOpt]] before that, e.g. for SubFeeds
+   * at the start of the DAG which do not yet know their schema.
+   */
+  def schema: GenericSchema = schemaOpt.getOrElse(
+    throw new IllegalStateException(s"($dataObjectId) schema of this SubFeed is not yet initialized")
+  )
+
   def filter: Option[String]
+
+  /** true if this SubFeed holds a streaming DataFrame */
+  def isStreamingDataFrame: Boolean = dataFrame.exists(_.isStreaming)
 
   def clearFilter(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     // if filter is removed, normally also the DataFrame must be removed so that the next action get's a fresh unfiltered DataFrame with all data of this DataObject
@@ -56,9 +96,10 @@ trait DataFrameSubFeed extends SubFeed {
   }
 
   override def breakLineage(implicit context: ActionPipelineContext): DataFrameSubFeed = {
-    // in order to keep the schema but truncate spark logical plan, a dummy DataFrame is created.
-    // dummy DataFrames must be exchanged to real DataFrames before reading in exec-phase.
-    if (dataFrame.isDefined && !isDummy && !context.simulation) convertToDummy(dataFrame.get.schema) else this
+    // The DataFrame is dropped in order to truncate the engines logical plan. The schema is kept, so that
+    // subsequent Actions can still validate the lineage in init phase. A DataFrame is recreated on demand,
+    // see DataFrameActionImpl.enrichSubFeedDataFrame.
+    if (dataFrame.isDefined && !context.simulation) withDataFrame(None) else this
   }
 
   override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
@@ -72,8 +113,16 @@ trait DataFrameSubFeed extends SubFeed {
     val updatedPartitionValues = SubFeed.filterPartitionValues(newPartitionValues.getOrElse(partitionValues), partitions)
     withPartitionValues(updatedPartitionValues)
   }
-  def isStreaming: Option[Boolean]
+  /**
+   * Set the DataFrame of this SubFeed. The schema follows the DataFrame if it is defined,
+   * otherwise the currently known schema is kept.
+   */
   def withDataFrame(dataFrame: Option[GenericDataFrame]): DataFrameSubFeed
+
+  /**
+   * Drop the DataFrame of this SubFeed and transport only the given schema.
+   */
+  def withSchema(schema: Option[GenericSchema]): DataFrameSubFeed
 
   def withObservation(observation: Option[DataFrameObservation]): DataFrameSubFeed = {
     ProductUtil.dynamicCopy(this, "observation", observation)
@@ -107,33 +156,41 @@ trait DataFrameSubFeed extends SubFeed {
     withDataFrame(dfResult)
   }
 
-  def asDummy(): DataFrameSubFeed = ProductUtil.dynamicCopy(this, "isDummy", true)
   def transform(transformer: GenericDataFrame => GenericDataFrame): DataFrameSubFeed = withDataFrame(dataFrame.map(transformer))
 
   def movePartitionColumnsLast(partitions: Seq[String]): DataFrameSubFeed = {
     withDataFrame(dataFrame.map(x => x.movePartitionColsLast(partitions)))
   }
-
-  private[smartdatalake] def convertToDummy(schema: GenericSchema)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
-    val dummyDf = dataFrame.map(_ => schema.getEmptyDataFrame(dataObjectId))
-    withDataFrame(dataFrame = dummyDf).asDummy()
-  }
 }
 
 trait DataFrameSubFeedCompanion extends SubFeedConverter[DataFrameSubFeed] with DataFrameFunctions {
   protected def subFeedType: universe.Type
+
   /**
-   * This method can create the schema for reading DataObjects.
+   * true if this engine can materialize a DataFrame, e.g. [[GenericDataFrame.cache]] is not a no-op.
+   */
+  def canCacheDataFrame: Boolean = false
+
+  /**
+   * true if [[GenericDataFrame.cache]] releases the materialized data again.
+   * Note that Snowpark creates a temporary table which can only be released by closing the session.
+   */
+  def canUncacheDataFrame: Boolean = false
+
+  /**
+   * Get the read schema of a DataObject from its configuration, without accessing the DataObject itself.
+   * Returns None if no schema is declared anywhere, in which case the DataObject has to be asked - see [[getDataObjectSchema]].
    * If SubFeed subtypes have DataObjects with other methods to create a schema, they can override this method.
    */
-  def getDataObjectReadSchema(dataObject: DataObject with CanCreateDataFrame)(implicit context: ActionPipelineContext): Option[GenericSchema] = {
-    dataObject match {
-      case input: UserDefinedSchema if input.schema.isDefined =>
-        input.schema.map(dataObject.createReadSchema)
-      case input: SchemaValidation if input.schemaMin.isDefined =>
-        input.schemaMin.map(dataObject.createReadSchema)
+  def getDeclaredDataObjectSchema(dataObject: DataObject with CanCreateDataFrame)(implicit context: ActionPipelineContext): Option[GenericSchema] = {
+    val schema = dataObject match {
+      case input: UserDefinedSchema if input.schema.isDefined => input.schema
+      case input: SchemaValidation if input.schemaMin.isDefined => input.schemaMin
+      case _ if context.globalConfig.dataObjectsSchemaSource.isDefined && !context.isExecPhase =>
+        context.globalConfig.getSchemaFromSource(dataObject.id)(context.hadoopConf)
       case _ => None
     }
+    schema.map(dataObject.createReadSchema)
   }
 
   /**
@@ -141,8 +198,13 @@ trait DataFrameSubFeedCompanion extends SubFeedConverter[DataFrameSubFeed] with 
    * @param dataObjectId Snowpark implementation needs to get the Snowpark-Session from the DataObject. This should not be used otherwise.
    */
   def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame
-  def getEmptyStreamingDataFrame(schema: GenericSchema)(implicit context: ActionPipelineContext): GenericDataFrame = throw new NotImplementedError(s"getEmptyStreamingDataFrame is not implemented for ${subFeedType.typeSymbol.name}")
   def getSubFeed(dataFrame: GenericDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrameSubFeed
+
+  /**
+   * Create a SubFeed which transports only a schema and no DataFrame.
+   * The consuming Action recreates a DataFrame on demand, see DataFrameActionImpl.enrichSubFeedDataFrame.
+   */
+  def getSchemaSubFeed(dataObjectId: DataObjectId, schema: GenericSchema, partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrameSubFeed
   def createSchema(fields: Seq[GenericField]): GenericSchema
 
   def createSchemaFromDdl(ddl: String): GenericSchema = throw new UnsupportedOperationException(s"createSchemaFromDdl is not supported for ${subFeedType.typeSymbol.name}")

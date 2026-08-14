@@ -60,8 +60,9 @@ class SparkSubFeedTest extends AnyFunSuite {
     val sf2 = SparkSubFeed(Some(SparkDataFrame(df)), "test1", Seq(PartitionValues(Map("dt"->"20200101"))))
     val sfUnion = sf1.union(sf2).asInstanceOf[SparkSubFeed]
     assert(sfUnion.partitionValues.isEmpty)
-    assert(sfUnion.dataFrame.get.schema.inner == df.schema)
-    assert(sfUnion.dataFrame.get.isEmpty)
+    // only one side has a reusable DataFrame -> transport only the schema, the DataFrame is read again from the DataObject
+    assert(sfUnion.dataFrame.isEmpty)
+    assert(sfUnion.schema.asInstanceOf[SparkSchema].inner == df.schema)
   }
 
   test("SparkSubFeed union with DataFrames, with partitionValues") {
