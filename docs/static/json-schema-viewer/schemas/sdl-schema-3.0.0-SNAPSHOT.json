@@ -775,7 +775,7 @@
         "title" : "ActionsExporterDataObject",
         "required" : [ "type" ],
         "additionalProperties" : false,
-        "description" : "Exports a util `DataFrame` that contains properties and metadata extracted from all `io.smartdatalake.workflow.action.Action`s\nthat are registered in the current `InstanceRegistry`.\n\nAlternatively, it can export the properties and metadata of all `io.smartdatalake.workflow.action.Action`s defined in config files. For this, the\nconfiguration \"config\" has to be set to the location of the config. Example:\n```\ndataObjects = {\n ...  \n actions-exporter {\n   type = ActionsExporterDataObject\n   config = path/to/myconfiguration.conf\n }\n ...  \n}\n```\n\n\nThe config value can point to a configuration file or a directory containing configuration files.\n\nSEE: Refer to `ConfigLoader.loadConfigFromFilesystem()` for details about the configuration loading."
+        "description" : "Exports a util `DataFrame` that contains properties and metadata extracted from all `Action`s\nthat are registered in the current `InstanceRegistry`.\n\nAlternatively, it can export the properties and metadata of all `Action`s defined in config files. For this, the\nconfiguration \"config\" has to be set to the location of the config. Example:\n```\ndataObjects = {\n ...  \n actions-exporter {\n   type = ActionsExporterDataObject\n   config = path/to/myconfiguration.conf\n }\n ...  \n}\n```\n\n\nThe config value can point to a configuration file or a directory containing configuration files.\n\nSEE: Refer to `ConfigLoader.loadConfigFromFilesystem()` for details about the configuration loading."
       },
       "AirbyteDataObject" : {
         "type" : "object",
