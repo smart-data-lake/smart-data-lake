@@ -21,6 +21,7 @@ package io.smartdatalake.app
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.definitions.{Environment, SDLSaveMode}
+import io.smartdatalake.testutils.CaptureRunContext
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.LogUtils.debugLog
 import io.smartdatalake.util.dag.TaskFailedException
@@ -50,7 +51,7 @@ import org.slf4j.Logger
 import java.nio.file
 import _root_.scala.util.{Failure, Success, Try}
 
-class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with SmartDataLakeLogger with BeforeAndAfter {
+class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with SmartDataLakeLogger with BeforeAndAfter with CaptureRunContext {
   @transient implicit private lazy val loggImpl: Logger = logger
   protected implicit val session: SparkSession = SparkTestUtil.session
 
@@ -169,11 +170,11 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
 
     val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"),
       feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath), streaming = true)
-    Environment._additionalStateListeners = Seq(stateListener)
+    setAdditionalStateListeners(stateListener)
     Environment.stopStreamingGracefully = false
     sdlb.run(sdlConfig)
     Environment.stopStreamingGracefully = false
-    Environment._additionalStateListeners = Seq()
+    setAdditionalStateListeners()
 
     debugLog("check data after streaming is terminated")
     assert(tgt1DO.listPartitions.map(_.apply("dt")) == Seq("20180101", "20180102"))
@@ -312,8 +313,8 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     }
     // runtime information is kept in the runtime registry of the context of the run, not in the test context,
     // so it has to be passed explicitly here (contextExec is the implicit in scope).
-    val contextRun: ActionPipelineContext = sdlb.lastContext.get
-    val action1RuntimeData = contextRun.runtimeRegistry.get(action1.id).get
+    val contextRun: ActionPipelineContext = lastRunContext
+    val action1RuntimeData = lastRunRuntimeData(action1.id).get
     debugLog(s"action1.runtimeData: $action1RuntimeData")
     debugLog(s"${action1RuntimeData.executions.length} action1.runtimeData.executions: " +
       s"${action1RuntimeData.executions.mkString(",")}")
@@ -690,11 +691,11 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     actionA.reset
     actionB.reset
     session.streams.resetTerminated() // reset terminated streaming query list
-    Environment._additionalStateListeners = Seq(stateListener)
+    setAdditionalStateListeners(stateListener)
     Environment.stopStreamingGracefully = false
     sdlb.run(sdlConfig)
     Environment.stopStreamingGracefully = false
-    Environment._additionalStateListeners = Seq()
+    setAdditionalStateListeners()
 
     // check data after streaming is terminated
     assert(tgt2DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20180102"))
@@ -788,17 +789,17 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
 
     debugLog("restart run")
     // runtime information is kept in the runtime registry of the context of the run, not in the test context
-    val currentRunId = sdlb.lastContext.get.runtimeRegistry.get(actionA.id).get
+    val currentRunId = lastRunRuntimeData(actionA.id).get
       .currentExecutionId.get.asInstanceOf[SDLExecutionId].runId
     session.streams.resetTerminated() // reset terminated streaming query list
     actionA.reset
     actionB.reset
     debugLog("this listener adds more data after first skipped run")
-    Environment._additionalStateListeners = Seq(new PartitionStreamingTestStateListener2(currentRunId + 1))
+    setAdditionalStateListeners(new PartitionStreamingTestStateListener2(currentRunId + 1))
     Environment.stopStreamingGracefully = false
     sdlb.run(sdlConfig)
     Environment.stopStreamingGracefully = false
-    Environment._additionalStateListeners = Seq()
+    setAdditionalStateListeners()
 
     debugLog("check data after streaming is terminated")
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20180102", "20190101"))

@@ -228,15 +228,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logAndThrowException(s"Aborting $appType after error", new ConfigurationException("Couldn't set command line parameters correctly."))
 
   /**
-   * The [[ActionPipelineContext]] created for the most recent execution.
-   *
-   * Runtime information of a run is kept in the [[io.smartdatalake.workflow.ActionsRuntimeRegistry]] of its
-   * context, so this is the handle to inspect events and metrics of a finished run, e.g. in tests.
-   * Note that in streaming mode the context is copied per iteration, but all copies share the same registry.
-   */
-  private[smartdatalake] var lastContext: Option[ActionPipelineContext] = None
-
-  /**
    * Run the application with the provided configuration.
    *
    * @param appConfig
@@ -530,7 +521,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       actionsSkipped = actionIdsSkipped,
       globalConfig = globalConfig
     )
-    lastContext = Some(context)
     val actionDAGRun = ActionDAGRun(
       actionsToExec,
       actionsToSkip,
