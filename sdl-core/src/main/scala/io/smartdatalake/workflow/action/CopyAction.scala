@@ -71,21 +71,21 @@ import scala.reflect.runtime.universe.Type
  *   Transformers. The transformations are applied according to the lists ordering.
  */
 case class CopyAction(
-    override val id: ActionId,
-    inputId: DataObjectId,
-    outputId: DataObjectId,
-    deleteDataAfterRead: Boolean = false,
-    transformers: Seq[GenericDfTransformer] = Seq(),
-    override val cacheOutput: Boolean = false,
-    override val persist: Boolean = false,
-    override val executionMode: Option[ExecutionMode] = None,
-    override val executionCondition: Option[Condition] = None,
-    override val metricsFailCondition: Option[String] = None,
-    override val expectations: Seq[ActionExpectation] = Seq(),
-    override val saveModeOptions: Option[SaveModeOptions] = None,
-    override val metadata: Option[ActionMetadata] = None,
-    override val agentId: Option[AgentId] = None,
-    override val engineConnectionId: Option[ConnectionId] = None
+                       override val id: ActionId,
+                       inputId: DataObjectId,
+                       outputId: DataObjectId,
+                       deleteDataAfterRead: Boolean = false,
+                       transformers: Seq[GenericDfTransformer] = Seq(),
+                       override val cacheOutput: Boolean = false,
+                       override val cacheInput: Boolean = false,
+                       override val executionMode: Option[ExecutionMode] = None,
+                       override val executionCondition: Option[Condition] = None,
+                       override val metricsFailCondition: Option[String] = None,
+                       override val expectations: Seq[ActionExpectation] = Seq(),
+                       override val saveModeOptions: Option[SaveModeOptions] = None,
+                       override val metadata: Option[ActionMetadata] = None,
+                       override val agentId: Option[AgentId] = None,
+                       override val engineConnectionId: Option[ConnectionId] = None
 )(implicit val instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)

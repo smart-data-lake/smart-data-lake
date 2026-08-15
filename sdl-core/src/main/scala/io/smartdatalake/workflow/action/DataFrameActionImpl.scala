@@ -63,7 +63,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
    * This improves performance if the input DataFrame is used multiple times in the transformation of this Action
    * and can serve as a recovery point in case a task gets lost.
    */
-  def persist: Boolean
+  def cacheInput: Boolean
 
   override def isAsynchronous: Boolean = executionMode.exists(_.isAsynchronous)
 
@@ -250,7 +250,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     preparedSubFeed = enrichSubFeedDataFrame(input = input, subFeed = preparedSubFeed,
       phase = context.phase, isRecursive = isRecursive)
     // materialize input DataFrame if requested. Only needed in exec phase, as init phase works on empty DataFrames.
-    if (persist && context.isExecPhase && subFeedHelper.canCacheDataFrame && !preparedSubFeed.isStreamingDataFrame) {
+    if (cacheInput && context.isExecPhase && subFeedHelper.canCacheDataFrame && !preparedSubFeed.isStreamingDataFrame) {
       preparedSubFeed = preparedSubFeed.cache
       context.cacheRegistry.register(preparedSubFeed)
     }

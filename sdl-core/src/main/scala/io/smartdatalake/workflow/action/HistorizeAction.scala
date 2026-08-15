@@ -123,26 +123,26 @@ import scala.reflect.runtime.universe.Type
  *   exclusive). Format is `x(ns|us|ms|s|m|h|d)`, e.g. 1d. Default is 1ms.
  */
 case class HistorizeAction(
-    override val id: ActionId,
-    inputId: DataObjectId,
-    outputId: DataObjectId,
-    transformers: Seq[GenericDfTransformer] = Seq(),
-    historizeBlacklist: Option[Seq[String]] = None,
-    historizeWhitelist: Option[Seq[String]] = None,
-    ignoreOldDeletedColumns: Boolean = false,
-    ignoreOldDeletedNestedColumns: Boolean = true,
-    mergeModeAdditionalJoinPredicate: Option[String] = None,
-    mergeModeCDCColumn: Option[String] = None,
-    mergeModeCDCDeletedValue: Option[String] = None,
-    checkInputUnique: Boolean = false,
-    timeAxisUnit: Duration = Duration.ofMillis(1),
-    override val cacheOutput: Boolean = false,
-    override val persist: Boolean = false,
-    override val executionMode: Option[ExecutionMode] = None,
-    override val executionCondition: Option[Condition] = None,
-    override val metricsFailCondition: Option[String] = None,
-    override val metadata: Option[ActionMetadata] = None,
-    override val engineConnectionId: Option[ConnectionId] = None
+                            override val id: ActionId,
+                            inputId: DataObjectId,
+                            outputId: DataObjectId,
+                            transformers: Seq[GenericDfTransformer] = Seq(),
+                            historizeBlacklist: Option[Seq[String]] = None,
+                            historizeWhitelist: Option[Seq[String]] = None,
+                            ignoreOldDeletedColumns: Boolean = false,
+                            ignoreOldDeletedNestedColumns: Boolean = true,
+                            mergeModeAdditionalJoinPredicate: Option[String] = None,
+                            mergeModeCDCColumn: Option[String] = None,
+                            mergeModeCDCDeletedValue: Option[String] = None,
+                            checkInputUnique: Boolean = false,
+                            timeAxisUnit: Duration = Duration.ofMillis(1),
+                            override val cacheOutput: Boolean = false,
+                            override val cacheInput: Boolean = false,
+                            override val executionMode: Option[ExecutionMode] = None,
+                            override val executionCondition: Option[Condition] = None,
+                            override val metricsFailCondition: Option[String] = None,
+                            override val metadata: Option[ActionMetadata] = None,
+                            override val engineConnectionId: Option[ConnectionId] = None
 )(implicit val instanceRegistry: InstanceRegistry, logger: Logger) extends DataFrameOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
