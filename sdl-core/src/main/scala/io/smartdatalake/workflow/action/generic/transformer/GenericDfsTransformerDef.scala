@@ -120,9 +120,17 @@ trait OptionsGenericDfsTransformer extends GenericDfsTransformer {
   private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])
                                    (implicit context: ActionPipelineContext): Map[String, String] = {
     lazy val data = DefaultExpressionData.from(context, partitionValues)
-    runtimeOptions.view.mapValues {
-      expr => ExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
-    }.filter(_._2.isDefined).view.mapValues(_.get).toMap
+    val evaluatedOptions = runtimeOptions.map {
+      case (key, expr) => (key, expr, ExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data))
+    }
+    // an option whose expression evaluates to null is left undefined. Log this, as a later substitution of %{key} fails.
+    evaluatedOptions.filter(_._3.isEmpty).foreach { case (key, expr, _) =>
+      logger.warn(s"($actionId) runtimeOption '$key' of transformation $name is not defined," +
+        s" because its expression \"$expr\" evaluated to null in phase ${context.phase}." +
+        " Note that metrics of previous Actions are only available in the exec phase." +
+        s" Use coalesce(<expression>, <default>) if $key should be defined in all phases.")
+    }
+    evaluatedOptions.collect { case (key, _, Some(value)) => (key, value) }.toMap
   }
 }
 object OptionsGenericDfsTransformer {

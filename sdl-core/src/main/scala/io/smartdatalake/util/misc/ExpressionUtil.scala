@@ -190,7 +190,11 @@ private[smartdatalake] object ExpressionUtil {
     val substituter = (regMatch: Regex.Match) => {
       val key = regMatch.group(1)
       options.getOrElse(key,
-        throw ConfigurationException(s"($id) key '$key' not found in options${getConfigNameMsg(configName)}")
+        throw ConfigurationException(s"($id) key '$key' not found in options${getConfigNameMsg(configName)}." +
+          s" Defined options are ${options.keys.toSeq.sorted.mkString(", ")}." +
+          s" Note that a runtimeOption is left undefined if its expression evaluates to null, see preceding log messages." +
+          s" This is the case for metrics of previous Actions outside the exec phase," +
+          s" where coalesce(<expression>, <default>) can be used to define a fallback value.", configName)
       )
     }
     tokenExpressionRegex.replaceAllIn(str, substituter)
