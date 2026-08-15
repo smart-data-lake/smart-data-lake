@@ -184,7 +184,8 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
         }
         // apply execution mode
         val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
-        executionMode.apply(action.id, mainInput, action.mainOutput, mainInputSubFeed, action.transformPartitionValues)
+        // transformPartitionValues is called while calculating the ExecutionModeResult, so its options are not yet available
+        executionMode.apply(action.id, mainInput, action.mainOutput, mainInputSubFeed, action.transformPartitionValues(_, Map()))
       case None => throw NotSupportedException(action.id, "has no ExecutionMode defined")
     }
 

@@ -69,6 +69,77 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that the DataFrameCacheRegistry is shared between contextInit & contextExec like this!
   }
 
+  test("runtime information of a predecessor action is available in runtimeOptions") {
+    // setup DataObjects
+    val srcDO = MockSparkDataObject("src1").register
+    val tgt1DO = MockSparkDataObject("tgt1").register
+    val tgt2DO = MockSparkDataObject("tgt2").register
+
+    // fill src with 2 records
+    val l1 = Seq(("doe", "john", 5), ("smith", "jane", 3)).toDF("lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(l1, Seq())
+
+    // action b reads the metrics of its predecessor action a.
+    // Note the coalesce: metrics are only available in exec phase, in init phase the expression evaluates to null.
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id)
+    val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id,
+      transformers = Seq(SQLDfTransformer(
+        code = Some("select *, %{cntA} as cnt_a, '%{stateA}' as state_a from tgt1"),
+        runtimeOptions = Map(
+          "cntA" -> "coalesce(predecessorActions['a'].metrics['tgt1']['records_written'], '-1')",
+          "stateA" -> "coalesce(predecessorActions['a'].state, 'unknown')"
+        )
+      ))
+    )
+    instanceRegistry.register(action1)
+    instanceRegistry.register(action2)
+    val dag: ActionDAGRun = ActionDAGRun(Seq(action1, action2))
+
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
+    dag.exec(contextExec)
+
+    // action a wrote 2 records, and action b picked that up from the runtime information of its predecessor
+    val result = tgt2DO.getSparkDataFrame()(contextExec).select($"cnt_a", $"state_a").distinct.as[(String, String)].collect().toSeq
+    assert(result == Seq(("2", "SUCCEEDED")))
+  }
+
+  test("runtime information is restricted to transitive predecessors") {
+    // a -> b -> c is one branch, d is an independent branch which must not be visible to b and c
+    val srcDO = MockSparkDataObject("src1").register
+    val tgt1DO = MockSparkDataObject("tgt1").register
+    val tgt2DO = MockSparkDataObject("tgt2").register
+    val src2DO = MockSparkDataObject("src2").register
+    val tgt3DO = MockSparkDataObject("tgt3").register
+
+    val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(l1, Seq())
+    src2DO.writeSparkDataFrame(l1, Seq())
+
+    val actionA = CopyAction("a", srcDO.id, tgt1DO.id)
+    val actionB = CopyAction("b", tgt1DO.id, tgt2DO.id)
+    val actionD = CopyAction("d", src2DO.id, tgt3DO.id)
+    Seq(actionA, actionB, actionD).foreach(instanceRegistry.register)
+    val dag: ActionDAGRun = ActionDAGRun(Seq(actionA, actionB, actionD))
+
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
+    dag.exec(contextExec)
+
+    // b only sees a, and not the independent branch d even though d has finished as well
+    val contextB = contextExec.withAction(actionB, Seq(actionA))
+    val predecessorsOfB = ActionExpressionData.predecessorsFrom(contextB)
+    assert(predecessorsOfB.keySet == Set("a"))
+    // the runtime information carries state, ids and metrics
+    val infoA = predecessorsOfB("a")
+    assert(infoA.state == "SUCCEEDED")
+    assert(infoA.inputIds == Seq(srcDO.id.id))
+    assert(infoA.outputIds == Seq(tgt1DO.id.id))
+    assert(infoA.metrics(tgt1DO.id.id)("records_written") == "1")
+    // an Action without predecessors sees nothing
+    assert(ActionExpressionData.predecessorsFrom(contextExec.withAction(actionA)).isEmpty)
+  }
+
   test("action dag with 2 actions in sequence with state") {
     // setup DataObjects
     val srcDO = MockSparkDataObject("src1").register

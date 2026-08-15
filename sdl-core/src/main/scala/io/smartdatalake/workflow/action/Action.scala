@@ -111,6 +111,17 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    *       expression = "!inputSubFeeds.stg-src1.isSkipped"
    *     }
    * }}}
+   *
+   * Besides the input SubFeeds, the runtime information of all Actions this Action transitively depends on is
+   * available through [[SubFeedsExpressionData.predecessorActions]], see [[ActionExpressionData]].
+   *
+   * Example:
+   * {{{
+   *     executionCondition = {
+   *       description = "execute if the previous action loaded data"
+   *       expression = "predecessorActions['loadAction'].metrics['stg-src1']['records_written'] > 0"
+   *     }
+   * }}}
    */
   def executionCondition: Option[Condition]
 
@@ -200,7 +211,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * Evaluate and check the executionCondition in exec phase
    * @throws TaskSkippedDontStopWarning if task is skipped
    */
-  private def checkExecutionCondition(subFeeds: Seq[SubFeed]): Unit = {
+  private def checkExecutionCondition(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
     //noinspection MapGetOrElseBoolean
     val skipMsg = executionCondition.map { c =>
       // evaluate condition if existing
@@ -287,10 +298,10 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Get potential state of input DataObjects when executionMode is DataObjectStateIncrementalMode.
    */
-  def getDataObjectsState: Seq[DataObjectState] = {
+  def getDataObjectsState(implicit context: ActionPipelineContext): Seq[DataObjectState] = {
     // only get state if incremental execution mode *and* action was successfully executed or skipped
     if (executionMode.exists(_.isInstanceOf[DataObjectStateIncrementalMode])
-        && runtimeData.getLatestEventState.exists(state => Seq(RuntimeEventState.SUCCEEDED,RuntimeEventState.INITIALIZED).contains(state))) {
+        && getLatestRuntimeEventState.exists(state => Seq(RuntimeEventState.SUCCEEDED,RuntimeEventState.INITIALIZED).contains(state))) {
       inputs.collect {
         case input: CanCreateIncrementalOutput => input.getState.map(DataObjectState(input.id, _))
       }.flatten
@@ -363,11 +374,14 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   }
 
   /**
-   * Runtime metrics & events
-   * Implementation of runtimeData can be overridden by subclasses
+   * Runtime metrics & events.
+   *
+   * The state itself is not kept on the Action, but in the [[ActionsRuntimeRegistry]] of the
+   * [[ActionPipelineContext]], so that it is scoped to the execution and not to the lifetime of this
+   * configuration object. Subclasses can choose the [[RuntimeData]] implementation by overriding
+   * [[createRuntimeData]].
    */
-  private[smartdatalake] val runtimeData: RuntimeData = getRuntimeDataImpl
-  protected def getRuntimeDataImpl: RuntimeData = {
+  private[smartdatalake] def createRuntimeData: RuntimeData = {
     SynchronousRuntimeData(Environment.runtimeDataNumberOfExecutionsToKeep)
   }
 
@@ -379,22 +393,23 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
                       state: RuntimeEventState,
                       msg: Option[String] = None,
                       results: Seq[SubFeed] = Seq(),
-                      tstmp: LocalDateTime = LocalDateTime.now): Unit = {
-    runtimeData.addEvent(executionId, RuntimeEvent(tstmp, phase, state, msg, results))
+                      tstmp: LocalDateTime = LocalDateTime.now)(implicit context: ActionPipelineContext): Unit = {
+    context.runtimeRegistry(this).addEvent(executionId, RuntimeEvent(tstmp, phase, state, msg, results))
   }
 
   /**
    * Get latest runtime state
    */
-  def getLatestRuntimeEventState: Option[RuntimeEventState] = runtimeData.getLatestEventState
+  def getLatestRuntimeEventState(implicit context: ActionPipelineContext): Option[RuntimeEventState] =
+    context.runtimeRegistry.get(id).flatMap(_.getLatestEventState)
 
   /**
    * Adds a runtime metric for this Action
    */
-  def addAsyncMetrics(executionId: Option[ExecutionId], dataObjectId: Option[DataObjectId], metric: ActionMetrics): Unit = {
+  def addAsyncMetrics(executionId: Option[ExecutionId], dataObjectId: Option[DataObjectId], metric: ActionMetrics)(implicit context: ActionPipelineContext): Unit = {
     if (dataObjectId.isDefined) {
       if (outputs.exists(_.id == dataObjectId.get)) try {
-        runtimeData.addMetric(executionId, dataObjectId.get, metric)
+        context.runtimeRegistry(this).addMetric(executionId, dataObjectId.get, metric)
       } catch {
         case e: AssertionError => logger.error(s"($id) ${e.getMessage}")
       }
@@ -407,26 +422,37 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * Get summarized runtime information for a given ExecutionId.
    * @param executionId ExecutionId to get runtime information for. If empty runtime information for last ExecutionId are returned.
    */
-  def getRuntimeInfo(executionId: Option[ExecutionId] = None) : Option[RuntimeInfo] = runtimeData
-    .getRuntimeInfo(inputIds = (inputs ++ recursiveInputs).map(_.id),
-      outputIds = outputs.map(_.id), dataObjectsState = getDataObjectsState, executionIdOpt = executionId)
+  def getRuntimeInfo(executionId: Option[ExecutionId] = None)(implicit context: ActionPipelineContext): Option[RuntimeInfo] =
+    context.runtimeRegistry.get(id).flatMap(
+      _.getRuntimeInfo(
+        inputIds = (inputs ++ recursiveInputs).map(_.id),
+        outputIds = outputs.map(_.id),
+        dataObjectsState = getDataObjectsState,
+        executionIdOpt = executionId
+      )
+    )
+
+  /**
+   * Get the latest asynchronous metrics collected for one of the outputs of this Action.
+   * Note that metrics of synchronous Actions are passed on in the corresponding SubFeed and are not found here.
+   */
+  def getRuntimeMetrics(dataObjectId: DataObjectId, executionId: Option[ExecutionId] = None)(implicit context: ActionPipelineContext): Option[ActionMetrics] =
+    context.runtimeRegistry.get(id).flatMap(_.getMetrics(dataObjectId, executionId))
 
   /**
    * Resets the runtime state of this Action
    * This is mainly used for testing
    */
   private[smartdatalake] def reset(implicit context: ActionPipelineContext): Unit = {
-    runtimeData.clear()
+    context.runtimeRegistry.reset(id)
   }
+
+  final override def toString: String = nodeId
 
   /**
    * This is displayed in ascii graph visualization
    */
-  final override def toString: String = {
-   nodeId + getRuntimeInfo().map(" "+_).getOrElse("")
-  }
-
-  final def toString(executionId: Option[ExecutionId]): String = {
+  final def toString(executionId: Option[ExecutionId])(implicit context: ActionPipelineContext): String = {
     nodeId + getRuntimeInfo(executionId).map(" "+_).getOrElse("")
   }
 

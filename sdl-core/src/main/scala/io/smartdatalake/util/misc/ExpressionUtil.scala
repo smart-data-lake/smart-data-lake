@@ -23,6 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.ActionExpressionData
 
 import java.sql.Timestamp
 import scala.reflect.ClassTag
@@ -211,7 +212,8 @@ case class DefaultExpressionData(
     referenceTimestamp: Option[Timestamp],
     runStartTime: Timestamp,
     attemptStartTime: Timestamp,
-    partitionValues: Seq[Map[String, String]]
+    partitionValues: Seq[Map[String, String]],
+    predecessorActions: Map[String, ActionExpressionData]
 )
 
 object DefaultExpressionData {
@@ -225,7 +227,8 @@ object DefaultExpressionData {
       referenceTimestamp = context.referenceTimestamp.map(Timestamp.valueOf),
       runStartTime = Timestamp.valueOf(context.runStartTime),
       attemptStartTime = Timestamp.valueOf(context.attemptStartTime),
-      partitionValues = partitionValues.map(_.elements.view.mapValues(_.toString).toMap)
+      partitionValues = partitionValues.map(_.elements.view.mapValues(_.toString).toMap),
+      predecessorActions = ActionExpressionData.predecessorsFrom(context)
     )
 }
 

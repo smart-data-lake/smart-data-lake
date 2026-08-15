@@ -115,8 +115,8 @@ case class CustomDataFrameAction(override val id: ActionId,
     transformerDefs.foreach(_.prepare(id))
   }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
-    applyTransformers(transformers, partitionValues)
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+    applyTransformers(transformers, partitionValues, executionModeResultOptions)
   }
 
   private val transformerDefs: Seq[GenericDfsTransformerDef] = transformers

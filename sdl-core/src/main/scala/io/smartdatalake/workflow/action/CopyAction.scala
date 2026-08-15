@@ -110,10 +110,10 @@ case class CopyAction(
   ): DataFrameSubFeed =
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String, String])(implicit
       context: ActionPipelineContext
   ): Map[PartitionValues, PartitionValues] =
-    applyTransformers(getTransformers, partitionValues)
+    applyTransformers(getTransformers, partitionValues, executionModeResultOptions)
 
   override def postExecSubFeed(inputSubFeed: SubFeed, outputSubFeed: SubFeed)(implicit context: ActionPipelineContext): Unit =
     if (deleteDataAfterRead) input match {

@@ -71,6 +71,18 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
 
   private def createScheduler(parallelism: Int = 1) = Scheduler.fixedPool(s"dag-${executionId.runId}", parallelism)
 
+  /**
+   * The Actions each Action transitively depends on, calculated once from the DAG structure.
+   * This is used to give an Action a deterministic view on the runtime information of previous Actions,
+   * see [[ActionPipelineContext.predecessorActions]].
+   */
+  private lazy val predecessorActions: Map[NodeId, Seq[Action]] = {
+    val actionNodes = dag.sortedNodes.collect { case a: Action => (a.nodeId, a) }.toMap
+    dag.transitivePredecessors.view.mapValues(_.toSeq.flatMap(actionNodes.get).sortBy(_.id.id)).toMap
+  }
+
+  private def getPredecessorActions(node: Action): Seq[Action] = predecessorActions.getOrElse(node.nodeId, Seq())
+
   private def run[R <: DAGResult](phase: ExecutionPhase, parallelism: Int = 1)(operation: (DAGNode, Seq[R]) => Seq[R])(implicit context: ActionPipelineContext): Seq[R] = {
     implicit val scheduler: SchedulerService = createScheduler(parallelism)
     val task = dag.buildTaskGraph[R](new ActionEventListener(phase)){
@@ -119,7 +131,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
       case (node: InitDAGNode, _) =>
         node.edges.map(dataObjectId => DummyDAGResult(dataObjectId))
       case (node: Action, _) =>
-        val actionContext = phaseContext.withAction(node)
+        val actionContext = phaseContext.withAction(node, getPredecessorActions(node))
         node.prepare(actionContext)
         node.outputs.map(outputDO => DummyDAGResult(outputDO.id.id))
       case x => throw new IllegalStateException(s"Unmatched case $x")
@@ -140,7 +152,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
         val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
         val previousThreadName = setThreadName(getActionThreadName(node.id))
         val resultSubFeeds = try {
-          val actionContext = phaseContext.withAction(node)
+          val actionContext = phaseContext.withAction(node, getPredecessorActions(node))
           val inputIds = node.inputs.map(_.id)
           node.preInit(deduplicatedSubFeeds, initialDataObjectsState.filter(state => inputIds.contains(state.dataObjectId)))(actionContext)
           node.init(deduplicatedSubFeeds)(actionContext)
@@ -176,7 +188,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
           val deduplicatedSubFeeds = unionDuplicateSubFeeds(subFeeds ++ getRecursiveSubFeeds(node), node.id)
           val previousThreadName = setThreadName(getActionThreadName(node.id))
           val resultSubFeeds = try {
-            val actionContext = phaseContext.withAction(node)
+            val actionContext = phaseContext.withAction(node, getPredecessorActions(node))
             node.preExec(deduplicatedSubFeeds)(actionContext)
             val resultSubFeeds = node.exec(deduplicatedSubFeeds)(actionContext)
             node.postExec(deduplicatedSubFeeds, resultSubFeeds)(actionContext)
@@ -197,7 +209,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
       context.cacheRegistry.releaseAll()
     }
     // log dag execution
-    ActionDAGRun.logDag(s"exec SUCCEEDED for dag ${executionId.runId}", dag, Some(executionId))
+    ActionDAGRun.logDag(s"exec SUCCEEDED for dag ${executionId.runId}", dag, Some(executionId))(context)
     // return
     result
   }
@@ -222,7 +234,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
   /**
    * Collect runtime information for every action of the dag and the current executionId
    */
-  def getRuntimeInfos: Map[ActionId, RuntimeInfo] = {
+  def getRuntimeInfos(implicit context: ActionPipelineContext): Map[ActionId, RuntimeInfo] = {
     dag.getNodes.map { a =>
       var runtimeInfo = a.getRuntimeInfo(Some(executionId)).getOrElse(RuntimeInfo(executionId, RuntimeEventState.PENDING))
       // overwrite DataObjectsState for skipped actions to keep previous state.
@@ -298,7 +310,7 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
   /**
    * Get Action count per RuntimeEventState
    */
-  def getStatistics: Map[RuntimeEventState, Int] = {
+  def getStatistics(implicit context: ActionPipelineContext): Map[RuntimeEventState, Int] = {
     getRuntimeInfos.map(_._2.state).groupBy(identity).view.mapValues(_.size).toMap
   }
 
@@ -363,7 +375,7 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
    * Log DAG-state as Ascii graph.
    * If graph is wider than a configured number of characters, it is only printed as list in topological order.
    */
-  def logDag(msg: String, dag: DAG[_], executionId: Option[ExecutionId] = None): Unit = {
+  def logDag(msg: String, dag: DAG[_], executionId: Option[ExecutionId] = None)(implicit context: ActionPipelineContext): Unit = {
     def nodeToString(node: DAGNode): String = {
       node match {
         case a: Action => a.toString(executionId)

@@ -307,10 +307,10 @@ case class HistorizeAction(
   ): DataFrameSubFeed =
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String, String])(implicit
       context: ActionPipelineContext
   ): Map[PartitionValues, PartitionValues] =
-    applyTransformers(getTransformers, partitionValues)
+    applyTransformers(getTransformers, partitionValues, executionModeResultOptions)
 
   private def incrementalHistorizeDataFrame(
       existingDf: Option[GenericDataFrame],

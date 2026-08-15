@@ -44,7 +44,8 @@ case class ScalaSubFeed(@transient override val dataFrame: Option[ScalaDataFrame
                         override val filter: Option[String] = None,
                         @transient override val observation: Option[DataFrameObservation] = None,
                         override val metrics: Option[MetricsMap] = None,
-                        @transient override val keptSchema: Option[GenericSchema] = None
+                        @transient override val keptSchema: Option[GenericSchema] = None,
+                        override val executionModeResultOptions: Map[String, String] = Map()
                        ) extends DataFrameSubFeed {
   @transient override def tpe: Type = typeOf[ScalaSubFeed]
 
@@ -55,7 +56,7 @@ case class ScalaSubFeed(@transient override val dataFrame: Option[ScalaDataFrame
 
   override def withSchema(schema: Option[GenericSchema]): ScalaSubFeed = this.copy(dataFrame = None, keptSchema = schema)
 
-  override def toOutput(dataObjectId: SdlConfigObject.DataObjectId): ScalaSubFeed = this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None)
+  override def toOutput(dataObjectId: SdlConfigObject.DataObjectId): ScalaSubFeed = this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None, executionModeResultOptions = Map())
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): ScalaSubFeed = {
     val (dataFrame, schema) = other match {
@@ -73,22 +74,23 @@ case class ScalaSubFeed(@transient override val dataFrame: Option[ScalaDataFrame
       , partitionValues = unionPartitionValues(other.partitionValues)
       , isDAGStart = this.isDAGStart || other.isDAGStart
       , isSkipped = this.isSkipped && other.isSkipped
+      , executionModeResultOptions = unionExecutionModeResultOptions(other)
     )
   }
 
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: SdlConfigObject.DataObjectId)(implicit context: ActionPipelineContext): ScalaSubFeed = {
     // apply input filter
     val inputFilter = if (this.dataObjectId == mainInputId) result.filter else None
-    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage // breaklineage keeps DataFrame schema without content
+    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false, executionModeResultOptions = result.options).breakLineage // breaklineage keeps DataFrame schema without content
       .asInstanceOf[ScalaSubFeed]
   }
 
   def applyExecutionModeResultForOutput(result: ExecutionModeResult): ScalaSubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None)
+    this.copy(partitionValues = result.inputPartitionValues, filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None, executionModeResultOptions = result.options)
   }
 
   def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): ScalaSubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None)
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None, executionModeResultOptions = result.options)
   }
 }
 
@@ -124,7 +126,7 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
   //TODO: ActionPipelineContext still has Spark dependencies (!)
   def fromSubFeed(subFeed: SubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     subFeed match {
-      case scalaSubFeed: ScalaSubFeed => scalaSubFeed.clearFilter().asInstanceOf[ScalaSubFeed] // make sure there is no filter, as filter can not be passed between actions.
+      case scalaSubFeed: ScalaSubFeed => scalaSubFeed.clearFilter().asInstanceOf[ScalaSubFeed].copy(executionModeResultOptions = Map()) // no filter and no executionModeResultOptions are passed between actions
       case _ => ScalaSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }

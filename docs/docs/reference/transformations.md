@@ -348,3 +348,50 @@ So in your custom class, you can read all options and runtimeOptions and use the
 ##### In Python
 Similarly in Python, in addition to the variables `inputDf` and `dataObjectId` (resp. `inputsDfs`), you get a variable called `options`
 containing all `options` and `runtimeOptions`.
+
+##### Runtime information of previous Actions
+`runtimeOptions` are evaluated against `DefaultExpressionData`, which includes `predecessorActions`:
+the runtime information of all Actions the current Action transitively depends on in the DAG, indexed by ActionId.
+
+```
+transformers = [{
+  type = SQLDfTransformer
+  sqlCode = "select *, %{cnt_loaded} as cnt_loaded from dataObject1"
+  runtimeOptions = {
+    // metrics are indexed by output DataObject id
+    cnt_loaded = "coalesce(predecessorActions['loadAction'].metrics['dataObject1']['records_written'], '-1')"
+  }
+}]
+```
+
+Per Action the following attributes are available:
+
+| Attribute | Description |
+| --- | --- |
+| `state` | SUCCEEDED, SKIPPED, FAILED, CANCELLED or STREAMING |
+| `partitionValues` | partition values of the results of the Action |
+| `metrics` | metrics per output DataObject id, e.g. `metrics['tgt1']['records_written']` |
+| `executionModeOptions` | options returned by the ExecutionMode of the Action |
+| `inputIds` / `outputIds` | input and output DataObject ids of the Action |
+| `startTstmp` / `endTstmp` / `durationMillis` | timing of the exec phase |
+
+Only *transitive predecessors* are included, not every Action that happens to have finished already.
+Predecessors are guaranteed to be complete when the current Action runs, so the result does not depend on the
+scheduling order of parallel branches and stays the same when running with `--parallelism` > 1.
+
+Note two limitations:
+* Metrics are only collected in the exec phase. In the init phase the corresponding expressions evaluate to `null`
+  and the runtime option is left undefined, which makes the `%{key}` substitution fail. Use `coalesce(..., '<default>')`
+  as shown above so the transformation also works during init.
+* On recovery, Actions that already completed in a previous attempt are not part of the DAG anymore and therefore
+  do not appear in `predecessorActions`.
+
+The same `predecessorActions` attribute is available in `executionCondition`, which is only evaluated in the exec
+phase and therefore always sees the metrics of its predecessors:
+
+```
+executionCondition = {
+  expression = "predecessorActions['loadAction'].metrics['dataObject1']['records_written'] > 0"
+  description = "only run if the previous action loaded data"
+}
+```

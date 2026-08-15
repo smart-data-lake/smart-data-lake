@@ -127,10 +127,10 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
 
   private[smartdatalake] override def subFeedConverter: SubFeedConverter[DataFrameSubFeed] = subFeedHelper
 
-  override def getRuntimeDataImpl: RuntimeData = {
+  private[smartdatalake] override def createRuntimeData: RuntimeData = {
     // use AsynchronousRuntimeData for streaming execution modes
     if (executionMode.exists(_.isStreamingMode)) AsynchronousRuntimeData(Environment.runtimeDataNumberOfExecutionsToKeep)
-    else super.getRuntimeDataImpl
+    else super.createRuntimeData
   }
 
   private[smartdatalake] def notifySparkStreamingQueryTerminated: Unit = {
@@ -189,6 +189,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
                   subFeed.filter.map(f => s" filtered by $f").getOrElse(""))
                 input.getSubFeed(subFeed.partitionValues, subFeedType) // get SubFeed of specified type with fresh DataFrame
                   .withFilter(subFeed.partitionValues, subFeed.filter)
+                  // the SubFeed is recreated from the DataObject, so the executionModeResultOptions have to be carried over
+                  .withExecutionModeResultOptions(subFeed.executionModeResultOptions).asInstanceOf[DataFrameSubFeed]
               } catch {
                 // if there is no data, but it's an action with multiple inputs, we need to avoid that the action gets skipped because of the thrown NoDataToProcessWarning
                 case _: NoDataToProcessWarning if inputs.size > 1 => subFeed.withDataFrame(Some(createEmptyDataFrame(input)))
@@ -465,6 +467,9 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
    */
   private[smartdatalake] def applyTransformers(transformers: Seq[GenericDfsTransformerDef], inputPartitionValues: Seq[PartitionValues], inputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
     val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
+    // the executionModeResultOptions are the same on all input SubFeeds, as the ExecutionModeResult is applied to all of them
+    val executionModeResultOptions = inputSubFeeds.find(_.dataObjectId == getMainInput.id)
+      .orElse(inputSubFeeds.headOption).map(_.executionModeResultOptions).getOrElse(Map())
     val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap, inputPartitionValues)) {
       case ((inputDfsMap, inputPartitionValues), transformer) =>
         val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap, executionModeResultOptions, outputs.map(_.id))
@@ -477,7 +482,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   /**
    * apply transformer to partition values
    */
-  protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues])
+  protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String, String])
                                  (implicit context: ActionPipelineContext): Map[PartitionValues, PartitionValues] = {
     transformers.foldLeft(PartitionValues.oneToOneMapping(partitionValues)) {
       case (partitionValuesMap, transformer) => transformer.applyTransformation(id, partitionValuesMap, executionModeResultOptions)

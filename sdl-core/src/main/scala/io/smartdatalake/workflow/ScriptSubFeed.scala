@@ -39,7 +39,8 @@ case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
                          override val partitionValues: Seq[PartitionValues],
                          override val isDAGStart: Boolean = false,
                          override val isSkipped: Boolean = false,
-                         override val metrics: Option[MetricsMap] = None
+                         override val metrics: Option[MetricsMap] = None,
+                         override val executionModeResultOptions: Map[String, String] = Map()
                         )
   extends SubFeed {
   override def breakLineage(implicit context: ActionPipelineContext): ScriptSubFeed = this
@@ -51,21 +52,23 @@ case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
     this.copy(partitionValues = updatedPartitionValues)
   }
   override def toOutput(dataObjectId: DataObjectId): ScriptSubFeed = {
-    this.copy(dataObjectId = dataObjectId, parameters = None, isDAGStart = false, isSkipped = false, metrics = None)
+    this.copy(dataObjectId = dataObjectId, parameters = None, isDAGStart = false, isSkipped = false, metrics = None, executionModeResultOptions = Map())
   }
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
     case subFeed: ScriptSubFeed =>
       this.copy(
         parameters = optionalizeMap(this.parameters.getOrElse(Map()) ++ subFeed.parameters.getOrElse(Map())),
-        partitionValues = unionPartitionValues(subFeed.partitionValues), isDAGStart = this.isDAGStart || subFeed.isDAGStart
+        partitionValues = unionPartitionValues(subFeed.partitionValues), isDAGStart = this.isDAGStart || subFeed.isDAGStart,
+        executionModeResultOptions = unionExecutionModeResultOptions(subFeed)
       )
-    case x => this.copy(parameters = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart)
+    case x => this.copy(parameters = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart,
+      executionModeResultOptions = unionExecutionModeResultOptions(x))
   }
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): ScriptSubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)
+    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, executionModeResultOptions = result.options)
   }
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): ScriptSubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false, parameters = None)
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false, parameters = None, executionModeResultOptions = result.options)
   }
 }
 object ScriptSubFeed extends SubFeedConverter[ScriptSubFeed] {
@@ -74,7 +77,8 @@ object ScriptSubFeed extends SubFeedConverter[ScriptSubFeed] {
    */
   override def fromSubFeed( subFeed: SubFeed )(implicit context: ActionPipelineContext): ScriptSubFeed = {
     subFeed match {
-      case subFeed: ScriptSubFeed => subFeed
+      // executionModeResultOptions are not passed on to the next Action
+      case subFeed: ScriptSubFeed => subFeed.copy(executionModeResultOptions = Map())
       case _ => ScriptSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }

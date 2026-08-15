@@ -34,7 +34,8 @@ import org.apache.commons.lang3.NotImplementedException
 case class InitSubFeed(override val dataObjectId: DataObjectId,
                        override val partitionValues: Seq[PartitionValues],
                        override val isSkipped: Boolean = false,
-                       override val metrics: Option[MetricsMap] = None
+                       override val metrics: Option[MetricsMap] = None,
+                       override val executionModeResultOptions: Map[String, String] = Map()
                       )
   extends SubFeed {
   override def isDAGStart: Boolean = true
@@ -59,14 +60,15 @@ case class InitSubFeed(override val dataObjectId: DataObjectId,
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = throw new NotImplementedException()
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
-    case x => this.copy(partitionValues = unionPartitionValues(x.partitionValues), isSkipped = this.isSkipped && other.isSkipped)
+    case x => this.copy(partitionValues = unionPartitionValues(x.partitionValues), isSkipped = this.isSkipped && other.isSkipped,
+      executionModeResultOptions = unionExecutionModeResultOptions(other))
   }
 
   def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)
+    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, executionModeResultOptions = result.options)
   }
 
   def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false)
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false, executionModeResultOptions = result.options)
   }
 }

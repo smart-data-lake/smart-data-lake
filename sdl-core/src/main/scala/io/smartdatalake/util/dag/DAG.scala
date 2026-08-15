@@ -72,6 +72,23 @@ case class DAG[N <: DAGNode : ClassTag] private(sortedNodes: Seq[DAGNode],
   extends SmartDataLakeLogger {
 
   /**
+   * All nodes a given node transitively depends on, indexed by node id.
+   *
+   * This is calculated in one pass, as `sortedNodes` is in topological order and the transitive predecessors
+   * of a node are therefore already known when the node is reached: they are the union of its direct
+   * predecessors and their transitive predecessors.
+   *
+   * Example: for `A->B, A->C, B->D, C->D` the entry for `D` is `Set(A,B,C)`.
+   */
+  lazy val transitivePredecessors: Map[NodeId, Set[NodeId]] = {
+    sortedNodes.foldLeft(Map.empty[NodeId, Set[NodeId]]) {
+      case (acc, node) =>
+        val directPredecessors = incomingEdgesMap.getOrElse(node.nodeId, Seq()).map(_.nodeIdFrom).distinct
+        acc + (node.nodeId -> (directPredecessors ++ directPredecessors.flatMap(acc.getOrElse(_, Set()))).toSet)
+    }
+  }
+
+  /**
    * Create text representation of the graph by using an ASCII graph layout library
    */
   def render(nodeToString: DAGNode => String): String = {
