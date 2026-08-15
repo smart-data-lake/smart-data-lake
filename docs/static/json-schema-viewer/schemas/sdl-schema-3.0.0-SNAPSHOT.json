@@ -3566,7 +3566,7 @@
             "type" : "boolean",
             "description" : "Cache the output DataFrame of this Action, so that subsequent Actions can reuse it instead of reading the output\nDataObject again. This saves reading the data again, at the cost of materializing it in the engine.\n\nBy default the DataFrame is not propagated to subsequent Actions, they get a fresh DataFrame from the output\nDataObject according to the SubFeed's partition values.\n\nNote that on Snowflake this materializes a temporary table which is only released when the session is closed."
           },
-          "persist" : {
+          "cacheInput" : {
             "type" : "boolean",
             "description" : "Force materializing input DataFrame's.  \nThis improves performance if the input DataFrame is used multiple times in the transformation of this Action\nand can serve as a recovery point in case a task gets lost."
           },
@@ -3750,7 +3750,7 @@
             "type" : "boolean",
             "description" : "Cache the output DataFrame of this Action, so that subsequent Actions can reuse it instead of reading the output\nDataObject again. This saves reading the data again, at the cost of materializing it in the engine.\n\nBy default the DataFrame is not propagated to subsequent Actions, they get a fresh DataFrame from the output\nDataObject according to the SubFeed's partition values.\n\nNote that on Snowflake this materializes a temporary table which is only released when the session is closed."
           },
-          "persist" : {
+          "cacheInput" : {
             "type" : "boolean",
             "description" : "Force materializing input DataFrame's.  \nThis improves performance if the input DataFrame is used multiple times in the transformation of this Action\nand can serve as a recovery point in case a task gets lost."
           },
@@ -4149,7 +4149,7 @@
             "type" : "boolean",
             "description" : "Cache the output DataFrame of this Action, so that subsequent Actions can reuse it instead of reading the output\nDataObject again. This saves reading the data again, at the cost of materializing it in the engine.\n\nBy default the DataFrame is not propagated to subsequent Actions, they get a fresh DataFrame from the output\nDataObject according to the SubFeed's partition values.\n\nNote that on Snowflake this materializes a temporary table which is only released when the session is closed."
           },
-          "persist" : {
+          "cacheInput" : {
             "type" : "boolean",
             "description" : "Force materializing input DataFrame's.  \nThis improves performance if the input DataFrame is used multiple times in the transformation of this Action\nand can serve as a recovery point in case a task gets lost."
           },
@@ -4413,7 +4413,7 @@
             "type" : "boolean",
             "description" : "Cache the output DataFrame of this Action, so that subsequent Actions can reuse it instead of reading the output\nDataObject again. This saves reading the data again, at the cost of materializing it in the engine.\n\nBy default the DataFrame is not propagated to subsequent Actions, they get a fresh DataFrame from the output\nDataObject according to the SubFeed's partition values.\n\nNote that on Snowflake this materializes a temporary table which is only released when the session is closed."
           },
-          "persist" : {
+          "cacheInput" : {
             "type" : "boolean",
             "description" : "Force materializing input DataFrame's.  \nThis improves performance if the input DataFrame is used multiple times in the transformation of this Action\nand can serve as a recovery point in case a task gets lost."
           },

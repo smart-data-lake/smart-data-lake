@@ -93,21 +93,21 @@ import scala.reflect.runtime.universe.Type
  *   'existing' to reference columns of the existing table data.
  */
 case class DeduplicateAction(
-    override val id: ActionId,
-    inputId: DataObjectId,
-    outputId: DataObjectId,
-    transformers: Seq[GenericDfTransformer] = Seq(),
-    ignoreOldDeletedColumns: Boolean = false,
-    ignoreOldDeletedNestedColumns: Boolean = true,
-    updateCapturedColumnOnlyWhenChanged: Boolean = false,
-    mergeModeAdditionalJoinPredicate: Option[String] = None,
-    override val cacheOutput: Boolean = false,
-    override val persist: Boolean = false,
-    override val executionMode: Option[ExecutionMode] = None,
-    override val executionCondition: Option[Condition] = None,
-    override val metricsFailCondition: Option[String] = None,
-    override val metadata: Option[ActionMetadata] = None,
-    override val engineConnectionId: Option[ConnectionId] = None
+                              override val id: ActionId,
+                              inputId: DataObjectId,
+                              outputId: DataObjectId,
+                              transformers: Seq[GenericDfTransformer] = Seq(),
+                              ignoreOldDeletedColumns: Boolean = false,
+                              ignoreOldDeletedNestedColumns: Boolean = true,
+                              updateCapturedColumnOnlyWhenChanged: Boolean = false,
+                              mergeModeAdditionalJoinPredicate: Option[String] = None,
+                              override val cacheOutput: Boolean = false,
+                              override val cacheInput: Boolean = false,
+                              override val executionMode: Option[ExecutionMode] = None,
+                              override val executionCondition: Option[Condition] = None,
+                              override val metricsFailCondition: Option[String] = None,
+                              override val metadata: Option[ActionMetadata] = None,
+                              override val engineConnectionId: Option[ConnectionId] = None
 )(implicit val instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl {
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)

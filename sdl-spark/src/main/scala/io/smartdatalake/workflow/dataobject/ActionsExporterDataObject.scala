@@ -31,10 +31,10 @@ import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
- * Exports a util [[DataFrame]] that contains properties and metadata extracted from all [[io.smartdatalake.workflow.action.Action]]s
+ * Exports a util [[DataFrame]] that contains properties and metadata extracted from all [[Action]]s
  * that are registered in the current [[InstanceRegistry]].
  *
- * Alternatively, it can export the properties and metadata of all [[io.smartdatalake.workflow.action.Action]]s defined in config files. For this, the
+ * Alternatively, it can export the properties and metadata of all [[Action]]s defined in config files. For this, the
  * configuration "config" has to be set to the location of the config.
  *
  * Example:
@@ -114,7 +114,7 @@ case class ActionsExporterDataObject(id: DataObjectId,
           // cacheOutput
           getFieldData[Boolean](action, "cacheOutput").map(_.toString),
           // persist
-          getFieldData[Boolean](action, "persist").map(_.toString)
+          getFieldData[Boolean](action, "cacheInput").map(_.toString)
         )
     }
 
@@ -132,7 +132,7 @@ case class ActionsExporterDataObject(id: DataObjectId,
       "columnBlacklist",
       "columnWhitelist",
       "cacheOutput",
-      "persist"
+      "cacheInput"
     )
   }
 
