@@ -114,8 +114,6 @@ class DeltaLakeTableSparkConnectEngine(dataObject: DeltaLakeTableDataObject) ext
       session.read.options(dataObject.options).table(table.fullName)
     }
 
-    if (incrementalOutputExpr.isDefined && !propertyExists(enableCdcFeedProperty)) activateCdc()
-
     SparkConnectDataFrame(df)
   }
 
