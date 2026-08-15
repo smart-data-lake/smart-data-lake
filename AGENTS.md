@@ -136,9 +136,8 @@ class MyDataObjectTest extends DataObjectTestSuite {
 Every source file MUST include GPLv3 license header (see existing files for template).
 
 ### Commit Messages
-- Subject: ≤50 chars, imperative mood, capitalized, no period
+- Subject: ≤50 chars, imperative mood, capitalized, no period, reference issue at the end using `(#<issueNb>)`
 - Body: ≤72 chars per line, separated by blank line
-- Reference issues: `#123`, `fixes #456`
 
 ### Code Style
 - Follow Scala Style Guide
@@ -165,7 +164,7 @@ Spark (`SparkSubFeed`, sdl-spark), plain-Scala (`ScalaSubFeed`, sdl-core), Snowp
 sdl-snowflake), etc. When adding or refactoring tests for such a feature, write the test logic **once**, engine-agnostic,
 and instantiate it once per engine — instead of duplicating near-identical Spark-only test classes.
 
-### Where behaviour traits live
+/### Where behaviour traits live
 
 Behaviour traits live in `sdl-core/src/test/scala/io/smartdatalake/testutils/*Behaviour.scala`, e.g.
 `DeduplicateActionBehaviour`, `SmartDataLakeBuilderBehaviour`, `ColumnsTransformerBehaviour`, `SQLDfsTransformerBehaviour`.

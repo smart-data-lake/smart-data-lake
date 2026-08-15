@@ -42,7 +42,7 @@ class OpenApiDataObjectIT extends AnyFunSuite {
     do1.prepare
     val df = do1.getSparkDataFrame()
     df.withColumn("result", explode($"results")).drop("results")
-      .limit(5).show(false)
+      .limit(5).collect()
   }
 
   test("get data.sbb.ch datasets with paging") {
@@ -59,7 +59,7 @@ class OpenApiDataObjectIT extends AnyFunSuite {
     val df = do1.getSparkDataFrame()
     df.withColumn("result", explode($"results"))
       .select($"result.*")
-      .limit(5).show(false)
+      .limit(5).collect()
   }
 
   test("get catfact.ninja breeds with array return type") {
@@ -73,7 +73,7 @@ class OpenApiDataObjectIT extends AnyFunSuite {
     )
     do1.prepare
     val df = do1.getSparkDataFrame()
-    df.limit(5).show(false)
+    df.limit(5).collect()
   }
 
   test("get catfact.ninja breeds with paging and array return type") {
@@ -87,6 +87,6 @@ class OpenApiDataObjectIT extends AnyFunSuite {
     )
     do1.prepare
     val df = do1.getSparkDataFrame()
-    df.limit(5).show(false)
+    df.limit(5).collect()
   }
 }

@@ -102,7 +102,7 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
 
     // read
     val dfResult2 = dataObj.getSparkDataFrame()
-    dfResult2.show()
+    dfResult2.collect()
   }
 
   test("Complex XML file") {

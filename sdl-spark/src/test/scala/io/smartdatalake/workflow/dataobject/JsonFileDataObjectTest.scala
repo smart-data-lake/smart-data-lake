@@ -58,7 +58,7 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
 
     val aj = JsonFileDataObject.fromConfig(config)
     val result = aj.getSparkDataFrame()
-    result.show()
+    result.collect()
     assert(result.count() == 3)
 
     val expectedSchema = StructType(List(
@@ -108,7 +108,7 @@ class JsonFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObjec
 
     val aj = JsonFileDataObject.fromConfig(config)
     val result = aj.getSparkDataFrame()
-    result.show()
+    result.collect()
     assert(result.count() == 1)
 
     val expectedSchema = StructType(List(

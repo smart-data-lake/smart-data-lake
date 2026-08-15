@@ -145,7 +145,6 @@ class EncryptColumnsTransformerTest extends AnyFunSuite with Quality {
     val colName = dfEnc.columns
     assert(colName.toSeq == Seq("c1", "c2", "c3"))
     val testCols = dfEnc.select("c2").collect().map(r => r.getString(0)).toList
-    dfEnc.show(false)
     logger.info(s"run_test: $enc_type encrypted dataFrame: ${testCols.length} testCols = ${testCols.mkString(",")}")
     assert(testCols != Seq("Foo", "Space", "Space"))
     if (enc_type === "GCM") {
@@ -160,7 +159,6 @@ class EncryptColumnsTransformerTest extends AnyFunSuite with Quality {
     logger.debug(s"run_test($enc_type): check the decoded DataFrame")
     val dec = instanceRegistry.get[ParquetFileDataObject]("dec")
     val dfDec = dec.getSparkDataFrame()
-    dfDec.show(false)
     logger.info(s"run_test: $enc_type decrypted dataFrame")
 
     val colDecName = dfDec.columns

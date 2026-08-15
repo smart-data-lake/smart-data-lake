@@ -267,7 +267,7 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with SparkTestTool {
     assert(dataObject.isTableExisting)
     val partitionValues = dataObject.listPartitions(contextExec)
     assert(partitionValues.toSet == Set(PartitionValues(Map("abc" -> "ext")), PartitionValues(Map("abc" -> "int"))))
-    dataObject.getSparkDataFrame().select($"abc").show()
+    dataObject.getSparkDataFrame().select($"abc").collect()
   }
 
   test("SaveMode merge") {
