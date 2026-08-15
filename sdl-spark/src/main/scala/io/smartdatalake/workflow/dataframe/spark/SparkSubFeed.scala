@@ -60,12 +60,13 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
                         override val filter: Option[String] = None,
                         @transient override val observation: Option[DataFrameObservation] = None,
                         override val metrics: Option[MetricsMap] = None,
-                        @transient override val keptSchema: Option[GenericSchema] = None
+                        @transient override val keptSchema: Option[GenericSchema] = None,
+                        override val executionModeResultOptions: Map[String, String] = Map()
                        )
   extends DataFrameSubFeed {
   @transient override val tpe: Type = typeOf[SparkSubFeed]
   override def toOutput(dataObjectId: DataObjectId): SparkSubFeed = {
-    this.copy(dataFrame = None, filter=None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None)
+    this.copy(dataFrame = None, filter=None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None, executionModeResultOptions = Map())
   }
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
     val (dataFrame, schema) = other match {
@@ -83,16 +84,17 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
       , partitionValues = unionPartitionValues(other.partitionValues)
       , isDAGStart = this.isDAGStart || other.isDAGStart
       , isSkipped = this.isSkipped && other.isSkipped
+      , executionModeResultOptions = unionExecutionModeResultOptions(other)
     )
   }
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SparkSubFeed = {
     // apply input filter
     val inputFilter = if (this.dataObjectId == mainInputId) result.filter else None
-    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage // breaklineage keeps the schema without the DataFrame
+    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false, executionModeResultOptions = result.options).breakLineage // breaklineage keeps the schema without the DataFrame
       .asInstanceOf[SparkSubFeed]
   }
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SparkSubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None)
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None, executionModeResultOptions = result.options)
   }
   override def withDataFrame(dataFrame: Option[GenericDataFrame]): SparkSubFeed = this.copy(
     dataFrame = dataFrame.map(_.asInstanceOf[SparkDataFrame]),
@@ -107,7 +109,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
    */
   override def fromSubFeed( subFeed: SubFeed )(implicit context: ActionPipelineContext): SparkSubFeed = {
     subFeed match {
-      case sparkSubFeed: SparkSubFeed => sparkSubFeed.clearFilter().asInstanceOf[SparkSubFeed] // make sure there is no filter, as filter can not be passed between actions.
+      case sparkSubFeed: SparkSubFeed => sparkSubFeed.clearFilter().asInstanceOf[SparkSubFeed].copy(executionModeResultOptions = Map()) // no filter and no executionModeResultOptions are passed between actions
       case _ => SparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }

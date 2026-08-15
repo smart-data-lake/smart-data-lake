@@ -157,7 +157,7 @@ case class SparkStreamingMode(
         val streamingMetrics = SparkStreamingMetrics(streamingQuery.lastProgress)
         if (streamingMetrics.noData) logger.info(s"(${action.id}) no data to process for ${output.id} in first micro-batch streaming mode")
         _streamingQuery = Some(streamingQuery)
-        val runtimeMetrics = action.runtimeData.getMetrics(output.id).map(_.getMainInfos).getOrElse(Map())
+        val runtimeMetrics = action.getRuntimeMetrics(output.id).map(_.getMainInfos).getOrElse(Map())
         subFeed.withMetrics(streamingMetrics.getMainInfos ++ runtimeMetrics).asInstanceOf[DataFrameSubFeed]
       } else {
         logger.debug(s"(${action.id}) streaming query already started")
@@ -177,7 +177,7 @@ case class SparkStreamingMode(
       queryListener.waitForFirstProgress()
       val streamingMetrics = SparkStreamingMetrics(streamingQuery.lastProgress)
       if (streamingMetrics.noData) logger.info(s"(${action.id}) no data to process for ${output.id} in streaming mode")
-      val runtimeMetrics = action.runtimeData.getMetrics(output.id).map(_.getMainInfos).getOrElse(Map())
+      val runtimeMetrics = action.getRuntimeMetrics(output.id).map(_.getMainInfos).getOrElse(Map())
       subFeed.withMetrics(streamingMetrics.getMainInfos ++ runtimeMetrics).asInstanceOf[DataFrameSubFeed]
     }
   }

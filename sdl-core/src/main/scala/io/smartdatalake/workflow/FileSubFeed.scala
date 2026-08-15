@@ -40,7 +40,8 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
                        override val isDAGStart: Boolean = false,
                        override val isSkipped: Boolean = false,
                        fileRefMapping: Option[Seq[FileRefMapping]] = None,
-                       override val metrics: Option[MetricsMap] = None
+                       override val metrics: Option[MetricsMap] = None,
+                       override val executionModeResultOptions: Map[String, String] = Map()
 )
   extends SubFeed {
 
@@ -68,25 +69,28 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
   }
 
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = {
-    this.copy(fileRefs = None, fileRefMapping = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, metrics = None)
+    this.copy(fileRefs = None, fileRefMapping = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, metrics = None, executionModeResultOptions = Map())
   }
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
     case fileSubFeed: FileSubFeed if this.fileRefs.isDefined && fileSubFeed.fileRefs.isDefined =>
       this.copy(fileRefs = this.fileRefs.map(_ ++ fileSubFeed.fileRefs.get)
         , partitionValues = unionPartitionValues(fileSubFeed.partitionValues)
-        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart, isSkipped = this.isSkipped && fileSubFeed.isSkipped)
+        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart, isSkipped = this.isSkipped && fileSubFeed.isSkipped
+        , executionModeResultOptions = unionExecutionModeResultOptions(fileSubFeed))
     case fileSubFeed: FileSubFeed =>
       this.copy(fileRefs = None, partitionValues = unionPartitionValues(fileSubFeed.partitionValues)
-        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart, isSkipped = this.isSkipped && fileSubFeed.isSkipped)
-    case x => this.copy(fileRefs = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart, isSkipped = this.isSkipped && x.isSkipped)
+        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart, isSkipped = this.isSkipped && fileSubFeed.isSkipped
+        , executionModeResultOptions = unionExecutionModeResultOptions(fileSubFeed))
+    case x => this.copy(fileRefs = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart, isSkipped = this.isSkipped && x.isSkipped
+      , executionModeResultOptions = unionExecutionModeResultOptions(x))
   }
 
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): FileSubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, fileRefs = result.fileRefs, fileRefMapping = None)
+    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, fileRefs = result.fileRefs, fileRefMapping = None, executionModeResultOptions = result.options)
   }
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): FileSubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false, fileRefs = None, fileRefMapping = None)
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false, fileRefs = None, fileRefMapping = None, executionModeResultOptions = result.options)
   }
 }
 object FileSubFeed extends SubFeedConverter[FileSubFeed] {
@@ -95,7 +99,8 @@ object FileSubFeed extends SubFeedConverter[FileSubFeed] {
    */
   override def fromSubFeed( subFeed: SubFeed )(implicit context: ActionPipelineContext): FileSubFeed = {
     subFeed match {
-      case fileSubFeed: FileSubFeed => fileSubFeed
+      // executionModeResultOptions are not passed on to the next Action
+      case fileSubFeed: FileSubFeed => fileSubFeed.copy(executionModeResultOptions = Map())
       case _ => FileSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }

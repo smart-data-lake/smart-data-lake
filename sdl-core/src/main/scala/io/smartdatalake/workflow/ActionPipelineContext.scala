@@ -46,8 +46,15 @@ import java.time.LocalDateTime
  * @param cacheRegistry Keeps track of DataFrames cached by Actions with cacheOutput=true, so that they can be released
  *                      again once no Action needs them anymore. Consumers are registered during ExecutionPhase.Init,
  *                      the caches are created and released during ExecutionPhase.Exec.
+ * @param runtimeRegistry Keeps the runtime state (events & metrics) of all Actions of this execution. As `copy` is
+ *                        shallow, all derived contexts share the same registry instance, so runtime information of an
+ *                        Action is visible to all Actions executed afterwards.
  * @param actionsSelected actions selected for execution by command line parameter --feed-sel
  * @param actionsSkipped actions selected but skipped in current attempt because they already succeeded in a previous attempt.
+ * @param currentAction the Action currently being executed, set by [[withAction]].
+ * @param predecessorActions all Actions the currentAction transitively depends on in the DAG, set by [[withAction]].
+ *                           These have all finished when the currentAction runs, so their runtime information is
+ *                           complete and independent of the scheduling order of parallel branches.
  */
 case class ActionPipelineContext (
                                    feed: String, application: String, executionId: SDLExecutionId,
@@ -60,13 +67,17 @@ case class ActionPipelineContext (
                                    simulation: Boolean = false,
                                    phase: ExecutionPhase = ExecutionPhase.Prepare,
                                    cacheRegistry: DataFrameCacheRegistry = new DataFrameCacheRegistry(),
+                                   runtimeRegistry: ActionsRuntimeRegistry = new ActionsRuntimeRegistry(),
                                    actionsSelected: Seq[ActionId] = Seq(),
                                    actionsSkipped: Seq[ActionId] = Seq(),
                                    globalConfig: GlobalConfig,
                                    currentAction: Option[Action] = None,
+                                   @transient
+                                   predecessorActions: Seq[Action] = Seq(),
                                  ) extends SmartDataLakeLogger {
 
-  def withAction(action: Action): ActionPipelineContext = this.copy(currentAction = Some(action))
+  def withAction(action: Action, predecessorActions: Seq[Action] = Seq()): ActionPipelineContext =
+    this.copy(currentAction = Some(action), predecessorActions = predecessorActions)
 
   def engineConnection: Option[Connection with EngineConnection] = {
     currentAction.map(_.getEngineConnection(instanceRegistry))

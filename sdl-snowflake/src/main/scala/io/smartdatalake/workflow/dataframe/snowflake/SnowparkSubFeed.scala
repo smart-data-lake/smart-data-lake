@@ -41,14 +41,15 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
                            override val filter: Option[String] = None,
                            @transient override val observation: Option[DataFrameObservation] = None,
                            override val metrics: Option[MetricsMap] = None,
-                           @transient override val keptSchema: Option[GenericSchema] = None
+                           @transient override val keptSchema: Option[GenericSchema] = None,
+                           override val executionModeResultOptions: Map[String, String] = Map()
                           )
   extends DataFrameSubFeed {
   @transient
   override val tpe: Type = typeOf[SnowparkSubFeed]
 
   override def toOutput(dataObjectId: DataObjectId): SnowparkSubFeed = {
-    this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None)
+    this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None, executionModeResultOptions = Map())
   }
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
@@ -67,6 +68,7 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
       , partitionValues = unionPartitionValues(other.partitionValues)
       , isDAGStart = this.isDAGStart || other.isDAGStart
       , isSkipped = this.isSkipped && other.isSkipped
+      , executionModeResultOptions = unionExecutionModeResultOptions(other)
     )
   }
 
@@ -74,11 +76,11 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SnowparkSubFeed = {
     // apply input filter
     val inputFilter = if (this.dataObjectId == mainInputId) result.filter else None
-    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage // breaklineage keeps the schema without the DataFrame
+    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false, executionModeResultOptions = result.options).breakLineage // breaklineage keeps the schema without the DataFrame
       .asInstanceOf[SnowparkSubFeed]
   }
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SnowparkSubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None)
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None, executionModeResultOptions = result.options)
   }
   override def withDataFrame(dataFrame: Option[GenericDataFrame]): SnowparkSubFeed = this.copy(
     dataFrame = dataFrame.map(_.asInstanceOf[SnowparkDataFrame]),
@@ -90,7 +92,8 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
 object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogger {
   override def fromSubFeed(subFeed: SubFeed)(implicit context: ActionPipelineContext): SnowparkSubFeed = {
     subFeed match {
-      case snowparkSubFeed: SnowparkSubFeed => snowparkSubFeed
+      // executionModeResultOptions are not passed on to the next Action
+      case snowparkSubFeed: SnowparkSubFeed => snowparkSubFeed.copy(executionModeResultOptions = Map())
       case dataFrameSubFeed: DataFrameSubFeed =>
         // transport only the schema, the DataFrame is read again from the DataObject where it is needed
         SnowparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped,

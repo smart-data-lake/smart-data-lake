@@ -77,7 +77,7 @@ case class DataObjectState(dataObjectId: DataObjectId, state: String) {
 private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
 
   // Note: if increasing this version, please check if a StateMigrator is needed to read files of older versions. See also stateMigrators below.
-  val runStateFormatVersion: Int = 5
+  val runStateFormatVersion: Int = 6
 
   implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections(ConfigParser.WORKFLOW_PACKAGE)
 
@@ -135,7 +135,9 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
      assert(formatVersion <= runStateFormatVersion,
        s"Cannot read state file with formatVersion=$formatVersion newer than the version of this build ($runStateFormatVersion)." +
          s" Check state file app=$appName runId=$runId attemptId=$attemptId and that your SDLB version is up-to-date!")
-    val migrators = stateMigrators.dropWhile(m => m.versionFrom <= formatVersion)
+    // a migrator has to be applied if the state file is not newer than the version it migrates from,
+    // e.g. a state file with formatVersion=5 still needs the migrator 5 -> 6.
+    val migrators = stateMigrators.dropWhile(m => m.versionFrom < formatVersion)
     if (migrators.nonEmpty) {
       logger.info(s"Applying state migrators ${migrators.mkString(", ")} to state json for app=$appName runId=$runId attemptId=$attemptId")
       Some(migrators.foldLeft(json)((v, m) => m.migrate(v)))
@@ -145,7 +147,8 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
   // list of state migrators, sorted in ascending order
   private val stateMigrators: Seq[StateMigratorDef] = Seq(
     new StateMigratorDef3To4(),
-    new StateMigratorDef4To5()
+    new StateMigratorDef4To5(),
+    new StateMigratorDef5To6()
   ).sortBy(_.versionFrom) // force ordering
   assert(stateMigrators.groupBy(_.versionFrom).forall(_._2.size == 1)) // check that versionFrom is unique
   assert(stateMigrators.forall(m => m.versionFrom + 1 == m.versionTo)) // check that a state migrator always converts to the next version, without skipping a version.

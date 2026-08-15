@@ -94,13 +94,15 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     // create output subfeeds with transformed partition values from main input
     var outputSubFeeds: Seq[S] = outputs.map(output =>
-      updateOutputPartitionValues(output, subFeedConverter.get(mainInputSubFeed.toOutput(output.id)), Some(transformPartitionValues))
+      // the ExecutionModeResult is not yet available here, so no executionModeResultOptions can be passed
+      updateOutputPartitionValues(output, subFeedConverter.get(mainInputSubFeed.toOutput(output.id)), Some(transformPartitionValues(_, Map())))
     )
     // apply execution mode only in exec phase
     if (context.isExecPhase) {
       // apply execution mode
       val executionModeResult = try {
-        executionMode.flatMap(_.apply(id, mainInput, mainOutput, mainInputSubFeed, transformPartitionValues))
+        // transformPartitionValues is called while calculating the ExecutionModeResult, so its options are not yet available
+        executionMode.flatMap(_.apply(id, mainInput, mainOutput, mainInputSubFeed, transformPartitionValues(_, Map())))
       } catch {
         // throw exception with skipped output subfeeds if "no data"
         case ex: NoDataToProcessWarning if ex.results.isEmpty => throw ex.copy(results = Some(ActionHelper.createSkippedSubFeeds(outputs)))
@@ -112,9 +114,8 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
             updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForInput(result, mainInput.id)))
           }
           outputSubFeeds = outputSubFeeds.map(subFeed =>
-            updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForOutput(result, transformPartitionValues)))
+            updateOutputPartitionValues(outputMap(subFeed.dataObjectId), subFeedConverter.get(subFeed.applyExecutionModeResultForOutput(result, transformPartitionValues(_, result.options))))
           )
-          executionModeResultOptions = result.options
         case _ => ()
       }
     }
@@ -129,10 +130,6 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     outputSubFeeds = outputSubFeeds.map(subFeed => addRunIdPartitionIfNeeded(outputMap(subFeed.dataObjectId), subFeed))
     (inputSubFeeds, outputSubFeeds)
   }
-
-  // Keep execution mode result in a variable for now.
-  // TODO: this should be a property of the SubFeed. Like that it is passed to the Action and its Input/Output DataObjects.
-  protected var executionModeResultOptions: Map[String, String] = Map()
 
   def postprocessOutputSubFeeds(subFeeds: Seq[S], inputSubFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
     // assert all outputs have a subFeed
@@ -372,7 +369,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    * Transform partition values.
    * Can be implemented by subclass.
    */
-  private[smartdatalake] def transformPartitionValues(partitionValues: Seq[PartitionValues])
+  private[smartdatalake] def transformPartitionValues(partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String, String])
                                                      (implicit context: ActionPipelineContext): Map[PartitionValues, PartitionValues] = PartitionValues.oneToOneMapping(partitionValues)
 
   /**
@@ -401,14 +398,17 @@ case class SubFeedExpressionData(partitionValues: Seq[Map[String, String]],
                                  isSkipped: Boolean,
                                  metrics: Map[String, String])
 
-case class SubFeedsExpressionData(inputSubFeeds: Map[String, SubFeedExpressionData], mainInputSubFeed: SubFeedExpressionData)
+case class SubFeedsExpressionData(inputSubFeeds: Map[String, SubFeedExpressionData],
+                                  mainInputSubFeed: SubFeedExpressionData,
+                                  predecessorActions: Map[String, ActionExpressionData])
 
 object SubFeedsExpressionData {
-  def fromSubFeeds(subFeeds: Seq[SubFeed], mainInputId: DataObjectId): SubFeedsExpressionData = {
+  def fromSubFeeds(subFeeds: Seq[SubFeed], mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SubFeedsExpressionData = {
     val subFeedDataMap = subFeeds.map(subFeed => (subFeed.dataObjectId.id,
       SubFeedExpressionData(subFeed.partitionValues.map(_.getMapString),
       subFeed.isDAGStart, subFeed.isSkipped, subFeed.metrics.getOrElse(Map()).view.mapValues(_.toString).toMap))
     ).toMap
-    SubFeedsExpressionData(inputSubFeeds = subFeedDataMap, mainInputSubFeed = subFeedDataMap(mainInputId.id))
+    SubFeedsExpressionData(inputSubFeeds = subFeedDataMap, mainInputSubFeed = subFeedDataMap(mainInputId.id),
+      predecessorActions = ActionExpressionData.predecessorsFrom(context))
   }
 }

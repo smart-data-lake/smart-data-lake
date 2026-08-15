@@ -93,6 +93,39 @@ class DAGTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger {
     assert(result.head.path == "A-B-C")
   }
 
+  test("transitive predecessors: diamond") {
+    // A -> B -> D, A -> C -> D
+    val nodes = Seq(TestNode("A"), TestNode("B"), TestNode("C"), TestNode("D"))
+    val edges = Seq(TestEgde("A", "B"), TestEgde("B", "D"), TestEgde("A", "C"), TestEgde("C", "D"))
+    val dag = DAG.create[TestNode](nodes, edges)
+    assert(dag.transitivePredecessors("A") == Set())
+    assert(dag.transitivePredecessors("B") == Set("A"))
+    assert(dag.transitivePredecessors("C") == Set("A"))
+    // D joins both branches: it sees the union of the predecessors of B and C, and B and C themselves
+    assert(dag.transitivePredecessors("D") == Set("A", "B", "C"))
+  }
+
+  test("transitive predecessors: chain") {
+    val nodes = Seq(TestNode("A"), TestNode("B"), TestNode("C"))
+    val edges = Seq(TestEgde("A", "B"), TestEgde("B", "C"))
+    val dag = DAG.create[TestNode](nodes, edges)
+    assert(dag.transitivePredecessors("A") == Set())
+    assert(dag.transitivePredecessors("B") == Set("A"))
+    assert(dag.transitivePredecessors("C") == Set("A", "B"))
+  }
+
+  test("transitive predecessors: unconnected subgraphs don't see each other") {
+    // A -> B and C -> D are independent
+    val nodes = Seq(TestNode("A"), TestNode("B"), TestNode("C"), TestNode("D"))
+    val edges = Seq(TestEgde("A", "B"), TestEgde("C", "D"))
+    val dag = DAG.create[TestNode](nodes, edges)
+    assert(dag.transitivePredecessors("B") == Set("A"))
+    assert(dag.transitivePredecessors("D") == Set("C"))
+    // B must not see the other branch, even though C and D might have finished earlier
+    assert(!dag.transitivePredecessors("B").contains("C"))
+    assert(!dag.transitivePredecessors("D").contains("A"))
+  }
+
   test("create and run dag: split and join with parallel execution") {
     val nodes = Seq(TestNode("A"), TestNode("B"), TestNode("C"), TestNode("D"))
     val edges = Seq(TestEgde("A", "B"), TestEgde("B", "D"), TestEgde("A", "C"), TestEgde("C", "D"))

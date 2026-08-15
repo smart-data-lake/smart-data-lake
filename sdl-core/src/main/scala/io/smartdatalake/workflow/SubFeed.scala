@@ -37,6 +37,13 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
   def metrics: Option[MetricsMap]
 
   /**
+   * Options returned by the ExecutionMode of the Action which created this SubFeed.
+   * They are set when the [[ExecutionModeResult]] is applied to the SubFeed and are passed on to the transformers
+   * and the Input/Output DataObjects of that Action. They are not passed on to the next Action, see `fromSubFeed`.
+   */
+  def executionModeResultOptions: Map[String, String]
+
+  /**
    * Break lineage.
    * This means to discard an existing DataFrame or List of FileRefs, so that it is requested again from the DataObject.
    * On one side this is usable to break long DataFrame Lineages over multiple Actions and instead reread the data from
@@ -72,6 +79,15 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
   def withMetrics(metrics: MetricsMap): SubFeed = ProductUtil.dynamicCopy(this, "metrics", Some(metrics))
 
   def appendMetrics(metrics: MetricsMap): SubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
+
+  def withExecutionModeResultOptions(options: Map[String, String]): SubFeed =
+    ProductUtil.dynamicCopy(this, "executionModeResultOptions", options)
+
+  /**
+   * Union of executionModeResultOptions when merging two SubFeeds for the same DataObject.
+   */
+  def unionExecutionModeResultOptions(other: SubFeed): Map[String, String] =
+    this.executionModeResultOptions ++ other.executionModeResultOptions
 
 }
 object SubFeed {

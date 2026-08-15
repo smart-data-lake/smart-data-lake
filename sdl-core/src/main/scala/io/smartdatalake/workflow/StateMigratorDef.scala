@@ -139,3 +139,27 @@ class StateMigratorDef4To5 extends StateMigratorDef with SmartDataLakeLogger {
     updateVersion(migratedJson, versionTo)
   }
 }
+/**
+ * Migrate state from format version 5 to 6:
+ * - SubFeeds got a new attribute `executionModeResultOptions`, holding the options returned by the ExecutionMode
+ *   of the Action which created the SubFeed.
+ *
+ * No transformation of existing content is needed: the attribute is missing in older state files and defaults to
+ * an empty Map when read. Only the version number is updated.
+ */
+class StateMigratorDef5To6 extends StateMigratorDef with SmartDataLakeLogger {
+  override val versionFrom = 5
+  override val versionTo = 6
+  override def migrate(json: JObject): JObject = {
+    assert(json \ "runStateFormatVersion" match {
+      case JInt(version) => version <= versionFrom
+      case JNothing => true // first state files did not have an attribute runStateFormatVersion
+      case _ =>
+        throw new IllegalStateException(s"Expected runStateFormatVersion to be an integer or missing," +
+          s" but found unexpected type during migration from version $versionFrom to $versionTo")
+    }, s"Version should be equals or less than $versionFrom")
+
+    // only the version is updated, executionModeResultOptions defaults to an empty Map when missing
+    updateVersion(json, versionTo)
+  }
+}
