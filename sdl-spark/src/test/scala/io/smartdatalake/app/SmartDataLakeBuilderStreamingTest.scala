@@ -224,7 +224,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc1, PartitionValues.fromDataFrame(SparkDataFrame(dfSrc1.select($"dt", $"type"))))
-    srcDO.getSparkDataFrame().createdLog("srcDO", showRows = true)
+    srcDO.getSparkDataFrame().createdLog("srcDO")
 
     debugLog("prepare streaming action")
     val action1 = CopyAction("a", srcDO.id, tgt1DO.id,
@@ -266,7 +266,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
                 dfWritten = true
                 debugLog("onQueryProgress: adding some more data")
                 srcDO.writeSparkDataFrame(dfSrc2)(contextExec)
-                srcDO.getSparkDataFrame()(contextExec).createdLog("srcDO", showRows = true)
+                srcDO.getSparkDataFrame()(contextExec).createdLog("srcDO")
               case x if x > 2 && batchAfterWriteProcessed =>
                 debugLog(s"onQueryProgress: x=$x stopping streaming query")
                 session.streams.active.find(_.name == prog.name).get.stop()
@@ -294,7 +294,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
 
     debugLog("check data after streaming is terminated")
     val tgt1DOdf = tgt1DO.getSparkDataFrame()
-    tgt1DOdf.debLog(dsName = "tgt1DOdf", showRows = true)
+    tgt1DOdf.debLog(dsName = "tgt1DOdf")
     Try {
       assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20190101"))
       assert(tgt1DOdf.select($"rating").as[Int].collect().toSeq == Seq(6, 11)) // +1 because of udfAddX
@@ -306,29 +306,33 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
         logger.error(s"action1  : ${action1.toDebugString}")
         logger.error(s"srcDO    : ${srcDO.toDebugString}")
         logger.error(s"content of $srcDOPath: ${new java.io.File(srcDOPath).list.mkString(", ")}")
-        srcDO.getSparkDataFrame().debLog(dsName = "src1", showRows = true)
-        tgt1DOdf.debLog(dsName = "tgt1DOdf", showRows = true)
+        srcDO.getSparkDataFrame().debLog(dsName = "src1")
+        tgt1DOdf.debLog(dsName = "tgt1DOdf")
       throw e
     }
-    debugLog(s"action1.runtimeData: ${action1.runtimeData}")
-    debugLog(s"${action1.runtimeData.executions.length} action1.runtimeData.executions: " +
-      s"${action1.runtimeData.executions.mkString(",")}")
+    // runtime information is kept in the runtime registry of the context of the run, not in the test context,
+    // so it has to be passed explicitly here (contextExec is the implicit in scope).
+    val contextRun: ActionPipelineContext = sdlb.lastContext.get
+    val action1RuntimeData = contextRun.runtimeRegistry.get(action1.id).get
+    debugLog(s"action1.runtimeData: $action1RuntimeData")
+    debugLog(s"${action1RuntimeData.executions.length} action1.runtimeData.executions: " +
+      s"${action1RuntimeData.executions.mkString(",")}")
 
-    val action1InfoSdl1: RuntimeInfo = action1.getRuntimeInfo(Some(SDLExecutionId(1))).get
+    val action1InfoSdl1: RuntimeInfo = action1.getRuntimeInfo(Some(SDLExecutionId(1)))(contextRun).get
     debugLog(s"action1InfoSdl1 = $action1InfoSdl1")
     debugLog(s"${action1InfoSdl1.results.length} action1InfoSdl1.results = ${action1InfoSdl1.results.mkString(",")}")
     assert(action1InfoSdl1.state == RuntimeEventState.SUCCEEDED) // State for SDL execution 1 is reported as SUCCEEDED by streaming action
     assert(getRecordsWritten(action1InfoSdl1) == 1)
 
-    val action1InfoSdl2 = action1.getRuntimeInfo(Some(SDLExecutionId(2))).get
+    val action1InfoSdl2 = action1.getRuntimeInfo(Some(SDLExecutionId(2)))(contextRun).get
     assert(action1InfoSdl2.state == RuntimeEventState.STREAMING) // State for SDL execution 2 is reported as STREAMING by streaming action
 
-    val action1InfoStream1 = action1.getRuntimeInfo(Some(SparkStreamingExecutionId(0)))
+    val action1InfoStream1 = action1.getRuntimeInfo(Some(SparkStreamingExecutionId(0)))(contextRun)
     assert(action1InfoStream1.isDefined)
     assert(action1InfoStream1.get.state == RuntimeEventState.SUCCEEDED)
     assert(getRecordsWritten(action1InfoStream1.get) == 1)
 
-    val action1InfoStream2 = action1.getRuntimeInfo(Some(SparkStreamingExecutionId(1)))
+    val action1InfoStream2 = action1.getRuntimeInfo(Some(SparkStreamingExecutionId(1)))(contextRun)
     assert(action1InfoStream2.isDefined)
     assert(action1InfoStream2.get.state == RuntimeEventState.SUCCEEDED)
     /* TODO: This assert fails every now and then. No Idea why.
@@ -562,7 +566,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc1)
-    srcDO.getSparkDataFrame().createdLog("srcDO", showRows = true)
+    srcDO.getSparkDataFrame().createdLog("srcDO")
 
     // prepare partition diff action
     val actionA = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
@@ -638,7 +642,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc1)
-    srcDO.getSparkDataFrame().createdLog("srcDO", showRows = true)
+    srcDO.getSparkDataFrame().createdLog("srcDO")
 
     // prepare streaming action
     val actionAFail = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(SparkStreamingMode(checkpointPath, "ProcessingTime", Some("1 seconds"))), metadata = Some(ActionMetadata(feed = Some(feedName)))
@@ -730,7 +734,7 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     val dfSrc1 = Seq(("20180101", "person", "doe", "john", 5)) // first partition 20180101
       .toDF("dt", "type", "lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(dfSrc1)
-    srcDO.getSparkDataFrame().createdLog("srcDO", showRows = true)
+    srcDO.getSparkDataFrame().createdLog("srcDO")
 
     // prepare partition diff action
     val actionA = CopyAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode(partitionColNb = Some(1))), metadata = Some(ActionMetadata(feed = Some(feedName)))
@@ -783,7 +787,9 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     assert(tgt1DO.listPartitions.map(_.apply("dt")).toSet == Set("20180101", "20190101"))
 
     debugLog("restart run")
-    val currentRunId = actionA.runtimeData.currentExecutionId.get.asInstanceOf[SDLExecutionId].runId
+    // runtime information is kept in the runtime registry of the context of the run, not in the test context
+    val currentRunId = sdlb.lastContext.get.runtimeRegistry.get(actionA.id).get
+      .currentExecutionId.get.asInstanceOf[SDLExecutionId].runId
     session.streams.resetTerminated() // reset terminated streaming query list
     actionA.reset
     actionB.reset

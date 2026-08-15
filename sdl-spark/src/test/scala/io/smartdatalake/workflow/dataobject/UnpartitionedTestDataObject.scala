@@ -48,7 +48,7 @@ case class UnpartitionedTestDataObject(override val id: DataObjectId,
 
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): MetricsMap = {
-    df.show()
+    df.collect()
     Map("records_written" -> df.count())
   }
 

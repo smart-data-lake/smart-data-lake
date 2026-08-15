@@ -60,7 +60,7 @@ class SmartDataLakeBuilderStatusInfoTest extends AnyFunSuite with Quality with B
     val srcDO = CsvFileDataObject("src1", "target/src1")(sdlb.instanceRegistry)
     val dfSrc1 = Seq("testData").toDF("testColumn")
     srcDO.writeDataFrame(SparkDataFrame(dfSrc1), Seq())
-    srcDO.getSparkDataFrame().createdLog("srcDO", showRows = true)
+    srcDO.getSparkDataFrame().createdLog("srcDO")
 
     val sdlConfig = SmartDataLakeBuilderConfig(feedSel = feedName,
       configuration = Seq(

@@ -81,8 +81,6 @@ class HistorizeActionTest extends AnyFunSuite with BeforeAndAfter
     val tgtSubFeed = action1.exec(Seq(srcSubFeed))(context1).head
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
     assert(tgtSubFeed.asInstanceOf[SparkSubFeed].dataFrame.isEmpty) // should transport only the schema, as cacheOutput is false by default
-    println("********* srcDO")
-    srcDO.getSparkDataFrame()(context1).show(false)
 
     {
       val actual = tgtDO.getSparkDataFrame()(context1).drop(Historization.historizeHashColName)
