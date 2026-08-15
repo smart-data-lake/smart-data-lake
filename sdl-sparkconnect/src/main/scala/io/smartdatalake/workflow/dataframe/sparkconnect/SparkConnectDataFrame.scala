@@ -165,10 +165,19 @@ case class SparkConnectDataFrame(override val inner: DataFrame) extends GenericD
 
   override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, aggregateColumns)
-    // Spark Connect has no QueryExecutionListener on the client side. Metrics are calculated with a separate query on the cached DataFrame.
-    val observation = GenericCalculatedObservation(this, aggregateColumns.toIndexedSeq: _*)
-    // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
-    (if (isExecPhase) this.cache else this, observation)
+    // Cache the DataFrame, so that metrics can be calculated with a separate query without recomputing it.
+    // This is needed for GenericCalculatedObservation, and as fallback of SparkConnectObservation.
+    val dfCached = if (isExecPhase) this.cache.asInstanceOf[SparkConnectDataFrame] else this
+    if (forceGenericObservation) {
+      (dfCached, GenericCalculatedObservation(dfCached, aggregateColumns.toIndexedSeq: _*))
+    } else {
+      // Spark Connect has no QueryExecutionListener on the client side, but the standard Spark Observation API
+      // transports the observed metrics back with the response of the query/command executing this plan.
+      val observation = new SparkConnectObservation(name, dfCached, aggregateColumns)
+      val sparkAggregatedColumns = aggregateColumns.map(_.asInstanceOf[SparkConnectColumn].inner)
+      val dfObserved = observation.on(dfCached.inner, sparkAggregatedColumns.toIndexedSeq: _*)
+      (SparkConnectDataFrame(dfObserved), observation)
+    }
   }
 
   def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = {
