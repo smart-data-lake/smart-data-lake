@@ -3154,6 +3154,57 @@
             },
             "description" : "partition columns for this data object"
           },
+          "constraints" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "name" : {
+                  "type" : "string",
+                  "description" : "name of the constraint"
+                },
+                "description" : {
+                  "type" : "string",
+                  "description" : "optional detailed description of the constraint"
+                },
+                "expression" : {
+                  "type" : "string",
+                  "description" : "SQL expression to evaluate on every row. The expressions return value should be a boolean.  \nIf it evaluates to true the constraint is validated successfully, otherwise it will throw an exception."
+                },
+                "errorMsgCols" : {
+                  "type" : "array",
+                  "items" : {
+                    "type" : "string"
+                  },
+                  "description" : "Optional list of column names to add to error message.  \nNote that primary key columns are always included.  \nIf there is no primary key defined, by default all columns with simple datatype are included in the error message."
+                }
+              },
+              "title" : "Constraint",
+              "required" : [ "name", "expression" ],
+              "additionalProperties" : false,
+              "description" : "Definition of row-level constraint to validate."
+            },
+            "description" : "List of row-level`Constraint`s to enforce when writing to this data object."
+          },
+          "expectations" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "$ref" : "#/definitions/Expectation/AvgCountPerPartitionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/CountExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLFractionExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/SQLQueryExpectation"
+              }, {
+                "$ref" : "#/definitions/Expectation/UniqueKeyExpectation"
+              } ]
+            },
+            "description" : "List of`Expectation`s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset."
+          },
           "saveMode" : {
             "type" : "string",
             "description" : "`SDLSaveMode` to use when writing the table, default is \"Overwrite\"",
