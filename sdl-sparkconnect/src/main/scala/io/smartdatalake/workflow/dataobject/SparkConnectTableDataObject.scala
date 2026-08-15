@@ -29,7 +29,8 @@ import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.SparkConnectConnection
 import io.smartdatalake.workflow.dataframe.sparkconnect.{SparkConnectDataFrame, SparkConnectSchema, SparkConnectSubFeed}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
-import io.smartdatalake.workflow.dataobject.generic.{CanEvolveSchema, CanHandlePartitions, CanMergeDataFrame, Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic.{CanEvolveSchema, CanHandlePartitions, CanMergeDataFrame, Constraint, ExpectationValidation, Table, TransactionalTableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.{DataFrame, DataFrameWriter, Row, SaveMode, SparkSession}
 
@@ -49,6 +50,8 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param table        table to be read/written by this data object
  * @param schemaMin    An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  * @param partitions   partition columns for this data object
+ * @param constraints  List of row-level [[Constraint]]s to enforce when writing to this data object.
+ * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param saveMode     [[SDLSaveMode]] to use when writing the table, default is "Overwrite"
  * @param format       Optional table format used when creating the table, e.g. parquet or delta. Default is the servers default table format.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema.
@@ -68,6 +71,8 @@ case class SparkConnectTableDataObject(override val id: DataObjectId,
                                        override var table: Table,
                                        override val schemaMin: Option[GenericSchema] = None,
                                        override val partitions: Seq[String] = Seq(),
+                                       override val constraints: Seq[Constraint] = Seq(),
+                                       override val expectations: Seq[Expectation] = Seq(),
                                        saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                        format: Option[String] = None,
                                        override val allowSchemaEvolution: Boolean = false,
@@ -80,7 +85,8 @@ case class SparkConnectTableDataObject(override val id: DataObjectId,
                                        override val expectedPartitionsCondition: Option[String] = None,
                                        override val metadata: Option[DataObjectMetadata] = None)
                                       (@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TransactionalTableDataObject with CanMergeDataFrame with CanHandlePartitions with CanEvolveSchema with SmartDataLakeLogger {
+  extends TransactionalTableDataObject with CanMergeDataFrame with CanHandlePartitions with CanEvolveSchema
+    with ExpectationValidation with SmartDataLakeLogger {
 
   val connection: SparkConnectConnection = getConnection[SparkConnectConnection](connectionId)
 

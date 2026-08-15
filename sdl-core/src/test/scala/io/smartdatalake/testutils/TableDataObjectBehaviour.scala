@@ -69,6 +69,10 @@ trait TableDataObjectBehaviour extends GenericTestTool {
 
   /** factory for the table DataObject under test */
   type TableDataObjectFactory = (String, TableDataObjectTestParams, InstanceRegistry) =>
+    TransactionalTableDataObject with CanMergeDataFrame with CanHandlePartitions
+
+  /** factory for the table DataObject under test, for behaviours needing incremental output */
+  type IncrementalTableDataObjectFactory = (String, TableDataObjectTestParams, InstanceRegistry) =>
     TransactionalTableDataObject with CanMergeDataFrame with CanHandlePartitions with CanCreateIncrementalOutput
 
   private def setupRegistryAndContext(): (InstanceRegistry, ActionPipelineContext, ActionPipelineContext) = {
@@ -558,7 +562,7 @@ trait TableDataObjectBehaviour extends GenericTestTool {
   /**
    * Normal output mode: reading after setting the state returns the full data.
    */
-  def testNormalOutputModeWithoutCdc(createTgtDataObject: TableDataObjectFactory): Unit = {
+  def testNormalOutputModeWithoutCdc(createTgtDataObject: IncrementalTableDataObjectFactory): Unit = {
     val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
     implicit val registry: InstanceRegistry = instanceRegistry
     implicit val context: ActionPipelineContext = contextInit
@@ -586,7 +590,7 @@ trait TableDataObjectBehaviour extends GenericTestTool {
    * Incremental output mode: only data written since the last state is returned.
    * @param stateIsOrdered set to false for DataObjects whose state is not monotonically increasing (e.g. Iceberg snapshot ids)
    */
-  def testIncrementalOutputModeWithInserts(createTgtDataObject: TableDataObjectFactory, stateIsOrdered: Boolean = true): Unit = {
+  def testIncrementalOutputModeWithInserts(createTgtDataObject: IncrementalTableDataObjectFactory, stateIsOrdered: Boolean = true): Unit = {
     val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
     implicit val registry: InstanceRegistry = instanceRegistry
     implicit val context: ActionPipelineContext = contextInit
@@ -638,7 +642,7 @@ trait TableDataObjectBehaviour extends GenericTestTool {
   /**
    * Incremental output mode needs a primary key defined on the table.
    */
-  def testIncrementalOutputModeWithoutPrimaryKey(createTgtDataObject: TableDataObjectFactory): Unit = {
+  def testIncrementalOutputModeWithoutPrimaryKey(createTgtDataObject: IncrementalTableDataObjectFactory): Unit = {
     val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
     implicit val registry: InstanceRegistry = instanceRegistry
     implicit val context: ActionPipelineContext = contextInit
@@ -667,7 +671,7 @@ trait TableDataObjectBehaviour extends GenericTestTool {
    * Incremental output mode with updates and inserts: only new records and the latest version of updated records are returned.
    * Updates and inserts are done with merge writes, as an engine-agnostic replacement for SQL INSERT/UPDATE statements.
    */
-  def testIncrementalOutputModeWithUpdatesAndInserts(createTgtDataObject: TableDataObjectFactory): Unit = {
+  def testIncrementalOutputModeWithUpdatesAndInserts(createTgtDataObject: IncrementalTableDataObjectFactory): Unit = {
     val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
     implicit val registry: InstanceRegistry = instanceRegistry
     implicit val context: ActionPipelineContext = contextInit

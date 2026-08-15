@@ -33,6 +33,15 @@ import java.util.UUID
  *
  * Note 1: Observations are not supported for streaming Datasets
  * Note 2: the name is used to make metrics unique across parallel queries in the same Spark session
+ *
+ * Note 3: Why not use org.apache.spark.sql.Observation directly, like SparkConnectObservation of sdl-sparkconnect?
+ *   The standard Observation gets the metrics of its own CollectMetrics node only, while this implementation uses the
+ *   QueryExecutionListener to read *all* observed metrics of the QueryExecution. That is what setOtherObservationNames
+ *   and setOtherObservationsPrefix need, in order to also pick up Spark observations which are set up independently of
+ *   GenericDataFrame.setupObservation - notably the file name observers of SparkFileDataObject (see FileIncrementalMoveMode),
+ *   and custom observations of the user. Switching to the standard Observation would lose this, so it is kept as is.
+ *   Note that metrics of sibling input observations do not need the listener: they are combined by DataFrameActionImpl
+ *   with SuffixedObservation, see DataFrameObservation.includeInInputObservationCombine.
  */
 private[smartdatalake] class SparkObservation(name: String = UUID.randomUUID().toString) extends DataFrameObservation with SmartDataLakeLogger {
 
