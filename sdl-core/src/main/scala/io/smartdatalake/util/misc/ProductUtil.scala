@@ -232,6 +232,9 @@ object ProductUtil {
         val value = if (key == fieldName) newValue else inst.reflectMethod(m).apply()
         (key, value)
       }
+    // without this check a wrong fieldName would silently return an unchanged object
+    require(attributes.exists(_._1 == fieldName),
+      s"field $fieldName not found in object of type ${obj.getClass.getSimpleName}, available fields are ${attributes.map(_._1).mkString(", ")}")
     inst.reflectMethod(copyConstructor.asMethod).apply(attributes.map(_._2).toIndexedSeq: _*).asInstanceOf[T]
   }
 

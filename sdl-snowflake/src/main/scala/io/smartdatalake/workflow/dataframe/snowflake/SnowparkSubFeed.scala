@@ -27,7 +27,7 @@ import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ColumnFilter, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
@@ -38,7 +38,7 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
                            override val partitionValues: Seq[PartitionValues],
                            override val isDAGStart: Boolean = false,
                            override val isSkipped: Boolean = false,
-                           override val filter: Option[String] = None,
+                           override val filters: Seq[ColumnFilter] = Seq(),
                            @transient override val observation: Option[DataFrameObservation] = None,
                            override val metrics: Option[MetricsMap] = None,
                            @transient override val keptSchema: Option[GenericSchema] = None,
@@ -49,7 +49,7 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
   override val tpe: Type = typeOf[SnowparkSubFeed]
 
   override def toOutput(dataObjectId: DataObjectId): SnowparkSubFeed = {
-    this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None, executionModeResultOptions = Map())
+    this.copy(dataFrame = None, filters = Seq(), isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None, executionModeResultOptions = Map())
   }
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
@@ -68,19 +68,21 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
       , partitionValues = unionPartitionValues(other.partitionValues)
       , isDAGStart = this.isDAGStart || other.isDAGStart
       , isSkipped = this.isSkipped && other.isSkipped
+      , filters = unionFilters(other)
       , executionModeResultOptions = unionExecutionModeResultOptions(other)
     )
   }
 
 
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SnowparkSubFeed = {
-    // apply input filter
-    val inputFilter = if (this.dataObjectId == mainInputId) result.filter else None
-    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false, executionModeResultOptions = result.options).breakLineage // breaklineage keeps the schema without the DataFrame
+    // apply input filters
+    val inputFilters = result.filtersForInput(this.dataObjectId == mainInputId)
+    this.copy(partitionValues = result.inputPartitionValues, filters = inputFilters, isSkipped = false, executionModeResultOptions = result.options).breakLineage // breaklineage keeps the schema without the DataFrame
       .asInstanceOf[SnowparkSubFeed]
   }
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SnowparkSubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None, executionModeResultOptions = result.options)
+    // filters of the output are set from the main input SubFeed after the transformation, see DataFrameActionImpl.updateOutputFilters
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filters = Seq(), isSkipped = false, dataFrame = None, keptSchema = None, executionModeResultOptions = result.options)
   }
   override def withDataFrame(dataFrame: Option[GenericDataFrame]): SnowparkSubFeed = this.copy(
     dataFrame = dataFrame.map(_.asInstanceOf[SnowparkDataFrame]),

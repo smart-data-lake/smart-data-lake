@@ -109,10 +109,6 @@ case class SparkConnectDataFrame(override val inner: DataFrame) extends GenericD
 
   override def distinct: SparkConnectDataFrame = SparkConnectDataFrame(inner.distinct())
 
-  override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): SparkConnectSubFeed = {
-    SparkConnectSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
-  }
-
   override def withColumn(colName: String, expression: GenericColumn): SparkConnectDataFrame = {
     expression match {
       case sparkExpression: SparkConnectColumn => SparkConnectDataFrame(inner.withColumn(colName, sparkExpression.inner))

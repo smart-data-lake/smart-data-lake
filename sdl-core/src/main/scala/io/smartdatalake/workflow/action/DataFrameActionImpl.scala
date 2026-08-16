@@ -186,11 +186,11 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
               try {
                 logger.info(s"($id) enrichSubFeedDataFrame: getting DataFrame for ${input.id}" +
                   (if (subFeed.partitionValues.nonEmpty) s" filtered by partition values ${subFeed.partitionValues.mkString(" ")}" else "") +
-                  subFeed.filter.map(f => s" filtered by $f").getOrElse(""))
-                input.getSubFeed(subFeed.partitionValues, subFeedType) // get SubFeed of specified type with fresh DataFrame
-                  .withFilter(subFeed.partitionValues, subFeed.filter)
+                  (if (subFeed.hasFilters) s" filtered by ${ColumnFilter.describe(subFeed.filters)}" else ""))
+                updateInputFilters(input.getSubFeed(subFeed.partitionValues, subFeedType) // get SubFeed of specified type with fresh DataFrame
+                  .withFilters(subFeed.partitionValues, subFeed.filters)
                   // the SubFeed is recreated from the DataObject, so the executionModeResultOptions have to be carried over
-                  .withExecutionModeResultOptions(subFeed.executionModeResultOptions).asInstanceOf[DataFrameSubFeed]
+                  .withExecutionModeResultOptions(subFeed.executionModeResultOptions).asInstanceOf[DataFrameSubFeed])
               } catch {
                 // if there is no data, but it's an action with multiple inputs, we need to avoid that the action gets skipped because of the thrown NoDataToProcessWarning
                 case _: NoDataToProcessWarning if inputs.size > 1 => subFeed.withDataFrame(Some(createEmptyDataFrame(input)))
@@ -201,7 +201,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
             }
           } else {
             // existing DataFrame can be used
-            subFeed
+            updateInputFilters(subFeed)
           }
         } else {
           // phase != exec
@@ -212,14 +212,37 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
             val emptyDf = subFeed.schemaOpt
               .map(_.getEmptyDataFrame(subFeed.dataObjectId))
               .getOrElse(createEmptyDataFrame(input))
+            // Note that the filters are not updated here: the empty DataFrame might be created from a declared or
+            // fallback schema, and dropping filters based on that could discard a filter which is valid in exec phase.
             subFeed.withDataFrame(Some(emptyDf))
-              .applyFilter // check that filter is working
+              .applyFilter // check that the filters are working
           } else if (subFeed.isStreamingDataFrame) {
             // convert to empty normal DataFrame
             subFeed.withDataFrame(subFeed.schemaOpt.map(x => x.getEmptyDataFrame(subFeed.dataObjectId)))
           } else subFeed
         }
     }
+  }
+
+  /**
+   * Updates the filters of an input SubFeed to the columns of its DataFrame:
+   * - remove filters for non-existing columns
+   * This is the column analogue of ActionSubFeedsImpl.updateInputPartitionValues. It is done here because the
+   * columns of a DataObject are only reliably known once its DataFrame has been created.
+   */
+  private def updateInputFilters(subFeed: DataFrameSubFeed): DataFrameSubFeed = {
+    subFeed.dataFrame.map(df => subFeed.updateFilters(df.schema)).getOrElse(subFeed)
+  }
+
+  /**
+   * Sets the propagating filters of the main input SubFeed on an output SubFeed:
+   * - keep only filters with propagate=true
+   * - remove filters for non-existing columns
+   */
+  private def updateOutputFilters(subFeed: DataFrameSubFeed, inputSubFeeds: Seq[DataFrameSubFeed]): DataFrameSubFeed = {
+    inputSubFeeds.find(_.dataObjectId == getMainInput.id)
+      .map(mainInputSubFeed => subFeed.withFilters(mainInputSubFeed.filters.filter(_.propagate)).updateFilters(subFeed.schema))
+      .getOrElse(subFeed)
   }
 
   def createEmptyDataFrame(dataObject: DataObject with CanCreateDataFrame)
@@ -244,10 +267,12 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     require(!context.simulation || !schemaChanges,
       s"($id) write & read schema is not the same for ${input.id}. Need to drop the DataFrame and pass on only the schema, but this is not allowed in simulation!")
     preparedSubFeed = if (schemaChanges) preparedSubFeed.withSchema(readSchema) else preparedSubFeed
-    // remove potential filter and partition values added by execution mode
-    if (ignoreFilters) preparedSubFeed = preparedSubFeed.breakLineage.clearFilter().clearPartitionValues().clearSkipped().asInstanceOf[DataFrameSubFeed]
-    // break lineage if a filter expression is set, as the cached DataFrame does not contain the filter
-    if (preparedSubFeed.filter.isDefined) preparedSubFeed = preparedSubFeed.breakLineage
+    // remove potential filters and partition values added by execution mode
+    if (ignoreFilters) preparedSubFeed = preparedSubFeed.breakLineage.clearFilters().clearPartitionValues().clearSkipped().asInstanceOf[DataFrameSubFeed]
+    // Break lineage if a filter is set which is not already reflected in the DataFrame.
+    // Filters added by the execution mode of this Action already broke the lineage in applyExecutionModeResultForInput,
+    // whereas propagated filters are by definition already applied to the data written by the previous Action.
+    if (preparedSubFeed.filters.exists(!_.propagate)) preparedSubFeed = preparedSubFeed.breakLineage
     // enrich with fresh DataFrame if needed
     preparedSubFeed = enrichSubFeedDataFrame(input = input, subFeed = preparedSubFeed,
       phase = context.phase, isRecursive = isRecursive)
@@ -285,6 +310,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   override def postprocessOutputSubFeedCustomized(subFeed: DataFrameSubFeed, inputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     assert(subFeed.dataFrame.isDefined)
     val output = outputs.find(_.id == subFeed.dataObjectId).get
+    // propagate the filters of the main input SubFeed to this output, restricted to the columns it has
+    val outputSubFeed = updateOutputFilters(subFeed, inputSubFeeds)
     // initialize outputs
     if (context.phase == ExecutionPhase.Init) {
       output.init(subFeed.dataFrame.get, subFeed.partitionValues, saveModeOptions)
@@ -314,11 +341,11 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
           }
         }
         // add updated dataframe and observation to SubFeed
-        var postSubFeed = subFeed.withDataFrame(Some(dfExpectations))
+        var postSubFeed = outputSubFeed.withDataFrame(Some(dfExpectations))
         val observations = inputObservationsToCombine ++ outputObservations
         if (observations.nonEmpty) postSubFeed = postSubFeed.withObservation(Some(CombinedObservation.create(inputObservationsToCombine ++ outputObservations)))
         postSubFeed
-      case _ => subFeed
+      case _ => outputSubFeed
     }
   }
 

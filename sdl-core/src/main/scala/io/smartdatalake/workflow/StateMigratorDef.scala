@@ -20,7 +20,7 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.json4s.JArray
-import org.json4s.JsonAST.{JField, JInt, JNothing, JObject}
+import org.json4s.JsonAST.{JField, JInt, JNothing, JObject, JString}
 
 /**
  * Definition of how to migrate from one state version to another.
@@ -161,5 +161,38 @@ class StateMigratorDef5To6 extends StateMigratorDef with SmartDataLakeLogger {
 
     // only the version is updated, executionModeResultOptions defaults to an empty Map when missing
     updateVersion(json, versionTo)
+  }
+}
+
+/**
+ * Migrate state from format version 6 to 7:
+ * - the SubFeed attribute `filter: Option[String]` is replaced by `filters: Seq[ColumnFilter]`.
+ *
+ * The column a legacy filter belongs to is not known, so legacy filters are dropped. This is safe because SubFeeds
+ * read from the state are output SubFeeds of completed Actions, and only filters with propagate=true are passed on
+ * to the next Action anyway, see DataFrameActionImpl.updateOutputFilters.
+ * `filters` defaults to an empty Seq when missing.
+ */
+class StateMigratorDef6To7 extends StateMigratorDef with SmartDataLakeLogger {
+  override val versionFrom = 6
+  override val versionTo = 7
+  override def migrate(json: JObject): JObject = {
+    assert(json \ "runStateFormatVersion" match {
+      case JInt(version) => version <= versionFrom
+      case JNothing => true // first state files did not have an attribute runStateFormatVersion
+      case _ =>
+        throw new IllegalStateException(s"Expected runStateFormatVersion to be an integer or missing," +
+          s" but found unexpected type during migration from version $versionFrom to $versionTo")
+    }, s"Version should be equals or less than $versionFrom")
+
+    // drop the legacy SubFeed attribute `filter`, which is only ever a string
+    val migratedJson = json.removeField {
+      case (name, JString(_)) if name == "filter" =>
+        logger.debug("dropping legacy SubFeed attribute 'filter' during state migration")
+        true
+      case _ => false
+    }.asInstanceOf[JObject]
+
+    updateVersion(migratedJson, versionTo)
   }
 }

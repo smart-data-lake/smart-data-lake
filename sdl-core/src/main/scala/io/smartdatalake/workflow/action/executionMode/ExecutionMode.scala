@@ -223,11 +223,27 @@ object ProcessAllMode extends FromConfigFactory[ExecutionMode] {
  * Result of execution mode application
  * @param inputPartitionValues selected partition values for main input
  * @param outputPartitionValues override of partition values for main output. If None, output partition values are created by transformPartitionValues in getOutputPartitionValues, otherwise not.
+ * @param filters column-bound filters to apply to the input SubFeeds of the Action. A filter is only applied if its
+ *                column exists in the corresponding DataObject, see [[ColumnFilter]]. There must be at most one
+ *                filter per column.
+ * @param fileRefs selected files for main input, used by file based execution modes.
+ * @param options options to pass on to the transformers and Input/Output DataObjects of the Action.
  */
 case class ExecutionModeResult( inputPartitionValues: Seq[PartitionValues] = Seq(), outputPartitionValues: Option[Seq[PartitionValues]] = None
-                                , filter: Option[String] = None, fileRefs: Option[Seq[FileRef]] = None, options: Map[String,String] = Map()) {
+                                , filters: Seq[ColumnFilter] = Seq(), fileRefs: Option[Seq[FileRef]] = None, options: Map[String,String] = Map()) {
+  require(!ColumnFilter.hasDuplicateColumns(filters),
+    s"ExecutionModeResult must not contain more than one ColumnFilter per column, but got ${ColumnFilter.describe(filters)}")
+
   def getOutputPartitionValues(partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues]): Seq[PartitionValues] = {
     outputPartitionValues.getOrElse(partitionValuesTransform(inputPartitionValues).values.toSeq.distinct)
+  }
+
+  /**
+   * Get the filters to apply to an input SubFeed of the Action.
+   * Filters with mainInputOnly=true are only returned for the main input.
+   */
+  def filtersForInput(isMainInput: Boolean): Seq[ColumnFilter] = {
+    if (isMainInput) filters else filters.filterNot(_.mainInputOnly)
   }
 }
 

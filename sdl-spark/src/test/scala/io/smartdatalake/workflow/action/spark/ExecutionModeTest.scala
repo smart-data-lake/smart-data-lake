@@ -182,7 +182,7 @@ class ExecutionModeTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAf
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val result = executionMode.apply(ActionId("test"), srcDO, tgt1DO, subFeed, PartitionValues.oneToOneMapping).get
-    assert(result.filter.isEmpty) // no filter if target is empty as everything needs to be copied
+    assert(result.filters.isEmpty) // no filter if target is empty as everything needs to be copied
   }
 
   test("DataFrameIncrementalMode partially filled target") {
@@ -190,21 +190,31 @@ class ExecutionModeTest extends AnyFunSuite with BeforeAndAfter with BeforeAndAf
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val result = executionMode.apply(ActionId("test"), srcDO, tgt2DO, subFeed, PartitionValues.oneToOneMapping).get
-    assert(result.filter.nonEmpty)
+    // the filter is bound to compareCol, applied to the main input only and not propagated by default
+    assert(result.filters.map(_.column) == Seq("rating"))
+    assert(result.filters.forall(f => f.mainInputOnly && !f.propagate))
+  }
+  test("DataFrameIncrementalMode propagateFilter") {
+    val executionMode = DataFrameIncrementalMode(compareCol = "rating", propagateFilter = true)
+    executionMode.prepare(ActionId("test"))
+    val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
+    val result = executionMode.apply(ActionId("test"), srcDO, tgt2DO, subFeed, PartitionValues.oneToOneMapping).get
+    assert(result.filters.forall(f => f.mainInputOnly && f.propagate))
   }
   test("DataFrameIncrementalMode comparison column has different case than InputDataObject Column") {
     val executionMode = DataFrameIncrementalMode(compareCol = "Rating")
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val result = executionMode.apply(ActionId("test"), srcDO, tgt3DO, subFeed, PartitionValues.oneToOneMapping).get
-    assert(result.filter.nonEmpty)
+    // the filter keeps the configured casing of compareCol
+    assert(result.filters.map(_.column) == Seq("Rating"))
   }
   test("DataFrameIncrementalMode comparison column has different case than OutputDataObject Column") {
     val executionMode = DataFrameIncrementalMode(compareCol = "rating")
     executionMode.prepare(ActionId("test"))
     val subFeed: SparkSubFeed = SparkSubFeed(dataFrame = None, srcDO.id, partitionValues = Seq())
     val result = executionMode.apply(ActionId("test"), srcDO, tgt3DO, subFeed, PartitionValues.oneToOneMapping).get
-    assert(result.filter.nonEmpty)
+    assert(result.filters.map(_.column) == Seq("rating"))
   }
 
   test("DataFrameIncrementalMode no data to process") {

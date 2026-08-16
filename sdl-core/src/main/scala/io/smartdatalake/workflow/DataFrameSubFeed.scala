@@ -82,17 +82,34 @@ trait DataFrameSubFeed extends SubFeed {
     throw new IllegalStateException(s"($dataObjectId) schema of this SubFeed is not yet initialized")
   )
 
-  def filter: Option[String]
+  /**
+   * Column-bound filters transported by this SubFeed, at most one per column.
+   * They are applied when the DataFrame is (re)created, and only if their column exists, see [[applyFilter]].
+   */
+  def filters: Seq[ColumnFilter]
+
+  def hasFilters: Boolean = filters.nonEmpty
+
+  /**
+   * Filters to keep when merging two SubFeeds for the same DataObject.
+   * Only filters present in both SubFeeds are kept: dropping a filter widens the data read, whereas keeping a filter
+   * which is not valid for the other SubFeed would lose data.
+   */
+  def unionFilters(other: SubFeed): Seq[ColumnFilter] = other match {
+    case dataFrameSubFeed: DataFrameSubFeed => this.filters.intersect(dataFrameSubFeed.filters)
+    case _ => Seq()
+  }
 
   /** true if this SubFeed holds a streaming DataFrame */
   def isStreamingDataFrame: Boolean = dataFrame.exists(_.isStreaming)
 
-  def clearFilter(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
-    // if filter is removed, normally also the DataFrame must be removed so that the next action get's a fresh unfiltered DataFrame with all data of this DataObject
-    if (breakLineageOnChange && filter.isDefined) {
-      logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearFilter")
-      ProductUtil.dynamicCopy(ProductUtil.dynamicCopy(this, "filter", None), "observation", None).breakLineage
-    } else ProductUtil.dynamicCopy(ProductUtil.dynamicCopy(this, "filter", None), "observation", None)
+  def clearFilters(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    // if filters are removed, normally also the DataFrame must be removed so that the next action get's a fresh unfiltered DataFrame with all data of this DataObject
+    val cleared = ProductUtil.dynamicCopy(ProductUtil.dynamicCopy(this, "filters", Seq.empty[ColumnFilter]), "observation", None)
+    if (breakLineageOnChange && hasFilters) {
+      logger.info(s"($dataObjectId) breakLineage called for SubFeed from clearFilters")
+      cleared.breakLineage
+    } else cleared
   }
 
   override def breakLineage(implicit context: ActionPipelineContext): DataFrameSubFeed = {
@@ -132,8 +149,35 @@ trait DataFrameSubFeed extends SubFeed {
     ProductUtil.dynamicCopy(this, "partitionValues", partitionValues)
   }
 
-  def withFilter(partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {
-    ProductUtil.dynamicCopy(withPartitionValues(partitionValues), "filter", filter)
+  /**
+   * Set the filters of this SubFeed, replacing existing ones. This does not apply them, see [[applyFilter]].
+   */
+  def withFilters(filters: Seq[ColumnFilter]): DataFrameSubFeed = {
+    ProductUtil.dynamicCopy(this, "filters", filters)
+  }
+
+  /**
+   * Add filters to this SubFeed. A filter for a column which already has one replaces it, see [[ColumnFilter.merge]].
+   */
+  def addFilters(added: Seq[ColumnFilter]): DataFrameSubFeed = {
+    withFilters(ColumnFilter.merge(filters, added, s"($dataObjectId)"))
+  }
+
+  /**
+   * Restrict the filters of this SubFeed to the columns existing in the given schema, analogous to
+   * [[updatePartitionValues]]. Filters for non-existing columns are dropped, as they do not apply to the
+   * corresponding DataObject.
+   */
+  def updateFilters(schema: GenericSchema): DataFrameSubFeed = {
+    val updatedFilters = ColumnFilter.filterExistingColumns(filters, schema)
+    val droppedFilters = filters.diff(updatedFilters)
+    if (droppedFilters.nonEmpty) logger.debug(s"($dataObjectId) filters ${ColumnFilter.describe(droppedFilters)}" +
+      s" are dropped because their column does not exist")
+    withFilters(updatedFilters)
+  }
+
+  def withFilters(partitionValues: Seq[PartitionValues], filters: Seq[ColumnFilter]): DataFrameSubFeed = {
+    withPartitionValues(partitionValues).withFilters(filters)
       .applyFilter
   }
   def applyFilter: DataFrameSubFeed = {
@@ -149,9 +193,14 @@ trait DataFrameSubFeed extends SubFeed {
       val filterExpr = PartitionValues.createFilterExpr(partitionValues)
       dataFrame.map(_.filter(filterExpr))
     }
-    // apply generic filter
-    val dfResult = if (filter.isDefined) dfPartitionFiltered.map(_.filter(companion.expr(filter.get)))
-    else dfPartitionFiltered
+    // apply column filters. A filter is only applied if its column exists in the DataFrame, so that an ExecutionMode
+    // can push a filter to all inputs of an Action.
+    // Note that df.schema is used deliberately and not schemaOpt: it is the schema the expression is evaluated
+    // against, and filtering only ever happens if a DataFrame is present.
+    val dfResult = dfPartitionFiltered.map { df =>
+      ColumnFilter.filterExistingColumns(filters, df.schema)
+        .foldLeft(df)((dfAcc, f) => dfAcc.filter(companion.expr(f.expression)))
+    }
     // return updated SubFeed
     withDataFrame(dfResult)
   }

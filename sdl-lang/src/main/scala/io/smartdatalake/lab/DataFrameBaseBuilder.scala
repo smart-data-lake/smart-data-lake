@@ -53,6 +53,7 @@ abstract class DataFrameBaseBuilder[R] {
 
   /**
    * Spark Filter expression to be applied on all DataFrames that contain the given column.
+   * The column is matched case-insensitive, unless Environment.caseSensitive is set.
    * @param colName column name
    * @param expr a Spark expression returning a boolean value
    */
@@ -60,6 +61,7 @@ abstract class DataFrameBaseBuilder[R] {
 
   /**
    * SQL Filter expression to be applied on all DataFrames that contain the given column.
+   * The column is matched case-insensitive, unless Environment.caseSensitive is set.
    * @param colName column name
    * @param sqlExpr a Spark SQL expression returning a boolean value
    */
