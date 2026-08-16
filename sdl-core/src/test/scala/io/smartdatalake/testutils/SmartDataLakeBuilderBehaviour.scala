@@ -164,7 +164,12 @@ trait SmartDataLakeBuilderBehaviour extends Assertions {
     // this should execute action b with partition 20180101 only!
     val action2success = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action2success.copy())
-    sdlb.run(sdlConfig)
+    val stats = sdlb.run(sdlConfig)
+
+    // the statistics separate what this attempt did from what was carried over from the failed attempt
+    assert(stats.currentAttempt == Map(RuntimeEventState.SUCCEEDED -> 1))
+    assert(stats.previousAttempts == Map(RuntimeEventState.SUCCEEDED -> 1))
+    assert(stats.toLogString == "SUCCEEDED=1; previous attempts: SUCCEEDED=1")
 
     // check results
     assert(tgt2DO.getDataFrame().select(col("rating")).collect[Int] == Seq(5))
@@ -189,6 +194,131 @@ trait SmartDataLakeBuilderBehaviour extends Assertions {
     assert(TestSDLPlugin.configureCalled)
     assert(TestSDLPlugin.shutdownCalled)
     Environment._sdlPlugins = Seq()
+  }
+
+  /**
+   * A run whose state file contains no FAILED action, but an action which did not complete, has to be recovered
+   * as well. Otherwise the not completed action is silently lost.
+   */
+  def testRecoveryOfCancelledRun(): Unit = {
+
+    // init sdlb
+    val appName = "sdlb-recovery-cancelled"
+    val feedName = "test"
+
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
+    implicit val instanceRegistry: InstanceRegistry = prepareRegistry()
+    implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
+
+    // setup DataObjects
+    val srcDO = createMockDataObject("src1")
+    val tgt1DO = createMockDataObject("tgt1")
+    val tgt2DO = createMockDataObject("tgt2")
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgt1DO))
+    import helper.implicits._
+
+    // prepare data
+    val dfSrc = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
+    srcDO.writeDataFrame(dfSrc, Seq())
+
+    // start first dag run -> action b fails
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action1.copy())
+    val action2fail = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(failTransformer))
+    instanceRegistry.register(action2fail.copy())
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+    intercept[TaskFailedException](sdlb.run(sdlConfig))
+
+    // rewrite the state file so that it contains SUCCEEDED and CANCELLED actions, but no FAILED action
+    {
+      val stateStore = getStateStore(appName)
+      val runState = stateStore.recoverRunState(stateStore.getLatestStateId().get)
+      assert(runState.actionsState.values.map(_.state).toSeq.sorted == Seq(RuntimeEventState.SUCCEEDED, RuntimeEventState.FAILED).sorted)
+      val cancelledState = runState.copy(actionsState = runState.actionsState.view.mapValues { info =>
+        if (info.state == RuntimeEventState.FAILED) info.copy(state = RuntimeEventState.CANCELLED) else info
+      }.toMap)
+      assert(cancelledState.isFinal && cancelledState.isFailed) // a cancelled action still needs recovery
+      stateStore.saveState(cancelledState)
+    }
+
+    // reset actions in registry and start recovery dag run
+    instanceRegistry.register(action1.copy())
+    val action2success = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action2success.copy())
+    sdlb.run(sdlConfig)
+
+    // check that the cancelled run was recovered, and not a new run started
+    {
+      val stateStore = getStateStore(appName)
+      val runState = stateStore.recoverRunState(stateStore.getLatestStateId().get)
+      assert(runState.runId == 1)
+      assert(runState.attemptId == 2)
+      val resultActionsState = runState.actionsState.view.mapValues(x => (x.state, x.executionId)).toMap
+      val expectedActionsState = Map(action1.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1)),
+        action2success.id -> (RuntimeEventState.SUCCEEDED, SDLExecutionId(1, 2)))
+      assert(resultActionsState == expectedActionsState)
+      assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
+    }
+  }
+
+  /**
+   * A failed run can be accepted by moving its state file into the 'succeeded' directory.
+   * It is then not recovered anymore, but a new run is started.
+   */
+  def testAcceptFailedRunInSucceededDir(): Unit = {
+
+    // init sdlb
+    val appName = "sdlb-accept-failed"
+    val feedName = "test"
+
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
+    implicit val instanceRegistry: InstanceRegistry = prepareRegistry()
+    implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
+
+    // setup DataObjects
+    val srcDO = createMockDataObject("src1")
+    val tgt1DO = createMockDataObject("tgt1")
+    val tgt2DO = createMockDataObject("tgt2")
+    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgt1DO))
+    import helper.implicits._
+
+    // prepare data
+    val dfSrc = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
+    srcDO.writeDataFrame(dfSrc, Seq())
+
+    // start first dag run -> action b fails
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action1.copy())
+    val action2fail = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName)))
+      , transformers = Seq(failTransformer))
+    instanceRegistry.register(action2fail.copy())
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+    intercept[TaskFailedException](sdlb.run(sdlConfig))
+
+    // accept the failed run by moving its state file from 'current' to 'succeeded'
+    {
+      val stateStore = getStateStore(appName)
+      val stateId = stateStore.getLatestStateId().get
+      assert(!stateId.isAccepted)
+      val succeededPath = new Path(statePath, "succeeded")
+      filesystem.mkdirs(succeededPath)
+      HdfsUtil.renamePath(stateId.path, new Path(succeededPath, stateId.path.getName))
+      assert(getStateStore(appName).getLatestStateId().get.isAccepted)
+    }
+
+    // reset actions in registry and start again, with the still failing action b
+    instanceRegistry.register(action1.copy())
+    instanceRegistry.register(action2fail.copy())
+    intercept[TaskFailedException](sdlb.run(sdlConfig))
+
+    // check that a new run was started instead of recovering the accepted one
+    {
+      val stateStore = getStateStore(appName)
+      val runState = stateStore.recoverRunState(stateStore.getLatestStateId().get)
+      assert(runState.runId == 2)
+      assert(runState.attemptId == 1)
+    }
   }
 
   def testRecoveryWithSkippedAction(): Unit = {

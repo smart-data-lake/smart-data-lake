@@ -24,7 +24,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
-import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
+import io.smartdatalake.workflow.action.{Action, RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.apache.hadoop.conf.Configuration
 
@@ -50,7 +50,11 @@ import java.time.LocalDateTime
  *                        shallow, all derived contexts share the same registry instance, so runtime information of an
  *                        Action is visible to all Actions executed afterwards.
  * @param actionsSelected actions selected for execution by command line parameter --feed-sel
- * @param actionsSkipped actions selected but skipped in current attempt because they already succeeded in a previous attempt.
+ * @param actionsSkipped actions skipped in the current attempt because they already completed in a previous attempt,
+ *                       with the [[RuntimeInfo]] of the attempt they completed in. This is the channel through
+ *                       which runtime information of previous attempts reaches the current attempt: it is merged into
+ *                       the state file by [[ActionDAGRun.saveState]], reported as previous attempt statistics by
+ *                       [[ActionDAGRun.getStatistics]] and exposed to expressions by [[ActionExpressionData]].
  * @param currentAction the Action currently being executed, set by [[withAction]].
  * @param predecessorActions all Actions the currentAction transitively depends on in the DAG, set by [[withAction]].
  *                           These have all finished when the currentAction runs, so their runtime information is
@@ -69,7 +73,7 @@ case class ActionPipelineContext (
                                    cacheRegistry: DataFrameCacheRegistry = new DataFrameCacheRegistry(),
                                    runtimeRegistry: ActionsRuntimeRegistry = new ActionsRuntimeRegistry(),
                                    actionsSelected: Seq[ActionId] = Seq(),
-                                   actionsSkipped: Seq[ActionId] = Seq(),
+                                   actionsSkipped: Map[ActionId, RuntimeInfo] = Map(),
                                    globalConfig: GlobalConfig,
                                    currentAction: Option[Action] = None,
                                    @transient

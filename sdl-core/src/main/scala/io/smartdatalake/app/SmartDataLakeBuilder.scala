@@ -218,10 +218,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
   private[smartdatalake] def logProgramStart(): Unit =
     logger.info(s"Starting Program $appType $appVersion")
 
-  private[smartdatalake] def logStats(stats: Map[RuntimeEventState, Int]): Unit = {
-    // convert stats to string
-    val statsStr = stats.toSeq.sortBy(_._1).map(x => x._1.toString + "=" + x._2.toString).mkString(" ")
-    logger.info(s"$appType finished successfully: $statsStr")
+  private[smartdatalake] def logStats(stats: RunStatistics): Unit = {
+    logger.info(s"$appType finished successfully: ${stats.toLogString}")
   }
 
   private[smartdatalake] def throwOParserError(): Unit =
@@ -233,12 +231,12 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * @param appConfig
    *   Application configuration (parsed from command line).
    */
-  def run(appConfig: SmartDataLakeBuilderConfig): Map[RuntimeEventState, Int] = {
+  def run(appConfig: SmartDataLakeBuilderConfig): RunStatistics = {
     debugLog(s"START SmartDataLakeBuilder.run: appConfig = ${appConfig.toDebugString}")
     require(!EnvironmentUtil.isWindowsOS || System.getenv("HADOOP_HOME") != null,
       "Env variable HADOOP_HOME needs to be set in local mode on Windows!")
     AppUtil.setSdlbRunLoggerContext(appConfig)
-    val stats: Map[RuntimeEventState, Int] = try {
+    val stats: RunStatistics = try {
       // invoke SDLPlugins if configured
       Environment.sdlPlugins.foreach(_.startup())
       // create default hadoop configuration, as we did not yet load custom spark/hadoop properties
@@ -254,7 +252,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
           val latestStateId = stateStore.getLatestStateId(latestRunId)
             .getOrElse(throw new IllegalStateException(s"State for last runId=$latestRunId not found"))
           val latestRunState = stateStore.recoverRunState(latestStateId)
-          if (!latestRunState.isFinal || latestRunState.isFailed) {
+          val needsRecovery = !latestRunState.isFinal || latestRunState.isFailed
+          if (needsRecovery && !latestStateId.isAccepted) {
             // start recovery
             assert(
               appConfig == latestRunState.appConfig,
@@ -262,6 +261,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
             )
             recoverRun(appConfig, stateStore, latestRunState)._2
           } else {
+            if (needsRecovery) logger.warn(s"run runId=${latestRunState.runId} attemptId=${latestRunState.attemptId}" +
+              s" has unfinished actions (${latestRunState.unfinishedActionsState.keys.map(_.id).toSeq.sorted.mkString(", ")})," +
+              s" but its state file is accepted -> not recovering it and starting a new run instead")
             val nextExecutionId = SDLExecutionId(latestRunState.runId + 1)
             startRun(appConfig, executionId = nextExecutionId, dataObjectsState = latestRunState.getDataObjectsState,
               stateStore = Some(stateStore))._2
@@ -306,7 +308,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       appConfig: SmartDataLakeBuilderConfig,
       stateStore: ActionDAGRunStateStore[S],
       runState: ActionDAGRunState
-  )(implicit hadoopConf: Configuration): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
+  )(implicit hadoopConf: Configuration): (Seq[SubFeed], RunStatistics) = {
     logger.info(s"recovering application ${appConfig.applicationName.get} runId=${runState.runId} lastAttemptId=${runState.attemptId}")
 
     // Accept recovery of old state files (without version), check version for newer formats
@@ -365,7 +367,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       initialSubFeeds: Seq[DataFrameSubFeed],
       dataObjectsState: Seq[DataObjectState] = Seq(),
       failOnMissingInputSubFeeds: Boolean = true
-  )(implicit instanceRegistry: InstanceRegistry): (Seq[DataFrameSubFeed], Map[RuntimeEventState, Int]) = {
+  )(implicit instanceRegistry: InstanceRegistry): (Seq[DataFrameSubFeed], RunStatistics) = {
     Environment._failSimulationOnMissingInputSubFeeds = Some(failOnMissingInputSubFeeds)
     val (subFeeds, stats) = exec(
       appConfig,
@@ -391,7 +393,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       appConfig: SmartDataLakeBuilderConfig,
       initialSubFeeds: Seq[DataFrameSubFeed],
       dataObjectsState: Seq[DataObjectState] = Seq()
-  )(hadoopConf: Configuration): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
+  )(hadoopConf: Configuration): (Seq[SubFeed], RunStatistics) = {
     loadConfigIntoInstanceRegistry(appConfig, hadoopConf)
     startSimulation(appConfig, initialSubFeeds, dataObjectsState)(this.instanceRegistry)
   }
@@ -414,7 +416,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       dataObjectsState: Seq[DataObjectState] = Seq(),
       stateStore: Option[ActionDAGRunStateStore[_]] = None,
       simulation: Boolean = false
-  )(implicit hadoopConf: Configuration): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
+  )(implicit hadoopConf: Configuration): (Seq[SubFeed], RunStatistics) = {
     AppUtil.setSdlbRunLoggerContext(appConfig, Some(executionId), Some(runStartTime))
 
     // validate application config
@@ -481,7 +483,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       stateListeners: Seq[StateListener],
       simulation: Boolean,
       globalConfig: GlobalConfig
-  )(implicit instanceRegistry: InstanceRegistry): (Seq[SubFeed], Map[RuntimeEventState, Int]) = {
+  )(implicit instanceRegistry: InstanceRegistry): (Seq[SubFeed], RunStatistics) = {
     AppUtil.setSdlbRunLoggerContext(appConfig, Some(executionId), Some(runStartTime))
 
     // select actions by feedSel
@@ -491,7 +493,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     logger.info(s"selected actions ${actionsSelected.map(_.id).mkString(", ")}")
     if (appConfig.test.contains(TestMode.Config)) { // stop here if only config check
       logger.info(s"${appConfig.test.get}-Test successful")
-      return (Seq(), Map())
+      return (Seq(), RunStatistics.empty)
     }
 
     // filter actions to skip
@@ -518,12 +520,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       attemptStartTime,
       simulation,
       actionsSelected = actionIdsSelected,
-      actionsSkipped = actionIdsSkipped,
+      actionsSkipped = actionsToSkip,
       globalConfig = globalConfig
     )
     val actionDAGRun = ActionDAGRun(
       actionsToExec,
-      actionsToSkip,
       appConfig.partitionValues.getOrElse(Seq()),
       appConfig.parallelism,
       initialSubFeeds,
@@ -553,7 +554,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         actionDAGRun.init(context)
         if (appConfig.isDryRun) { // stop here if only dry-run
           logger.info(s"${appConfig.test.get}-Test successful")
-          return (Seq(), Map())
+          return (Seq(), RunStatistics.empty)
         }
         execActionDAG(actionDAGRun, actionsSelected, context)
       }
@@ -598,11 +599,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       attemptStartTime = attemptStartTime,
       simulation = simulation,
       actionsSelected = actionsToExecute.map(_.id),
-      actionsSkipped = Nil,
+      actionsSkipped = Map(),
       globalConfig = globalConfig
     )
     val actionDAGRun =
-      ActionDAGRun(actionsToExecute, Map(), appConfig.partitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds,
+      ActionDAGRun(actionsToExecute, appConfig.partitionValues.getOrElse(Seq()), appConfig.parallelism, initialSubFeeds,
         dataObjectsState, stateStore, stateListeners)(context)
 
     phase match {
@@ -636,10 +637,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     val nextExec: Option[(ActionDAGRun, ActionPipelineContext, Option[LocalDateTime])] =
       if (context.appConfig.streaming && lastStartTime.nonEmpty && context.actionsSkipped.nonEmpty) {
         // we have to recreate the action DAG if there are skipped actions in the original DAG
-        val newContext = context.copy(actionsSkipped = Seq())
+        val newContext = context.copy(actionsSkipped = Map())
         val newDag = ActionDAGRun(
           actionsSelected,
-          Map[ActionId, RuntimeInfo](),
           context.appConfig.partitionValues.getOrElse(Seq()),
           context.appConfig.parallelism,
           actionDAGRun.initialSubFeeds,

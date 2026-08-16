@@ -63,6 +63,31 @@ class ActionDAGRunTest extends AnyFunSuite {
     assert(deserializedState == expectedState)
   }
 
+  test("a run needs recovery if an action did not complete") {
+    def stateWith(states: RuntimeEventState.RuntimeEventState*): ActionDAGRunState = {
+      val actionsState = states.zipWithIndex.map { case (state, i) =>
+        ActionId(s"a$i") -> RuntimeInfo(SDLExecutionId.executionId1, state)
+      }.toMap
+      ActionDAGRunState(SmartDataLakeBuilderConfig(feedSel = "abc"), 1, 1, LocalDateTime.now, LocalDateTime.now,
+        actionsState, isFinal = true, Some(ActionDAGRunState.runStateFormatVersion), None, None)
+    }
+    import RuntimeEventState._
+    // a run without anything left to do is finished
+    assert(stateWith(SUCCEEDED, SUCCEEDED).isSucceeded)
+    assert(stateWith(SUCCEEDED, SKIPPED).isSucceeded)
+    assert(stateWith(SKIPPED, SKIPPED).isSucceeded)
+    // asynchronous streaming actions report STREAMING in the final state of a run stopped gracefully
+    assert(stateWith(SUCCEEDED, STREAMING).isSucceeded)
+    // everything a recovery would execute again makes the run failed
+    assert(stateWith(SUCCEEDED, FAILED).isFailed)
+    assert(stateWith(SUCCEEDED, CANCELLED).isFailed)
+    assert(stateWith(SUCCEEDED, PENDING).isFailed)
+    assert(stateWith(SUCCEEDED, CANCELLED).unfinishedActionsState.keys.toSeq == Seq(ActionId("a1")))
+    assert(stateWith(SUCCEEDED, CANCELLED).finalState.contains(FAILED))
+    // a non final state always needs recovery
+    assert(!stateWith(SUCCEEDED).copy(isFinal = false).isSucceeded)
+  }
+
   test("read old state version") {
     val stateContent = CustomCodeUtil.readResourceFile("stateFileV2.json")
     val migratedState = ActionDAGRunState.fromJson(stateContent)

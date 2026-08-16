@@ -53,6 +53,9 @@ Usage:  [options]
   --version                Display version information.
 ```
 
+See [Run State & Recovery](runState.md) for what SDLB writes to `--state-path` and how a failed run is recovered
+or accepted.
+
 The **DefaultSmartDataLakeBuilder** class should be fine in most situations. 
 It tries to use an existing Spark session of the environment, e.g. Databricks Cluster. It will not create a new Spark session. See SparkSmartDataLakeBuilder below to create a new Spark session.
 

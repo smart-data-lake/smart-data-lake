@@ -31,7 +31,7 @@ import io.smartdatalake.workflow.action.spark.customlogic.CustomDsNto1Transforme
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.CsvFileDataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, RunStatistics, SubFeed}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -322,7 +322,7 @@ class ScalaClassSparkDsNTo1TransformerTest extends AnyFunSuite with BeforeAndAft
           ))))
     )
     //Run SDLB
-    val (subFeeds, _): (Seq[SubFeed], Map[RuntimeEventState, Int]) = sdlb.startSimulationWithConfigFile(sdlConfig, Seq(srcDO1, srcDO2))(session.sparkContext.hadoopConfiguration)
+    val (subFeeds, _): (Seq[SubFeed], RunStatistics) = sdlb.startSimulationWithConfigFile(sdlConfig, Seq(srcDO1, srcDO2))(session.sparkContext.hadoopConfiguration)
 
     val tgt1DO: SparkSubFeed = subFeeds.head.asInstanceOf[SparkSubFeed]
     val actual = tgt1DO.dataFrame.get.inner.as[AnotherOutputDataSetPartitioned].collect().head
