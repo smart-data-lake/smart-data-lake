@@ -25,6 +25,7 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.custom.TestCustomDfsTransformer
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.testutils.{SmartDataLakeBuilderBehaviour, TestSDLPlugin, WebserviceTestUtil}
+import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, StateUploader}
 import io.smartdatalake.util.spark.GetSession.loggEnv
@@ -158,6 +159,14 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter with Smar
     testRecoveryAfterActionFailed()
   }
 
+  test("sdlb run recovered although state file contains only succeeded and cancelled actions") {
+    testRecoveryOfCancelledRun()
+  }
+
+  test("sdlb run not recovered because failed state file was accepted by moving it to succeeded directory") {
+    testAcceptFailedRunInSucceededDir()
+  }
+
   test("sdlb run with skipped action and recovery after action 2 failed the first time") {
     testRecoveryWithSkippedAction()
   }
@@ -184,6 +193,56 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter with Smar
 
   test("sdlb run with 2 actions and PartitionDiffMode, recovery after action 2 failed the first time") {
     testPartitionDiffModeRecoveryWithExpectation()
+  }
+
+  test("sdlb run recovery, runtime information of action completed in previous attempt is available") {
+
+    // init sdlb
+    val appName = "sdlb-recovery-predecessor"
+    val feedName = "test"
+
+    HdfsUtil.deleteFiles(path = new Path(statePath), doWarn = false)
+    implicit val instanceRegistry: InstanceRegistry = prepareRegistry()
+    implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
+
+    // setup DataObjects
+    val srcDO = MockSparkDataObject("src1").register
+    val tgt1DO = MockSparkDataObject("tgt1").register
+    val tgt2DO = MockSparkDataObject("tgt2").register
+
+    // prepare data
+    val dfSrc = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(dfSrc, Seq())
+
+    // action b only runs if its predecessor a wrote records
+    val executionCondition = Some(Condition("predecessorActions['a'].metrics['tgt1']['records_written'] > 0",
+      Some("run only if action a wrote records")))
+
+    // start first dag run -> action a succeeds, action b fails
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action1.copy())
+    val action2fail = CopyAction("b", tgt1DO.id, tgt2DO.id, executionCondition = executionCondition,
+      metadata = Some(ActionMetadata(feed = Some(feedName))), transformers = Seq(failTransformer))
+    instanceRegistry.register(action2fail.copy())
+    val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName,
+      applicationName = Some(appName), statePath = Some(statePath))
+    intercept[TaskFailedException](sdlb.run(sdlConfig))
+
+    // start recovery dag run.
+    // action a completed in attempt 1 and is not executed again, but its metrics must still be available to the
+    // executionCondition of action b.
+    instanceRegistry.register(action1.copy())
+    val action2success = CopyAction("b", tgt1DO.id, tgt2DO.id, executionCondition = executionCondition,
+      metadata = Some(ActionMetadata(feed = Some(feedName))))
+    instanceRegistry.register(action2success.copy())
+    sdlb.run(sdlConfig)
+
+    // if the predecessor was not visible, the condition would not be fulfilled and action b would have been skipped
+    assert(tgt2DO.getSparkDataFrame().select($"rating").as[Int].collect().toSeq == Seq(5))
+    val stateStore = getStateStore(appName)
+    val runState = stateStore.recoverRunState(stateStore.getLatestStateId().get)
+    assert(runState.attemptId == 2)
+    assert(runState.actionsState(action2success.id).state == RuntimeEventState.SUCCEEDED)
   }
 
   test("sdlb run with executionMode=DataObjectStateIncrementalMode") {
@@ -285,7 +344,8 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter with Smar
 
     // check results
     assert(finalSubFeeds.size == 1)
-    assert(stats == Map(RuntimeEventState.INITIALIZED -> 2))
+    assert(stats.currentAttempt == Map(RuntimeEventState.INITIALIZED -> 2))
+    assert(stats.previousAttempts.isEmpty)
     assert(finalSubFeeds.head.dataFrame.get.select(dfSrc1.columns.toList.map(SparkSubFeed.col)).symmetricDifference(SparkDataFrame(dfSrc1)).isEmpty)
   }
 

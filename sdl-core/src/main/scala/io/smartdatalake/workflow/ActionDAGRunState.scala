@@ -41,7 +41,18 @@ case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, 
 
   def toJson: String = ActionDAGRunState.toJson(this)
 
-  def isFailed: Boolean = actionsState.exists(_._2.state == RuntimeEventState.FAILED)
+  /**
+   * Actions which did not reach a successful end state and which a recovery run would execute again.
+   *
+   * This mirrors [[RuntimeInfo.hasCompleted]], the condition used to decide which Actions are skipped on recovery,
+   * so that a run is considered failed exactly if there is something left for a recovery to do. Note that STREAMING
+   * is excluded: asynchronous streaming Actions report this state in the final state file of a run which stopped
+   * gracefully, and such a run must not be recovered.
+   */
+  def unfinishedActionsState: Map[ActionId, RuntimeInfo] =
+    actionsState.filterNot { case (_, info) => info.hasCompleted || info.state == RuntimeEventState.STREAMING }
+
+  def isFailed: Boolean = unfinishedActionsState.nonEmpty
 
   def isSucceeded: Boolean = isFinal && !isFailed
 
@@ -182,4 +193,11 @@ private[smartdatalake] trait ActionDAGRunStateStore[A <: StateId] extends SmartD
 private[smartdatalake] trait StateId {
   def runId: Int
   def attemptId: Int
+
+  /**
+   * True if this state was accepted, meaning that the run must not be recovered even if it contains failed Actions.
+   * See [[HadoopFileActionDAGRunStateStore]], where a state file is accepted by moving it into the 'succeeded'
+   * directory.
+   */
+  def isAccepted: Boolean = false
 }

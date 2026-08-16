@@ -74,6 +74,14 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with SmartDataLakeLogger with
     testRecoveryAfterActionFailed()
   }
 
+  test("sdlb run recovered although state file contains only succeeded and cancelled actions") {
+    testRecoveryOfCancelledRun()
+  }
+
+  test("sdlb run not recovered because failed state file was accepted by moving it to succeeded directory") {
+    testAcceptFailedRunInSucceededDir()
+  }
+
   test("sdlb run with skipped action and recovery after action 2 failed the first time") {
     testRecoveryWithSkippedAction()
   }

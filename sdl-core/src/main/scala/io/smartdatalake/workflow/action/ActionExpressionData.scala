@@ -35,6 +35,9 @@ import java.sql.Timestamp
  * @param startTstmp start of the exec phase of the Action.
  * @param endTstmp end of the exec phase of the Action.
  * @param durationMillis duration of the last successful phase of the Action in milliseconds.
+ * @param runId runId of the execution which produced this information.
+ * @param attemptId attemptId of the execution which produced this information. This is smaller than the attemptId of
+ *                  the current run if the Action already completed in a previous attempt and was not executed again.
  */
 case class ActionExpressionData(
     state: String,
@@ -45,7 +48,9 @@ case class ActionExpressionData(
     outputIds: Seq[String],
     startTstmp: Option[Timestamp],
     endTstmp: Option[Timestamp],
-    durationMillis: Option[Long]
+    durationMillis: Option[Long],
+    runId: Option[Int],
+    attemptId: Option[Int]
 )
 
 object ActionExpressionData {
@@ -67,20 +72,32 @@ object ActionExpressionData {
   }
 
   private def from(action: Action)(implicit context: ActionPipelineContext): Option[ActionExpressionData] = {
-    action.getRuntimeInfo(Some(context.executionId)).map { runtimeInfo =>
-      ActionExpressionData(
-        state = runtimeInfo.state.toString,
-        partitionValues = runtimeInfo.results.flatMap(_.partitionValues).distinct.map(_.getMapString),
-        metrics = runtimeInfo.results
-          .map(subFeed => subFeed.dataObjectId.id -> subFeed.metrics.getOrElse(Map()).view.mapValues(_.toString).toMap)
-          .toMap,
-        executionModeOptions = runtimeInfo.results.map(_.executionModeResultOptions).reduceOption(_ ++ _).getOrElse(Map()),
-        inputIds = runtimeInfo.inputIds.map(_.id),
-        outputIds = runtimeInfo.outputIds.map(_.id),
-        startTstmp = runtimeInfo.startTstmp.map(Timestamp.valueOf),
-        endTstmp = runtimeInfo.endTstmp.map(Timestamp.valueOf),
-        durationMillis = runtimeInfo.duration.map(_.toMillis)
-      )
-    }
+    // An Action which already completed in a previous attempt has no runtime information in the registry of this
+    // attempt, as it is not executed again. Its RuntimeInfo is restored from the state file on recovery instead,
+    // see ActionPipelineContext.actionsSkipped.
+    action.getRuntimeInfo(Some(context.executionId))
+      .orElse(context.actionsSkipped.get(action.id))
+      .map { runtimeInfo =>
+        ActionExpressionData(
+          state = runtimeInfo.state.toString,
+          partitionValues = runtimeInfo.results.flatMap(_.partitionValues).distinct.map(_.getMapString),
+          metrics = runtimeInfo.results
+            .map(subFeed => subFeed.dataObjectId.id -> subFeed.metrics.getOrElse(Map()).view.mapValues(_.toString).toMap)
+            .toMap,
+          executionModeOptions = runtimeInfo.results.map(_.executionModeResultOptions).reduceOption(_ ++ _).getOrElse(Map()),
+          inputIds = runtimeInfo.inputIds.map(_.id),
+          outputIds = runtimeInfo.outputIds.map(_.id),
+          startTstmp = runtimeInfo.startTstmp.map(Timestamp.valueOf),
+          endTstmp = runtimeInfo.endTstmp.map(Timestamp.valueOf),
+          durationMillis = runtimeInfo.duration.map(_.toMillis),
+          runId = sdlExecutionId(runtimeInfo).map(_.runId),
+          attemptId = sdlExecutionId(runtimeInfo).map(_.attemptId)
+        )
+      }
+  }
+
+  private def sdlExecutionId(runtimeInfo: RuntimeInfo): Option[SDLExecutionId] = runtimeInfo.executionId match {
+    case id: SDLExecutionId => Some(id)
+    case _ => None // asynchronous executions, e.g. SparkStreamingExecutionId, have no runId/attemptId
   }
 }

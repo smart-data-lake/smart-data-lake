@@ -56,6 +56,7 @@ const sidebars = {
     {'Reference' : [
       'reference/build',
       'reference/commandLine',
+      'reference/runState',
       {'SDLB objects' : [
         'reference/dataObjects',
         'reference/actions',

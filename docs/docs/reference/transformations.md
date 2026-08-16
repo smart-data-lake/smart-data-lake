@@ -374,17 +374,19 @@ Per Action the following attributes are available:
 | `executionModeOptions` | options returned by the ExecutionMode of the Action |
 | `inputIds` / `outputIds` | input and output DataObject ids of the Action |
 | `startTstmp` / `endTstmp` / `durationMillis` | timing of the exec phase |
+| `runId` / `attemptId` | the execution that produced this information, see below |
 
 Only *transitive predecessors* are included, not every Action that happens to have finished already.
 Predecessors are guaranteed to be complete when the current Action runs, so the result does not depend on the
 scheduling order of parallel branches and stays the same when running with `--parallelism` > 1.
 
-Note two limitations:
-* Metrics are only collected in the exec phase. In the init phase the corresponding expressions evaluate to `null`
-  and the runtime option is left undefined, which makes the `%{key}` substitution fail. Use `coalesce(..., '<default>')`
-  as shown above so the transformation also works during init.
-* On recovery, Actions that already completed in a previous attempt are not part of the DAG anymore and therefore
-  do not appear in `predecessorActions`.
+This also holds across attempts: if a run is [recovered](runState.md), the Actions that already completed in a
+previous attempt are not executed again, but they still appear in `predecessorActions` with the runtime information
+of the attempt in which they completed. Their `attemptId` is then smaller than the `attemptId` of the current run.
+
+Note one limitation: metrics are only collected in the exec phase. In the init phase the corresponding expressions
+evaluate to `null` and the runtime option is left undefined, which makes the `%{key}` substitution fail. Use
+`coalesce(..., '<default>')` as shown above so the transformation also works during init.
 
 The same `predecessorActions` attribute is available in `executionCondition`, which is only evaluated in the exec
 phase and therefore always sees the metrics of its predecessors:

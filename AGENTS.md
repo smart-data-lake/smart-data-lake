@@ -37,6 +37,14 @@ mvn clean install -pl sdl-core
 mvn -B test -pl sdl-core -Dsuites=io.smartdatalake.workflow.dataobject.AccessTableDataObjectTest
 ```
 
+### Waiting for long-running builds
+
+A full reactor build takes ~10 minutes, so it is usually started in the background. When polling for its
+completion, **do not detect the running build with `pgrep -f "<some part of the maven command line>"`**: the
+polling shell's own command line contains that pattern, so `pgrep` matches itself and reports "still running"
+forever. Detect completion from the build output instead, e.g. by grepping the log for
+`BUILD SUCCESS|BUILD FAILURE`, or by waiting on the process/job directly.
+
 ## Configuration Patterns
 
 ### HOCON Structure (`application.conf`)
@@ -147,6 +155,10 @@ Every source file MUST include GPLv3 license header (see existing files for temp
 - IntelliJ IDEA config in `.idea/codeStyles/`
 - scalafmt configured (`.scalafmt.conf`)
 
+### Json Schema
+docs/static/json-schema-viewer/schemas/*.json are created and committed by a GitHub Action.
+Do not hand-edit it. There is also no need to run maven to update it.
+
 ## Testing Strategy
 
 ### Test Categories
@@ -235,12 +247,23 @@ If a feature genuinely isn't implemented for one engine (e.g. `DataFrameFunction
 `ScalaSubFeed`), `ignore(...)` the test in *that engine's* instantiation with a one-line comment explaining why —
 keep the shared trait itself universal, don't special-case engines inside it.
 
+Engine differences are not limited to the DataFrame API — **expression syntax differs too**. Expressions in
+`executionCondition`, `executionMode` and `runtimeOptions` are evaluated by Spark SQL on Spark, but by the
+hand-written parser in `io.smartdatalake.workflow.dataframe.plainScala.ExpressionParser` on the plain-Scala engine,
+which supports considerably less syntax (no map/array indexing such as `predecessorActions['a'].state`, for example).
+Such an expression fails already in the prepare phase, in `Condition.syntaxCheck`. A test that needs richer
+expression syntax therefore belongs in the Spark suite, not in a behaviour trait.
+
 ### Build/test workflow gotchas
 
 - After changing anything under `sdl-core/.../testutils/`, run `mvn install -pl sdl-core -DskipTests` before
   test-compiling/testing a dependent module (e.g. sdl-spark) — that module resolves sdl-core's test-jar from the
   local repo, so a stale install causes confusing "not found" compile errors that look like a code bug.
 - Filter to one suite with `-Dsuites=<FQCN>`, not `-Dtest=` (the scalatest-maven-plugin used here ignores `-Dtest`).
+- The existing tests group their assertions in anonymous blocks (`{ val stateStore = ...; assert(...) }`). Such a
+  block must not directly follow an `assert(...)` call, otherwise Scala parses it as a second argument list and
+  compilation fails with `not enough arguments for macro method assert: Unspecified value parameter pos`. Put a
+  comment line or another statement in between, as the surrounding code does.
 
 ## Module Development
 

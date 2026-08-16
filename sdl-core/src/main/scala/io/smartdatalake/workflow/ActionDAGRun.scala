@@ -64,7 +64,7 @@ private[smartdatalake] case class GenericMetrics(id: String, order: Long, mainIn
   def getMainInfos: Map[String, Any] = mainInfos
 }
 
-private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SDLExecutionId, partitionValues: Seq[PartitionValues], parallelism: Int, initialSubFeeds: Seq[SubFeed], initialDataObjectsState: Seq[DataObjectState], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener], actionsSkipped: Map[ActionId, RuntimeInfo]) extends SmartDataLakeLogger {
+private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], predecessorDag: DAG[Action], executionId: SDLExecutionId, partitionValues: Seq[PartitionValues], parallelism: Int, initialSubFeeds: Seq[SubFeed], initialDataObjectsState: Seq[DataObjectState], stateStore: Option[ActionDAGRunStateStore[_]], stateListeners: Seq[StateListener]) extends SmartDataLakeLogger {
   private val sdlbVersionInfo = BuildVersionInfo.sdlbVersionInfo.map(_.entries().toMap)
   private val appVersionInfo = BuildVersionInfo.appVersionInfo.map(_.entries().toMap)
     .orElse(AppUtil.getManifestVersion.map(v => Map("version"->v)))
@@ -75,10 +75,14 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
    * The Actions each Action transitively depends on, calculated once from the DAG structure.
    * This is used to give an Action a deterministic view on the runtime information of previous Actions,
    * see [[ActionPipelineContext.predecessorActions]].
+   *
+   * Note that this is calculated from `predecessorDag`, which also contains the Actions skipped because they
+   * already completed in a previous attempt. Those are not executed anymore and therefore not part of `dag`, but
+   * they are still predecessors and their runtime information is still available, see [[ActionExpressionData]].
    */
   private lazy val predecessorActions: Map[NodeId, Seq[Action]] = {
-    val actionNodes = dag.sortedNodes.collect { case a: Action => (a.nodeId, a) }.toMap
-    dag.transitivePredecessors.view.mapValues(_.toSeq.flatMap(actionNodes.get).sortBy(_.id.id)).toMap
+    val actionNodes = predecessorDag.sortedNodes.collect { case a: Action => (a.nodeId, a) }.toMap
+    predecessorDag.transitivePredecessors.view.mapValues(_.toSeq.flatMap(actionNodes.get).sortBy(_.id.id)).toMap
   }
 
   private def getPredecessorActions(node: Action): Seq[Action] = predecessorActions.getOrElse(node.nodeId, Seq())
@@ -254,7 +258,9 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
    */
   def saveState(phase: ExecutionPhase, changedActionId: Option[ActionId] = None, isFinal: Boolean = false)(implicit context: ActionPipelineContext): ActionDAGRunState = {
     val runtimeInfos = getRuntimeInfos
-    val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, actionsSkipped ++ runtimeInfos, isFinal, Some(ActionDAGRunState.runStateFormatVersion), sdlbVersionInfo, appVersionInfo)
+    // Actions completed in previous attempts are not executed again, but their runtime information is kept in the
+    // state file so that it stays complete for the whole run.
+    val runState = ActionDAGRunState(context.appConfig, executionId.runId, executionId.attemptId, context.runStartTime, context.attemptStartTime, context.actionsSkipped ++ runtimeInfos, isFinal, Some(ActionDAGRunState.runStateFormatVersion), sdlbVersionInfo, appVersionInfo)
     if (phase == ExecutionPhase.Exec) {
       stateStore.foreach(_.saveState(runState))
     }
@@ -308,10 +314,14 @@ private[smartdatalake] case class ActionDAGRun(dag: DAG[Action], executionId: SD
   }
 
   /**
-   * Get Action count per RuntimeEventState
+   * Get Action count per RuntimeEventState, for the current attempt and for the Actions which already completed
+   * in previous attempts of the same run.
    */
-  def getStatistics(implicit context: ActionPipelineContext): Map[RuntimeEventState, Int] = {
-    getRuntimeInfos.map(_._2.state).groupBy(identity).view.mapValues(_.size).toMap
+  def getStatistics(implicit context: ActionPipelineContext): RunStatistics = {
+    RunStatistics(
+      currentAttempt = RunStatistics.countStates(getRuntimeInfos.values.map(_.state)),
+      previousAttempts = RunStatistics.countStates(context.actionsSkipped.values.map(_.state))
+    )
   }
 
   /**
@@ -343,7 +353,26 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
   /**
    * create ActionDAGRun
    */
-  def apply(actions: Seq[Action], actionsSkipped: Map[ActionId, RuntimeInfo] = Map(), partitionValues: Seq[PartitionValues] = Seq(), parallelism: Int = 1, initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, stateListeners: Seq[StateListener] = Seq())(implicit context: ActionPipelineContext): ActionDAGRun = {
+  def apply(actions: Seq[Action], partitionValues: Seq[PartitionValues] = Seq(), parallelism: Int = 1, initialSubFeeds: Seq[SubFeed] = Seq(), dataObjectsState: Seq[DataObjectState] = Seq(), stateStore: Option[ActionDAGRunStateStore[_]] = None, stateListeners: Seq[StateListener] = Seq())(implicit context: ActionPipelineContext): ActionDAGRun = {
+
+    // create dag of the actions to execute
+    val dag = createDag(actions, logMsg = Some(s"created dag runId=${context.executionId.runId} attemptId=${context.executionId.attemptId}"))
+
+    // On recovery the Actions which already completed in a previous attempt are not executed anymore, so they are
+    // missing in the dag above. They are still predecessors of the Actions to execute though, and their runtime
+    // information is available. Create a second dag including them, used to calculate transitive predecessors only.
+    val skippedActions = context.actionsSkipped.keys.toSeq.sortBy(_.id)
+      .flatMap(actionId => context.instanceRegistry.getActions.find(_.id == actionId))
+    val predecessorDag = if (skippedActions.isEmpty) dag else createDag(actions ++ skippedActions)
+
+    ActionDAGRun(dag, predecessorDag, context.executionId, partitionValues, parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners)
+  }
+
+  /**
+   * Create a DAG from the dependencies between the given Actions.
+   * Dependencies are derived by combining input and output ids of the Actions.
+   */
+  private def createDag(actions: Seq[Action], logMsg: Option[String] = None)(implicit context: ActionPipelineContext): DAG[Action] = {
 
     // prepare edges: list of actions dependencies
     // this can be created by combining input and output ids between actions
@@ -359,16 +388,16 @@ private[smartdatalake] object ActionDAGRun extends SmartDataLakeLogger {
 
     // create init node from input edges
     val inputEdges = allEdges.filter(_._1.isEmpty)
-    logger.info(s"input edges are $inputEdges")
+    if (logMsg.isDefined) logger.info(s"input edges are $inputEdges")
     val initNodeId = "start"
     val initAction = InitDAGNode(initNodeId, inputEdges.map(_._3.id))
     val edges = allEdges.map { case (nodeIdFromOpt, nodeIdTo, resultId) => ActionDAGEdge(nodeIdFromOpt.map(_.id).getOrElse(initNodeId), nodeIdTo.id, resultId.id) }
 
     // create dag
     val dag = DAG.create[Action](initAction +: actions, edges)
-    logDag(s"created dag runId=${context.executionId.runId} attemptId=${context.executionId.attemptId}", dag)
+    logMsg.foreach(msg => logDag(msg, dag))
 
-    ActionDAGRun(dag, context.executionId, partitionValues, parallelism, initialSubFeeds, dataObjectsState, stateStore, stateListeners, actionsSkipped)
+    dag
   }
 
   /**

@@ -32,8 +32,8 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
 
   private val hadoopStatePath = HdfsUtil.addHadoopDefaultSchemaAuthority(new Path(statePath))
   private val indexFile = new Path(hadoopStatePath, "index.json")
-  private val currentStatePath: Path = new Path(hadoopStatePath, "current")
-  private val succeededStatePath: Path = new Path(hadoopStatePath, "succeeded")
+  private val currentStatePath: Path = new Path(hadoopStatePath, HadoopFileActionDAGRunStateStore.currentDirName)
+  private val succeededStatePath: Path = new Path(hadoopStatePath, HadoopFileActionDAGRunStateStore.succeededDirName)
   implicit val filesystem: FileSystem = HdfsUtil.getHadoopFsWithConf(hadoopStatePath)(hadoopConf)
   if (!filesystem.exists(hadoopStatePath)) filesystem.mkdirs(currentStatePath) // make sure current state directory exists
   filesystem.setWriteChecksum(false) // disable writing CRC files
@@ -131,7 +131,9 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
       .map{ x => logger.debug(s"found files ${x.getPath}"); x }
       .flatMap( x => x.getPath.getName match {
         case filenameMatcher(appName, runId, attemptId) =>
-          Some(HadoopFileStateId(x.getPath, appName, runId.toInt, attemptId.toInt))
+          // a state file in the 'succeeded' directory is accepted, see HadoopFileStateId.isAccepted
+          val accepted = x.getPath.getParent.getName == HadoopFileActionDAGRunStateStore.succeededDirName
+          Some(HadoopFileStateId(x.getPath, appName, runId.toInt, attemptId.toInt, accepted))
         case _ => None
       })
       .filter(_.appName == this.appName).toList
@@ -149,8 +151,14 @@ private[smartdatalake] case class HadoopFileActionDAGRunStateStore(statePath: St
   }
 }
 
-case class HadoopFileStateId(path: Path, appName: String, runId: Int, attemptId: Int) extends StateId {
-  def getSortAttrs: (Int, Int) = (runId, attemptId)
+/**
+ * @param isAccepted true if the state file lies in the 'succeeded' directory. A run is normally moved there by
+ *                   [[HadoopFileActionDAGRunStateStore.saveState]] once it succeeded, but a failed run can also be
+ *                   accepted manually by moving its state file there, so that it is not recovered on the next start.
+ */
+case class HadoopFileStateId(path: Path, appName: String, runId: Int, attemptId: Int, override val isAccepted: Boolean = false) extends StateId {
+  // if a state file exists in both directories for the same attempt, the accepted one wins
+  def getSortAttrs: (Int, Int, Boolean) = (runId, attemptId, isAccepted)
 }
 
 private case class IndexActionEntry(state: RuntimeEventState, dataObjects: Seq[DataObjectId])
@@ -182,4 +190,6 @@ private object IndexEntry {
 
 private[smartdatalake] object HadoopFileActionDAGRunStateStore {
   val fileNamePartSeparator = "."
+  val currentDirName = "current"
+  val succeededDirName = "succeeded"
 }
