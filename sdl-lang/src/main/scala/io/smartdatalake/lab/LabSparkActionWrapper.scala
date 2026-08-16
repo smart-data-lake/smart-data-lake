@@ -19,7 +19,7 @@
 package io.smartdatalake.lab
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, ExcludeFromSchemaExport, FromConfigFactory}
+import io.smartdatalake.config.{ConfigurationException, ExcludeFromSchemaExport}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.ProductUtil
 import io.smartdatalake.util.misc.StringUtil.strToCamelCase
@@ -377,7 +377,6 @@ private case class LabSparkDfsTransformer(
       options: Map[String, String]
   )(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] =
     customTransformer.transformPartitionValues(options, partitionValues)
-  override def factory: FromConfigFactory[GenericDfsTransformer] = throw new NotImplementedError()
 }
 
 private case class LabSparkDfTransformer(
@@ -401,5 +400,4 @@ private case class LabSparkDfTransformer(
       options: Map[String, String]
   )(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] =
     customTransformer.transformPartitionValues(options, partitionValues)
-  override def factory: FromConfigFactory[GenericDfTransformer] = ScalaClassSparkDfTransformer
 }

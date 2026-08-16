@@ -117,8 +117,6 @@ case class AWSUserPwdAuthMode(region: String, userPool: String, clientId: String
     Some(oAuth2Service.getToken.getAuthHeader(useIdToken)).toMap
   }
 
-  override def factory: FromConfigFactory[HttpAuthMode] = AWSUserPwdAuthMode
-
 }
 
 object AWSUserPwdAuthMode extends FromConfigFactory[HttpAuthMode] {

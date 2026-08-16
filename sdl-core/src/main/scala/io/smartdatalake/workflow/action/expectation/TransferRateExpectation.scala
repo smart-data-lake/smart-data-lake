@@ -78,7 +78,6 @@ case class TransferRateExpectation(
     val updatedMetrics = metrics + (name -> pct)
     (col.toSeq, updatedMetrics)
   }
-  override def factory: FromConfigFactory[ActionExpectation] = TransferRateExpectation
 }
 
 object TransferRateExpectation extends FromConfigFactory[ActionExpectation] {

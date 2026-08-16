@@ -104,8 +104,6 @@ case class AvroFileDataObject( override val id: DataObjectId,
       .getOrElse(df)
   }
 
-
-  override def factory: FromConfigFactory[DataObject] = AvroFileDataObject
 }
 
 

@@ -169,8 +169,6 @@ case class FileIncrementalMoveMode(archivePath: Option[String] = None, archiveIn
     val (path, separator, filename) = splitPathAndFilename(file)
     path + separator + strip(relativePath, isSeparator) + separator + filename
   }
-
-  override def factory: FromConfigFactory[ExecutionMode] = ProcessAllMode
 }
 
 object FileIncrementalMoveMode extends FromConfigFactory[ExecutionMode] {

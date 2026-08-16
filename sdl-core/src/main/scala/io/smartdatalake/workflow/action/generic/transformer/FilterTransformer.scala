@@ -71,7 +71,6 @@ case class FilterTransformer(override val name: String = "filter", override val 
     import functions._
     df.filter(expr(filterClause))
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = FilterTransformer
 }
 
 object FilterTransformer extends FromConfigFactory[GenericDfTransformer] {

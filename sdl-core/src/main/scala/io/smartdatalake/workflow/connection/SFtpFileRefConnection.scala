@@ -131,8 +131,6 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
 
     override def destroyObject(p: PooledObject[SSHClient]): Unit = p.getObject.close()
   }
-
-  override def factory: FromConfigFactory[Connection] = SFtpFileRefConnection
 }
 
 object SFtpFileRefConnection extends FromConfigFactory[Connection] {

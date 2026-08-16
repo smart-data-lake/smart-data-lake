@@ -151,8 +151,6 @@ case class SnowflakeConnection(override val id: ConnectionId,
     }
     Session.builder.configs(commonOptions ++ authOptions ++ getProxyOptions).create
   }
-
-  override def factory: FromConfigFactory[Connection] = SnowflakeConnection
 }
 
 object SnowflakeConnection extends FromConfigFactory[Connection] {

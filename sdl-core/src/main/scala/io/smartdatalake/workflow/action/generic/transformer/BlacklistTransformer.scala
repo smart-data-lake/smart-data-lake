@@ -70,8 +70,6 @@ case class BlacklistTransformer(override val name: String = "blacklist", overrid
     val colsToSelect = df.schema.filterColumns(columnBlacklist, includeColumns = false)
     df.select(colsToSelect.map(SQLUtil.sparkQuoteSQLIdentifier).map(col))
   }
-
-  override def factory: FromConfigFactory[GenericDfTransformer] = BlacklistTransformer
 }
 
 object BlacklistTransformer extends FromConfigFactory[GenericDfTransformer] {

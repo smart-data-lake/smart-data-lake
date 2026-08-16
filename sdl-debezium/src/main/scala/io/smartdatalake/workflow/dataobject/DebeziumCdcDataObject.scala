@@ -141,8 +141,6 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     propsForEngine
   }
 
-  override def factory: FromConfigFactory[DataObject] = DebeziumCdcDataObject
-
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
 
     implicit val spark: SparkSession = SparkSubFeed.getSparkSession

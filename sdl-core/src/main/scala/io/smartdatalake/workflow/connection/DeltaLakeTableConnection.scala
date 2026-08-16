@@ -57,10 +57,7 @@ case class DeltaLakeTableConnection(override val id: ConnectionId,
                                     pathPrefix: String,
                                     checkDeltaLakeSparkOptions: Boolean = true,
                                     override val metadata: Option[ConnectionMetadata] = None
-                               ) extends Connection {
-
-  override def factory: FromConfigFactory[Connection] = DeltaLakeTableConnection
-}
+                               ) extends Connection
 
 object DeltaLakeTableConnection extends FromConfigFactory[Connection] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): DeltaLakeTableConnection = {

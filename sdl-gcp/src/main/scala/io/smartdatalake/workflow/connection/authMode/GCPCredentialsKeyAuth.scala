@@ -62,8 +62,6 @@ case class GCPCredentialsKeyAuth(private val serviceAccountKey: Option[StringOrS
   private[smartdatalake] def getAuthCredentials(): (String, String) = {
     if (serviceAccountKey.isDefined) ("credentials", serviceAccountKey.get.resolve()) else ("credentialsFile", serviceAccountKeyFile.get.resolve())
   }
-
-  override def factory: FromConfigFactory[AuthMode] = GCPCredentialsKeyAuth
 }
 
 object GCPCredentialsKeyAuth extends FromConfigFactory[AuthMode] {

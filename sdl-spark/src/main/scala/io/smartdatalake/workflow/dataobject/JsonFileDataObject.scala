@@ -102,8 +102,6 @@ case class JsonFileDataObject( override val id: DataObjectId,
     val dfSuper = super.beforeWrite(df)
     if (stringify) dfSuper.castAll2String else dfSuper
   }
-
-  override def factory: FromConfigFactory[DataObject] = JsonFileDataObject
 }
 
 object JsonFileDataObject extends FromConfigFactory[DataObject] {

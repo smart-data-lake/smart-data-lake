@@ -84,8 +84,6 @@ case class CompletenessExpectation(
     val updatedMetrics = metrics + (name -> pct)
     (col.toSeq, updatedMetrics)
   }
-
-  override def factory: FromConfigFactory[ActionExpectation] = CompletenessExpectation
 }
 
 object CompletenessExpectation extends FromConfigFactory[ActionExpectation] {

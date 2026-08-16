@@ -21,22 +21,15 @@ package io.smartdatalake.config
 /**
  * A class that can be parsed from a [[com.typesafe.config.Config]] by [[ConfigParser]].
  *
+ * Implementations must provide a companion object implementing [[FromConfigFactory]]. [[ConfigParser]] resolves
+ * it by reflection, there is no member pointing to it. `FactoryMethodCompletenessTest` in sdl-lang asserts that
+ * every implementation has such a companion object, except those marked with [[ExcludeFromSchemaExport]].
+ *
  * @tparam CO The type of this class.
  *
- * @see [[ParsableFromConfig]]
+ * @see [[FromConfigFactory]]
  */
-private[smartdatalake] trait ParsableFromConfig[+CO <: ParsableFromConfig[CO]] {
-
-  /**
-   * Returns the factory that can parse this type (that is, type `CO`).
-   *
-   * Typically, implementations of this method should return the companion object of the implementing class.
-   * The companion object in turn should implement [[FromConfigFactory]].
-   *
-   * @return  the factory (object) for this class.
-   */
-  def factory: FromConfigFactory[CO]
-}
+private[smartdatalake] trait ParsableFromConfig[+CO <: ParsableFromConfig[CO]]
 
 /**
  * A marker trait to exclude an SdlConfigObject from the schema export.

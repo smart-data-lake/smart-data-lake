@@ -69,8 +69,6 @@ case class TestDataObject( id: DataObjectId,
 
   override def scriptNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
-  override def factory: FromConfigFactory[DataObject] = TestDataObject
-
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {}
 }
 

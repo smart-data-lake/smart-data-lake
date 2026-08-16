@@ -73,7 +73,6 @@ case class SASLSCRAMAuthMode(
 ) extends AuthMode {
   private[smartdatalake] val passwordSecret: StringOrSecret = password
     .getOrElse(throw ConfigurationException(s"password must be defined."))
-  override def factory: FromConfigFactory[AuthMode] = SASLSCRAMAuthMode
 }
 
 object SASLSCRAMAuthMode extends FromConfigFactory[AuthMode] {

@@ -103,7 +103,6 @@ case class DebugTransformer(override val name: String = "debug", override val de
     val prefix = StringUtils.repeat(' ', n)
     s.linesIterator.map(prefix + _).mkString(System.lineSeparator())
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = DebugTransformer
 }
 
 object DebugTransformer extends FromConfigFactory[GenericDfTransformer] {

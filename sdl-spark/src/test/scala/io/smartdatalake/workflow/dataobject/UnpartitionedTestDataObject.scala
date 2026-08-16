@@ -51,8 +51,6 @@ case class UnpartitionedTestDataObject(override val id: DataObjectId,
     df.collect()
     Map("records_written" -> df.count())
   }
-
-  override def factory: FromConfigFactory[DataObject] = UnpartitionedTestDataObject
 }
 
 object UnpartitionedTestDataObject extends FromConfigFactory[DataObject] {

@@ -52,10 +52,7 @@ case class HadoopFileConnection(override val id: ConnectionId,
                                 pathPrefix: String,
                                 sparkConnectionId: Option[ConnectionId] = None,
                                 override val metadata: Option[ConnectionMetadata] = None
-                               ) extends Connection {
-
-  override def factory: FromConfigFactory[Connection] = HadoopFileConnection
-}
+                               ) extends Connection
 
 object HadoopFileConnection extends FromConfigFactory[Connection] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): HadoopFileConnection = {

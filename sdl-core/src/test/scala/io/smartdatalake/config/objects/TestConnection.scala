@@ -31,10 +31,7 @@ import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 case class TestConnection( override val id: ConnectionId,
                            override val metadata: Option[ConnectionMetadata] = None)
                          ( implicit val instanceRegistry: InstanceRegistry)
-extends Connection {
-
-  override def factory: FromConfigFactory[Connection] = TestConnection
-}
+extends Connection
 
 object TestConnection extends FromConfigFactory[Connection] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): TestConnection = {

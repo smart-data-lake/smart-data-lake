@@ -129,8 +129,6 @@ case class CustomDataFrameAction(override val id: ActionId,
     transformerTypeStats.map(_._1).headOption
   }
 
-  override def factory: FromConfigFactory[Action] = CustomDataFrameAction
-
 }
 
 

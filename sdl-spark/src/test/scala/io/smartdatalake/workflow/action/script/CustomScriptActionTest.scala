@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action.script
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ExcludeFromSchemaExport, InstanceRegistry}
 import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CustomScriptAction
@@ -80,12 +80,10 @@ class CustomScriptActionTest extends AnyFunSuite with BeforeAndAfter {
 
 }
 
-case class TestScriptNotificationDataObject(override val id: DataObjectId, notifyFunc: String => Unit) extends DataObject with CanReceiveScriptNotification {
+case class TestScriptNotificationDataObject(override val id: DataObjectId, notifyFunc: String => Unit) extends DataObject with CanReceiveScriptNotification with ExcludeFromSchemaExport {
   override def metadata: Option[DataObjectMetadata] = None
 
   override def scriptNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     notifyFunc(parameters("test"))
   }
-
-  override def factory: FromConfigFactory[DataObject] = throw new NotImplementedException
 }

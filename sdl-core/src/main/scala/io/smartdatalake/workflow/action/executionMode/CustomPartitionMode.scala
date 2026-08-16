@@ -80,7 +80,6 @@ case class CustomPartitionMode(className: String, override val alternativeOutput
         throw ConfigurationException(s"$actionId has set executionMode = CustomPartitionMode but $mainInput does not support partitions!")
     }
   }
-  override def factory: FromConfigFactory[ExecutionMode] = CustomPartitionMode
 }
 
 object CustomPartitionMode extends FromConfigFactory[ExecutionMode] {

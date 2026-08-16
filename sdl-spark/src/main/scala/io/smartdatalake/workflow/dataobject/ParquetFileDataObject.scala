@@ -100,8 +100,6 @@ case class ParquetFileDataObject( override val id: DataObjectId,
     schema.map(s => NestedColumnUtil.selectSchema(SparkDataFrame(df), s).asInstanceOf[SparkDataFrame].inner)
       .getOrElse(df)
   }
-
-  override def factory: FromConfigFactory[DataObject] = ParquetFileDataObject
 }
 
 object ParquetFileDataObject extends FromConfigFactory[DataObject] {

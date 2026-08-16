@@ -58,8 +58,6 @@ case class TestAction(override val id: ActionId,
   override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
   override val outputs: Seq[TransactionalTableDataObject] = Seq(output)
   override val recursiveInputs:Seq[DataObject with CanCreateDataFrame] = Seq()
-
-  override def factory: FromConfigFactory[Action] = TestAction
 }
 
 object TestAction extends FromConfigFactory[Action] {

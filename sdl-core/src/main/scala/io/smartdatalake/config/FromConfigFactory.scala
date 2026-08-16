@@ -25,6 +25,7 @@ import configs.ConfigReader
  * A factory object that fulfils the contract for a static factory method that parses (case) classes from [[Config]]s.
  *
  * This trait is (usually) implemented by companion objects of SDL config objects (DataObjects, Actions, ...).
+ * [[ConfigParser]] finds the companion object by reflection and invokes its `fromConfig` method.
  *
  * @see [[ParsableFromConfig]]
  *

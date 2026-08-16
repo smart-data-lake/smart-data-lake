@@ -97,7 +97,6 @@ case class PartitionRetentionMode(retentionCondition: String, description: Optio
         partitionedDataObject.deletePartitions(pvsToDelete)
         logger.info(s"(${dataObject.id}) Housekeeping cleaned partitions ${pvsToDelete.mkString(", ")}")
     }
-  override def factory: FromConfigFactory[HousekeepingMode] = PartitionRetentionMode
 }
 
 object PartitionRetentionMode extends FromConfigFactory[HousekeepingMode] {
@@ -186,7 +185,6 @@ case class PartitionArchiveMode(
           logger.info(s"(${dataObject.id}) Housekeeping archived partitions ${pvsToArchive.mkString(", ")}")
         }
     }
-  override def factory: FromConfigFactory[HousekeepingMode] = PartitionArchiveMode
 }
 
 object PartitionArchiveMode extends FromConfigFactory[HousekeepingMode] {

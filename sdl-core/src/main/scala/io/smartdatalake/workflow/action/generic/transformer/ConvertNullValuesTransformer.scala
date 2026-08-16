@@ -102,8 +102,6 @@ case class ConvertNullValuesTransformer(override val name: String = "ConvertNull
 
     dfNew
   }
-
-  override def factory: FromConfigFactory[GenericDfTransformer] = ConvertNullValuesTransformer
 }
 
 object ConvertNullValuesTransformer extends FromConfigFactory[GenericDfTransformer] {

@@ -60,10 +60,7 @@ case class IcebergTableConnection(override val id: ConnectionId,
                                   checkIcebergSparkOptions: Boolean = true,
                                   addFilesParallelism: Option[Int] = None,
                                   override val metadata: Option[ConnectionMetadata] = None
-                               ) extends Connection {
-
-  override def factory: FromConfigFactory[Connection] = IcebergTableConnection
-}
+                               ) extends Connection
 
 object IcebergTableConnection extends FromConfigFactory[Connection] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): IcebergTableConnection = {

@@ -126,8 +126,6 @@ case class PKViolatorsDataObject(id: DataObjectId,
   }
 
   override private[smartdatalake] def getSubFeedSupportedTypes = Seq(typeOf[DataFrameSubFeed])
-
-  override def factory: FromConfigFactory[PKViolatorsDataObject] = PKViolatorsDataObject
 }
 
 object PKViolatorsDataObject extends FromConfigFactory[PKViolatorsDataObject] {

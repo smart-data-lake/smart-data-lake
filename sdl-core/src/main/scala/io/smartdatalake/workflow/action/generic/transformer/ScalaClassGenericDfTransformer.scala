@@ -75,8 +75,6 @@ case class ScalaClassGenericDfTransformer(override val name: String = "scalaTran
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
     customTransformer.transformPartitionValues(options, partitionValues)
   }
-
-  override def factory: FromConfigFactory[GenericDfTransformer] = ScalaClassGenericDfTransformer
 }
 
 object ScalaClassGenericDfTransformer extends FromConfigFactory[GenericDfTransformer] {

@@ -160,8 +160,6 @@ case class CustomFileAction(override val id: ActionId,
     }
     super.postprocessOutputSubFeedCustomized(subFeed, inputSubFeeds)
   }
-
-  override def factory: FromConfigFactory[Action] = CustomFileAction
 }
 
 object CustomFileAction extends FromConfigFactory[Action] {

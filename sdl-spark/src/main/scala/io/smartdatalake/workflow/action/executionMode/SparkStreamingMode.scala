@@ -181,8 +181,6 @@ case class SparkStreamingMode(
       subFeed.withMetrics(streamingMetrics.getMainInfos ++ runtimeMetrics).asInstanceOf[DataFrameSubFeed]
     }
   }
-
-  override def factory: FromConfigFactory[ExecutionMode] = SparkStreamingMode
 }
 
 object SparkStreamingMode extends FromConfigFactory[ExecutionMode] {

@@ -233,8 +233,6 @@ case class AirbyteDataObject(override val id: DataObjectId,
     val msg = msgs.collectFirst{ case x: T => x }
     msg.getOrElse(throw AirbyteConnectorException(s"($id) Expected message of type '${cls.runtimeClass.getSimpleName}' not found in connector output"))
   }
-
-  override def factory: FromConfigFactory[DataObject] = AirbyteDataObject
 }
 
 object AirbyteDataObject extends FromConfigFactory[DataObject] {

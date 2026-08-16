@@ -104,7 +104,6 @@ case class CountExpectation(override val name: String = "count", override val de
       (col.toSeq, metrics)
     }
   }
-  override def factory: FromConfigFactory[Expectation] = CountExpectation
 }
 
 object CountExpectation extends FromConfigFactory[Expectation] {

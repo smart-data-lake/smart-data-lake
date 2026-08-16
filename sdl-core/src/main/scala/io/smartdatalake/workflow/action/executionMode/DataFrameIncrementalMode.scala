@@ -133,7 +133,6 @@ case class DataFrameIncrementalMode(compareCol: String
       }
     } else None
   }
-  override def factory: FromConfigFactory[ExecutionMode] = DataFrameIncrementalMode
 }
 
 object DataFrameIncrementalMode extends FromConfigFactory[ExecutionMode] {

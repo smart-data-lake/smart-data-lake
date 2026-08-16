@@ -178,8 +178,6 @@ case class AccessTableDataObject(override val id: DataObjectId,
       case java.sql.Types.VARCHAR => StringType
     }
   }
-
-  override def factory: FromConfigFactory[DataObject] = AccessTableDataObject
 }
 
 object AccessTableDataObject extends FromConfigFactory[DataObject] {

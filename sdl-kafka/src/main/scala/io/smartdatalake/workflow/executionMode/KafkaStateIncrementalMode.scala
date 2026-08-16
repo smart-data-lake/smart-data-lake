@@ -91,8 +91,6 @@ case class KafkaStateIncrementalMode(delayedMaxTimestampExpr: Option[String] = N
     // commit offsets read to Kafka
     kafkaInputs.foreach(_.commitIncrementalOutputState)
   }
-
-  override def factory: FromConfigFactory[ExecutionMode] = KafkaStateIncrementalMode
 }
 
 object KafkaStateIncrementalMode extends FromConfigFactory[ExecutionMode] {

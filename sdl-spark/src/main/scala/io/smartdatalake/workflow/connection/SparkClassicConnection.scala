@@ -190,8 +190,6 @@ case class SparkClassicConnection(
   override def activate(operation: Option[String])(implicit context: ActionPipelineContext): Unit = {
     setSparkJobMetadata(operation)
   }
-
-  override def factory: FromConfigFactory[Connection] = SparkClassicConnection
 }
 
 object SparkClassicConnection extends FromConfigFactory[Connection] with SmartDataLakeLogger {

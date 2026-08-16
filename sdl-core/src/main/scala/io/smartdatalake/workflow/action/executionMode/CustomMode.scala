@@ -71,7 +71,6 @@ case class CustomMode(className: String, override val alternativeOutputId: Optio
     val output = alternativeOutput.getOrElse(mainOutput)
     impl.apply(options.getOrElse(Map()), actionId, mainInput, output, subFeed.partitionValues.map(_.getMapString), context)
   }
-  override def factory: FromConfigFactory[ExecutionMode] = CustomMode
 }
 
 object CustomMode extends FromConfigFactory[ExecutionMode] {

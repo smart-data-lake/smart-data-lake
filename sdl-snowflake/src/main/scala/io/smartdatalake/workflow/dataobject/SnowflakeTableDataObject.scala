@@ -274,8 +274,6 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     connection.execJdbcStatement(s"drop table if exists ${table.fullName}")
   }
 
-  override def factory: FromConfigFactory[DataObject] = SnowflakeTableDataObject
-
   private def applyReadTransformer(partitionValues: Seq[PartitionValues], df: GenericDataFrame)(implicit context: ActionPipelineContext): GenericDataFrame = {
     readTransformer
       .filter(t => t.getSubFeedSupportedType =:= df.subFeedType || t.getSubFeedSupportedType =:= typeOf[DataFrameSubFeed])

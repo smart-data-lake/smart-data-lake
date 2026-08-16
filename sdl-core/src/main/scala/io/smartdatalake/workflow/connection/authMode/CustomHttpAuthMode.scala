@@ -58,8 +58,6 @@ case class CustomHttpAuthMode(className: String, options: Map[String, StringOrSe
   private[smartdatalake] override def prepare(): Unit = impl.prepare(options)
 
   override def getHeaders: Map[String, String] = impl.getHeaders
-
-  override def factory: FromConfigFactory[HttpAuthMode] = CustomHttpAuthMode
 }
 
 object CustomHttpAuthMode extends FromConfigFactory[HttpAuthMode] {

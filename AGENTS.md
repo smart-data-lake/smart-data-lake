@@ -74,10 +74,7 @@ case class MyDataObject(
   override val id: DataObjectId,
   path: String,
   override val metadata: Option[DataObjectMetadata] = None
-) extends DataObject with CanCreateSparkDataFrame {
-
-  override def factory: FromConfigFactory[DataObject] = MyDataObject
-}
+) extends DataObject with CanCreateSparkDataFrame
 
 object MyDataObject extends FromConfigFactory[DataObject] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): MyDataObject = {
@@ -85,6 +82,12 @@ object MyDataObject extends FromConfigFactory[DataObject] {
   }
 }
 ```
+
+The companion object is mandatory: `ConfigParser` resolves it by reflection from the class named in the
+Hocon `type` attribute, then looks up `fromConfig` by name and signature. There is no member on the class
+pointing at it. `FactoryMethodCompletenessTest` (sdl-lang) asserts that every `ParsableFromConfig`
+implementation has a valid companion object; mark a type with `ExcludeFromSchemaExport` if it is
+intentionally not parsable from config.
 
 ### Testing Patterns
 ```scala

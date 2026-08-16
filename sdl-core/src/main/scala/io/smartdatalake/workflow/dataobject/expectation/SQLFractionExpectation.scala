@@ -115,8 +115,6 @@ case class SQLFractionExpectation(
       (col.toSeq, updatedMetrics)
     }
   }
-
-  override def factory: FromConfigFactory[Expectation] = SQLFractionExpectation
 }
 
 object SQLFractionExpectation extends FromConfigFactory[Expectation] {

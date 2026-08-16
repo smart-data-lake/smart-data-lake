@@ -50,8 +50,6 @@ import io.smartdatalake.util.secrets.StringOrSecret
 case class PublicKeyAuthMode(private val user: Option[StringOrSecret]) extends AuthMode {
   private[smartdatalake] val userSecret: StringOrSecret = user
     .getOrElse(throw ConfigurationException(s"user must be defined."))
-
-  override def factory: FromConfigFactory[AuthMode] = PublicKeyAuthMode
 }
 
 object PublicKeyAuthMode extends FromConfigFactory[AuthMode] {

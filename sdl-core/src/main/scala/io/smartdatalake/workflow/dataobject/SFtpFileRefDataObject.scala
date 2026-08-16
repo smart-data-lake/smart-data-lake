@@ -281,8 +281,6 @@ case class SFtpFileRefDataObject(override val id: DataObjectId,
       sftp => SshUtil.sftpListFiles(s"${parentPath.getOrElse(getPath)}$separator$fileName")(sftp)
     }
   }
-
-  override def factory: FromConfigFactory[DataObject] = SFtpFileRefDataObject
 }
 
 object SFtpFileRefDataObject extends FromConfigFactory[DataObject] {

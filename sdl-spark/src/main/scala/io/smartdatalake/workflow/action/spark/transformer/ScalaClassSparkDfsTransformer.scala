@@ -154,8 +154,6 @@ case class ScalaClassSparkDfsTransformer(
       options: Map[String, String]
   )(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] =
     customTransformer.transformPartitionValues(options, partitionValues)
-
-  override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSparkDfsTransformer
 }
 
 object ScalaClassSparkDfsTransformer extends FromConfigFactory[GenericDfsTransformer] {

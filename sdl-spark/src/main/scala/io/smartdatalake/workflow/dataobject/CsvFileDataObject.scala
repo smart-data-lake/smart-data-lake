@@ -152,8 +152,6 @@ case class CsvFileDataObject(
       case DateColumnType.Date => dfSuper.castAllDate2Timestamp
     }
   }
-
-  override def factory: FromConfigFactory[DataObject] = CsvFileDataObject
 }
 
 object CsvFileDataObject extends FromConfigFactory[DataObject] {

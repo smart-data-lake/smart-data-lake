@@ -142,8 +142,6 @@ case class KafkaConnection(
     catch {
       case e: Exception => throw ConfigurationException(s"($id) Can not connect to schema registry (${schemaRegistry.get})", None, e)
     }
-
-  override def factory: FromConfigFactory[Connection] = KafkaConnection
 }
 
 object KafkaConnection extends FromConfigFactory[Connection] {

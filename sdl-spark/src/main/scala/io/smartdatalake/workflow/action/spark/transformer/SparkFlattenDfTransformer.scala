@@ -101,7 +101,6 @@ case class SparkFlattenDfTransformer(override val name: String = "sparkFlattenDa
   }
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame =
     flattenDf(df)
-  override def factory: FromConfigFactory[GenericDfTransformer] = SparkFlattenDfTransformer
 }
 object SparkFlattenDfTransformer extends FromConfigFactory[GenericDfTransformer] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SparkFlattenDfTransformer = {

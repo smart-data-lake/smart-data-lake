@@ -60,7 +60,6 @@ case class StandardizeSparkDatatypesTransformer(override val name: String = "sta
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     df.castAllDecimal2IntegralFloat
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = StandardizeSparkDatatypesTransformer
 }
 
 object StandardizeSparkDatatypesTransformer extends FromConfigFactory[GenericDfTransformer] {

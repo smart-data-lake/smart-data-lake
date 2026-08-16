@@ -33,8 +33,6 @@ case class TestHousekeepingMode(arg1: Option[String]) extends HousekeepingMode {
   override def prepare(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = None
 
   override def postWrite(dataObject: DataObject)(implicit context: ActionPipelineContext): Unit = None
-
-  override def factory: FromConfigFactory[HousekeepingMode] = TestHousekeepingMode
 }
 
 object TestHousekeepingMode extends FromConfigFactory[HousekeepingMode] {
