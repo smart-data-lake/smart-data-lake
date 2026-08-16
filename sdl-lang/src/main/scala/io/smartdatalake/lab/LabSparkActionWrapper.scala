@@ -313,7 +313,7 @@ abstract class LabSparkActionWrapper[A <: DataFrameActionImpl, T <: Transformer,
     inputSubFeeds = filters.foldLeft(inputSubFeeds) {
       case (subFeeds, (column, filterExpr)) =>
         subFeeds.map(f =>
-          if (f.schemaOpt.toSeq.flatMap(_.columns).contains(column)) f.withDataFrame(f.dataFrame.map(_.filter(filterExpr))) else f
+          if (f.schemaOpt.exists(_.columnExists(column))) f.withDataFrame(f.dataFrame.map(_.filter(filterExpr))) else f
         )
     }
 

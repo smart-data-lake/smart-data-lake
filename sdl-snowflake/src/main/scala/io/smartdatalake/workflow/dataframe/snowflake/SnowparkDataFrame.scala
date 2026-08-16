@@ -100,9 +100,6 @@ case class SnowparkDataFrame(override val inner: DataFrame) extends GenericDataF
 
   override def collect: Seq[GenericRow] = inner.collect().toIndexedSeq.map(SnowparkRow)
   override def distinct: SnowparkDataFrame = SnowparkDataFrame(inner.distinct())
-  override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {
-    SnowparkSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
-  }
   override def withColumn(colName: String, expression: GenericColumn): GenericDataFrame = {
     expression match {
       case snowparkExpression: SnowparkColumn => SnowparkDataFrame(inner.withColumn(colName,snowparkExpression.inner))

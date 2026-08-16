@@ -276,8 +276,6 @@ trait GenericDataFrame extends GenericTypedObject {
   /**
    * Create an empty SubFeed for this subFeedType.
    */
-  def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed
-
   def apply(columnName: String): GenericColumn
 
   def isStreaming: Boolean = false

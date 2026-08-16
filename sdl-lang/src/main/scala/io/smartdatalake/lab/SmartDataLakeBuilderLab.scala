@@ -26,6 +26,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, NotFoundError, TransformDfsMethod, TransformInfo}
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.prepareTolerantKey
+import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
@@ -118,7 +119,7 @@ case class SmartDataLakeBuilderLab[D,A](
     // filter
     dfs = filters.foldLeft(dfs) {
       case (dfs, (column, filterExpr)) =>
-        dfs.view.mapValues(df => if (df.schema.fieldNames.contains(column)) df.filter(filterExpr) else df).toMap
+        dfs.view.mapValues(df => if (SparkSchema(df.schema).columnExists(column)) df.filter(filterExpr) else df).toMap
     }
 
     // transform

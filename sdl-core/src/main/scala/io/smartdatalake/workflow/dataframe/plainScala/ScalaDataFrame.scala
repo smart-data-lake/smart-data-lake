@@ -431,10 +431,6 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
   /**
    * Create an empty SubFeed for this subFeedType.
    */
-  override def getDataFrameSubFeed(dataObjectId: SdlConfigObject.DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): ScalaSubFeed = {
-    ScalaSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
-  }
-
   override def subFeedType: universe.Type = universe.typeOf[ScalaSubFeed]
 
   def returnEmpty: ScalaDataFrame = ScalaDataFrame.returnEmpty(this.schema)

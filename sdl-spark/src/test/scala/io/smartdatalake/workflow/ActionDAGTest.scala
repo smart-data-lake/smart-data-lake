@@ -18,8 +18,10 @@
  */
 package io.smartdatalake.workflow
 
+import com.typesafe.config.Config
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, GlobalConfig, SmartDataLakeBuilderConfig}
-import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.dag.TaskFailedException
@@ -356,6 +358,115 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
       .select($"lastname", $"firstname", $"origin")
       .as[(String, String, Int)].collect().toSet
     assert(r1 == Set(("doe", "john", 1), ("doe", "john", 2), ("doe", "john", 3), ("xyz", "john", 3)))
+  }
+
+  test("action dag where a column filter of the execution mode is applied to all inputs having the column") {
+    // setup DataObjects: src3 has no rating column, so the filter must not be applied to it
+    val srcDO1 = MockSparkDataObject("src1").register
+    val srcDO2 = MockSparkDataObject("src2").register
+    val srcDO3 = MockSparkDataObject("src3").register
+    val tgtDO = MockSparkDataObject("tgt1").register
+
+    val l1 = Seq(("doe", "john", 1), ("doe", "jane", 5)).toDF("lastname", "firstname", "rating")
+    srcDO1.writeSparkDataFrame(l1, Seq())
+    srcDO2.writeSparkDataFrame(l1, Seq())
+    srcDO3.writeSparkDataFrame(Seq(("doe", "jim")).toDF("lastname", "firstname"), Seq())
+
+    val action1 = CustomDataFrameAction("a", inputIds = Seq(srcDO1.id, srcDO2.id, srcDO3.id), outputIds = Seq(tgtDO.id)
+      , executionMode = Some(TestColumnFilterMode(Seq(ColumnFilter("rating", "rating > 3"))))
+      , transformers = Seq(ScalaClassSparkDfsTransformer(className = classOf[TestDfsUnionWithoutRating].getName)))
+    val dag = ActionDAGRun(Seq(action1))
+
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
+    dag.exec(contextExec)
+
+    // src1 and src2 have the rating column and are filtered, src3 has not and is not filtered
+    val r1 = tgtDO.getSparkDataFrame(Seq()).select($"firstname", $"origin").as[(String, Int)].collect().toSet
+    assert(r1 == Set(("jane", 1), ("jane", 2), ("jim", 3)))
+  }
+
+  test("action dag where a mainInputOnly column filter of the execution mode is applied to the main input only") {
+    val srcDO1 = MockSparkDataObject("src1").register
+    val srcDO2 = MockSparkDataObject("src2").register
+    val srcDO3 = MockSparkDataObject("src3").register
+    val tgtDO = MockSparkDataObject("tgt1").register
+
+    val l1 = Seq(("doe", "john", 1), ("doe", "jane", 5)).toDF("lastname", "firstname", "rating")
+    srcDO1.writeSparkDataFrame(l1, Seq())
+    srcDO2.writeSparkDataFrame(l1, Seq())
+    srcDO3.writeSparkDataFrame(Seq(("doe", "jim")).toDF("lastname", "firstname"), Seq())
+
+    // mainInputId must be set explicitly, otherwise the main input is chosen by number of partition columns
+    val action1 = CustomDataFrameAction("a", inputIds = Seq(srcDO1.id, srcDO2.id, srcDO3.id), mainInputId = Some(srcDO1.id), outputIds = Seq(tgtDO.id)
+      , executionMode = Some(TestColumnFilterMode(Seq(ColumnFilter("rating", "rating > 3", mainInputOnly = true))))
+      , transformers = Seq(ScalaClassSparkDfsTransformer(className = classOf[TestDfsUnionWithoutRating].getName)))
+    val dag = ActionDAGRun(Seq(action1))
+
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
+    dag.exec(contextExec)
+
+    // only src1 is the main input and gets filtered
+    val r1 = tgtDO.getSparkDataFrame(Seq()).select($"firstname", $"origin").as[(String, Int)].collect().toSet
+    assert(r1 == Set(("jane", 1), ("john", 2), ("jane", 2), ("jim", 3)))
+  }
+
+  test("action dag where a column filter of the execution mode is ignored for inputIdsToIgnoreFilter") {
+    val srcDO1 = MockSparkDataObject("src1").register
+    val srcDO2 = MockSparkDataObject("src2").register
+    val srcDO3 = MockSparkDataObject("src3").register
+    val tgtDO = MockSparkDataObject("tgt1").register
+
+    val l1 = Seq(("doe", "john", 1), ("doe", "jane", 5)).toDF("lastname", "firstname", "rating")
+    srcDO1.writeSparkDataFrame(l1, Seq())
+    srcDO2.writeSparkDataFrame(l1, Seq())
+    srcDO3.writeSparkDataFrame(Seq(("doe", "jim")).toDF("lastname", "firstname"), Seq())
+
+    val action1 = CustomDataFrameAction("a", inputIds = Seq(srcDO1.id, srcDO2.id, srcDO3.id), inputIdsToIgnoreFilter = Seq(srcDO2.id), outputIds = Seq(tgtDO.id)
+      , executionMode = Some(TestColumnFilterMode(Seq(ColumnFilter("rating", "rating > 3"))))
+      , transformers = Seq(ScalaClassSparkDfsTransformer(className = classOf[TestDfsUnionWithoutRating].getName)))
+    val dag = ActionDAGRun(Seq(action1))
+
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
+    dag.exec(contextExec)
+
+    // src2 ignores the filter, so both of its records are kept
+    val r1 = tgtDO.getSparkDataFrame(Seq()).select($"firstname", $"origin").as[(String, Int)].collect().toSet
+    assert(r1 == Set(("jane", 1), ("john", 2), ("jane", 2), ("jim", 3)))
+  }
+
+  test("action dag where a column filter is propagated to the following action only if propagate=true") {
+    def runDag(propagate: Boolean, tgt2HasRating: Boolean): Set[String] = {
+      val srcDO = MockSparkDataObject("src1").register
+      val tgt1DO = MockSparkDataObject("tgt1").register
+      val tgt2DO = MockSparkDataObject("tgt2").register
+
+      srcDO.writeSparkDataFrame(Seq(("doe", "john", 1), ("doe", "jane", 5)).toDF("lastname", "firstname", "rating"), Seq())
+
+      val action1 = CopyAction("a", srcDO.id, tgt1DO.id
+        , executionMode = Some(TestColumnFilterMode(Seq(ColumnFilter("rating", "rating > 3", propagate = propagate)))))
+      // the second action drops the rating column if the filter must not be applicable on tgt2
+      val action2 = if (tgt2HasRating) CopyAction("b", tgt1DO.id, tgt2DO.id)
+      else CopyAction("b", tgt1DO.id, tgt2DO.id, transformers = Seq(SQLDfTransformer(code = Some("select lastname, firstname from tgt1"))))
+      val dag = ActionDAGRun(Seq(action1, action2))
+
+      dag.prepare(contextPrep)
+      dag.init(contextInit)
+      dag.exec(contextExec)
+
+      // tgt1 already only contains the increment, so re-applying the propagated filter changes nothing there.
+      // What is asserted is that the propagated filter is accepted and does not remove data unexpectedly.
+      tgt2DO.getSparkDataFrame(Seq()).select($"firstname").as[String].collect().toSet
+    }
+
+    // without propagation the second action reads all of tgt1
+    assert(runDag(propagate = false, tgt2HasRating = true) == Set("jane"))
+    // with propagation the filter is re-applied on tgt1, which contains the increment only
+    assert(runDag(propagate = true, tgt2HasRating = true) == Set("jane"))
+    // if the column does not exist in the second action's DataFrame, the propagated filter is silently dropped
+    assert(runDag(propagate = true, tgt2HasRating = false) == Set("jane"))
   }
 
   test("action dag with four dependencies") {
@@ -1337,6 +1448,35 @@ class TestStreamingTransformer extends CustomDfsTransformer {
   override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame]): Map[String, DataFrame] = {
     val dfTgt1 = dfs("src1").unionByName(dfs("src2"))
     Map("tgt1" -> dfTgt1)
+  }
+}
+
+/**
+ * Unions three inputs on the columns they have in common, so that src3 does not need a rating column.
+ */
+class TestDfsUnionWithoutRating extends CustomDfsTransformer {
+  override def transform(session: SparkSession, options: Map[String, String], dfs: Map[String, DataFrame]): Map[String, DataFrame] = {
+    import session.implicits._
+    val dfTgt = dfs("src1").select($"lastname", $"firstname").withColumn("origin", lit(1))
+      .union(dfs("src2").select($"lastname", $"firstname").withColumn("origin", lit(2)))
+      .union(dfs("src3").select($"lastname", $"firstname").withColumn("origin", lit(3)))
+    Map("tgt1" -> dfTgt)
+  }
+}
+
+/**
+ * An ExecutionMode returning the given column filters, to test their handling.
+ */
+case class TestColumnFilterMode(testFilters: Seq[ColumnFilter]) extends ExecutionMode {
+  override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
+                     , partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])
+                    (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
+    Some(ExecutionModeResult(filters = testFilters))
+  }
+}
+object TestColumnFilterMode extends FromConfigFactory[ExecutionMode] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): TestColumnFilterMode = {
+    extract[TestColumnFilterMode](config)
   }
 }
 

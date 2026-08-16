@@ -49,7 +49,7 @@ import scala.util.Try
  * @param partitionValues Values of Partitions transported by this SubFeed
  * @param isDAGStart true if this subfeed is a start node of the dag
  * @param isSkipped true if this subfeed is the result of a skipped action
- * @param filter a spark SQL filter expression. This is used by DataFrameIncrementalMode.
+ * @param filters column-bound filters to be applied when the DataFrame is (re)created, see [[ColumnFilter]].
  * @param keptSchema schema transported by this SubFeed if it holds no DataFrame. Use `schema`/`schemaOpt` to read it.
  */
 case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame],
@@ -57,7 +57,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
                         override val partitionValues: Seq[PartitionValues],
                         override val isDAGStart: Boolean = false,
                         override val isSkipped: Boolean = false,
-                        override val filter: Option[String] = None,
+                        override val filters: Seq[ColumnFilter] = Seq(),
                         @transient override val observation: Option[DataFrameObservation] = None,
                         override val metrics: Option[MetricsMap] = None,
                         @transient override val keptSchema: Option[GenericSchema] = None,
@@ -66,7 +66,7 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
   extends DataFrameSubFeed {
   @transient override val tpe: Type = typeOf[SparkSubFeed]
   override def toOutput(dataObjectId: DataObjectId): SparkSubFeed = {
-    this.copy(dataFrame = None, filter=None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None, executionModeResultOptions = Map())
+    this.copy(dataFrame = None, filters = Seq(), isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None, executionModeResultOptions = Map())
   }
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
     val (dataFrame, schema) = other match {
@@ -84,17 +84,19 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
       , partitionValues = unionPartitionValues(other.partitionValues)
       , isDAGStart = this.isDAGStart || other.isDAGStart
       , isSkipped = this.isSkipped && other.isSkipped
+      , filters = unionFilters(other)
       , executionModeResultOptions = unionExecutionModeResultOptions(other)
     )
   }
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SparkSubFeed = {
-    // apply input filter
-    val inputFilter = if (this.dataObjectId == mainInputId) result.filter else None
-    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false, executionModeResultOptions = result.options).breakLineage // breaklineage keeps the schema without the DataFrame
+    // apply input filters
+    val inputFilters = result.filtersForInput(this.dataObjectId == mainInputId)
+    this.copy(partitionValues = result.inputPartitionValues, filters = inputFilters, isSkipped = false, executionModeResultOptions = result.options).breakLineage // breaklineage keeps the schema without the DataFrame
       .asInstanceOf[SparkSubFeed]
   }
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SparkSubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None, keptSchema = None, executionModeResultOptions = result.options)
+    // filters of the output are set from the main input SubFeed after the transformation, see DataFrameActionImpl.updateOutputFilters
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filters = Seq(), isSkipped = false, dataFrame = None, keptSchema = None, executionModeResultOptions = result.options)
   }
   override def withDataFrame(dataFrame: Option[GenericDataFrame]): SparkSubFeed = this.copy(
     dataFrame = dataFrame.map(_.asInstanceOf[SparkDataFrame]),
@@ -109,7 +111,7 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
    */
   override def fromSubFeed( subFeed: SubFeed )(implicit context: ActionPipelineContext): SparkSubFeed = {
     subFeed match {
-      case sparkSubFeed: SparkSubFeed => sparkSubFeed.clearFilter().asInstanceOf[SparkSubFeed].copy(executionModeResultOptions = Map()) // no filter and no executionModeResultOptions are passed between actions
+      case sparkSubFeed: SparkSubFeed => sparkSubFeed.copy(executionModeResultOptions = Map()) // no executionModeResultOptions are passed between actions. Filters are kept, only propagating filters can be present here.
       case _ => SparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }

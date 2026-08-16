@@ -27,11 +27,12 @@ import io.smartdatalake.workflow.action.ActionHelper.getOptionalDataFrame
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.generic.CanCreateDataFrame
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ColumnFilter, DataFrameSubFeed, SubFeed}
 
 /**
  * Compares max entry in "compare column" between mainOutput and mainInput and incrementally loads the delta.
- * This mode works only with SparkSubFeeds. The filter is not propagated to following actions.
+ * This mode works only with SparkSubFeeds. By default the filter is not propagated to following actions,
+ * see `propagateFilter`.
  *
  * Pick this mode for non-partitioned sources which have a monotonically increasing column, e.g. a technical
  * timestamp or a sequence-based id: the mode reads `max(compareCol)` from the output and adds a filter
@@ -62,10 +63,16 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFe
  *                            It can be used to ensure processing all partitions over multiple actions in case of errors.
  * @param applyCondition      Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of [[DefaultExecutionModeExpressionData]] returning a boolean.
  *                            Default is to apply the execution mode.
+ * @param propagateFilter     If true the incremental filter is passed on to following actions, where it is applied to
+ *                            every DataObject having the compareCol column. Set this only if the increment written by
+ *                            this action can still be identified by the filter, as the filter is then assumed to be
+ *                            applied already. Default is false, so the filter is only used to read the increment for
+ *                            this action.
  */
 case class DataFrameIncrementalMode(compareCol: String
                                     , override val alternativeOutputId: Option[DataObjectId] = None
                                     , applyCondition: Option[Condition] = None
+                                    , propagateFilter: Boolean = false
                                    ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
   override val applyConditionsDef: Seq[Condition] = applyCondition.toSeq
 
@@ -112,14 +119,15 @@ case class DataFrameIncrementalMode(compareCol: String
               } else None
               warnMsg.foreach(msg => throw NoDataToProcessWarning(actionId.id, msg))
               // prepare filter
-              val dataFilter = if (outputLatestValue != null) {
-                logger.info(s"($actionId) DataFrameIncrementalMode selected increment for writing to ${output.id}: column $compareCol} from $outputLatestValue to $inputLatestValue to process")
-                Some(s"$compareCol > cast('$outputLatestValue' as ${inputColType.sql})")
+              val dataFilters = if (outputLatestValue != null) {
+                logger.info(s"($actionId) DataFrameIncrementalMode selected increment for writing to ${output.id}: column $compareCol from $outputLatestValue to $inputLatestValue to process")
+                Seq(ColumnFilter(compareCol, s"$compareCol > cast('$outputLatestValue' as ${inputColType.sql})",
+                  mainInputOnly = true, propagate = propagateFilter))
               } else {
                 logger.info(s"($actionId) DataFrameIncrementalMode selected all data for writing to ${output.id}: output table is currently empty")
-                None
+                Seq()
               }
-              Some(ExecutionModeResult(filter = dataFilter))
+              Some(ExecutionModeResult(filters = dataFilters))
             // select all if output is empty
             case (Some(_), None) =>
               logger.info(s"($actionId) DataFrameIncrementalMode selected all records for writing to ${output.id}, because output DataObject is still empty.")

@@ -110,10 +110,6 @@ case class SparkDataFrame(override val inner: DataFrame) extends GenericDataFram
 
   override def distinct: SparkDataFrame = SparkDataFrame(inner.distinct())
 
-  override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): SparkSubFeed = {
-    SparkSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
-  }
-
   override def withColumn(colName: String, expression: GenericColumn): SparkDataFrame = {
     expression match {
       case sparkExpression: SparkColumn => SparkDataFrame(inner.withColumn(colName, sparkExpression.inner))

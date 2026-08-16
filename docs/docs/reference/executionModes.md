@@ -97,6 +97,23 @@ If you need to read everything from one DataObject, even though it does have the
 you can again use `CustomDataFrameAction.inputIdsToIgnoreFilter` to override the default behavior.
 :::
 
+### Column filters
+
+Besides partition values, an execution mode can also return *column filters*.
+A column filter is a filter expression bound to a column, and it works analogously to partition values:
+it is applied to every input DataObject _that contains the given column_, and it has no effect on input DataObjects
+which don't have it.
+
+A column filter has two options:
+
+* `mainInputOnly`: if set, the filter is only applied to the main input of the Action instead of to all inputs.
+* `propagate`: if set, the filter is passed on to the outputs of the Action, and therefore to the following Actions,
+  again restricted to the columns they contain. Only set this if the filter still describes the data written by the
+  Action, because the filter is then assumed to be applied already. Default is that a filter is not propagated.
+
+`CustomDataFrameAction.inputIdsToIgnoreFilter` excludes an input from column filters as well, exactly like it does
+for partition values.
+
 
 ### FailIfNoPartitionValuesMode
 If you use the method described above, you might want to set the executionMode to `FailIfNoPartitionValuesMode`.
@@ -209,6 +226,13 @@ You configure it by defining the attribute `compareCol` naming a column that exi
 For this mode to work, `compareCol` needs to be of a sortable datatype like int or timestamp.
 
 The attributes `applyCondition` and `alternativeOutputId` work the same as for [PartitionDiffMode](executionModes#partitiondiffmode-dynamic-partition-values-filter).
+
+Internally the mode creates a [column filter](executionModes#column-filters) on `compareCol`, which is applied to the
+main input only.
+By default the filter is not propagated to the following Actions, so they still process the whole output DataObject.
+Set `propagateFilter = true` if the following Actions should process the increment only.
+Note that the filter is then applied to every following DataObject having a `compareCol` column, so only use this if
+the increment can still be identified by the filter after it has been written.
 
 :::info
 This execution mode has a performance drawback as it has to query the maximum value for `compareCol` on input and output DataObjects each time.

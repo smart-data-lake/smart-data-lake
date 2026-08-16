@@ -71,7 +71,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param mainInputId            optional selection of main inputId used for execution mode and partition values propagation. Only needed if there are multiple input DataObject's.
  * @param mainOutputId           optional selection of main outputId used for execution mode and partition values propagation. Only needed if there are multiple output DataObject's.
  * @param recursiveInputIds      output of action that are used as input in the same action
- * @param inputIdsToIgnoreFilter optional list of input ids to ignore filter (partition values & filter clause)
+ * @param inputIdsToIgnoreFilter optional list of input ids to ignore filter (partition values & column filters)
  */
 case class CustomDataFrameAction(override val id: ActionId,
                                  inputIds: Seq[DataObjectId],
