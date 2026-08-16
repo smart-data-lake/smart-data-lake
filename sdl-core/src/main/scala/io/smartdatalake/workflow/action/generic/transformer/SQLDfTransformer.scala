@@ -110,8 +110,6 @@ case class SQLDfTransformer(override val name: String = "sqlTransform",
       case e: Throwable => throw new SQLTransformationException(s"($actionId.transformers.$name) SQL query error: ${e.getMessage}. Also note to use token '%{inputViewName}' or '$inputViewName' as temporary view name in the SQL statement.", e)
     }
   }
-
-  override def factory: FromConfigFactory[GenericDfTransformer] = SQLDfTransformer
 }
 
 object SQLDfTransformer extends FromConfigFactory[GenericDfTransformer] {

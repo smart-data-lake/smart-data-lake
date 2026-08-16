@@ -234,8 +234,6 @@ case class RelaxedCsvFileDataObject(override val id: DataObjectId,
       case DateColumnType.Date => dfSuper.castAllDate2Timestamp
     }
   }
-
-  override def factory: FromConfigFactory[DataObject] = CsvFileDataObject
 }
 
 object RelaxedCsvFileDataObject extends FromConfigFactory[DataObject] {

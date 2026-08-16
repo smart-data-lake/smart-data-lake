@@ -76,8 +76,6 @@ case class CmdScript(override val name: String = "cmd", override val description
     cmd ++ cmdParams
   }
 
-  override def factory: FromConfigFactory[ParsableScriptDef] = CmdScript
-
   override private[smartdatalake] def isWslCmd = EnvironmentUtil.isWindowsOS && winCmd.exists(_.startsWith("wsl"))
 }
 

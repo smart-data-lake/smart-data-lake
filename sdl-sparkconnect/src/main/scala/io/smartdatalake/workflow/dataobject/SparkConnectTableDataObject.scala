@@ -242,8 +242,6 @@ case class SparkConnectTableDataObject(override val id: DataObjectId,
   override def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     sqlOpt.foreach(sql => session.sql(sql).collect())
   }
-
-  override def factory: FromConfigFactory[DataObject] = SparkConnectTableDataObject
 }
 
 object SparkConnectTableDataObject extends FromConfigFactory[DataObject] {

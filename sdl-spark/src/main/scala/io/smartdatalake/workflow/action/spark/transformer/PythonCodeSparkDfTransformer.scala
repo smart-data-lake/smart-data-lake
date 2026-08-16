@@ -99,7 +99,6 @@ case class PythonCodeDfTransformer(override val name: String = "pythonSparkTrans
       case e: Throwable => throw new PythonTransformationException(s"($actionId.transformers.$name) Could not execute Python code. Error: ${e.getMessage}", e)
     }
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = PythonCodeDfTransformer
 }
 
 object PythonCodeDfTransformer extends FromConfigFactory[GenericDfTransformer] {

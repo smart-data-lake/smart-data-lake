@@ -168,8 +168,6 @@ case class FailIfNoPartitionValuesMode() extends ExecutionMode {
     // return: no change of given partition values and filter
     None
   }
-
-  override def factory: FromConfigFactory[ExecutionMode] = FailIfNoPartitionValuesMode
 }
 
 object FailIfNoPartitionValuesMode extends FromConfigFactory[ExecutionMode] {
@@ -213,7 +211,6 @@ case class ProcessAllMode() extends ExecutionMode {
     logger.info(s"($actionId) ProcessModeAll reset partition values")
     Some(ExecutionModeResult())
   }
-  override def factory: FromConfigFactory[ExecutionMode] = ProcessAllMode
 }
 
 object ProcessAllMode extends FromConfigFactory[ExecutionMode] {

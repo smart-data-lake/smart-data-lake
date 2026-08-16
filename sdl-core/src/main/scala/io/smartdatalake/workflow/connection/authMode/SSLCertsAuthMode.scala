@@ -70,7 +70,6 @@ case class SSLCertsAuthMode(
     .getOrElse(throw ConfigurationException(s"truststorePass must be defined."))
   private[smartdatalake] val keystorePassSecret: StringOrSecret = keystorePass
     .getOrElse(throw ConfigurationException(s"keystorePass must be defined."))
-  override def factory: FromConfigFactory[AuthMode] = SSLCertsAuthMode
 }
 
 object SSLCertsAuthMode extends FromConfigFactory[AuthMode] {

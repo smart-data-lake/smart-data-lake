@@ -100,7 +100,6 @@ case class AvgCountPerPartitionExpectation(override val name: String, override v
       (Seq(), metrics)
     }
   }
-  override def factory: FromConfigFactory[Expectation] = AvgCountPerPartitionExpectation
 }
 
 object AvgCountPerPartitionExpectation extends FromConfigFactory[Expectation] {

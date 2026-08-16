@@ -62,8 +62,6 @@ import java.net.URI
 case class JettyAgent(override val id: AgentId, url: String, override val connections: Map[String, Connection] = Map())
   extends Agent with AgentClient with SmartDataLakeLogger {
 
-  override def factory: FromConfigFactory[Agent] = JettyAgent
-
   private val uri = URI.create(url)
 
   override def getClient: AgentClient = this

@@ -105,7 +105,6 @@ case class DebeziumConnection(override val id: ConnectionId,
    *
    * @return the factory (object) for this class.
    */
-  override def factory: FromConfigFactory[Connection] = DebeziumConnection
 }
 
 object DebeziumConnection extends FromConfigFactory[Connection] {

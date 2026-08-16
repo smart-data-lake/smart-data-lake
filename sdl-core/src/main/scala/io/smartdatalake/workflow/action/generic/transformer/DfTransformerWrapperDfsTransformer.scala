@@ -75,8 +75,6 @@ case class DfTransformerWrapperDfsTransformer(transformer: GenericDfTransformer,
   override def transformPartitionValues(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
     transformer.transformPartitionValues(actionId, partitionValues, executionModeResultOptions)
   }
-
-  override def factory: FromConfigFactory[GenericDfsTransformer] = DfTransformerWrapperDfsTransformer
 }
 
 object DfTransformerWrapperDfsTransformer extends FromConfigFactory[GenericDfsTransformer] {

@@ -198,8 +198,6 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
       }
     )
   }
-
-  override def factory: FromConfigFactory[DataObject] = BigQueryTableDataObject
 }
 
 object BigQueryTableDataObject extends FromConfigFactory[DataObject] {

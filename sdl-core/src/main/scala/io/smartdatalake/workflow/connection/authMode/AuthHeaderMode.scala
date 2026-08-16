@@ -55,8 +55,6 @@ case class AuthHeaderMode(
 ) extends HttpAuthMode {
 
   override def getHeaders: Map[String, String] = Map(headerName -> secret.resolve())
-
-  override def factory: FromConfigFactory[HttpAuthMode] = AuthHeaderMode
 }
 
 object AuthHeaderMode extends FromConfigFactory[HttpAuthMode] {

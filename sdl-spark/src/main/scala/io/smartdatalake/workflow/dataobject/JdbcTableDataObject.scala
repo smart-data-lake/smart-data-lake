@@ -516,8 +516,6 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     connection.dropTable(table.fullName)
   }
 
-  override def factory: FromConfigFactory[DataObject] = JdbcTableDataObject
-
   /**
    * Listing virtual partitions by a "select distinct partition-columns" query
    */

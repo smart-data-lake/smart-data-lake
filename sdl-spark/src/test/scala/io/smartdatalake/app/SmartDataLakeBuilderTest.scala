@@ -20,7 +20,7 @@ package io.smartdatalake.app
 
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.config.SdlConfigObject.{DataObjectId, stringToDataObjectId}
-import io.smartdatalake.config.{ConfigParser, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigParser, ExcludeFromSchemaExport, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.custom.TestCustomDfsTransformer
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
@@ -476,7 +476,7 @@ case class TestIncrementalDataObject(
                                       override val metadata: Option[DataObjectMetadata] = None,
                                       initVal: Int = 1
                                     )(implicit val instanceRegistry: InstanceRegistry)
-  extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput {
+  extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput with ExcludeFromSchemaExport {
 
   // State is the start number of the last delivered increment
   var previousState: Int = initVal
@@ -503,6 +503,4 @@ case class TestIncrementalDataObject(
   override def getState: Option[String] = {
     nextState.map(_.toString)
   }
-
-  override def factory: FromConfigFactory[DataObject] = null // this DataObject will not be instantiated from config files...
 }

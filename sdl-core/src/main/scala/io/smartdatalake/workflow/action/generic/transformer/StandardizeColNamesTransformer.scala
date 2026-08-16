@@ -76,7 +76,6 @@ case class StandardizeColNamesTransformer(override val name: String = "colNamesL
     df.standardizeColNames(camelCaseToLower, normalizeToAscii,
       removeNonStandardSQLNameChars, replaceNonStandardSQLNameCharsWithUnderscores)
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = StandardizeColNamesTransformer
 }
 
 object StandardizeColNamesTransformer extends FromConfigFactory[GenericDfTransformer] {

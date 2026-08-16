@@ -68,8 +68,6 @@ case class BasicAuthMode(
   }
   override def getHeaders: Map[String, String] = Map("Authorization" -> basicAuthValue(userSecret.resolve(), passwordSecret.resolve()))
 
-  override def factory: FromConfigFactory[HttpAuthMode] = BasicAuthMode
-
 }
 
 object BasicAuthMode extends FromConfigFactory[HttpAuthMode] {

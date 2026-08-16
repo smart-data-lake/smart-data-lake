@@ -80,8 +80,6 @@ case class AzureADClientGrantAuthMode(authority: StringOrSecret, applicationId: 
     Map("Authorization" -> s"Bearer $token")
   }
 
-  override def factory: FromConfigFactory[HttpAuthMode] = AzureADClientGrantAuthMode
-
 }
 
 object AzureADClientGrantAuthMode extends FromConfigFactory[HttpAuthMode] {

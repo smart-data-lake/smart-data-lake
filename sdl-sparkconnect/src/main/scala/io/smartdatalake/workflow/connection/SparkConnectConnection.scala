@@ -76,8 +76,6 @@ case class SparkConnectConnection(
     sparkSession.clearTags()
     sparkSession.addTag(s"${context.appConfig.appName}-$metadataId-runId-${context.executionId.runId}".replaceAll("[,.]", "-"))
   }
-
-  override def factory: FromConfigFactory[Connection] = SparkConnectConnection
 }
 
 object SparkConnectConnection extends FromConfigFactory[Connection] {

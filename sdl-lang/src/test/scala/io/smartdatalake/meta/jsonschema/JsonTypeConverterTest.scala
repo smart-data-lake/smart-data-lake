@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.meta.jsonschema
 
-import io.smartdatalake.config.{FromConfigFactory, SdlConfigObject}
+import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConfigObjectId, ConnectionId, DataObjectId}
 import io.smartdatalake.meta.GenericTypeDef
 import io.smartdatalake.meta.GenericTypeUtil.attributesForCaseClass
@@ -87,7 +87,6 @@ class JsonTypeConverterTest extends AnyFunSuite {
 
   case class TestDataObjectWithDataObjectId(id: DataObjectId) extends DataObject {
     override def metadata: Option[DataObjectMetadata] = None
-    override def factory: FromConfigFactory[DataObject] = null
   }
   test("do not add id in subtype of DataObject to json schema") {
     val typeDef = getGenericTypeDef(typeOf[TestDataObjectWithDataObjectId])
@@ -99,7 +98,6 @@ class JsonTypeConverterTest extends AnyFunSuite {
 
   case class TestConnectionWithConnectionId(id: ConnectionId) extends Connection {
     override def metadata: Option[ConnectionMetadata] = None
-    override def factory: FromConfigFactory[Connection] = null
   }
   test("do not add id in subtype of ConnectionId to json schema") {
     val typeDef = getGenericTypeDef(typeOf[TestConnectionWithConnectionId])

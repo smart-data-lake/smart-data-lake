@@ -70,7 +70,6 @@ case class SQLExpectation(override val name: String, override val description: O
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL aggExpression '$aggExpression'", Some(s"expectations.$name.aggExpression"), e)
     }
   }
-  override def factory: FromConfigFactory[Expectation] = SQLExpectation
 }
 
 object SQLExpectation extends FromConfigFactory[Expectation] {

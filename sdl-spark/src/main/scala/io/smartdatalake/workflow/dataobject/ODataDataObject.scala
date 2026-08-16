@@ -610,8 +610,6 @@ case class ODataDataObject(
   override def getState: Option[String] = {
     Some(nextState)
   }
-
-  override def factory: FromConfigFactory[DataObject] = ODataDataObject
 }
 
 object ODataDataObject extends FromConfigFactory[DataObject] with SmartDataLakeLogger {

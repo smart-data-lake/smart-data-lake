@@ -132,8 +132,6 @@ case class ExcelFileDataObject(override val id: DataObjectId,
       case c if " -.".contains(c) => '_' case c => c
     }.filter(validHeaderChars.contains)
   }
-
-  override def factory: FromConfigFactory[DataObject] = ExcelFileDataObject
 }
 
 object ExcelFileDataObject extends FromConfigFactory[DataObject] {

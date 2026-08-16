@@ -67,8 +67,6 @@ import java.nio.ByteBuffer
 case class AzureRelayAgent(override val id: AgentId, url: String, override val connections: Map[String, Connection] = Map())
   extends Agent with AgentClient with SmartDataLakeLogger {
 
-  override def factory: FromConfigFactory[Agent] = AzureRelayAgent
-
   override def getClient: AgentClient = this
 
   override def sendSDLMessage(message: SDLMessage)(implicit context: ActionPipelineContext): AgentResult = {

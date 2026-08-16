@@ -191,8 +191,6 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
       }
     } else None
   }
-
-  override def factory: FromConfigFactory[ExecutionMode] = PartitionDiffMode
 }
 
 object PartitionDiffMode extends FromConfigFactory[ExecutionMode] {

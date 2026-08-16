@@ -126,8 +126,6 @@ case class CopyAction(
       case _ => throw new IllegalStateException(s"($id) input ${input.id} doesn't support deleting data")
     }
 
-  override def factory: FromConfigFactory[Action] = CopyAction
-
   def toDebugString: String = ProductUtil.toDebugString(obj = this)
 
 }

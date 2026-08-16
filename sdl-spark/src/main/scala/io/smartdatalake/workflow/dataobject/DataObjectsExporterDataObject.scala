@@ -132,8 +132,6 @@ case class DataObjectsExporterDataObject(
       "connectionId"
     )
   }
-
-  override def factory: FromConfigFactory[DataObjectsExporterDataObject] = DataObjectsExporterDataObject
 }
 
 object DataObjectsExporterDataObject extends FromConfigFactory[DataObjectsExporterDataObject] {

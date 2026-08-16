@@ -74,7 +74,6 @@ case class DataObjectStateIncrementalMode() extends ExecutionMode {
       inputsWithIncrementalOutput.foreach(i => i.setState(i.getState))
     }
   }
-  override def factory: FromConfigFactory[ExecutionMode] = DataObjectStateIncrementalMode
 }
 
 object DataObjectStateIncrementalMode extends FromConfigFactory[ExecutionMode] {

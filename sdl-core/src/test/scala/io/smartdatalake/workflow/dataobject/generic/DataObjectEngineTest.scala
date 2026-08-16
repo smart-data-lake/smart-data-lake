@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.dataobject.generic
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, ExcludeFromSchemaExport, InstanceRegistry}
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -46,9 +46,8 @@ class DummyGenericTestEngine(dataObject: DummyEngineTestDataObject) extends Dumm
 }
 
 case class DummyEngineTestDataObject(override val id: DataObjectId)(implicit instanceRegistry: InstanceRegistry)
-  extends DataObject with HasEngineImplementation[DummyTestEngine] {
+  extends DataObject with HasEngineImplementation[DummyTestEngine] with ExcludeFromSchemaExport {
   override def metadata: Option[DataObjectMetadata] = None
-  override def factory: FromConfigFactory[DataObject] = throw new NotImplementedError()
   override protected def createEngines: Seq[DummyTestEngine] =
     DataObjectEngine.createEngines[DummyTestEngine, DummyEngineTestDataObject](this, classOf[DummyEngineTestDataObject])
   override protected def engineNotFoundHint: String = "Add a dummy engine module."
@@ -69,9 +68,8 @@ case class DummyEngineTestDataObject(override val id: DataObjectId)(implicit ins
 private[smartdatalake] trait DummyMissingTestEngine extends DataObjectEngine
 
 case class DummyMissingEngineTestDataObject(override val id: DataObjectId)(implicit instanceRegistry: InstanceRegistry)
-  extends DataObject with HasEngineImplementation[DummyMissingTestEngine] {
+  extends DataObject with HasEngineImplementation[DummyMissingTestEngine] with ExcludeFromSchemaExport {
   override def metadata: Option[DataObjectMetadata] = None
-  override def factory: FromConfigFactory[DataObject] = throw new NotImplementedError()
   override protected def createEngines: Seq[DummyMissingTestEngine] =
     DataObjectEngine.createEngines[DummyMissingTestEngine, DummyMissingEngineTestDataObject](this, classOf[DummyMissingEngineTestDataObject])
   override protected def engineNotFoundHint: String = "Add a dummy engine module."

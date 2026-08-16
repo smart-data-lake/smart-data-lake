@@ -135,8 +135,6 @@ case class ActionsExporterDataObject(id: DataObjectId,
       "cacheInput"
     )
   }
-
-  override def factory: FromConfigFactory[ActionsExporterDataObject] = ActionsExporterDataObject
 }
 
 object ActionsExporterDataObject extends FromConfigFactory[ActionsExporterDataObject] {

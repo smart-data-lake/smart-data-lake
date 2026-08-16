@@ -254,8 +254,6 @@ case class MockSparkDataObject(override val id: DataObjectId,
 
   private def getPartitionValueFilter(pv: PartitionValues) = pv.getFilterExpr.asInstanceOf[SparkColumn].inner
 
-  override def factory: FromConfigFactory[DataObject] = MockSparkDataObject
-
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {}
 
 

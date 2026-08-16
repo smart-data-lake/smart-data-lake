@@ -69,8 +69,6 @@ case class WhitelistTransformer(override val name: String = "whitelist", overrid
     val colsToSelect = df.schema.filterColumns(columnWhitelist)
     df.select(colsToSelect.map(SQLUtil.sparkQuoteSQLIdentifier).map(col))
   }
-
-  override def factory: FromConfigFactory[GenericDfTransformer] = WhitelistTransformer
 }
 
 object WhitelistTransformer extends FromConfigFactory[GenericDfTransformer] {

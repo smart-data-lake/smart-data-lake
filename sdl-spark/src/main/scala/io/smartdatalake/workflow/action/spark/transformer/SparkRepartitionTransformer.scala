@@ -64,7 +64,6 @@ case class SparkRepartitionTransformer(override val name: String = "sparkReparti
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     SparkRepartitionDef.repartitionDataFrame(df, partitionValues, dataObjectId, keyCols, numberOfTasksPerPartition)
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = SparkRepartitionTransformer
 }
 
 object SparkRepartitionTransformer extends FromConfigFactory[GenericDfTransformer] {

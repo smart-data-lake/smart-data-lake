@@ -404,8 +404,6 @@ case class HistorizeAction(
     super.reset
     existingDfNeedsHashColumn = None
   }
-
-  override def factory: FromConfigFactory[Action] = HistorizeAction
 }
 
 object HistorizeAction extends FromConfigFactory[Action] {

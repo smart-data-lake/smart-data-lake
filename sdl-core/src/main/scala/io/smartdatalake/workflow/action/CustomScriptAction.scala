@@ -89,8 +89,6 @@ case class CustomScriptAction(override val id: ActionId,
     lastLine.map(_.split(' ').map(_.split('=')).filter(_.length==2).map{case Array(k,v) => (k,v)}.toMap).getOrElse(Map())
   }
 
-  override def factory: FromConfigFactory[Action] = CustomScriptAction
-
 }
 
 object CustomScriptAction extends FromConfigFactory[Action] {

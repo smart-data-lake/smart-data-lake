@@ -115,7 +115,6 @@ case class ScalaCodeSparkDfsTransformer(
       options: Map[String, String]
   )(implicit context: ActionPipelineContext): Map[String, DataFrame] =
     fnTransform(getSparkSession, options, dfs)
-  override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaCodeSparkDfsTransformer
 }
 
 object ScalaCodeSparkDfsTransformer extends FromConfigFactory[GenericDfsTransformer] {

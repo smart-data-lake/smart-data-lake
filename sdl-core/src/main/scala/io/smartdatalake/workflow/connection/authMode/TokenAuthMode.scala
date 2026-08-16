@@ -74,8 +74,6 @@ case class TokenAuthMode(
     Map("Authorization" -> s"$tokenType ${tokenSecret.resolve()}")
 
   override def getToken: String = tokenSecret.resolve()
-
-  override def factory: FromConfigFactory[HttpAuthMode] = TokenAuthMode
 }
 
 object TokenAuthMode extends FromConfigFactory[HttpAuthMode] {

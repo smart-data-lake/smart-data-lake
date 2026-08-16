@@ -81,8 +81,6 @@ case class ScalaClassSparkDsTransformer(override val name: String = "ScalaClassS
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
     customTransformer.transformPartitionValues(options, partitionValues)
   }
-
-  override def factory: FromConfigFactory[GenericDfTransformer] = ScalaClassSparkDsTransformer
 }
 
 object ScalaClassSparkDsTransformer extends FromConfigFactory[GenericDfTransformer] {

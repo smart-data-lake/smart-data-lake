@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.communication.agent.AgentClient
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.{ExcludeFromSchemaExport, FromConfigFactory, InstanceRegistry, SdlConfigObject}
+import io.smartdatalake.config.{ExcludeFromSchemaExport, InstanceRegistry, SdlConfigObject}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.dag.DAGHelper.NodeId
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
@@ -41,8 +41,6 @@ case class ProxyAction(wrappedAction: Action, override val id: SdlConfigObject.A
                       (implicit val instanceRegistry: InstanceRegistry) extends Action with ExcludeFromSchemaExport {
   assert(wrappedAction.isInstanceOf[DataFrameActionImpl], "Only Actions handling DataFrames supported by ProxyAction for now")
   private val dataFrameAction = wrappedAction.asInstanceOf[DataFrameActionImpl]
-
-  override def factory: FromConfigFactory[Action] = wrappedAction.factory
 
   override def nodeId: NodeId = wrappedAction.nodeId
 

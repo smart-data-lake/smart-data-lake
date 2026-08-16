@@ -52,8 +52,6 @@ case class ScalaConnection (
                            ) extends Connection with EngineConnection {
 
   override def subFeedType: universe.Type = typeOf[ScalaSubFeed]
-
-  override def factory: FromConfigFactory[Connection] = ScalaConnection
 }
 
 object ScalaConnection extends FromConfigFactory[Connection] {

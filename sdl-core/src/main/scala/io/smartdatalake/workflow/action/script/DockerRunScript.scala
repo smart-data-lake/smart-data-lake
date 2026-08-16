@@ -87,8 +87,6 @@ case class DockerRunScript(override val name: String = "docker-run", override va
     cmd ++ dockerParameters ++ Seq(image) ++ runParameters
   }
 
-  override def factory: FromConfigFactory[ParsableScriptDef] = DockerRunScript
-
   override private[smartdatalake] def isWslCmd = EnvironmentUtil.isWindowsOS && winDockerCmd.startsWith("wsl")
 }
 

@@ -95,8 +95,6 @@ case class BigQueryTableConnection(override val id: ConnectionId,
   lazy val bigQueryObject = getBigQueryObject
 
 
-  override def factory: FromConfigFactory[Connection] = BigQueryTableConnection
-
 }
 
 object BigQueryTableConnection extends FromConfigFactory[Connection] {

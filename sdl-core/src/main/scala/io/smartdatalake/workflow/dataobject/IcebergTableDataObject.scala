@@ -277,8 +277,6 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   override def getColumnStats(update: Boolean, lastModifiedAt: Option[Long])
                              (implicit context: ActionPipelineContext): Map[String, Map[String, Any]] = engine.getColumnStats(update, lastModifiedAt)
 
-  override def factory: FromConfigFactory[DataObject] = IcebergTableDataObject
-
   private[smartdatalake] var incrementalOutputExpr: Option[String] = None
 
   /**

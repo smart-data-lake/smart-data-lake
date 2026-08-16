@@ -252,8 +252,6 @@ case class OpenApiDataObject(override val id: DataObjectId,
     }
   }
 
-  override def factory: FromConfigFactory[DataObject] = OpenApiDataObject
-
 }
 
 object OpenApiDataObject extends FromConfigFactory[DataObject] {

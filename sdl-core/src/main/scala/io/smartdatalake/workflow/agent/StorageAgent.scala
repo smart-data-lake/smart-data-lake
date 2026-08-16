@@ -99,8 +99,6 @@ case class StorageAgent(override val id: AgentId, path: String, startTimeoutSec:
   }
 
   override def getClient: AgentClient = this
-
-  override def factory: FromConfigFactory[Agent] = StorageAgent
 }
 
 object StorageAgent extends FromConfigFactory[Agent] {

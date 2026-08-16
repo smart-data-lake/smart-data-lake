@@ -90,7 +90,6 @@ case class ColumnsTransformer(override val name: String = "additionalColumns", o
     }
     dfDropped
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = ColumnsTransformer
 }
 
 object ColumnsTransformer extends FromConfigFactory[GenericDfTransformer] {

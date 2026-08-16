@@ -201,8 +201,6 @@ case class DeduplicateAction(
 
   override def transformPartitionValues(partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): Map[PartitionValues, PartitionValues] =
     applyTransformers(getTransformers, partitionValues, executionModeResultOptions)
-
-  override def factory: FromConfigFactory[Action] = DeduplicateAction
 }
 
 object DeduplicateAction extends FromConfigFactory[Action] {

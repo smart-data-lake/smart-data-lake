@@ -100,7 +100,6 @@ case class SQLQueryExpectation(override val name: String, override val descripti
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL code '$code': ${e.getClass.getSimpleName} ${e.getMessage}", Some(s"expectations.$name.code"), e)
     }
   }
-  override def factory: FromConfigFactory[Expectation] = SQLQueryExpectation
 }
 
 object SQLQueryExpectation extends FromConfigFactory[Expectation] {

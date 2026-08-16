@@ -121,8 +121,6 @@ case class RawFileDataObject( override val id: DataObjectId,
     customPartitionLayout.orElse(super.partitionLayout())
   }
 
-  override def factory: FromConfigFactory[DataObject] = RawFileDataObject
-
 }
 
 object RawFileDataObject extends FromConfigFactory[DataObject] {

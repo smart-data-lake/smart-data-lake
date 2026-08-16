@@ -115,7 +115,6 @@ case class ScalaNotebookSparkDfTransformer(
       options: Map[String, String]
   )(implicit context: ActionPipelineContext): DataFrame =
     fnTransform(getSparkSession, options, df, dataObjectId.id)
-  override def factory: FromConfigFactory[GenericDfTransformer] = ScalaNotebookSparkDfTransformer
 }
 
 object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransformer] {

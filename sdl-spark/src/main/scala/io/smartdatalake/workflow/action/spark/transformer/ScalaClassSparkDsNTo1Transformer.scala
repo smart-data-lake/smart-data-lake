@@ -194,8 +194,6 @@ case class ScalaClassSparkDsNTo1Transformer(override val description: Option[Str
         (paramIndex, ds)
     }
   }
-
-  override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSparkDsNTo1Transformer
 }
 
 object ScalaClassSparkDsNTo1Transformer extends FromConfigFactory[GenericDfsTransformer] {

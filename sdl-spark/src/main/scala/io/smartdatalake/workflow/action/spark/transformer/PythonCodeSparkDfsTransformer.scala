@@ -128,7 +128,6 @@ case class PythonCodeDfsTransformer(
         )
     }
   }
-  override def factory: FromConfigFactory[GenericDfsTransformer] = PythonCodeDfsTransformer
 }
 
 object PythonCodeDfsTransformer extends FromConfigFactory[GenericDfsTransformer] {

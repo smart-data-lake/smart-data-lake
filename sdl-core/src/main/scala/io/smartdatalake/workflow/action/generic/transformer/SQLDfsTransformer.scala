@@ -136,8 +136,6 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform",
       yield (key, (map1.get(key), map2.get(key)))
     zipped.toMap
   }
-
-  override def factory: FromConfigFactory[GenericDfsTransformer] = SQLDfsTransformer
 }
 
 object SQLDfsTransformer extends FromConfigFactory[GenericDfsTransformer] {

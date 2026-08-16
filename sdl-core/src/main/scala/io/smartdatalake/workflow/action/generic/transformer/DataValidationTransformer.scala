@@ -70,7 +70,6 @@ case class DataValidationTransformer(override val name: String = "dataValidation
     import functions._
     df.withColumn(errorsColumn, array_construct_compact(rules.map(rule => rule.getValidationColumn).toIndexedSeq: _*))
   }
-  override def factory: FromConfigFactory[GenericDfTransformer] = DataValidationTransformer
 }
 
 object DataValidationTransformer extends FromConfigFactory[GenericDfTransformer] {

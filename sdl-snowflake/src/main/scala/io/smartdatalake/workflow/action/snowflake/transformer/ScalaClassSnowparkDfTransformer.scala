@@ -85,7 +85,6 @@ case class ScalaClassSnowparkDfTransformer(override val name: String = "scalaSpa
   }
 
   override def getSubFeedSupportedType: Type = typeOf[SnowparkSubFeed]
-  override def factory: FromConfigFactory[GenericDfTransformer] = ScalaClassSnowparkDfTransformer
 }
 
 object ScalaClassSnowparkDfTransformer extends FromConfigFactory[GenericDfTransformer] {

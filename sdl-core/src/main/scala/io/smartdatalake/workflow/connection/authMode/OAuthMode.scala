@@ -116,8 +116,6 @@ case class OAuthMode (
   override def getToken: String = {
     oAuth2Service.getToken.token(useIdToken)
   }
-
-  override def factory: FromConfigFactory[HttpAuthMode] = OAuthMode
 }
 
 

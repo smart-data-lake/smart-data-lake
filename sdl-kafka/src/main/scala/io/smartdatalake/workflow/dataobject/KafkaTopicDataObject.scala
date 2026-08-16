@@ -615,8 +615,6 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     consumer.commitSync(offsetsToCommit.toMap.asJava)
     logger.info(s"($id) committed offsets: ${incrementalOutputState.get.mkString(",")}")
   }
-
-  override def factory: FromConfigFactory[DataObject] = KafkaTopicDataObject
 }
 
 object KafkaColumnType extends Enumeration {

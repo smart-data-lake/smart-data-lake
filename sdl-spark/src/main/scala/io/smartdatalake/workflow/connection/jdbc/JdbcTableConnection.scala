@@ -193,8 +193,6 @@ case class JdbcTableConnection(
     val resultSet: ResultSet = connectionMetadata.getPrimaryKeys(catalog, schema, tableName)
     this.catalog.handlePrimaryKeyResultSet(resultSet)
   }
-
-  override def factory: FromConfigFactory[Connection] = JdbcTableConnection
 }
 
 object JdbcTableConnection extends FromConfigFactory[Connection] {

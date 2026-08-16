@@ -88,8 +88,6 @@ case class ScalaClassSnowparkDfsTransformer(name: String = "snowparkScalaTransfo
   }
 
   override def getSubFeedSupportedType: Type = typeOf[SnowparkSubFeed]
-
-  override def factory: FromConfigFactory[GenericDfsTransformer] = ScalaClassSnowparkDfsTransformer
 }
 
 // This companion object ensures that SnowparkDfsTransformer can be parsed from the configuration

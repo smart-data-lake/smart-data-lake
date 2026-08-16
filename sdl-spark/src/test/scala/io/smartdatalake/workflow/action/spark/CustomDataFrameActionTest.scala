@@ -656,7 +656,6 @@ case class TestResultOptionsCustomMode() extends ExecutionMode {
   override def apply(actionId: SdlConfigObject.ActionId, input: DataObject, output: DataObject, subFeed: SubFeed, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues,PartitionValues])(implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
     Some(ExecutionModeResult(options = Map("testOption" -> "test")))
   }
-  override def factory: FromConfigFactory[ExecutionMode] = TestResultOptionsCustomMode
 }
 object TestResultOptionsCustomMode extends FromConfigFactory[ExecutionMode] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): TestResultOptionsCustomMode = {
@@ -669,7 +668,6 @@ case class TestResultOutputPvsExecutionMode() extends ExecutionMode {
     // only first inputPartitionValue as outputPartitionValue
     Some(ExecutionModeResult(inputPartitionValues = subFeed.partitionValues, outputPartitionValues = Some(subFeed.partitionValues.take(1))))
   }
-  override def factory: FromConfigFactory[ExecutionMode] = TestResultOutputPvsExecutionMode
 }
 object TestResultOutputPvsExecutionMode extends FromConfigFactory[ExecutionMode] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): TestResultOutputPvsExecutionMode = {

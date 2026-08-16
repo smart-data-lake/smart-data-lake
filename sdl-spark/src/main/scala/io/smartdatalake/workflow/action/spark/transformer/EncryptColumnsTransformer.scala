@@ -87,8 +87,6 @@ case class EncryptColumnsTransformer(override val name: String = "encryptColumns
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame = {
     crypt.encryptColumns(df, encryptColumns)
   }
-
-  override def factory: FromConfigFactory[GenericDfTransformer] = EncryptColumnsTransformer
 }
 
 object EncryptColumnsTransformer extends FromConfigFactory[GenericDfTransformer] {

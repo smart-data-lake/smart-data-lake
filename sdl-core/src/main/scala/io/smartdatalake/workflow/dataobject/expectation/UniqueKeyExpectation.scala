@@ -112,7 +112,6 @@ case class UniqueKeyExpectation(
     // only calculate metrics as DataFrame observation for approximate_count_distinct function, as count_distinct is not supported as aggregate function for Spark observations.
     super.calculateAsJobDataFrameObservation && approximate
   }
-  override def factory: FromConfigFactory[Expectation] = UniqueKeyExpectation
 }
 
 object UniqueKeyExpectation extends FromConfigFactory[Expectation] {

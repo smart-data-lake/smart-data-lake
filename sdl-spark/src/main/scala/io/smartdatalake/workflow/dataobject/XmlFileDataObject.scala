@@ -98,8 +98,6 @@ case class XmlFileDataObject(override val id: DataObjectId,
     // return
     metrics
   }
-
-  override def factory: FromConfigFactory[DataObject] = XmlFileDataObject
 }
 
 object XmlFileDataObject extends FromConfigFactory[DataObject] {

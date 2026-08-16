@@ -84,8 +84,6 @@ case class DeduplicateTransformer(override val name: String = "DeduplicateTransf
       df.dropDuplicates(primaryKey)
     }
   }
-
-  override def factory: FromConfigFactory[GenericDfTransformer] = DeduplicateTransformer
 }
 
 object DeduplicateTransformer extends FromConfigFactory[GenericDfTransformer] {
