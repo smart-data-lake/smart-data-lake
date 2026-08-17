@@ -82,7 +82,9 @@ case class ScalaSubFeed(@transient override val dataFrame: Option[ScalaDataFrame
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: SdlConfigObject.DataObjectId)(implicit context: ActionPipelineContext): ScalaSubFeed = {
     // apply input filters
     val inputFilters = result.filtersForInput(this.dataObjectId == mainInputId)
-    this.copy(partitionValues = result.inputPartitionValues, filters = inputFilters, isSkipped = false, executionModeResultOptions = result.options).breakLineage // breaklineage keeps DataFrame schema without content
+    // the execution mode changed partition values and filters, so an existing DataFrame no longer matches them and is
+    // dropped by breakLineage. Its schema is kept, see SubFeed.breakLineage.
+    this.copy(partitionValues = result.inputPartitionValues, filters = inputFilters, isSkipped = false, executionModeResultOptions = result.options).breakLineage
       .asInstanceOf[ScalaSubFeed]
   }
 

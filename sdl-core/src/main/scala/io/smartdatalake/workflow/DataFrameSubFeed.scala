@@ -113,9 +113,11 @@ trait DataFrameSubFeed extends SubFeed {
   }
 
   override def breakLineage(implicit context: ActionPipelineContext): DataFrameSubFeed = {
-    // The DataFrame is dropped in order to truncate the engines logical plan. The schema is kept, so that
-    // subsequent Actions can still validate the lineage in init phase. A DataFrame is recreated on demand,
-    // see DataFrameActionImpl.enrichSubFeedDataFrame.
+    // The DataFrame is dropped in order to truncate the engines logical plan. The schema is kept, so that subsequent
+    // Actions can still validate the lineage of Actions and DataObjects in init phase. A DataFrame is recreated on
+    // demand, see DataFrameActionImpl.enrichSubFeedDataFrame.
+    // Exception: a simulation run passes the data through in memory without writing it, so it can not be reread from
+    // the DataObject and the DataFrame must be kept.
     if (dataFrame.isDefined && !context.simulation) withDataFrame(None) else this
   }
 

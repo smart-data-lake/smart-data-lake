@@ -45,9 +45,16 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
 
   /**
    * Break lineage.
-   * This means to discard an existing DataFrame or List of FileRefs, so that it is requested again from the DataObject.
-   * On one side this is usable to break long DataFrame Lineages over multiple Actions and instead reread the data from
-   * an intermediate table. On the other side it is needed if partition values or filter condition are changed.
+   * This means to discard the data transported by this SubFeed, so that it is requested again from the DataObject.
+   *
+   * What is broken is the lineage of the *engine*, e.g. the Spark or Snowpark logical plan. On one side this is usable to
+   * truncate long plans spanning multiple Actions and instead reread the data from an intermediate table. On the other
+   * side it is needed if partition values or filter conditions are changed, as the existing data no longer matches them.
+   *
+   * This does *not* break the lineage of Actions and DataObjects known to SDLB: a [[DataFrameSubFeed]] keeps its schema
+   * (see [[DataFrameSubFeed.keptSchema]]), so that subsequent Actions can still be validated in init phase.
+   * Which data is discarded is implementation specific: [[DataFrameSubFeed]] drops its DataFrame, [[FileSubFeed]] drops
+   * its FileRefs, while [[ScriptSubFeed]] and [[InitSubFeed]] transport no data and are left unchanged.
    */
   def breakLineage(implicit context: ActionPipelineContext): SubFeed
 

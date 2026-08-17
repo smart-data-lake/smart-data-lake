@@ -77,7 +77,9 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SnowparkSubFeed = {
     // apply input filters
     val inputFilters = result.filtersForInput(this.dataObjectId == mainInputId)
-    this.copy(partitionValues = result.inputPartitionValues, filters = inputFilters, isSkipped = false, executionModeResultOptions = result.options).breakLineage // breaklineage keeps the schema without the DataFrame
+    // the execution mode changed partition values and filters, so an existing DataFrame no longer matches them and is
+    // dropped by breakLineage. Its schema is kept, see SubFeed.breakLineage.
+    this.copy(partitionValues = result.inputPartitionValues, filters = inputFilters, isSkipped = false, executionModeResultOptions = result.options).breakLineage
       .asInstanceOf[SnowparkSubFeed]
   }
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SnowparkSubFeed = {
