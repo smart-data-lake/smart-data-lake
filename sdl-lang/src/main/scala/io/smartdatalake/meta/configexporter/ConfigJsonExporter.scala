@@ -53,20 +53,25 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
   val appType: String = getClass.getSimpleName.replaceAll("\\$$", "") // remove $ from object name and use it as appType
 
   /**
-   * Transformer types implemented as Java/Scala class which support a dynamic transform method, with the name of
-   * their configuration parameter holding the class name. For these the parameters of the transform method are
-   * exported to be shown in the UI.
+   * Transformer types implemented as Java/Scala class which support a dynamic transform method. For these the
+   * parameters of the transform method are exported to be shown in the UI.
+   * They all hold the class name in configuration parameter [[CLASS_NAME_PARAMETER]].
    * Note that they are listed by name, as not all corresponding modules are on the classpath of the exporter.
    */
-  private[configexporter] val customTransformerTypesWithClassName: Map[String, String] = Map(
-    "ScalaClassSparkDfsTransformer" -> "className",
-    "ScalaClassSparkDfTransformer" -> "className",
-    "ScalaClassSparkDsTransformer" -> "transformerClassName",
-    "ScalaClassGenericDfsTransformer" -> "className",
-    "ScalaClassGenericDfTransformer" -> "className",
-    "ScalaClassSnowparkDfsTransformer" -> "className",
-    "ScalaClassSnowparkDfTransformer" -> "className"
+  private[configexporter] val customTransformerTypes: Set[String] = Set(
+    "ScalaClassSparkDfsTransformer",
+    "ScalaClassSparkDfTransformer",
+    "ScalaClassGenericDfsTransformer",
+    "ScalaClassGenericDfTransformer",
+    "ScalaClassSnowparkDfsTransformer",
+    "ScalaClassSnowparkDfTransformer"
   )
+
+  /**
+   * Name of the configuration parameter holding the class name of the transformer types listed in
+   * [[customTransformerTypes]].
+   */
+  private[configexporter] val CLASS_NAME_PARAMETER = "className"
 
   protected val parser: OptionParser[ConfigJsonExporterConfig] = new OptionParser[ConfigJsonExporterConfig](appType) {
     override def showUsageOnError: Option[Boolean] = Some(true)
@@ -334,16 +339,14 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
       // condition
       value.valueType == ConfigValueType.STRING &&
         key == "type" &&
-        ConfigJsonExporter.customTransformerTypesWithClassName.contains(value.unwrapped.asInstanceOf[String])
+        ConfigJsonExporter.customTransformerTypes.contains(value.unwrapped.asInstanceOf[String])
     }
     val customTransformerConfigurationPaths = HoconUtil.findInConfigObject(config.root, searchCondition)
     // enrich config with custom transformer parameters if available
     logger.info(s"Enriching custom transformer parameter information for ${customTransformerConfigurationPaths.length} transformers")
     customTransformerConfigurationPaths.foldLeft(config) {
       case (config, path) =>
-        val transformerType = getConfigValue(config.root(), path).unwrapped().asInstanceOf[String]
-        val classNameParameter = ConfigJsonExporter.customTransformerTypesWithClassName(transformerType)
-        val className = getConfigValue(config.root(), path.init :+ classNameParameter).unwrapped().asInstanceOf[String]
+        val className = getConfigValue(config.root(), path.init :+ ConfigJsonExporter.CLASS_NAME_PARAMETER).unwrapped().asInstanceOf[String]
         val classInstance = CustomCodeUtil.getClassInstanceByName[CustomTransformMethodDef](className)
         val parameters = classInstance.customTransformMethod.map(CustomCodeUtil.analyzeMethodParameters(None, _))
         if (parameters.isDefined) {

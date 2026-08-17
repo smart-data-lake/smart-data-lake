@@ -55,6 +55,8 @@ import org.slf4j.Logger
  * Pick this transformer when the transformation logic is too complex for SQL and should live in compiled, unit-testable
  * code. The class named by `className` must be on the classpath of the SDLB job and needs a constructor without
  * arguments. For transformations with multiple inputs or outputs use [[ScalaClassSparkDfsTransformer]] instead.
+ * For strongly typed code use a dynamic transform method with `Dataset[<Product>]` parameters and return type,
+ * e.g. `transform(ds: Dataset[Rating], factor: Int = 2): Dataset[Rating]`.
  *
  * Example:
  * {{{

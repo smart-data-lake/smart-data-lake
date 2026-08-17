@@ -72,7 +72,7 @@ import scala.util.{Failure, Success}
  * }}}
  *
  * @note The notebook is downloaded on every job start, so the pipeline result depends on the current
- *       notebook content. Prefer [[ScalaCodeSparkDfTransformer]] or [[ScalaClassSparkDsTransformer]]
+ *       notebook content. Prefer [[ScalaCodeSparkDfTransformer]] or [[ScalaClassSparkDfTransformer]]
  *       for reproducible production pipelines.
  *
  * @param name
