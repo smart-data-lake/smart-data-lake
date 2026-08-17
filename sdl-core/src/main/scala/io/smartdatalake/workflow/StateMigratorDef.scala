@@ -143,9 +143,13 @@ class StateMigratorDef4To5 extends StateMigratorDef with SmartDataLakeLogger {
  * Migrate state from format version 5 to 6:
  * - SubFeeds got a new attribute `executionModeResultOptions`, holding the options returned by the ExecutionMode
  *   of the Action which created the SubFeed.
- *
- * No transformation of existing content is needed: the attribute is missing in older state files and defaults to
- * an empty Map when read. Only the version number is updated.
+ *   No transformation of existing content is needed: the attribute is missing in older state files and defaults to
+ *   an empty Map when read.
+ * - the SubFeed attribute `filter: Option[String]` is replaced by `filters: Seq[ColumnFilter]`.
+ *   The column a legacy filter belongs to is not known, so legacy filters are dropped. This is safe because SubFeeds
+ *   read from the state are output SubFeeds of completed Actions, and only filters with propagate=true are passed on
+ *   to the next Action anyway, see DataFrameActionImpl.updateOutputFilters.
+ *   `filters` defaults to an empty Seq when missing.
  */
 class StateMigratorDef5To6 extends StateMigratorDef with SmartDataLakeLogger {
   override val versionFrom = 5
@@ -159,33 +163,8 @@ class StateMigratorDef5To6 extends StateMigratorDef with SmartDataLakeLogger {
           s" but found unexpected type during migration from version $versionFrom to $versionTo")
     }, s"Version should be equals or less than $versionFrom")
 
-    // only the version is updated, executionModeResultOptions defaults to an empty Map when missing
-    updateVersion(json, versionTo)
-  }
-}
-
-/**
- * Migrate state from format version 6 to 7:
- * - the SubFeed attribute `filter: Option[String]` is replaced by `filters: Seq[ColumnFilter]`.
- *
- * The column a legacy filter belongs to is not known, so legacy filters are dropped. This is safe because SubFeeds
- * read from the state are output SubFeeds of completed Actions, and only filters with propagate=true are passed on
- * to the next Action anyway, see DataFrameActionImpl.updateOutputFilters.
- * `filters` defaults to an empty Seq when missing.
- */
-class StateMigratorDef6To7 extends StateMigratorDef with SmartDataLakeLogger {
-  override val versionFrom = 6
-  override val versionTo = 7
-  override def migrate(json: JObject): JObject = {
-    assert(json \ "runStateFormatVersion" match {
-      case JInt(version) => version <= versionFrom
-      case JNothing => true // first state files did not have an attribute runStateFormatVersion
-      case _ =>
-        throw new IllegalStateException(s"Expected runStateFormatVersion to be an integer or missing," +
-          s" but found unexpected type during migration from version $versionFrom to $versionTo")
-    }, s"Version should be equals or less than $versionFrom")
-
-    // drop the legacy SubFeed attribute `filter`, which is only ever a string
+    // drop the legacy SubFeed attribute `filter`, which is only ever a string.
+    // executionModeResultOptions needs no transformation, it defaults to an empty Map when missing.
     val migratedJson = json.removeField {
       case (name, JString(_)) if name == "filter" =>
         logger.debug("dropping legacy SubFeed attribute 'filter' during state migration")

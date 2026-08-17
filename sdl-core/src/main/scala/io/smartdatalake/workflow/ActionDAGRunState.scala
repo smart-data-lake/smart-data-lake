@@ -88,7 +88,7 @@ case class DataObjectState(dataObjectId: DataObjectId, state: String) {
 private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
 
   // Note: if increasing this version, please check if a StateMigrator is needed to read files of older versions. See also stateMigrators below.
-  val runStateFormatVersion: Int = 7
+  val runStateFormatVersion: Int = 6
 
   implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections(ConfigParser.WORKFLOW_PACKAGE)
 
@@ -159,8 +159,7 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
   private val stateMigrators: Seq[StateMigratorDef] = Seq(
     new StateMigratorDef3To4(),
     new StateMigratorDef4To5(),
-    new StateMigratorDef5To6(),
-    new StateMigratorDef6To7()
+    new StateMigratorDef5To6()
   ).sortBy(_.versionFrom) // force ordering
   assert(stateMigrators.groupBy(_.versionFrom).forall(_._2.size == 1)) // check that versionFrom is unique
   assert(stateMigrators.forall(m => m.versionFrom + 1 == m.versionTo)) // check that a state migrator always converts to the next version, without skipping a version.

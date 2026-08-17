@@ -23,11 +23,11 @@ import org.json4s.jackson.JsonMethods
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-class StateMigratorDef6To7Test extends AnyFlatSpec with Matchers {
+class StateMigratorDef5To6Test extends AnyFlatSpec with Matchers {
 
-  private val stateV6 =
+  private val stateV5 =
     """{
-      |  "runStateFormatVersion": 6,
+      |  "runStateFormatVersion": 5,
       |  "actionsState": {
       |    "load-test": {
       |      "results": [
@@ -37,14 +37,14 @@ class StateMigratorDef6To7Test extends AnyFlatSpec with Matchers {
       |  }
       |}""".stripMargin
 
-  "StateMigratorDef6To7" should "drop the legacy SubFeed filter and update the version" in {
-    val json = JsonMethods.parse(stateV6).asInstanceOf[JObject]
+  "StateMigratorDef5To6" should "drop the legacy SubFeed filter and update the version" in {
+    val json = JsonMethods.parse(stateV5).asInstanceOf[JObject]
     // the legacy attribute is present before the migration
     JsonMethods.compact(JsonMethods.render(json)) should include("\"filter\"")
 
-    val migrated = new StateMigratorDef6To7().migrate(json)
+    val migrated = new StateMigratorDef5To6().migrate(json)
 
-    (migrated \ "runStateFormatVersion") shouldBe JInt(7)
+    (migrated \ "runStateFormatVersion") shouldBe JInt(6)
     // the column a legacy filter belongs to is unknown, so it is dropped. `filters` defaults to an empty Seq.
     JsonMethods.compact(JsonMethods.render(migrated)) should not include "\"filter\""
     // the other attributes are untouched
@@ -52,7 +52,7 @@ class StateMigratorDef6To7Test extends AnyFlatSpec with Matchers {
       (json \ "actionsState" \ "load-test" \ "results" \ "dataObjectId")
   }
 
-  it should "be registered so that a version 6 state file can be read" in {
-    ActionDAGRunState.runStateFormatVersion shouldBe 7
+  it should "be registered so that a version 5 state file can be read" in {
+    ActionDAGRunState.runStateFormatVersion shouldBe 6
   }
 }
