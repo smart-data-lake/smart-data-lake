@@ -21,6 +21,7 @@ package io.smartdatalake.workflow.dataframe
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.workflow.ActionPipelineContext
 
+import java.time.Duration
 import scala.reflect.runtime.universe
 
 /**
@@ -44,6 +45,12 @@ trait DataFrameFunctions {
   def least(columns: GenericColumn*): GenericColumn
   def greatest(columns: GenericColumn*): GenericColumn
   def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn
+
+  /**
+   * Subtract a fixed duration from a timestamp column.
+   * Note that the resolution of the duration is limited to microseconds by most engines.
+   */
+  def timestampSubtract(column: GenericColumn, duration: Duration): GenericColumn
 
   /**
    * Construct array from given columns and removing null values

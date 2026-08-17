@@ -26,6 +26,8 @@ import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, ColumnFilter, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 
+import java.sql.Timestamp
+import java.time.Duration
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 
@@ -271,6 +273,17 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
         } else {
           throw new IllegalStateException(s"Invalid data type for 'substring' function: ${sparkColumn.dataType.getClass.getSimpleName}. Only String data type is supported.")
         }
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+
+  def timestampSubtract(column: GenericColumn, duration: Duration): GenericColumn = {
+    column match {
+      case scalaColumn: ScalaAbstractColumn =>
+        ScalaUnaryExpr(scalaColumn, "timestampSubtract", _.map {
+          case ts: Timestamp => Timestamp.from(ts.toInstant.minus(duration))
+          case v => throw new IllegalStateException(s"Invalid value for 'timestampSubtract' function: $v. Only Timestamp values are supported.")
+        }, Some(ScalaTimestampDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }

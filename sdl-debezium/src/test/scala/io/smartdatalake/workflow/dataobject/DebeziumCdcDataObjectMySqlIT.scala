@@ -51,8 +51,9 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
   implicit val sparkSession: SparkSession = SparkTestUtil.session
   import sparkSession.implicits._
 
-  val COMMIT_TYPE_COLUMN_NAME = "__commit_event"
-  val COMMIT_TIMESTAMP_COLUMN_NAME = "__event_timestamp"
+  val CHANGE_TYPE_COLUMN_NAME = "_change_type"
+  val COMMIT_TIMESTAMP_COLUMN_NAME = "_commit_timestamp"
+  val CHANGE_ORDINAL_COLUMN_NAME = "_change_ordinal"
 
   val jdbcConnection = JdbcTableConnection(
     id = "mysqlCon",
@@ -132,11 +133,11 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
       df.columns.contains("value") &&
       df.columns.contains("timestampCol") &&
       df.columns.contains("decimalCol") &&
-      df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+      df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
       df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
     )
 
-    assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
+    assert(df.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
 
   }
 
@@ -200,11 +201,11 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
       df.columns.contains("value") &&
       df.columns.contains("timestampCol") &&
       df.columns.contains("decimalCol") &&
-      df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+      df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
       df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
     )
 
-    assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("create")).filter(!$"test").isEmpty)
+    assert(df.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME) === lit("insert")).filter(!$"test").isEmpty)
 
   }
 
@@ -268,11 +269,11 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
       df.columns.contains("value") &&
       df.columns.contains("timestampCol") &&
       df.columns.contains("decimalCol") &&
-      df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+      df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
       df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
     )
 
-    assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME).isin(lit("update_preimage"), lit("update_postimage"))).collect().length == 2)
+    assert(df.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME).isin(lit("update_preimage"), lit("update_postimage"))).collect().length == 2)
 
   }
 
@@ -336,11 +337,11 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
       df.columns.contains("value") &&
       df.columns.contains("timestampCol") &&
       df.columns.contains("decimalCol") &&
-      df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+      df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
       df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
     )
 
-    assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("delete")).filter(!$"test").isEmpty)
+    assert(df.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME) === lit("delete")).filter(!$"test").isEmpty)
 
   }
 
@@ -403,7 +404,7 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
       df.columns.contains("value") &&
       df.columns.contains("timestampCol") &&
       df.columns.contains("decimalCol") &&
-      df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+      df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
       df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
     )
 

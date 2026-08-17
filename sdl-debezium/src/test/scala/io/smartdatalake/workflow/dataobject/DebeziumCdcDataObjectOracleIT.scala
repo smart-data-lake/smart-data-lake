@@ -55,8 +55,9 @@ object DebeziumCdcDataObjectOracleIT extends App with SmartDataLakeLogger {
 
   import sparkSession.implicits._
 
-  val COMMIT_TYPE_COLUMN_NAME = "__commit_event"
-  val COMMIT_TIMESTAMP_COLUMN_NAME = "__event_timestamp"
+  val CHANGE_TYPE_COLUMN_NAME = "_change_type"
+  val COMMIT_TIMESTAMP_COLUMN_NAME = "_commit_timestamp"
+  val CHANGE_ORDINAL_COLUMN_NAME = "_change_ordinal"
 
   val connection = DebeziumConnection(
     id = "dbzCon",
@@ -125,11 +126,11 @@ object DebeziumCdcDataObjectOracleIT extends App with SmartDataLakeLogger {
     df.columns.contains("VALUE") &&
     df.columns.contains("TIMESTAMPCOL") &&
     df.columns.contains("DECIMALCOL") &&
-    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
     df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
   )
 
-  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
+  assert(df.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
 
   // 2. Insert test
   jdbcConnection.execJdbcStatement(
@@ -144,11 +145,11 @@ object DebeziumCdcDataObjectOracleIT extends App with SmartDataLakeLogger {
     df.columns.contains("VALUE") &&
     df.columns.contains("TIMESTAMPCOL") &&
     df.columns.contains("DECIMALCOL") &&
-    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
     df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
   )
 
-  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("create")).filter(!$"test").isEmpty)
+  assert(df.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME) === lit("insert")).filter(!$"test").isEmpty)
 
   // 3. Update test
   jdbcConnection.execJdbcStatement("UPDATE C##DEMO.TEST SET VALUE = 'UPDATE TEST' WHERE VALUE = 'INSERT TEST'")
@@ -161,11 +162,11 @@ object DebeziumCdcDataObjectOracleIT extends App with SmartDataLakeLogger {
     df.columns.contains("VALUE") &&
     df.columns.contains("TIMESTAMPCOL") &&
     df.columns.contains("DECIMALCOL") &&
-    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
     df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
   )
 
-  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME).isin(lit("update_preimage"), lit("update_postimage"))).collect().length == 2)
+  assert(df.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME).isin(lit("update_preimage"), lit("update_postimage"))).collect().length == 2)
 
   // 4. Delete test
   jdbcConnection.execJdbcStatement("DELETE FROM C##DEMO.TEST WHERE VALUE = 'UPDATE TEST'")
@@ -178,11 +179,11 @@ object DebeziumCdcDataObjectOracleIT extends App with SmartDataLakeLogger {
     df.columns.contains("VALUE") &&
     df.columns.contains("TIMESTAMPCOL") &&
     df.columns.contains("DECIMALCOL") &&
-    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
     df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
   )
 
-  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("delete")).filter(!$"test").isEmpty)
+  assert(df.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME) === lit("delete")).filter(!$"test").isEmpty)
 
   // 5. No new data test
 
@@ -194,7 +195,7 @@ object DebeziumCdcDataObjectOracleIT extends App with SmartDataLakeLogger {
     df.columns.contains("VALUE") &&
     df.columns.contains("TIMESTAMPCOL") &&
     df.columns.contains("DECIMALCOL") &&
-    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
     df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
   )
 

@@ -522,6 +522,52 @@ object Environment extends SmartDataLakeLogger {
   var _delimitedColumnName: Option[String] = None
 
   /**
+   * Name of column that holds the type of a change-data-capture (CDC) event, see [[CdcChangeType]] for its values.
+   * Produced by CDC DataObjects like DebeziumCdcDataObject and interpreted by HistorizeAction.
+   * The name follows the change data feed of Delta Lake and Iceberg.
+   * Default is `_change_type`.
+   */
+  def cdcChangeTypeColumnName: String = {
+    if (_cdcChangeTypeColumnName.isEmpty) {
+      _cdcChangeTypeColumnName = Some(EnvironmentUtil.getSdlParameter("cdcChangeTypeColumnName").getOrElse("_change_type"))
+    }
+    _cdcChangeTypeColumnName.get
+  }
+
+  var _cdcChangeTypeColumnName: Option[String] = None
+
+  /**
+   * Name of column that holds the timestamp when a change-data-capture (CDC) event was committed in the source system.
+   * Produced by CDC DataObjects like DebeziumCdcDataObject and interpreted by HistorizeAction.
+   * The name follows the change data feed of Delta Lake.
+   * Default is `_commit_timestamp`.
+   */
+  def cdcCommitTimestampColumnName: String = {
+    if (_cdcCommitTimestampColumnName.isEmpty) {
+      _cdcCommitTimestampColumnName = Some(EnvironmentUtil.getSdlParameter("cdcCommitTimestampColumnName").getOrElse("_commit_timestamp"))
+    }
+    _cdcCommitTimestampColumnName.get
+  }
+
+  var _cdcCommitTimestampColumnName: Option[String] = None
+
+  /**
+   * Name of column that holds the position of a change-data-capture (CDC) event within the events received by one run.
+   * It is used to order events of the same primary key, as [[cdcCommitTimestampColumnName]] is not precise enough to
+   * separate changes committed within the same millisecond.
+   * The name follows the changelog view of Iceberg.
+   * Default is `_change_ordinal`.
+   */
+  def cdcChangeOrdinalColumnName: String = {
+    if (_cdcChangeOrdinalColumnName.isEmpty) {
+      _cdcChangeOrdinalColumnName = Some(EnvironmentUtil.getSdlParameter("cdcChangeOrdinalColumnName").getOrElse("_change_ordinal"))
+    }
+    _cdcChangeOrdinalColumnName.get
+  }
+
+  var _cdcChangeOrdinalColumnName: Option[String] = None
+
+  /**
    * Whether SDLB should throw an exception if a SparkListener doesn't get expected notifications.
    * If true SDLB will throw an exception and stop execution, otherwise a Warning is logged.
    * Default is false, e.g. a warning is logged.

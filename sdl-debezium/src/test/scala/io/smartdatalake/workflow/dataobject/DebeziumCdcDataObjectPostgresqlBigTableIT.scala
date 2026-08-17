@@ -57,8 +57,9 @@ object DebeziumCdcDataObjectPostgresqlBigTableIT extends App with SmartDataLakeL
 
   import sparkSession.implicits._
 
-  val COMMIT_TYPE_COLUMN_NAME = "__commit_event"
-  val COMMIT_TIMESTAMP_COLUMN_NAME = "__event_timestamp"
+  val CHANGE_TYPE_COLUMN_NAME = "_change_type"
+  val COMMIT_TIMESTAMP_COLUMN_NAME = "_commit_timestamp"
+  val CHANGE_ORDINAL_COLUMN_NAME = "_change_ordinal"
 
   val connection = DebeziumConnection(
     id = "dbzCon",
@@ -128,10 +129,10 @@ object DebeziumCdcDataObjectPostgresqlBigTableIT extends App with SmartDataLakeL
 
   assert(df.columns.contains("id") &&
     df.columns.contains("value") &&
-    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
     df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
   )
 
-  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
+  assert(df.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
 
 }

@@ -44,7 +44,9 @@ class JdbcHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with Sm
       dataObject.dropTable(SparkTestUtil.getDefaultActionPipelineContext(registry))
       dataObject
     },
-    tgtConnection = Some(jdbcConnection)
+    tgtConnection = Some(jdbcConnection),
+    // hsqldb does not accept the unquoted column name _change_type in the generated SQL statements
+    supportsColumnNamesWithUnderscorePrefix = false
   ))
 
   testsFor(historizeIncrementalPipeline(

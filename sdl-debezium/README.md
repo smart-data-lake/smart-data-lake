@@ -60,6 +60,9 @@ ALTER USER postgres WITH REPLICATION LOGIN;
 
 Running integration tests for Postgres can be done using DebeziumCdcDataObjectPostgresIT run configuration in IntelliJ.
 
+Note that its last test case historizes the change events into table `demo.test_hist`. That table is created and dropped
+by the test itself, so no additional ddl is needed.
+
 ### MySQL
 
 Server can easily be setup with an oneliner as docker / podman command:

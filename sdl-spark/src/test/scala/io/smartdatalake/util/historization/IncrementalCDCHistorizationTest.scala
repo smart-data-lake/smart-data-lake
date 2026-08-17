@@ -19,7 +19,7 @@
 package io.smartdatalake.util.historization
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.{CdcChangeType, Environment}
 import io.smartdatalake.testutils.spark.{SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.historization.HistorizationTestUtils._
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -30,6 +30,8 @@ import org.apache.spark.sql.types.TimestampType
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 import org.slf4j.Logger
+
+import java.sql.Timestamp
 
 /**
  * Unit tests for historization with incrementalCDCHistorize. incrementalCDCHistorize is much
@@ -86,6 +88,93 @@ class IncrementalCDCHistorizationTest extends AnyFunSuite with BeforeAndAfter wi
 
     val result = dfExpected.isEqual(dfHistorized)
     if (!result) printFailedTestResult("Deleted record creates updateClose record for merge statement")(dfHistorized)(dfExpected)
+    assert(result)
+  }
+
+  test("prepareCdcInput removes preimages and keeps the last event per primary key") {
+    val dataNewFeed = List(
+      (123, "Egon", 23, "healthy", CdcChangeType.insert, 0),
+      (123, "Egon", 24, "healthy", CdcChangeType.updatePreimage, 1),
+      (123, "Egon", 24, "sick", CdcChangeType.updatePostimage, 2),
+      (124, "Erika", 30, "healthy", CdcChangeType.updatePreimage, 3), // an event of another primary key is not mixed up
+      (124, "Erika", 31, "healthy", CdcChangeType.updatePostimage, 4)
+    )
+    val cdcColNames = colNames ++ Seq(Environment.cdcChangeTypeColumnName, Environment.cdcChangeOrdinalColumnName)
+    val dfNewFeed = toDataDf(dataNewFeed, cdcColNames)
+
+    val dfPrepared = Historization.prepareCdcInput(dfNewFeed, Seq("id"), Environment.cdcChangeTypeColumnName,
+      Some(Environment.cdcChangeOrdinalColumnName))
+
+    val dfExpected = toDataDf(Seq(
+      (123, "Egon", 24, "sick", CdcChangeType.updatePostimage, 2),
+      (124, "Erika", 31, "healthy", CdcChangeType.updatePostimage, 4)
+    ), cdcColNames)
+
+    val result = dfExpected.isEqual(dfPrepared)
+    if (!result) printFailedTestResult("prepareCdcInput removes preimages and keeps the last event per primary key")(dfPrepared)(dfExpected)
+    assert(result)
+  }
+
+  test("prepareCdcInput keeps a delete as last event of a primary key") {
+    val cdcColNames = colNames ++ Seq(Environment.cdcChangeTypeColumnName, Environment.cdcChangeOrdinalColumnName)
+    val dfNewFeed = toDataDf(List(
+      (123, "Egon", 23, "healthy", CdcChangeType.updatePostimage, 0),
+      (123, "Egon", 23, "healthy", CdcChangeType.delete, 1)
+    ), cdcColNames)
+
+    val dfPrepared = Historization.prepareCdcInput(dfNewFeed, Seq("id"), Environment.cdcChangeTypeColumnName,
+      Some(Environment.cdcChangeOrdinalColumnName))
+
+    val dfExpected = toDataDf(Seq((123, "Egon", 23, "healthy", CdcChangeType.delete, 1)), cdcColNames)
+
+    val result = dfExpected.isEqual(dfPrepared)
+    if (!result) printFailedTestResult("prepareCdcInput keeps a delete as last event of a primary key")(dfPrepared)(dfExpected)
+    assert(result)
+  }
+
+  test("prepareCdcInput without order column only removes preimages") {
+    val cdcColNames = colNames :+ Environment.cdcChangeTypeColumnName
+    val dfNewFeed = toDataDf(List(
+      (123, "Egon", 23, "healthy", CdcChangeType.updatePreimage),
+      (123, "Egon", 24, "healthy", CdcChangeType.updatePostimage),
+      (124, "Erika", 30, "healthy", CdcChangeType.insert)
+    ), cdcColNames)
+
+    val dfPrepared = Historization.prepareCdcInput(dfNewFeed, Seq("id"), Environment.cdcChangeTypeColumnName, None)
+
+    val dfExpected = toDataDf(Seq(
+      (123, "Egon", 24, "healthy", CdcChangeType.updatePostimage),
+      (124, "Erika", 30, "healthy", CdcChangeType.insert)
+    ), cdcColNames)
+
+    val result = dfExpected.isEqual(dfPrepared)
+    if (!result) printFailedTestResult("prepareCdcInput without order column only removes preimages")(dfPrepared)(dfExpected)
+    assert(result)
+  }
+
+  test("Validity of new versions starts at the commit timestamp of the source system") {
+    val commitTs = Timestamp.valueOf(referenceTimestampNew.minusDays(2))
+    val cdcColNames = colNames ++ Seq(Environment.cdcChangeTypeColumnName, Environment.cdcCommitTimestampColumnName)
+    val dfNewFeed = toDataDf(List((123, "Egon", 23, "healthy", CdcChangeType.updatePostimage, commitTs)), cdcColNames)
+
+    val dfHistorized = Historization.incrementalCDCHistorize(
+      dfNewFeed,
+      col(Environment.cdcChangeTypeColumnName) === lit(CdcChangeType.delete),
+      referenceTimestampNewTs,
+      defaultTimeAxisUnit,
+      Some(Environment.cdcCommitTimestampColumnName)
+    ).drop(Environment.cdcChangeTypeColumnName).drop(Environment.cdcCommitTimestampColumnName)
+
+    // the versions are delimited relative to the commit timestamp, not to the reference timestamp of the run
+    val commitTsPreviousTick = Timestamp.from(commitTs.toInstant.minusMillis(1))
+    val dfExpected = toDataDf(Seq(
+      (123, "Egon", 23, "healthy", true, HistorizationRecordOperations.updateClose, null, commitTsPreviousTick),
+      (123, "Egon", 23, "healthy", false, HistorizationRecordOperations.insertNew, commitTs, doomsdayTs)
+    ), colNames ++ Seq("dl_dummy", Historization.historizeOperationColName, Environment.capturedColumnName,
+      Environment.delimitedColumnName))
+
+    val result = dfExpected.isEqual(dfHistorized)
+    if (!result) printFailedTestResult("Validity of new versions starts at the commit timestamp of the source system")(dfHistorized)(dfExpected)
     assert(result)
   }
 }

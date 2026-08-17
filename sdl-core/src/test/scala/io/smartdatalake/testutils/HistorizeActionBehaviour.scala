@@ -19,8 +19,9 @@
 package io.smartdatalake.testutils
 
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.{CdcChangeType, Environment}
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil.getCommonSubFeed
 import io.smartdatalake.util.historization.Historization
@@ -51,10 +52,16 @@ trait HistorizeActionBehaviour extends GenericTestTool {
 
   def defaultEngineConnection: Connection with EngineConnection
 
+  /**
+   * @param supportsColumnNamesWithUnderscorePrefix set to false for output DataObjects which can not write columns
+   *                                                with a name starting with an underscore, e.g. JDBC tables where
+   *                                                identifiers are not quoted in the generated SQL statements.
+   */
   def historizeWithMergeMode(
                               createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
                               createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
-                              tgtConnection: Option[Connection] = None
+                              tgtConnection: Option[Connection] = None,
+                              supportsColumnNamesWithUnderscorePrefix: Boolean = true
                             ): Unit = {
     logger.debug(s"historizeWithMergeMode START: tgtConnection=$tgtConnection")
 
@@ -310,6 +317,218 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       assert(tgtDO.getDataFrame().columns.map(_.toLowerCase).contains("dl_hash"))
 
     }
+
+    test("historize CDC change events of standard cdc columns") {
+
+      implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+      tgtConnection.foreach(instanceRegistry.register)
+      instanceRegistry.register(defaultEngineConnection)
+
+      implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(phase = ExecutionPhase.Exec)
+
+      // setup DataObjects
+      val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
+      val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("id")), instanceRegistry))
+      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      import helper.implicits._
+
+      // commit timestamps of the change events in the source system. They are independent of the runs reference
+      // timestamp, as the source system committed the changes before SDLB read them.
+      val commitTs1 = Timestamp.valueOf(LocalDateTime.now().minusDays(3))
+      val commitTs2 = Timestamp.valueOf(LocalDateTime.now().minusDays(2))
+      val commitTs3 = Timestamp.valueOf(LocalDateTime.now().minusDays(1))
+      def previousTick(ts: Timestamp) = Timestamp.from(ts.toInstant.minusMillis(1))
+
+      // prepare & start 1st load: initial snapshot of the source table, including a record deleted in the meantime
+      val action1 = cdcHistorizeAction("ha", srcDO.id, tgtDO.id)
+      val context1 = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action1))
+      val l1 = Seq(
+        (1, 5, CdcChangeType.read, commitTs1, 0),
+        (2, 5, CdcChangeType.read, commitTs1, 1),
+        (3, 5, CdcChangeType.delete, commitTs1, 2)
+      ).toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
+      srcDO.writeDataFrame(l1, Seq())(context1)
+      execCdcHistorizeAction(action1, context1)
+
+      {
+        // deleted records are not part of the initial history, and the CDC columns are not written to the output
+        val expected = Seq(
+          (1, 5, commitTs1, definitions.Environment.historizationUpperHorizonTimestamp),
+          (2, 5, commitTs1, definitions.Environment.historizationUpperHorizonTimestamp)
+        ).toDF("id", "rating", "dl_ts_captured", "dl_ts_delimited")
+        val actual = tgtDO.getDataFrame().drop(Historization.historizeDummyColName)
+        val resultat = expected.isEqual(actual)
+        if (!resultat) printFailedTestResultGdf("historize cdc 1st load", Seq())(actual)(expected)
+        assert(resultat)
+      }
+
+      // prepare & start 2nd load: an update (delivered as preimage and postimage), a delete, and a delete of a
+      // record which never existed
+      val action2 = cdcHistorizeAction("ha2", srcDO.id, tgtDO.id)
+      val context2 = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action2))
+      val l2 = Seq(
+        (1, 5, CdcChangeType.updatePreimage, commitTs2, 0),
+        (1, 10, CdcChangeType.updatePostimage, commitTs2, 1),
+        (2, 5, CdcChangeType.delete, commitTs2, 2),
+        (99, 0, CdcChangeType.delete, commitTs2, 3)
+      ).toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
+      srcDO.writeDataFrame(l2, Seq())(context2)
+      execCdcHistorizeAction(action2, context2)
+
+      {
+        // the preimage is ignored, as its value is already in the history. The deleted record 99 has no version to
+        // close, so it is not added to the history.
+        val expected = Seq(
+          (1, 5, commitTs1, previousTick(commitTs2)),
+          (1, 10, commitTs2, definitions.Environment.historizationUpperHorizonTimestamp),
+          (2, 5, commitTs1, previousTick(commitTs2))
+        ).toDF("id", "rating", "dl_ts_captured", "dl_ts_delimited")
+        val actual = tgtDO.getDataFrame().drop(Historization.historizeDummyColName)
+        val resultat = expected.isEqual(actual)
+        if (!resultat) printFailedTestResultGdf("historize cdc 2nd load", Seq())(actual)(expected)
+        assert(resultat)
+      }
+
+      // prepare & start 3rd load: several change events for the same primary key in one batch
+      val action3 = cdcHistorizeAction("ha3", srcDO.id, tgtDO.id)
+      val context3 = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action3))
+      val l3 = Seq(
+        (4, 1, CdcChangeType.insert, commitTs3, 0),
+        (4, 2, CdcChangeType.updatePostimage, commitTs3, 1),
+        (1, 20, CdcChangeType.updatePostimage, commitTs3, 2)
+      ).toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
+      srcDO.writeDataFrame(l3, Seq())(context3)
+      execCdcHistorizeAction(action3, context3)
+
+      {
+        // only the last change event per primary key is historized, e.g. record 4 is created with rating 2
+        val expected = Seq(
+          (1, 5, commitTs1, previousTick(commitTs2)),
+          (1, 10, commitTs2, previousTick(commitTs3)),
+          (1, 20, commitTs3, definitions.Environment.historizationUpperHorizonTimestamp),
+          (2, 5, commitTs1, previousTick(commitTs2)),
+          (4, 2, commitTs3, definitions.Environment.historizationUpperHorizonTimestamp)
+        ).toDF("id", "rating", "dl_ts_captured", "dl_ts_delimited")
+        val actual = tgtDO.getDataFrame().drop(Historization.historizeDummyColName)
+        val resultat = expected.isEqual(actual)
+        if (!resultat) printFailedTestResultGdf("historize cdc 3rd load", Seq())(actual)(expected)
+        assert(resultat)
+      }
+    }
+
+    test("historize CDC change events using the runs reference timestamp") {
+
+      implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+      tgtConnection.foreach(instanceRegistry.register)
+      instanceRegistry.register(defaultEngineConnection)
+
+      implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(phase = ExecutionPhase.Exec)
+
+      // setup DataObjects
+      val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
+      val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("id")), instanceRegistry))
+      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      import helper.implicits._
+
+      val commitTs = Timestamp.valueOf(LocalDateTime.now().minusDays(3))
+
+      // prepare & start 1st load
+      val refTimestamp1 = LocalDateTime.now()
+      val action1 = cdcHistorizeAction("ha", srcDO.id, tgtDO.id).copy(mergeModeCDCUseSourceTimestamp = false)
+      val context1 = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec, currentAction = Some(action1))
+      val l1 = Seq((1, 5, CdcChangeType.insert, commitTs, 0))
+        .toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
+      srcDO.writeDataFrame(l1, Seq())(context1)
+      execCdcHistorizeAction(action1, context1)
+
+      // prepare & start 2nd load
+      val refTimestamp2 = LocalDateTime.now()
+      val action2 = cdcHistorizeAction("ha2", srcDO.id, tgtDO.id).copy(mergeModeCDCUseSourceTimestamp = false)
+      val context2 = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec, currentAction = Some(action2))
+      val l2 = Seq((1, 10, CdcChangeType.updatePostimage, commitTs, 0))
+        .toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
+      srcDO.writeDataFrame(l2, Seq())(context2)
+      execCdcHistorizeAction(action2, context2)
+
+      {
+        // the validity of the versions is defined by the reference timestamp of the runs, not by the commit timestamp
+        val expected = Seq(
+          (1, 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
+          (1, 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp)
+        ).toDF("id", "rating", "dl_ts_captured", "dl_ts_delimited")
+        val actual = tgtDO.getDataFrame().drop(Historization.historizeDummyColName)
+        val resultat = expected.isEqual(actual)
+        if (!resultat) printFailedTestResultGdf("historize cdc with reference timestamp", Seq())(actual)(expected)
+        assert(resultat)
+      }
+    }
+
+    // this test writes the CDC columns to the output DataObject, as they are treated as normal attributes
+    if (supportsColumnNamesWithUnderscorePrefix) test("historize CDC change events with mergeModeCDCAutoDetect disabled") {
+
+      implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+      tgtConnection.foreach(instanceRegistry.register)
+      instanceRegistry.register(defaultEngineConnection)
+
+      implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(phase = ExecutionPhase.Exec)
+
+      // setup DataObjects
+      val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
+      val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("id")), instanceRegistry))
+      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      import helper.implicits._
+
+      val commitTs = Timestamp.valueOf(LocalDateTime.now().minusDays(3))
+
+      // prepare & start load with auto detection of the standard CDC columns disabled
+      val refTimestamp1 = LocalDateTime.now()
+      val action1 = HistorizeAction("ha", srcDO.id, tgtDO.id, mergeModeCDCAutoDetect = false)
+      val context1 = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec, currentAction = Some(action1))
+      val l1 = Seq((1, 5, CdcChangeType.insert, commitTs, 0))
+        .toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
+      srcDO.writeDataFrame(l1, Seq())(context1)
+      execCdcHistorizeAction(action1, context1)
+
+      {
+        // the CDC columns are historized as normal attributes, and the reference timestamp defines the validity
+        val expected = Seq((1, 5, CdcChangeType.insert, commitTs, 0, Timestamp.valueOf(refTimestamp1),
+          definitions.Environment.historizationUpperHorizonTimestamp))
+          .toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol, "dl_ts_captured",
+            "dl_ts_delimited")
+        val actual = tgtDO.getDataFrame().drop(Historization.historizeHashColName)
+        val resultat = expected.isEqual(actual)
+        if (!resultat) printFailedTestResultGdf("historize cdc without auto detection", Seq())(actual)(expected)
+        assert(resultat)
+      }
+    }
+  }
+
+  private def cdcChangeTypeCol = Environment.cdcChangeTypeColumnName
+  private def cdcCommitTimestampCol = Environment.cdcCommitTimestampColumnName
+  private def cdcChangeOrdinalCol = Environment.cdcChangeOrdinalColumnName
+
+  /**
+   * HistorizeAction for input using SDLBs standard CDC columns. Note that no CDC specific configuration is needed.
+   */
+  private def cdcHistorizeAction(actionId: String, srcId: DataObjectId, tgtId: DataObjectId)(implicit
+      instanceRegistry: InstanceRegistry
+  ) = HistorizeAction(actionId, srcId, tgtId)
+
+  private def execCdcHistorizeAction(action: HistorizeAction, context: ActionPipelineContext): Unit = {
+    val srcSubFeed = ScalaSubFeed(None, action.inputId, Seq())
+    action.prepare(context.copy(phase = ExecutionPhase.Prepare))
+    action.preInit(Seq(srcSubFeed), Seq())(context.copy(phase = ExecutionPhase.Init))
+    action.init(Seq(srcSubFeed))(context.copy(phase = ExecutionPhase.Init))
+    action.exec(Seq(srcSubFeed))(context)
   }
 
   def historizeIncrementalPipeline(

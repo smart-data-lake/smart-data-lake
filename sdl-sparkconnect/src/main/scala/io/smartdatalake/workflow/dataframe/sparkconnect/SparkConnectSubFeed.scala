@@ -31,6 +31,7 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.types._
 
+import java.time.Duration
 import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
@@ -183,6 +184,14 @@ object SparkConnectSubFeed extends DataFrameSubFeedCompanion {
   override def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn = {
     column match {
       case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.substring(sparkColumn.inner, pos, len))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def timestampSubtract(column: GenericColumn, duration: Duration): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn =>
+        // Spark timestamps have microsecond resolution
+        SparkConnectColumn(functions.timestamp_add("MICROSECOND", functions.lit(-(duration.toNanos / 1000)), sparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }

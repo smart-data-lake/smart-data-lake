@@ -19,7 +19,7 @@
 package io.smartdatalake.util.historization
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.{CdcChangeType, Environment}
 import io.smartdatalake.util.LogUtils.debugLog
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame}
@@ -169,6 +169,53 @@ object Historization {
   }
 
   /**
+   * Prepares change-data-capture (CDC) events for [[incrementalCDCHistorize]].
+   *
+   * A batch of CDC events can contain several events for the same primary key, and events which describe the value
+   * of a record before it was changed. As one SQL Upsert statement can create at most one new version per primary
+   * key, the events are reduced to the last event per primary key:
+   *   1. events of type `update_preimage` are removed, as they describe the value of a record before the update,
+   *      which is already stored in the existing history
+   *   1. of the remaining events only the last event per primary key is kept, e.g. intermediate states of a record
+   *      within the same batch are not historized
+   *
+   * @param dfNew
+   *   change events of the current run
+   * @param primaryKey
+   *   primary key columns of the output DataObject
+   * @param changeTypeColName
+   *   name of the column holding the change type, see [[io.smartdatalake.definitions.CdcChangeType]]
+   * @param orderColName
+   *   optional name of the column defining the order of the events, normally
+   *   [[Environment.cdcChangeOrdinalColumnName]] or [[Environment.cdcCommitTimestampColumnName]].
+   *   If empty, events are not reduced to the last event per primary key.
+   *   Note that events with a null value in this column are dropped, as their order can not be determined.
+   */
+  private[smartdatalake] def prepareCdcInput(
+      dfNew: GenericDataFrame,
+      primaryKey: Seq[String],
+      changeTypeColName: String,
+      orderColName: Option[String]
+  ): GenericDataFrame = {
+    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(dfNew.subFeedType)
+    import functions._
+
+    // remove preimages, e.g. the value of a record before it was updated. Note that <=> is null-safe, so events
+    // without change type are kept.
+    val dfEvents = dfNew.where(not(col(changeTypeColName) <=> lit(CdcChangeType.updatePreimage)))
+
+    // keep the last event per primary key
+    orderColName.map { orderCol =>
+      val dfLastEvents = dfEvents
+        .groupBy(primaryKey.map(col))
+        .agg(Seq(max(col(orderCol)).as(orderCol)))
+      dfEvents.join(dfLastEvents, primaryKey :+ orderCol)
+        .select(dfEvents.columns.map(col)) // join by column names reorders columns, restore the original order
+        .dropDuplicates(primaryKey) // safety net if several events of the same primary key share the same order value
+    }.getOrElse(dfEvents)
+  }
+
+  /**
    * Historizes data by merging the current load with the existing history, generating records to
    * update and insert for SQL Upsert statements. This algorithm uses information about the delete
    * operation from the source system to optimize historization. If deleted records can be
@@ -189,25 +236,32 @@ object Historization {
    *   - no hash column is needed as we know from the CDC event that something has changed
    *
    * @param referenceTimestamp
-   *   The valid from timestamp for new records
+   *   The valid from timestamp for new records, used if eventTimestampColName is empty
    * @param timeAxisUnit
    *   Time between ticks on the timestamp. Used to create valid to timestamp for existing/old
    *   records. Set to empty to create a history with half-open intervals (e.g. valid to timestamp
    *   is exclusive)
+   * @param eventTimestampColName
+   *   Optional name of a column holding the timestamp when the change happened in the source system, normally
+   *   [[Environment.cdcCommitTimestampColumnName]]. If given, the validity of the new version starts at this
+   *   timestamp instead of the reference timestamp, e.g. the history reflects the time axis of the source system.
    */
   def incrementalCDCHistorize(
       dfNew: GenericDataFrame,
       deletedRecordsCondition: GenericColumn,
       referenceTimestamp: Timestamp,
-      timeAxisUnit: Option[Duration]
+      timeAxisUnit: Option[Duration],
+      eventTimestampColName: Option[String] = None
   ): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(dfNew.subFeedType)
     import functions._
 
-    // Current timestamp (used for insert and update operations, for "new" value)
-    val timestampNew = lit(referenceTimestamp)
-    // Previous entry on time axis before the reference timestamp ("Tick"). This is used to delimit existing old records.
-    val timestampOld = lit(timeAxisUnit.map(getPreviousTimeAxisEntry(referenceTimestamp, _)).getOrElse(referenceTimestamp))
+    // Timestamp when the new version starts to be valid (used for insert and update operations, for "new" value)
+    val timestampNew = eventTimestampColName.map(col).getOrElse(lit(referenceTimestamp))
+    // Previous entry on time axis before timestampNew ("Tick"). This is used to delimit existing old records.
+    val timestampOld = eventTimestampColName.map { c =>
+      timeAxisUnit.map(unit => timestampSubtract(col(c), unit)).getOrElse(col(c))
+    }.getOrElse(lit(timeAxisUnit.map(getPreviousTimeAxisEntry(referenceTimestamp, _)).getOrElse(referenceTimestamp)))
     // join existing with new and determine operations needed
     val dfOperations = dfNew
       .withColumn(
@@ -251,16 +305,29 @@ object Historization {
    * @param df
    *   current run of feed
    * @param referenceTimestamp
-   *   timestamp to use
+   *   timestamp to use if eventTimestampColName is empty
+   * @param deletedRecordsCondition
+   *   condition marking a record as deleted in the source system. Deleted records are not part of the initial
+   *   history, as there is no existing version they could close.
+   * @param eventTimestampColName
+   *   optional name of a column holding the timestamp when the change happened in the source system, see
+   *   [[incrementalCDCHistorize]]
    * @return
    *   initial history, identical with data from current run
    */
-  def getInitialHistoryWithDummyCol(df: GenericDataFrame, referenceTimestamp: Timestamp)(implicit logger: Logger): GenericDataFrame = {
+  def getInitialHistoryWithDummyCol(
+      df: GenericDataFrame,
+      referenceTimestamp: Timestamp,
+      deletedRecordsCondition: Option[GenericColumn] = None,
+      eventTimestampColName: Option[String] = None
+  )(implicit logger: Logger): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
-    debugLog(s"Initial history used for ${Environment.capturedColumnName}: $referenceTimestamp")
-    val df1 = df.withColumn(historizeDummyColName, lit(true))
-    addVersionCols(df1, referenceTimestamp, Environment.historizationUpperHorizonTimestamp)
+    debugLog(s"Initial history used for ${Environment.capturedColumnName}: ${eventTimestampColName.getOrElse(referenceTimestamp)}")
+    val dfWithoutDeleted = deletedRecordsCondition.map(condition => df.where(not(condition))).getOrElse(df)
+    val df1 = dfWithoutDeleted.withColumn(historizeDummyColName, lit(true))
+    df1.withColumn(Environment.capturedColumnName, eventTimestampColName.map(col).getOrElse(lit(referenceTimestamp)))
+      .withColumn(Environment.delimitedColumnName, lit(Environment.historizationUpperHorizonTimestamp))
   }
 
   /**

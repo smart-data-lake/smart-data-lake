@@ -55,8 +55,9 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
 
   import sparkSession.implicits._
 
-  val COMMIT_TYPE_COLUMN_NAME = "__commit_event"
-  val COMMIT_TIMESTAMP_COLUMN_NAME = "__event_timestamp"
+  val CHANGE_TYPE_COLUMN_NAME = "_change_type"
+  val COMMIT_TIMESTAMP_COLUMN_NAME = "_commit_timestamp"
+  val CHANGE_ORDINAL_COLUMN_NAME = "_change_ordinal"
 
   val connection = DebeziumConnection(
     id = "dbzCon",
@@ -119,8 +120,8 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
 
   var df = tgtDO1.getSparkDataFrame()
 
-  assert(df.columns.toSet == Set("value", "timestampCol", "decimalCol", COMMIT_TYPE_COLUMN_NAME, COMMIT_TIMESTAMP_COLUMN_NAME))
-  assert(df.select(col(COMMIT_TYPE_COLUMN_NAME)).as[String].collect().forall(_ == "read"))
+  assert(df.columns.toSet == Set("value", "timestampCol", "decimalCol", CHANGE_TYPE_COLUMN_NAME, COMMIT_TIMESTAMP_COLUMN_NAME, CHANGE_ORDINAL_COLUMN_NAME))
+  assert(df.select(col(CHANGE_TYPE_COLUMN_NAME)).as[String].collect().forall(_ == "read"))
 
   // 2. Insert test
   jdbcConnection.execJdbcStatement("INSERT INTO demo.test (value, timestampCol, decimalCol) VALUES ('INSERT TEST', '1994-07-30 07:07:07', 30.0)")
@@ -133,11 +134,11 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
     df.columns.contains("value") &&
     df.columns.contains("timestampCol") &&
     df.columns.contains("decimalCol") &&
-    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
     df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
   )
 
-  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("create")).filter(!$"test").isEmpty)
+  assert(df.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME) === lit("insert")).filter(!$"test").isEmpty)
 
   // 3. Update test
   jdbcConnection.execJdbcStatement("UPDATE demo.test SET value = 'UPDATE TEST' WHERE value = 'INSERT TEST'")
@@ -150,11 +151,11 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
     df.columns.contains("value") &&
     df.columns.contains("timestampCol") &&
     df.columns.contains("decimalCol") &&
-    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
     df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
   )
 
-  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME).isin(lit("update_preimage"), lit("update_postimage"))).collect().length == 2)
+  assert(df.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME).isin(lit("update_preimage"), lit("update_postimage"))).collect().length == 2)
 
   // 4. Delete test
   jdbcConnection.execJdbcStatement("DELETE FROM demo.test WHERE value = 'UPDATE TEST'")
@@ -167,11 +168,11 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
     df.columns.contains("value") &&
     df.columns.contains("timestampCol") &&
     df.columns.contains("decimalCol") &&
-    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
     df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
   )
 
-  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("delete")).filter(!$"test").isEmpty)
+  assert(df.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME) === lit("delete")).filter(!$"test").isEmpty)
 
   // 5. No new data test
 
@@ -183,7 +184,7 @@ object DebeziumCdcDataObjectMariaDBIT extends App with SmartDataLakeLogger {
     df.columns.contains("value") &&
     df.columns.contains("timestampCol") &&
     df.columns.contains("decimalCol") &&
-    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
     df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
   )
 

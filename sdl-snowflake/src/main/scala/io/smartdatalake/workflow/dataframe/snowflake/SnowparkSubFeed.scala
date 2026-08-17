@@ -29,6 +29,7 @@ import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ColumnFilter, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 
+import java.time.Duration
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
@@ -258,6 +259,13 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
   override def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn = {
     column match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.substring(snowparkColumn.inner, pos, len))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def timestampSubtract(column: GenericColumn, duration: Duration): GenericColumn = {
+    column match {
+      case snowparkColumn: SnowparkColumn =>
+        SnowparkColumn(functions.dateadd("microsecond", functions.lit(-(duration.toNanos / 1000)), snowparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }

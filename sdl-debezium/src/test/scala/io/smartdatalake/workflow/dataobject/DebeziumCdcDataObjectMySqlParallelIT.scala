@@ -51,8 +51,9 @@ object DebeziumCdcDataObjectMySqlParallelIT extends App with SmartDataLakeLogger
 
   import sparkSession.implicits._
 
-  val COMMIT_TYPE_COLUMN_NAME = "__commit_event"
-  val COMMIT_TIMESTAMP_COLUMN_NAME = "__event_timestamp"
+  val CHANGE_TYPE_COLUMN_NAME = "_change_type"
+  val COMMIT_TIMESTAMP_COLUMN_NAME = "_commit_timestamp"
+  val CHANGE_ORDINAL_COLUMN_NAME = "_change_ordinal"
 
   val connection = DebeziumConnection(
     id = "dbzCon",
@@ -114,18 +115,18 @@ object DebeziumCdcDataObjectMySqlParallelIT extends App with SmartDataLakeLogger
 
   assert(tgtDF1.columns.contains("id") &&
     tgtDF1.columns.contains("value") &&
-    tgtDF1.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    tgtDF1.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
     tgtDF1.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
   )
 
-  assert(tgtDF1.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
+  assert(tgtDF1.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
 
   assert(tgtDF2.columns.contains("id") &&
     tgtDF2.columns.contains("value") &&
-    tgtDF2.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    tgtDF2.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
     tgtDF2.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
   )
 
-  assert(tgtDF2.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
+  assert(tgtDF2.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
 
 }
