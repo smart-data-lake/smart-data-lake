@@ -20,14 +20,32 @@ package io.smartdatalake.workflow.action.snowflake.customlogic
 
 import com.snowflake.snowpark.{DataFrame, Session}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.{DynamicTransformContext, TransformParameterMapper, TransformReturnMapper}
+import io.smartdatalake.workflow.action.generic.customlogic.DynamicTransform
+
+import scala.reflect.runtime.universe
+import scala.reflect.runtime.universe.typeOf
 
 /**
  * Interface to define a custom Snowpark-DataFrame transformation (1:1)
+ *
+ * There are two methods to define the transformation:
+ *
+ * 1) Overwrite the transform function below.
+ *
+ * 2) Implement any transform method using parameters of type Session, Map[String,String], DataFrame and any
+ * primitive data type (String, Boolean, Int, ...). Primitive data types might also use default values or be
+ * enclosed in an Option[...] to mark it as non required. The transform method is then called dynamically by looking
+ * for the parameter values in the options. As there is exactly one input DataFrame, a DataFrame parameter is mapped
+ * to it independent of the parameters name. The id of the input DataObject is available as option `dataObjectId`.
  */
-trait CustomSnowparkDfTransformer extends Serializable {
+trait CustomSnowparkDfTransformer extends DynamicTransform with Serializable {
 
   /**
    * Function to be implemented to define the transformation between an input and output DataFrame (1:1)
+   *
+   * Note that the default implementation is looking for an implementation of a 'transform' function with custom
+   * parameters, which it will call dynamically.
    *
    * @param session the Snowpark session
    * @param options Options specified in the configuration for this transformation
@@ -35,7 +53,20 @@ trait CustomSnowparkDfTransformer extends Serializable {
    * @param dataObjectId Id of DataObject of SubFeed
    * @return Transformed DataFrame
    */
-  def transform(session: Session, options: Map[String, String], df: DataFrame, dataObjectId: String) : DataFrame
+  def transform(session: Session, options: Map[String, String], df: DataFrame, dataObjectId: String) : DataFrame = {
+    callDynamicTransformSingleOutput(DynamicTransformContext(
+      dfs = Map(dataObjectId -> df),
+      options = options + (DynamicTransform.OPTION_DATAOBJECT_ID -> dataObjectId),
+      engineObjects = Seq(session),
+      singleInput = true,
+      defaultOutputName = Some(dataObjectId)
+    )).asInstanceOf[DataFrame]
+  }
+
+  override protected def stdTransformMethodSignature: universe.Type = CustomSnowparkDfTransformer.stdTransformMethodSignature
+  override protected def transformMethodHelpMsg: String = CustomSnowparkDfTransformer.transformMethodHelpMsg
+  override protected def transformParameterMappers: Seq[TransformParameterMapper] = SnowparkTransformMappers.parameterMappers
+  override protected def transformReturnMapper: TransformReturnMapper = SnowparkTransformMappers.SnowparkReturnMapper
 
   /**
    * Optional function to define the transformation of input to output partition values.
@@ -48,4 +79,17 @@ trait CustomSnowparkDfTransformer extends Serializable {
    *         Return None if mapping is 1:1.
    */
   def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues,PartitionValues]] = None
+}
+
+object CustomSnowparkDfTransformer {
+  private[smartdatalake] val stdTransformMethodSignature: universe.Type =
+    typeOf[CustomSnowparkDfTransformer].members.find(_.name.toString == "transform").head.typeSignature
+  private[smartdatalake] val transformMethodHelpMsg: String =
+    """
+      | CustomSnowparkDfTransformer implementations need to implement one method with name 'transform'.
+      | Traditionally the signature of the transform method is 'transform(session: Session, options: Map[String,String], df: DataFrame, dataObjectId: String): DataFrame',
+      | but you can also implement any transform method using parameters of type Session, Map[String,String], DataFrame and any primitive data type (String, Boolean, Int, ...).
+      | Primitive data types might also use default values or be enclosed in an Option[...] to mark it as non required.
+      | The transform method is then called dynamically by looking for the parameter values in the options.
+    """.stripMargin
 }

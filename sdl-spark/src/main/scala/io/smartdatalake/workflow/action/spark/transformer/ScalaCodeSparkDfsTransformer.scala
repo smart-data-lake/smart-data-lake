@@ -26,11 +26,12 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData, FileUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformer
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.slf4j.Logger
 
 /**
@@ -44,6 +45,21 @@ import org.slf4j.Logger
  * input DataFrame (joins, unions) or produces more than one output DataFrame. The returned map must
  * contain an entry for every output DataObject id of the action. Exactly one of `code` or `file` must
  * be defined; the code is compiled at job startup so errors surface in the prepare phase.
+ *
+ * Alternatively the code can create an implementation of [[CustomDfsTransformer]] defining any transform method.
+ * The transform method is then called dynamically by looking for the parameter values in the input DataFrames and
+ * Options, see [[CustomDfsTransformer]]. Example:
+ * {{{
+ *   code = """
+ *     import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
+ *     import org.apache.spark.sql.DataFrame
+ *     new CustomDfsTransformer {
+ *       def transform(dfStgDepartures: DataFrame, dfIntAirports: DataFrame): DataFrame = {
+ *         dfStgDepartures.join(dfIntAirports, Seq("ident"))
+ *       }
+ *     }
+ *   """
+ * }}}
  *
  * Example:
  * {{{
@@ -96,11 +112,23 @@ case class ScalaCodeSparkDfsTransformer(
   private implicit val loggImp: Logger = logger
   assert(file.isEmpty || code.isEmpty, s"Only one of `file` or `code` must be defined for ScalaCodeSparkDfsTransformer")
 
-  private lazy val fnTransform = {
+  private lazy val compiledCode: Any = {
     implicit val defaultHadoopConf: Configuration = new Configuration()
-    file.map(file => CustomCodeUtil.compileCode[fnTransformType](FileUtil.readFromPath(new Path(file))))
-      .orElse(code.map(code => CustomCodeUtil.compileCode[fnTransformType](code)))
+    file.map(file => CustomCodeUtil.compileCode[Any](FileUtil.readFromPath(new Path(file))))
+      .orElse(code.map(code => CustomCodeUtil.compileCode[Any](code)))
       .getOrElse(throw ConfigurationException(s"Either `file` or `code` must be defined for ScalaCodeSparkDfsTransformer"))
+  }
+
+  /**
+   * The compiled code is either an implementation of [[CustomDfsTransformer]], which allows to define a transform
+   * method with dynamic parameters, or a function of type [[fnTransformType]].
+   */
+  private lazy val fnTransform: (SparkSession, Map[String, String], Map[String, DataFrame]) => Map[String, DataFrame] = compiledCode match {
+    case customTransformer: CustomDfsTransformer => customTransformer.transform
+    case fn: Function3[_, _, _, _] => fn.asInstanceOf[fnTransformType]
+    case x => throw ConfigurationException(s"Code compiled for ScalaCodeSparkDfsTransformer must be a function of type" +
+      s" (SparkSession, Map[String,String], Map[String,DataFrame]) => Map[String,DataFrame] or an implementation of" +
+      s" CustomDfsTransformer, but is ${x.getClass.getName}")
   }
   if (!Environment.compileScalaCodeLazy) fnTransform
   override def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {

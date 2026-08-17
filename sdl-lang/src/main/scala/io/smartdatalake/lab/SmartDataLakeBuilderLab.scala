@@ -24,8 +24,10 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.StringUtil.strToCamelCase
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID
-import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, NotFoundError, TransformDfsMethod, TransformInfo}
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDsNTo1Transformer.prepareTolerantKey
+import io.smartdatalake.util.misc.NameUtil.prepareTolerantKey
+import io.smartdatalake.util.misc.NotFoundError
+import io.smartdatalake.workflow.action.generic.customlogic.TransformInfo
+import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, TransformDfsMethod}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import org.apache.hadoop.conf.Configuration

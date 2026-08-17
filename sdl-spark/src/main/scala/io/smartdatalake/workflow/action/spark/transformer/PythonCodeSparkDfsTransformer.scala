@@ -47,6 +47,19 @@ import scala.jdk.CollectionConverters._
  * transformer with [[io.smartdatalake.workflow.action.CustomDataFrameAction]]; for a single input and output prefer
  * [[PythonCodeDfTransformer]].
  *
+ * Alternatively the Python code can define a function named `transform`. It is then called dynamically by looking
+ * for its parameter values in the input DataFrames and options, and its return value is used as output DataFrames.
+ * A parameter with the name of an input DataFrame gets this DataFrame, a `df` prefix is stripped from the parameter
+ * name before the lookup and the lookup ignores case, `-` and `_`. A parameter named `dfs` gets all input
+ * DataFrames as dict, a parameter named `options` gets all options as dict, and a parameter with the name of an
+ * option gets its value converted according to its type annotation or the type of its default value. Example:
+ * {{{
+ *   code = """
+ *     def transform(dfStgDepartures, dfStgAirports):
+ *         return {'int-departures': dfStgDepartures.join(dfStgAirports, 'ident')}
+ *   """
+ * }}}
+ *
  * Example:
  * {{{
  * actions = {
@@ -113,7 +126,8 @@ case class PythonCodeDfsTransformer(
           """.stripMargin
       PythonUtil.execPythonSparkCode(
         entryPoint,
-        additionalInitCode + sys.props("line.separator") + dedent(pythonCode)
+        additionalInitCode + sys.props("line.separator") + dedent(pythonCode) + sys.props("line.separator")
+          + PythonDynamicTransform.dfsPostludeCode
       )
       entryPoint.outputDfs.getOrElse(
         throw new IllegalStateException(

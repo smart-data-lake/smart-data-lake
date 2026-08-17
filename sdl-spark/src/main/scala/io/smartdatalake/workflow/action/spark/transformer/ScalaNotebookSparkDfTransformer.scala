@@ -26,6 +26,7 @@ import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData}
 import io.smartdatalake.util.webservice.SttpWebserviceClient
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
+import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig.fnTransformType
 import io.smartdatalake.workflow.connection.authMode.AuthMode
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
@@ -47,6 +48,11 @@ import scala.util.{Failure, Success}
  * without copying the code: SDLB downloads the notebook from `url`, concatenates all Scala code cells
  * and compiles the function named `functionName`. Cells containing only exploratory code (test data,
  * `show()` calls) should be marked with a leading "//!IGNORE" comment so they are skipped.
+ *
+ * The function named `functionName` can also define any other parameters of type SparkSession, Map[String,String],
+ * DataFrame, Dataset[<Product>] and primitive data types. It is then called dynamically by looking for the parameter
+ * values in the Options, see [[CustomDfTransformer]]. As there is exactly one input DataFrame, a DataFrame or
+ * Dataset parameter gets this DataFrame independent of the parameters name.
  *
  * Example:
  * {{{
@@ -98,7 +104,7 @@ case class ScalaNotebookSparkDfTransformer(
 ) extends OptionsSparkDfTransformer {
   private implicit val loggImp: Logger = logger
   import ScalaNotebookSparkDfTransformer._
-  private lazy val fnTransform: fnTransformType = {
+  private lazy val fnTransform: CustomDfTransformer = {
     val notebookCode = prepareFunction(parseNotebook(downloadNotebook(url, authMode)), functionName)
     compileCode(notebookCode)
   }
@@ -114,7 +120,7 @@ case class ScalaNotebookSparkDfTransformer(
       dataObjectId: DataObjectId,
       options: Map[String, String]
   )(implicit context: ActionPipelineContext): DataFrame =
-    fnTransform(getSparkSession, options, df, dataObjectId.id)
+    fnTransform.transform(getSparkSession, options, df, dataObjectId.id)
 }
 
 object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransformer] {
@@ -171,17 +177,25 @@ object ScalaNotebookSparkDfTransformer extends FromConfigFactory[GenericDfTransf
 
   /**
    * Prepare function
+   *
+   * The notebook code is wrapped into an implementation of [[CustomDfTransformer]], which calls the function with
+   * the given name dynamically. This allows the notebook function to define any parameters of type SparkSession,
+   * Map[String,String], DataFrame, Dataset[<Product>] and primitive data types, see [[CustomDfTransformer]].
    */
   def prepareFunction(notebookCode: String, functionName: String): String = {
     require(notebookCode.contains(functionName),
       s"Notebook code doesn't contain a function with name $functionName")
     val defaultImports = """
-        |import org.apache.spark.sql.{DataFrame, SparkSession}
+        |import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
         |""".stripMargin
-    // return function as last statement of notebook code block
-    defaultImports + System.lineSeparator() + notebookCode + System.lineSeparator() + s"$functionName _"
+    // return an instance of CustomDfTransformer calling the notebook function as last statement of the code block
+    defaultImports + System.lineSeparator() +
+      s"new ${classOf[CustomDfTransformer].getName} {" + System.lineSeparator() +
+      notebookCode + System.lineSeparator() +
+      s"""  override protected def transformMethodName: String = "$functionName"""" + System.lineSeparator() +
+      "}"
   }
 
-  def compileCode(code: String)(implicit logger: Logger): fnTransformType =
-    CustomCodeUtil.compileCode[fnTransformType](code)
+  def compileCode(code: String)(implicit logger: Logger): CustomDfTransformer =
+    CustomCodeUtil.compileCode[CustomDfTransformer](code)
 }

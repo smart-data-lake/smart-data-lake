@@ -39,6 +39,17 @@ object CustomCodeUtil {
   private lazy val tb = runtimeMirror.mkToolBox()
 
   /**
+   * Get a runtime mirror which is able to reflect the given class.
+   * Classes compiled at runtime are loaded by the class loader of the Scala Toolbox, which is not known by the
+   * default runtime mirror. For those we need a mirror created with the class loader of the class itself.
+   */
+  private[smartdatalake] def mirrorFor(cls: Class[_]): universe.Mirror = {
+    val classLoader = cls.getClassLoader
+    if (classLoader == null || classLoader == Environment.classLoader()) runtimeMirror
+    else universe.runtimeMirror(classLoader)
+  }
+
+  /**
    * Compiling Scala Source Code into Object of Type T
    *
    * @param code
@@ -98,7 +109,7 @@ object CustomCodeUtil {
    * Get method symbol with given name from class definition
    */
   def getClassMethodsByName(cls: Class[_], methodName: String): scala.Seq[universe.MethodSymbol] = {
-    val mirror = scala.reflect.runtime.currentMirror
+    val mirror = mirrorFor(cls)
     val classType = mirror.classSymbol(cls).toType
     classType.members.filter(_.isMethod).filter(_.name.toString == methodName).map(_.asMethod).toSeq
   }
@@ -113,7 +124,7 @@ object CustomCodeUtil {
    *   a Map with parameter names and their default values.
    */
   def getMethodParameterDefaultValues(instance: AnyRef, method: universe.MethodSymbol): Map[String, Any] = {
-    val instanceMirror = runtimeMirror.reflect(instance)
+    val instanceMirror = mirrorFor(instance.getClass).reflect(instance)
     val classType = instanceMirror.symbol.toType
     method.paramLists.head.zipWithIndex.flatMap {
       case (p, i) =>
@@ -132,7 +143,7 @@ object CustomCodeUtil {
    * Dynamically call method on class instance.
    */
   def callMethod[R](instance: Any, methodSymbol: universe.MethodSymbol, args: Seq[Any]): R = {
-    val instanceMirror = runtimeMirror.reflect(instance)
+    val instanceMirror = mirrorFor(instance.getClass).reflect(instance)
     instanceMirror.reflectMethod(methodSymbol).apply(args: _*).asInstanceOf[R]
   }
 

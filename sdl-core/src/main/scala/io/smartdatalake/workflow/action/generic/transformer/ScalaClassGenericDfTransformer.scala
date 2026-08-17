@@ -37,6 +37,11 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * [[io.smartdatalake.workflow.dataframe.DataFrameFunctions]], the transformation stays engine independent.
  * Use `options`/`runtimeOptions` to parameterize the code instead of hard-coding values.
  *
+ * Instead of overwriting the standard transform function, the class can also implement any transform method using
+ * parameters of type DataFrameFunctions, Map[String,String], GenericDataFrame and any primitive data type. It is then
+ * called dynamically by looking for the parameter values in the Options, see [[CustomGenericDfTransformer]].
+ * The id of the input DataObject is passed as option `dataObjectId`.
+ *
  * Example:
  * {{{
  * actions = {

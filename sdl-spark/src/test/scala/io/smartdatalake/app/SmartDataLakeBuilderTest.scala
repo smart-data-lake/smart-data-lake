@@ -513,7 +513,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter with Smar
 }
 
 class RuntimeFailTransformer extends CustomDfTransformer {
-  def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String): DataFrame = {
+  override def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String): DataFrame = {
     // fail at spark runtime
     df.withColumn(df.schema.fieldNames.head, raise_error(lit(s"($dataObjectId) aborted by RuntimeFailTransformer")))
   }

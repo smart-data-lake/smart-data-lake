@@ -19,15 +19,42 @@
 package io.smartdatalake.workflow.action.spark.customlogic
 
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.{DynamicTransformContext, TransformParameterMapper, TransformReturnMapper}
+import io.smartdatalake.workflow.action.generic.customlogic.DynamicTransform
 import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import scala.reflect.runtime.universe
+import scala.reflect.runtime.universe.typeOf
 
 /**
  * Interface to define a custom Spark-DataFrame transformation (1:1)
+ *
+ * There are two methods to define the transformation:
+ *
+ * 1) Overwrite the transform function below: Define a transform function which receives a SparkSession, a map of
+ * options, the input DataFrame and the id of its DataObject, and has to return the transformed DataFrame.
+ *
+ * 2) Implement any transform method using parameters of type SparkSession, Map[String,String], DataFrame,
+ * Dataset[<Product>] and any primitive data type (String, Boolean, Int, ...). Primitive data types might also use
+ * default values or be enclosed in an Option[...] to mark it as non required. The transform method is then called
+ * dynamically by looking for the parameter values in the options. As there is exactly one input DataFrame, a
+ * DataFrame or Dataset parameter is mapped to it independent of the parameters name. The id of the input DataObject
+ * is available as option `dataObjectId`.
+ *
+ * Example:
+ * {{{
+ *   class ComputeDistanceTransformer extends CustomDfTransformer {
+ *     def transform(df: DataFrame, unit: String = "km"): DataFrame = ...
+ *   }
+ * }}}
  */
-trait CustomDfTransformer extends Serializable {
+trait CustomDfTransformer extends DynamicTransform with Serializable {
 
   /**
    * Function to be implemented to define the transformation between an input and output DataFrame (1:1)
+   *
+   * Note that the default implementation is looking for an implementation of a 'transform' function with custom
+   * parameters, which it will call dynamically.
    *
    * @param session Spark Session
    * @param options Options specified in the configuration for this transformation
@@ -35,7 +62,15 @@ trait CustomDfTransformer extends Serializable {
    * @param dataObjectId Id of DataObject of SubFeed
    * @return Transformed DataFrame
    */
-  def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String) : DataFrame
+  def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String) : DataFrame = {
+    callDynamicTransformSingleOutput(DynamicTransformContext(
+      dfs = Map(dataObjectId -> df),
+      options = options + (DynamicTransform.OPTION_DATAOBJECT_ID -> dataObjectId),
+      engineObjects = Seq(session),
+      singleInput = true,
+      defaultOutputName = Some(dataObjectId)
+    )).asInstanceOf[DataFrame]
+  }
 
   /**
    * Optional function to define the transformation of input to output partition values.
@@ -48,6 +83,24 @@ trait CustomDfTransformer extends Serializable {
    *         Return None if mapping is 1:1.
    */
   def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues,PartitionValues]] = None
+
+  override protected def stdTransformMethodSignature: universe.Type = CustomDfTransformer.stdTransformMethodSignature
+  override protected def transformMethodHelpMsg: String = CustomDfTransformer.transformMethodHelpMsg
+  override protected def transformParameterMappers: Seq[TransformParameterMapper] = SparkTransformMappers.parameterMappers
+  override protected def transformReturnMapper: TransformReturnMapper = SparkTransformMappers.SparkReturnMapper
+}
+
+object CustomDfTransformer {
+  private[smartdatalake] val stdTransformMethodSignature: universe.Type =
+    typeOf[CustomDfTransformer].members.find(_.name.toString == "transform").head.typeSignature
+  private[smartdatalake] val transformMethodHelpMsg: String =
+    """
+      | CustomDfTransformer implementations need to implement one method with name 'transform'.
+      | Traditionally the signature of the transform method is 'transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String): DataFrame',
+      | but you can also implement any transform method using parameters of type SparkSession, Map[String,String], DataFrame, Dataset[<Product>] and any primitive data type (String, Boolean, Int, ...).
+      | Primitive data types might also use default values or be enclosed in an Option[...] to mark it as non required.
+      | The transform method is then called dynamically by looking for the parameter values in the options.
+    """.stripMargin
 }
 
 object CustomDfTransformerConfig {

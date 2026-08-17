@@ -42,6 +42,11 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * driver or executors. It can be combined in the same `transformers` list with generic transformers like
  * SQLDfTransformer or ColumnsTransformer, as long as input and output DataObjects are Snowflake tables.
  *
+ * Instead of overwriting the standard transform function, the class can also implement any transform method using
+ * parameters of type Session, Map[String,String], DataFrame and any primitive data type. It is then called
+ * dynamically by looking for the parameter values in the Options, see [[CustomSnowparkDfTransformer]].
+ * The id of the input DataObject is passed as option `dataObjectId`.
+ *
  * Example:
  * {{{
  * actions = {
