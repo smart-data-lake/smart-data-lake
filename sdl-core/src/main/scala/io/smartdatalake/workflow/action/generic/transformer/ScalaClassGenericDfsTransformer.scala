@@ -37,6 +37,11 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * no-argument constructor and must be on the classpath of the SDLB job. If this is the last transformer of the chain,
  * the returned map must contain an entry for every outputId of the Action.
  *
+ * Instead of overwriting the standard transform function, the class can also implement any transform method using
+ * parameters of type DataFrameFunctions, Map[String,String], GenericDataFrame and any primitive data type. It is then
+ * called dynamically by looking for the parameter values in the input DataFrames and Options, see
+ * [[CustomGenericDfsTransformer]].
+ *
  * Example:
  * {{{
  * actions = {
@@ -59,13 +64,31 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * @param options        Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param renamedInputIds  optional map of [input DataFrame name, renamed input DataFrame name]. Adapt names of input
+ *                         DataFrames to the expected names in the transformation. This is useful if the transformation
+ *                         expects specific input names, or if you want to use more generic names in the transformation
+ *                         than the actual input DataObjectIds.
+ * @param renamedOutputIds optional map of [output DataFrame name, renamed output DataFrame name]. Adapt names of output
+ *                         DataFrames of the transformation to the expected names of the output DataObjects or the next
+ *                         transformation.
+ * @param overrideOutputId override name of output DataFrame, if the transformer returns a single DataFrame, and not a
+ *                         Map of type String -> GenericDataFrame. By default, a single DataFrame is named after the
+ *                         output DataObjectId of the Action if the action has only one output DataObject. This
+ *                         parameter is ignored if the transformation returns multiple DataFrames.
  */
-case class ScalaClassGenericDfsTransformer(override val name: String = "scalaTransform", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map()) extends OptionsGenericDfsTransformer {
+case class ScalaClassGenericDfsTransformer(override val name: String = "scalaTransform", override val description: Option[String] = None, className: String, options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map(), renamedInputIds: Map[String, String] = Map(), renamedOutputIds: Map[String, String] = Map(), overrideOutputId: Option[String] = None) extends OptionsGenericDfsTransformer {
   private val customTransformer = CustomCodeUtil.getClassInstanceByName[CustomGenericDfsTransformer](className)
 
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
     val functions = DataFrameSubFeed.getFunctions(dfs.values.head.subFeedType)
-    customTransformer.transform(functions, options, dfs)
+    val mappedInputDfs = dfs.map {
+      case (k, v) => (renamedInputIds.getOrElse(k, k), v)
+    }
+    val optionsPrep = options ++ overrideOutputId.map(OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID -> _)
+    val outputDfs = customTransformer.transform(functions, optionsPrep, mappedInputDfs)
+    outputDfs.map {
+      case (k, v) => (renamedOutputIds.getOrElse(k, k), v)
+    }
   }
 
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {

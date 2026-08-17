@@ -77,7 +77,6 @@ The following custom transformations are available.
 | ScalaClassSparkDfTransformer     | Spark DataFrame transformation in Scala 1-to-1            |
 | ScalaClassSparkDfsTransformer    | Spark DataFrame transformation in Scala many-to-many      |
 | ScalaClassSparkDsTransformer     | Spark DataSet transformation in Scala 1-to-1              |
-| ScalaClassSparkDsNTo1Transformer | Spark DataFrame transformation in Scala many-to-one       |
 | ScalaNotebookSparkDfTransformer  | Loads custom code from a Notebook                         | 
 | PythonCodeSparkDfTransformer | Spark DataFrame transformation in Python 1-to-1 (using PySpark)  |
 | PythonCodeSparkDfsTransformer | Spark DataFrame transformation in Python many-to-many (using PySpark) |
@@ -168,6 +167,18 @@ In the end, you simply need to return a DataFrame back to SDLB.
 
 Because a CopyAction is 1-to-1 only, the transformer also needs to extend the 1-to-1 `CustomDfTransformer`.
 
+Instead of overwriting the standard transform method, you can also define any transform method that suits you best,
+see [Dynamic transform methods](#dynamic-transform-methods). As a 1-to-1 transformer has exactly one input DataFrame,
+a `DataFrame` or `Dataset[<Product>]` parameter gets this DataFrame independent of the parameters name.
+The id of the input DataObject is available as option `dataObjectId`:
+```
+class MyFirstTransformer extends CustomDfTransformer {
+    def transform(df: DataFrame, newColumnDefault: String = "na") : DataFrame = {
+        df.withColumn("newColumn", when($"desc".isNotNull, $"desc").otherwise(lit(newColumnDefault)))
+    }
+}
+```
+
 ##### As Scala class many-to-many
 If you have a many-to-many action and want to write a custom Scala transformer, you need to switch to a `CustomDataFrameAction`. 
 ```
@@ -183,24 +194,8 @@ my_many_to_many_action {
 ```
 
 In this case, your Scala class also needs to extend the many-to-many `CustomDfsTransformer`. You can either overwrite the respective transform method as shown later, 
-or define any transform method that suits you best (starting from SDLB version 2.6.x).
-
-If you choose to implement any transform method, this method is called dynamically by looking for the parameter values in the input DataFrames and Options.
-The limitation is that the parameter types must be chosen from the following list:
-- `SparkSession`
-- `Map[String,String]`
-- `DataFrame`
-- `Dataset[<Product>]`
-- any primitive data type (`String`, `Boolean`, `Int`, ...)
-
-Primitive value parameters are assigned looking up the parameter name in the Map of Options and converted to the target data type.
-Data types for primitive values might also use default values or be enclosed in an Option[...] to mark it as non required.
-
-DataFrame parameters are assigned looking up the parameter name in the Map of DataFrames. A potential `df` prefix is removed from the parameter name before the lookup.
-
-All lookups of parameters are done case-insensitive, also dash and underscores are removed.
-
-If the Action has only one output DataObject, the return type can also be defined as a simple DataFrame instead of a `Map[String,DataFrame]`.
+or define any transform method that suits you best (starting from SDLB version 2.6.x), see
+[Dynamic transform methods](#dynamic-transform-methods).
 
 ```
 class MySecondTransformer extends CustomDfsTransformer {
@@ -230,6 +225,45 @@ we use it to extract the two DataFrames.
 Again, you can manipulate all DataFrames as needed and this time, return a map with all output Data Objects.
 As noted, it's best practice to only return one Data Object (many-to-one action) as in our example.
 
+
+##### Dynamic transform methods
+Instead of overwriting the standard transform method of a transformer interface, you can define **any** transform
+method that suits you best. The method is then called dynamically by looking for the parameter values in the input
+DataFrames and Options.
+
+This is supported by all transformers implemented in Scala/Java code or Scala code compiled at runtime:
+
+| Transformer type                                                              | Interface                       | DataFrame type     |
+|-------------------------------------------------------------------------------|---------------------------------|--------------------|
+| ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer, ScalaNotebookSparkDfTransformer | CustomDfTransformer  | Spark DataFrame    |
+| ScalaClassSparkDfsTransformer, ScalaCodeSparkDfsTransformer                    | CustomDfsTransformer            | Spark DataFrame    |
+| ScalaClassSparkDsTransformer                                                   | CustomDsTransformer             | Spark Dataset      |
+| ScalaClassGenericDfTransformer                                                 | CustomGenericDfTransformer      | GenericDataFrame   |
+| ScalaClassGenericDfsTransformer                                                | CustomGenericDfsTransformer     | GenericDataFrame   |
+| ScalaClassSnowparkDfTransformer                                                | CustomSnowparkDfTransformer     | Snowpark DataFrame |
+| ScalaClassSnowparkDfsTransformer                                               | CustomSnowparkDfsTransformer    | Snowpark DataFrame |
+
+The parameter types must be chosen from the following list:
+- the engines session or helper object: `SparkSession` (Spark), `DataFrameFunctions` (generic) or `Session` (Snowpark)
+- `Map[String,String]` to get all options
+- the engines DataFrame type, and `Dataset[<Product>]` for Spark
+- a Map of the engines DataFrame type to get all input DataFrames, e.g. `Map[String,DataFrame]`
+- any primitive data type (`String`, `Boolean`, `Int`, ...), also as `Option[...]` or `Seq[...]`
+
+Primitive value parameters are assigned looking up the parameter name in the Map of Options and converted to the target data type.
+Data types for primitive values might also use default values or be enclosed in an Option[...] to mark it as non required.
+A `Seq[...]` parameter is assigned by splitting the option value by comma.
+
+DataFrame parameters are assigned looking up the parameter name in the Map of DataFrames. A potential `df` prefix
+(`ds` for Datasets) is removed from the parameter name before the lookup.
+For 1-to-1 transformers there is exactly one input DataFrame, which is assigned independent of the parameters name.
+They also get the id of the input DataObject as option `dataObjectId`.
+
+All lookups of parameters are done case-insensitive, also dash and underscores are removed.
+
+If the Action has only one output DataObject, the return type can also be defined as a simple DataFrame instead of a
+`Map[String,DataFrame]`. Alternatively the name of a single returned DataFrame can be set with the transformers
+option `overrideOutputId`.
 
 :::info
 One thing that might be confusing at this point:

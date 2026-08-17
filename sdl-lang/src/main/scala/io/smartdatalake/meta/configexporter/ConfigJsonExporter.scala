@@ -30,8 +30,7 @@ import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
 import io.smartdatalake.util.misc.HoconUtil.{getConfigValue, updateConfigValue}
 import io.smartdatalake.util.misc.StringUtil.strToLowerCamelCase
 import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, ScaladocUtil, SmartDataLakeLogger}
-import io.smartdatalake.workflow.action.spark.customlogic.{CustomTransformMethodDef, CustomTransformMethodWrapper}
-import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
+import io.smartdatalake.workflow.action.generic.customlogic.CustomTransformMethodDef
 import org.apache.commons.lang3.NotImplementedException
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -52,6 +51,22 @@ case class ConfigJsonExporterConfig(
 object ConfigJsonExporter extends SmartDataLakeLogger {
 
   val appType: String = getClass.getSimpleName.replaceAll("\\$$", "") // remove $ from object name and use it as appType
+
+  /**
+   * Transformer types implemented as Java/Scala class which support a dynamic transform method, with the name of
+   * their configuration parameter holding the class name. For these the parameters of the transform method are
+   * exported to be shown in the UI.
+   * Note that they are listed by name, as not all corresponding modules are on the classpath of the exporter.
+   */
+  private[configexporter] val customTransformerTypesWithClassName: Map[String, String] = Map(
+    "ScalaClassSparkDfsTransformer" -> "className",
+    "ScalaClassSparkDfTransformer" -> "className",
+    "ScalaClassSparkDsTransformer" -> "transformerClassName",
+    "ScalaClassGenericDfsTransformer" -> "className",
+    "ScalaClassGenericDfTransformer" -> "className",
+    "ScalaClassSnowparkDfsTransformer" -> "className",
+    "ScalaClassSnowparkDfTransformer" -> "className"
+  )
 
   protected val parser: OptionParser[ConfigJsonExporterConfig] = new OptionParser[ConfigJsonExporterConfig](appType) {
     override def showUsageOnError: Option[Boolean] = Some(true)
@@ -314,22 +329,23 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
   }
 
   private def enrichCustomTransformerParameters(config: Config): Config = {
-    // we are looking for type = ScalaClassSparkDfsTransformer (for now)
+    // we are looking for all transformers which are implemented as Java/Scala class and support a dynamic transform method
     def searchCondition(key: String, value: ConfigValue) = {
       // condition
       value.valueType == ConfigValueType.STRING &&
         key == "type" &&
-        value.unwrapped.asInstanceOf[String] == classOf[ScalaClassSparkDfsTransformer].getSimpleName
+        ConfigJsonExporter.customTransformerTypesWithClassName.contains(value.unwrapped.asInstanceOf[String])
     }
     val customTransformerConfigurationPaths = HoconUtil.findInConfigObject(config.root, searchCondition)
-    // enrich config with ScalaClassSparkDfsTransformer parameters if available
+    // enrich config with custom transformer parameters if available
     logger.info(s"Enriching custom transformer parameter information for ${customTransformerConfigurationPaths.length} transformers")
     customTransformerConfigurationPaths.foldLeft(config) {
       case (config, path) =>
-        val className = getConfigValue(config.root(), path.init :+ "className").unwrapped().asInstanceOf[String]
+        val transformerType = getConfigValue(config.root(), path).unwrapped().asInstanceOf[String]
+        val classNameParameter = ConfigJsonExporter.customTransformerTypesWithClassName(transformerType)
+        val className = getConfigValue(config.root(), path.init :+ classNameParameter).unwrapped().asInstanceOf[String]
         val classInstance = CustomCodeUtil.getClassInstanceByName[CustomTransformMethodDef](className)
-        val wrapper = classInstance.customTransformMethod.map(new CustomTransformMethodWrapper(_))
-        val parameters = wrapper.map(_.getParameterInfo())
+        val parameters = classInstance.customTransformMethod.map(CustomCodeUtil.analyzeMethodParameters(None, _))
         if (parameters.isDefined) {
           val parametersValue = ConfigValueFactory.fromIterable(parameters.get.map(p => ConfigValueFactory.fromMap(p.toMap.asJava)).asJava)
           updateConfigValue(config.root(), path.init :+ "_parameters", parametersValue).asInstanceOf[ConfigObject].toConfig

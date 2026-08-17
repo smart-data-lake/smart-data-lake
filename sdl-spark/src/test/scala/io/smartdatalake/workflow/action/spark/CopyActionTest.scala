@@ -99,7 +99,7 @@ class CopyActionTest extends AnyFunSuite with BeforeAndAfter {
     // define custom transformation
     val codeStr = """
       import org.apache.spark.sql.{DataFrame, SparkSession}
-      def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
+      override def transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
         import session.implicits._
         df.withColumn("rating", $"rating" + 1)
       }

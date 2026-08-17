@@ -43,6 +43,11 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * pushed down to Snowflake and executed by Snowpark. If a single input and output is sufficient, prefer the simpler
  * [[ScalaClassSnowparkDfTransformer]].
  *
+ * Instead of overwriting the standard transform function, the class can also implement any transform method using
+ * parameters of type Session, Map[String,String], DataFrame and any primitive data type. It is then called
+ * dynamically by looking for the parameter values in the input DataFrames and Options, see
+ * [[CustomSnowparkDfsTransformer]].
+ *
  * Example:
  * {{{
  * actions = {
@@ -67,12 +72,23 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param options        Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param renamedInputIds  optional map of [input DataFrame name, renamed input DataFrame name]. Adapt names of input
+ *                         DataFrames to the expected names in the transformation.
+ * @param renamedOutputIds optional map of [output DataFrame name, renamed output DataFrame name]. Adapt names of output
+ *                         DataFrames of the transformation to the expected names of the output DataObjects or the next
+ *                         transformation.
+ * @param overrideOutputId override name of output DataFrame, if the transformer returns a single DataFrame, and not a
+ *                         Map of type String -> DataFrame. By default, a single DataFrame is named after the output
+ *                         DataObjectId of the Action if the action has only one output DataObject.
  */
 case class ScalaClassSnowparkDfsTransformer(name: String = "snowparkScalaTransform",
                                   description: Option[String] = None,
                                   className: String,
                                   options: Map[String, String] = Map(),
-                                  runtimeOptions: Map[String, String] = Map()
+                                  runtimeOptions: Map[String, String] = Map(),
+                                  renamedInputIds: Map[String, String] = Map(),
+                                  renamedOutputIds: Map[String, String] = Map(),
+                                  overrideOutputId: Option[String] = None
                                  )
   extends OptionsGenericDfsTransformer {
 
@@ -82,9 +98,12 @@ case class ScalaClassSnowparkDfsTransformer(name: String = "snowparkScalaTransfo
     assert(dfs.values.forall(_.isInstanceOf[SnowparkDataFrame]), s"($actionId) Unsupported subFeedType(s) ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method transform")
     val action = context.instanceRegistry.get[Action](actionId)
     val snowparkSession = action.inputs.head.asInstanceOf[SnowflakeTableDataObject].snowparkSession
-    val snowparkDfs = dfs.view.mapValues(_.asInstanceOf[SnowparkDataFrame].inner).toMap
-    customTransformer.transform(snowparkSession, options, snowparkDfs)
-      .view.mapValues(SnowparkDataFrame).toMap
+    val snowparkDfs = dfs.map {
+      case (k, v) => (renamedInputIds.getOrElse(k, k), v.asInstanceOf[SnowparkDataFrame].inner)
+    }
+    val optionsPrep = options ++ overrideOutputId.map(OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID -> _)
+    customTransformer.transform(snowparkSession, optionsPrep, snowparkDfs)
+      .map { case (k, v) => (renamedOutputIds.getOrElse(k, k), SnowparkDataFrame(v)) }
   }
 
   override def getSubFeedSupportedType: Type = typeOf[SnowparkSubFeed]

@@ -41,6 +41,20 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * - `dataObjectId`: Id of input dataObject as String
  * Output DataFrame must be set with `setOutputDf(df)`.
  *
+ * Alternatively the Python code can define a function named `transform`. It is then called dynamically by looking
+ * for its parameter values in the input DataFrame and options, and its return value is used as output DataFrame.
+ * A parameter named `options` gets all options as dict, a parameter with the name of an option gets its value
+ * converted according to its type annotation or the type of its default value. As there is exactly one input
+ * DataFrame, a parameter named `df`/`inputDf`, a parameter matching the DataObjectId, or otherwise the first
+ * parameter without default value gets this DataFrame. Example:
+ * {{{
+ *   code = """
+ *     from pyspark.sql.functions import col
+ *     def transform(inputDf, country: str = 'CH'):
+ *         return inputDf.where(col('country') == country)
+ *   """
+ * }}}
+ *
  * Either `code` (inline PySpark code, best for a few lines) or `file` (a path to a `.py` file, best for longer logic
  * and unit-testable code) must be defined. Prefer [[ScalaClassSparkDfTransformer]] or an SQL transformer if you do not
  * specifically need Python libraries, as starting the Python gateway adds overhead per Action.
@@ -93,7 +107,9 @@ case class PythonCodeDfTransformer(override val name: String = "pythonSparkTrans
           |def setOutputDf( df ):
           |    entryPoint.setOutputDf(df._jdf)
           """.stripMargin
-      PythonUtil.execPythonSparkCode(entryPoint, additionalInitCode + sys.props("line.separator") + PythonCodeDfTransformer.dedent(pythonCode))
+      PythonUtil.execPythonSparkCode(entryPoint, additionalInitCode + sys.props("line.separator")
+        + PythonCodeDfTransformer.dedent(pythonCode) + sys.props("line.separator")
+        + PythonDynamicTransform.dfPostludeCode)
       entryPoint.outputDf.getOrElse(throw new IllegalStateException(s"($actionId.transformers.$name) Python transformation must set output DataFrame (call setOutputDf(df))"))
     } catch {
       case e: Throwable => throw new PythonTransformationException(s"($actionId.transformers.$name) Could not execute Python code. Error: ${e.getMessage}", e)

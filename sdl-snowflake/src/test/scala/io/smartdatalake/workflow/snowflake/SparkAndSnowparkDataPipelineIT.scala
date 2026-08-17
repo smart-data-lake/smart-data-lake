@@ -117,7 +117,7 @@ object SparkAndSnowparkDataPipelineIT extends App {
 }
 
 class TestOptionsSnowparkDfTransformer extends CustomSnowparkDfTransformer {
-  def transform(session: Session, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
+  override def transform(session: Session, options: Map[String,String], df: DataFrame, dataObjectId: String) : DataFrame = {
     import com.snowflake.snowpark.functions._
     df.withColumn("test", lit(options("test")+"-"+options("appName")))
   }

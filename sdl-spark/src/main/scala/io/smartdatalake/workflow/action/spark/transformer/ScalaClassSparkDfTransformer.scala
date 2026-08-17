@@ -34,12 +34,23 @@ import org.slf4j.Logger
 
 /**
  * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1)
- * as Java/Scala Class. Define a transform function which receives a DataObjectId, a DataFrame and a
- * map of options and has to return a DataFrame. The Java/Scala class has to implement interface
- * [[CustomDfTransformer]].
+ * as Java/Scala Class. The Java/Scala class has to implement interface [[CustomDfTransformer]].
+ *
+ * There are two methods of defining the transformation:
+ *
+ * 1) Overwrite the standard transform function of CustomDfTransformer, which receives a DataObjectId, a DataFrame
+ * and a map of options and has to return a DataFrame. The exact signature is
+ * `transform(session: SparkSession, options: Map[String,String], df: DataFrame, dataObjectId: String): DataFrame`.
+ *
+ * 2) Implement any transform method using parameters of type SparkSession, Map[String,String], DataFrame,
+ * Dataset[<Product>] and any primitive data type (String, Boolean, Int, ...). Primitive data types might also use
+ * default values or be enclosed in an Option[...] to mark it as non required. The transform method is then called
+ * dynamically by looking for the parameter values in the options. As there is exactly one input DataFrame, a
+ * DataFrame or Dataset parameter gets this DataFrame independent of the parameters name.
  *
  * Note that the following options are passed by default to the transformation:
  *   - isExec: defined as `context.isExecPhase`
+ *   - dataObjectId: id of the DataObject of the input SubFeed
  *
  * Pick this transformer when the transformation logic is too complex for SQL and should live in compiled, unit-testable
  * code. The class named by `className` must be on the classpath of the SDLB job and needs a constructor without
