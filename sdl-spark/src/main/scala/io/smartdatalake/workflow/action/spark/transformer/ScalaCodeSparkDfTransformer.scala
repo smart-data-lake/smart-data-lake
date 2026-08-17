@@ -79,7 +79,7 @@ import org.slf4j.Logger
  * }}}
  *
  * @note Runtime compilation needs the Scala compiler on the classpath; for production pipelines a
- *       compiled transformer ([[ScalaClassSparkDsTransformer]]) is usually preferable.
+ *       compiled transformer ([[ScalaClassSparkDfTransformer]]) is usually preferable.
  *
  * @param name
  *   name of the transformer

@@ -24,7 +24,7 @@ import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.misc.CustomCodeUtil
 import io.smartdatalake.workflow.action.CopyAction
-import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, CustomDfsTransformer, CustomDsTransformer}
+import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, CustomDfsTransformer}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 import org.scalatest.funsuite.AnyFunSuite
@@ -113,16 +113,10 @@ class DynamicTransformTest extends AnyFunSuite with SparkTestTool {
     assert(result.columns.toSeq == Seq("a", "b"))
   }
 
-  test("CustomDsTransformer can dynamically map parameters") {
+  test("CustomDfTransformer can dynamically map a typed Dataset parameter and return value") {
     val transformer = new DynamicDsTransformer
-    val result = transformer.transformWithTypeConversion(session, Map("factor" -> "2"), dfSrc, "src")
+    val result = transformer.transform(session, Map("factor" -> "2"), dfSrc, "src")
     assert(result.head().getInt(1) == 2)
-  }
-
-  test("CustomDsTransformer with standard transform method is still supported") {
-    val transformer = new StdDsTransformer
-    val result = transformer.transformWithTypeConversion(session, Map(), dfSrc, "src")
-    assert(result.head().getInt(1) == 1)
   }
 
   test("ScalaCode compiled at runtime can implement a dynamic CustomDfsTransformer") {
@@ -205,15 +199,11 @@ class StdDfTransformer extends CustomDfTransformer {
   override def transform(session: SparkSession, options: Map[String, String], df: DataFrame, dataObjectId: String): DataFrame = df
 }
 
-class DynamicDsTransformer extends CustomDsTransformer[TestDs, TestDs] {
+class DynamicDsTransformer extends CustomDfTransformer {
   def transform(ds: Dataset[TestDs], factor: Int): Dataset[TestDs] = {
     import ds.sparkSession.implicits._
-    ds.map(x => x.copy(b = x.b * factor))
+    ds.map(x => x.copy(b = x.b * factor)) // typed operation, needs a correct encoder for TestDs
   }
-}
-
-class StdDsTransformer extends CustomDsTransformer[TestDs, TestDs] {
-  override def transform(session: SparkSession, options: Map[String, String], inputDS: Dataset[TestDs], dataObjectId: String): Dataset[TestDs] = inputDS
 }
 
 case class TestDs(a: String, b: Int)

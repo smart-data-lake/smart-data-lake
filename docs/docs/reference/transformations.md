@@ -76,7 +76,6 @@ The following custom transformations are available.
 | ScalaClassSnowparkDfsTransformer | Snowpark (Snowflake) transformation in Scala many-to-many |
 | ScalaClassSparkDfTransformer     | Spark DataFrame transformation in Scala 1-to-1            |
 | ScalaClassSparkDfsTransformer    | Spark DataFrame transformation in Scala many-to-many      |
-| ScalaClassSparkDsTransformer     | Spark DataSet transformation in Scala 1-to-1              |
 | ScalaNotebookSparkDfTransformer  | Loads custom code from a Notebook                         | 
 | PythonCodeSparkDfTransformer | Spark DataFrame transformation in Python 1-to-1 (using PySpark)  |
 | PythonCodeSparkDfsTransformer | Spark DataFrame transformation in Python many-to-many (using PySpark) |
@@ -178,6 +177,15 @@ class MyFirstTransformer extends CustomDfTransformer {
     }
 }
 ```
+This is also the way to write strongly typed transformations: declare the parameter and return type as
+`Dataset[<Product>]` and SDLB converts the input DataFrame to the given case class and the returned Dataset back:
+```
+class MyTypedTransformer extends CustomDfTransformer {
+    def transform(ds: Dataset[Rating], factor: Int = 2) : Dataset[Rating] = {
+        ds.map(rating => rating.copy(value = rating.value * factor))
+    }
+}
+```
 
 ##### As Scala class many-to-many
 If you have a many-to-many action and want to write a custom Scala transformer, you need to switch to a `CustomDataFrameAction`. 
@@ -237,7 +245,6 @@ This is supported by all transformers implemented in Scala/Java code or Scala co
 |-------------------------------------------------------------------------------|---------------------------------|--------------------|
 | ScalaClassSparkDfTransformer, ScalaCodeSparkDfTransformer, ScalaNotebookSparkDfTransformer | CustomDfTransformer  | Spark DataFrame    |
 | ScalaClassSparkDfsTransformer, ScalaCodeSparkDfsTransformer                    | CustomDfsTransformer            | Spark DataFrame    |
-| ScalaClassSparkDsTransformer                                                   | CustomDsTransformer             | Spark Dataset      |
 | ScalaClassGenericDfTransformer                                                 | CustomGenericDfTransformer      | GenericDataFrame   |
 | ScalaClassGenericDfsTransformer                                                | CustomGenericDfsTransformer     | GenericDataFrame   |
 | ScalaClassSnowparkDfTransformer                                                | CustomSnowparkDfTransformer     | Snowpark DataFrame |
