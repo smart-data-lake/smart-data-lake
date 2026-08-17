@@ -89,12 +89,16 @@
             "required" : [ "expression" ],
             "additionalProperties" : false,
             "description" : "Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of`DefaultExecutionModeExpressionData` returning a boolean.  \nDefault is to apply the execution mode."
+          },
+          "propagateFilter" : {
+            "type" : "boolean",
+            "description" : "If true the incremental filter is passed on to following actions, where it is applied to\nevery DataObject having the compareCol column. Set this only if the increment written by\nthis action can still be identified by the filter, as the filter is then assumed to be\napplied already. Default is false, so the filter is only used to read the increment for\nthis action."
           }
         },
         "title" : "DataFrameIncrementalMode",
         "required" : [ "type", "compareCol" ],
         "additionalProperties" : false,
-        "description" : "Compares max entry in \"compare column\" between mainOutput and mainInput and incrementally loads the delta.  \nThis mode works only with SparkSubFeeds. The filter is not propagated to following actions.\n\nPick this mode for non-partitioned sources which have a monotonically increasing column, e.g. a technical\ntimestamp or a sequence-based id: the mode reads `max(compareCol)` from the output and adds a filter `compareCol > <lastValue>` on the input. If the output is still empty all records are selected.  \nIf input and output are on the same value, a NoDataToProcessWarning is thrown and following actions are skipped. `compareCol` must exist in both main input and main output and be of a sortable type. Example:\n```\nactions = {\n  copy-airports {\n    type = CopyAction\n    inputId = stg-airports\n    outputId = int-airports\n    executionMode = {\n      type = DataFrameIncrementalMode\n      compareCol = \"dl_ts_captured\"\n      applyCondition = { expression = \"isStartNode\" }\n    }\n  }\n}\n```\n\n\nSEE: `PartitionDiffMode` if the input DataObject is partitioned, `DataObjectStateIncrementalMode` if the\ninput DataObject can remember its own state."
+        "description" : "Compares max entry in \"compare column\" between mainOutput and mainInput and incrementally loads the delta.  \nThis mode works only with SparkSubFeeds. By default the filter is not propagated to following actions,\nsee `propagateFilter` .\n\nPick this mode for non-partitioned sources which have a monotonically increasing column, e.g. a technical\ntimestamp or a sequence-based id: the mode reads `max(compareCol)` from the output and adds a filter `compareCol > <lastValue>` on the input. If the output is still empty all records are selected.  \nIf input and output are on the same value, a NoDataToProcessWarning is thrown and following actions are skipped. `compareCol` must exist in both main input and main output and be of a sortable type. Example:\n```\nactions = {\n  copy-airports {\n    type = CopyAction\n    inputId = stg-airports\n    outputId = int-airports\n    executionMode = {\n      type = DataFrameIncrementalMode\n      compareCol = \"dl_ts_captured\"\n      applyCondition = { expression = \"isStartNode\" }\n    }\n  }\n}\n```\n\n\nSEE: `PartitionDiffMode` if the input DataObject is partitioned, `DataObjectStateIncrementalMode` if the\ninput DataObject can remember its own state."
       },
       "DataObjectStateIncrementalMode" : {
         "type" : "object",
@@ -3937,7 +3941,7 @@
             "items" : {
               "type" : "string"
             },
-            "description" : "optional list of input ids to ignore filter (partition values & filter clause)"
+            "description" : "optional list of input ids to ignore filter (partition values & column filters)"
           },
           "engineConnectionId" : {
             "type" : "string",
