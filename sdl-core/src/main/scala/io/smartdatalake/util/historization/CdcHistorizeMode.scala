@@ -40,7 +40,7 @@ import java.time.Duration
  * @param changeTypeColName name of the column holding the change type/operation
  * @param deletedValue value of changeTypeColName marking a record as deleted
  * @param isStandardCdc true if the input uses SDLBs standard CDC columns, see [[CdcChangeType]].
- *                      Only then change events are prepared by [[Historization.prepareCdcInput]].
+ *                      Only then change events are prepared by [[CdcHistorizeMode.prepareCdcInput]].
  * @param orderColName optional column defining the order of change events of the same primary key
  * @param sourceTimestampColName optional column holding the timestamp of the change in the source system, used as
  *                               start of validity of the new version. Note that this is `_commit_timestamp` for
@@ -78,7 +78,7 @@ case class CdcHistorizeMode(
     val mergeTimePredicate = if (sourceTimestampColName.isDefined) {
       // the validity of a new version starts at the timestamp of the source system, which is different for every
       // record. It is not available as column of the merge statement, but the delimited timestamp of the record to
-      // close is derived from it, see Historization.incrementalCDCHistorize.
+      // close is derived from it, see [[CdcHistorizeMode.incrementalCDCHistorize]].
       if (action.timeAxisUnitOpt.isDefined)
         s"new.${Environment.delimitedColumnName} between existing.${Environment.capturedColumnName}" +
           s" AND existing.${Environment.delimitedColumnName}"

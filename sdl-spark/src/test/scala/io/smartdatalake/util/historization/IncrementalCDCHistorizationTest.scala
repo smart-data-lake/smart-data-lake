@@ -53,7 +53,7 @@ class IncrementalCDCHistorizationTest extends AnyFunSuite with BeforeAndAfter wi
     val dfNewFeed = toDataDf(dataNewFeed, colNames :+ "operation")
 
     val dfHistorized =
-      Historization.incrementalCDCHistorize(dfNewFeed, col("operation") === lit("deleted"), referenceTimestampNewTs, defaultTimeAxisUnit)
+      CdcHistorizeMode.incrementalCDCHistorize(dfNewFeed, col("operation") === lit("deleted"), referenceTimestampNewTs, defaultTimeAxisUnit)
         .drop("operation")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
@@ -75,7 +75,7 @@ class IncrementalCDCHistorizationTest extends AnyFunSuite with BeforeAndAfter wi
     val dfNewFeed = toDataDf(dataNewFeed, colNames :+ "operation")
 
     val dfHistorized =
-      Historization.incrementalCDCHistorize(dfNewFeed, col("operation") === lit("deleted"), referenceTimestampNewTs, defaultTimeAxisUnit)
+      CdcHistorizeMode.incrementalCDCHistorize(dfNewFeed, col("operation") === lit("deleted"), referenceTimestampNewTs, defaultTimeAxisUnit)
         .drop("operation")
     if (logger.isDebugEnabled) logger.debug(s"Historization result:\n${dfHistorized.showString()}")
 
@@ -102,7 +102,7 @@ class IncrementalCDCHistorizationTest extends AnyFunSuite with BeforeAndAfter wi
     val cdcColNames = colNames ++ Seq(Environment.cdcChangeTypeColumnName, Environment.cdcChangeOrdinalColumnName)
     val dfNewFeed = toDataDf(dataNewFeed, cdcColNames)
 
-    val dfPrepared = Historization.prepareCdcInput(dfNewFeed, Seq("id"), Environment.cdcChangeTypeColumnName,
+    val dfPrepared = CdcHistorizeMode.prepareCdcInput(dfNewFeed, Seq("id"), Environment.cdcChangeTypeColumnName,
       Some(Environment.cdcChangeOrdinalColumnName))
 
     val dfExpected = toDataDf(Seq(
@@ -122,7 +122,7 @@ class IncrementalCDCHistorizationTest extends AnyFunSuite with BeforeAndAfter wi
       (123, "Egon", 23, "healthy", CdcChangeType.delete, 1)
     ), cdcColNames)
 
-    val dfPrepared = Historization.prepareCdcInput(dfNewFeed, Seq("id"), Environment.cdcChangeTypeColumnName,
+    val dfPrepared = CdcHistorizeMode.prepareCdcInput(dfNewFeed, Seq("id"), Environment.cdcChangeTypeColumnName,
       Some(Environment.cdcChangeOrdinalColumnName))
 
     val dfExpected = toDataDf(Seq((123, "Egon", 23, "healthy", CdcChangeType.delete, 1)), cdcColNames)
@@ -140,7 +140,7 @@ class IncrementalCDCHistorizationTest extends AnyFunSuite with BeforeAndAfter wi
       (124, "Erika", 30, "healthy", CdcChangeType.insert)
     ), cdcColNames)
 
-    val dfPrepared = Historization.prepareCdcInput(dfNewFeed, Seq("id"), Environment.cdcChangeTypeColumnName, None)
+    val dfPrepared = CdcHistorizeMode.prepareCdcInput(dfNewFeed, Seq("id"), Environment.cdcChangeTypeColumnName, None)
 
     val dfExpected = toDataDf(Seq(
       (123, "Egon", 24, "healthy", CdcChangeType.updatePostimage),
@@ -157,7 +157,7 @@ class IncrementalCDCHistorizationTest extends AnyFunSuite with BeforeAndAfter wi
     val cdcColNames = colNames ++ Seq(Environment.cdcChangeTypeColumnName, Environment.cdcCommitTimestampColumnName)
     val dfNewFeed = toDataDf(List((123, "Egon", 23, "healthy", CdcChangeType.updatePostimage, commitTs)), cdcColNames)
 
-    val dfHistorized = Historization.incrementalCDCHistorize(
+    val dfHistorized = CdcHistorizeMode.incrementalCDCHistorize(
       dfNewFeed,
       col(Environment.cdcChangeTypeColumnName) === lit(CdcChangeType.delete),
       referenceTimestampNewTs,
