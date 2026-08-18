@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject.generic
 /**
  * Marker interface to let Actions know that a DataObject can evolve its schema
  */
-private[smartdatalake] trait CanEvolveSchema {
+trait CanEvolveSchema {
   /**
    * If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
    */

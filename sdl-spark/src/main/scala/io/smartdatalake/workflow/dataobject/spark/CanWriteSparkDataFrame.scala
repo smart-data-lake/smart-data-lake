@@ -90,9 +90,9 @@ trait CanWriteSparkDataFrame extends CanWriteDataFrame with Quality { this: Data
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method init")
     }
 
-  override private[smartdatalake] def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SparkSubFeed])
+  override def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SparkSubFeed])
 
-  override private[smartdatalake] def writeDataFrameToPath(df: GenericDataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit
+  override def writeDataFrameToPath(df: GenericDataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit
       context: ActionPipelineContext
   ): Unit =
     df match {

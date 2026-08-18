@@ -113,12 +113,12 @@ case class SparkConnectTableDataObject(override val id: DataObjectId,
     else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
   }
 
-  override private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+  override def getSubFeed(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     if (subFeedType =:= typeOf[SparkConnectSubFeed]) SparkConnectSubFeed(Some(getSparkConnectDataFrame(partitionValues)), id, partitionValues)
     else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
   }
 
-  override private[smartdatalake] def getSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SparkConnectSubFeed])
+  override def getSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SparkConnectSubFeed])
 
   override def init(df: GenericDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     df match {
@@ -171,7 +171,7 @@ case class SparkConnectTableDataObject(override val id: DataObjectId,
     Map()
   }
 
-  override private[smartdatalake] def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SparkConnectSubFeed])
+  override def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SparkConnectSubFeed])
 
   private def newDfWriter(df: DataFrame): DataFrameWriter[Row] = {
     val dfWriter = df.write.options(options)

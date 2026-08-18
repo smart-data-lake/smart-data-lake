@@ -113,7 +113,7 @@ trait HasEngineImplementation[E <: DataObjectEngine] extends CanCreateDataFrame 
       }
   }
 
-  override private[smartdatalake] def getSubFeedSupportedTypes: Seq[Type] = engines.map(_.subFeedType)
+  override def getSubFeedSupportedTypes: Seq[Type] = engines.map(_.subFeedType)
 
-  override private[smartdatalake] def writeSubFeedSupportedTypes: Seq[Type] = engines.map(_.subFeedType)
+  override def writeSubFeedSupportedTypes: Seq[Type] = engines.map(_.subFeedType)
 }

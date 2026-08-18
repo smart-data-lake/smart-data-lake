@@ -224,7 +224,7 @@ case class MockSparkDataObject(override val id: DataObjectId,
     this
   }
 
-  override private[smartdatalake] def expectedPartitionsCondition: Option[String] = None
+  override def expectedPartitionsCondition: Option[String] = None
 
   override val metadata: Option[DataObjectMetadata] = None
   override val options: Map[String, String] = Map()

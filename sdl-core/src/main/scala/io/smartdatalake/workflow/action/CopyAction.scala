@@ -97,7 +97,7 @@ case class CopyAction(
 
   validateConfig()
 
-  private[smartdatalake] override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] =
+  override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] =
     transformers
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {

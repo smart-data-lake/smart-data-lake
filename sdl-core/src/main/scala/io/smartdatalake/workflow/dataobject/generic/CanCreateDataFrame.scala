@@ -35,12 +35,12 @@ trait CanCreateDataFrame {
    * Get a GenericDataFrameSubFeed for the given language.
    * See getSubFeedSupportedTypes for supported languages.
    */
-  private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed
+  def getSubFeed(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed
 
   /**
    * Declare supported Language for getting DataFrame
    */
-  private[smartdatalake] def getSubFeedSupportedTypes: Seq[Type]
+  def getSubFeedSupportedTypes: Seq[Type]
 
   /**
    * Creates the read schema based on a given write schema.

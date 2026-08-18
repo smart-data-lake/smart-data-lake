@@ -74,7 +74,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * Define if recursive inputs should be prepared as input SubFeed by ActionDAG or if this is handled by the action internally.
    * Default is to prepare & expect it as input SubFeed, but this can be overridden by subclasses
    */
-  private[smartdatalake] def handleRecursiveInputsAsSubFeeds: Boolean = true
+  def handleRecursiveInputsAsSubFeeds: Boolean = true
 
   /**
    * Output [[DataObject]]s
@@ -146,7 +146,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * If this Action should be run as asynchronous streaming process
    */
-  private[smartdatalake] def isAsynchronous: Boolean = false
+  def isAsynchronous: Boolean = false
 
   private[smartdatalake] def isAsynchronousProcessStarted: Boolean = false
 

@@ -107,7 +107,7 @@ trait GenericDfTransformerDef extends PartitionValueTransformer {
    * Declare supported Language for transformation. Can be DataFrameSubFeed to work with
    * GenericDataFrame, or SparkSubFeed to work with Spark-DataFrames
    */
-  private[smartdatalake] def getSubFeedSupportedType: Type = typeOf[DataFrameSubFeed]
+  def getSubFeedSupportedType: Type = typeOf[DataFrameSubFeed]
 
   private[smartdatalake] def applyTransformation(
       actionId: ActionId,

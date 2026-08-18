@@ -38,7 +38,7 @@ import scala.reflect.runtime.universe.Type
  *
  * An expectation validation means that the evaluated metric value is compared against a condition set the the user as `expectation` attribute. This could be for instance {{{<value> <= 20}}}
  */
-private[smartdatalake] trait ExpectationValidation {
+trait ExpectationValidation {
   this: DataObject with SmartDataLakeLogger =>
 
   /**

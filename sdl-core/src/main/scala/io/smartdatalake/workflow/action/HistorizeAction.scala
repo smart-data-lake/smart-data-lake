@@ -249,7 +249,7 @@ case class HistorizeAction(
   // This override is needed to force tick-tock write operation.
   override val recursiveInputs: Seq[TransactionalTableDataObject] = Seq(output)
 
-  private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
+  override val handleRecursiveInputsAsSubFeeds: Boolean = false
 
   // DataFrame created by HistorizeAction should not be passed on to the next Action,
   // but must be recreated from the DataObject.
@@ -312,7 +312,7 @@ case class HistorizeAction(
     }
   }
 
-  private[smartdatalake] override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
+  override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
     val capturedTs = Timestamp.valueOf(getReferenceTimestamp)
     val pks = output.table.primaryKey.get // existence is validated earlier
     val historizeMode = mode

@@ -119,13 +119,13 @@ case class PKViolatorsDataObject(id: DataObjectId,
     pkViolatorsDfs.reduce(_ unionByName _)
   }
 
-  override private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues], subFeedType: universe.Type)(implicit context: ActionPipelineContext) = {
+  override def getSubFeed(partitionValues: Seq[PartitionValues], subFeedType: universe.Type)(implicit context: ActionPipelineContext) = {
     val helper = DataFrameSubFeed.getCompanion(subFeedType)
     val df = getDataFrame(partitionValues, subFeedType)
     helper.getSubFeed(df, id, partitionValues)
   }
 
-  override private[smartdatalake] def getSubFeedSupportedTypes = Seq(typeOf[DataFrameSubFeed])
+  override def getSubFeedSupportedTypes = Seq(typeOf[DataFrameSubFeed])
 }
 
 object PKViolatorsDataObject extends FromConfigFactory[PKViolatorsDataObject] {

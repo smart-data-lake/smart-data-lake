@@ -57,7 +57,7 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
   /**
    * Prepares list of transformers
    */
-  private[smartdatalake] def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef]
+  def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef]
 
   /**
    * Transform a [[SparkSubFeed]].
@@ -93,7 +93,7 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
   /**
    * apply transformer to SubFeed
    */
-  private[smartdatalake] def applyTransformers(transformers: Seq[GenericDfTransformerDef], inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+  def applyTransformers(transformers: Seq[GenericDfTransformerDef], inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     val duplicateTransformerNames = transformers.groupBy(_.name).values.filter(_.size > 1).map(_.head.name)
     assert(!transformers.exists(_.isInstanceOf[SQLDfTransformer]) || duplicateTransformerNames.isEmpty, s"($id) transformers.name must be unique if SQLDfTransformer is used, but duplicate (default?) names ${duplicateTransformerNames.mkString(", ")} where detected")
     val (transformedSubFeed, _) = transformers.foldLeft((inputSubFeed, Option.empty[String])) {

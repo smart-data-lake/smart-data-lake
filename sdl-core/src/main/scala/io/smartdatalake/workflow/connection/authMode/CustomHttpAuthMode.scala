@@ -55,7 +55,7 @@ import io.smartdatalake.util.secrets.StringOrSecret
 case class CustomHttpAuthMode(className: String, options: Map[String, StringOrSecret]) extends HttpAuthMode with HttpHeaderAuth {
   private val impl = CustomCodeUtil.getClassInstanceByName[CustomHttpAuthModeLogic](className)
 
-  private[smartdatalake] override def prepare(): Unit = impl.prepare(options)
+  override def prepare(): Unit = impl.prepare(options)
 
   override def getHeaders: Map[String, String] = impl.getHeaders
 }

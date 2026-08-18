@@ -48,19 +48,19 @@ trait CanHandlePartitions { this: DataObject =>
    *
    * @return true if partition is expected to exist.
    */
-  private[smartdatalake] def expectedPartitionsCondition: Option[String]
+  def expectedPartitionsCondition: Option[String]
 
   /**
    * Delete given partitions. This is used to cleanup partitions by housekeeping.
    * Note: this is optional to implement.
    */
-  private[smartdatalake] def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"deletePartitions not implemented")
+  def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"deletePartitions not implemented")
 
   /**
    * Move given partitions. This is used to archive partitions by housekeeping.
    * Note: this is optional to implement.
    */
-  private[smartdatalake] def movePartitions(partitionValues: Seq[(PartitionValues,PartitionValues)])(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"movePartitions not implemented")
+  def movePartitions(partitionValues: Seq[(PartitionValues,PartitionValues)])(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"movePartitions not implemented")
 
   /**
    * list partition values
@@ -70,7 +70,7 @@ trait CanHandlePartitions { this: DataObject =>
   /**
    * create empty partition
    */
-  private[smartdatalake] def createEmptyPartition(partitionValues: PartitionValues)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"createEmptyPartition not implemented")
+  def createEmptyPartition(partitionValues: PartitionValues)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException(s"createEmptyPartition not implemented")
 
   /**
    * Create empty partitions for partition values not yet existing
@@ -110,7 +110,7 @@ trait CanHandlePartitions { this: DataObject =>
     if (missingCols.nonEmpty) throw new SchemaViolationException(s"($id) DataFrame is missing partition cols ${missingCols.mkString(", ")} on $role")
   }
 
-  private[smartdatalake] def getPartitionStats(implicit context: ActionPipelineContext): Map[String,Any] = {
+  def getPartitionStats(implicit context: ActionPipelineContext): Map[String,Any] = {
     if (partitions.nonEmpty) {
       val partitionValues = PartitionValues.sort(partitions, listPartitions)
       Map(TableStatsType.NumPartitions.toString -> partitionValues.size, TableStatsType.MinPartition.toString -> partitionValues.head.toString, TableStatsType.MaxPartition.toString -> partitionValues.last.toString)

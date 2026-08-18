@@ -57,7 +57,7 @@ trait GenericDfsTransformerDef extends PartitionValueTransformer {
    * Declare supported Language for transformation.
    * Can be DataFrameSubFeed to work with GenericDataFrame, or SparkSubFeed to work with Spark-DataFrames
    */
-  private[smartdatalake] def getSubFeedSupportedType: Type = typeOf[DataFrameSubFeed]
+  def getSubFeedSupportedType: Type = typeOf[DataFrameSubFeed]
 
   private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], executionModeResultOptions: Map[String,String], outputDataObjectIds: Seq[DataObjectId])(implicit context: ActionPipelineContext): (Map[String,GenericDataFrame], Seq[PartitionValues]) = {
     val transformedDfs = transform(actionId, partitionValues, dfs, executionModeResultOptions, outputDataObjectIds.map(_.id))

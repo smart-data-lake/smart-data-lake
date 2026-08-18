@@ -48,13 +48,13 @@ trait CanWriteDataFrame {
   /**
    * Declare supported Language for writing DataFrame.
    */
-  private[smartdatalake] def writeSubFeedSupportedTypes: Seq[Type]
+  def writeSubFeedSupportedTypes: Seq[Type]
 
   /**
    * Write DataFrame to specific Path with properties of this DataObject.
    * This is needed for compacting partitions by housekeeping.
    * Note: this is optional to implement.
    */
-  private[smartdatalake] def writeDataFrameToPath(df: GenericDataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException("writeDataFrameToPath not implemented")
+  def writeDataFrameToPath(df: GenericDataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): Unit = throw new RuntimeException("writeDataFrameToPath not implemented")
 
 }

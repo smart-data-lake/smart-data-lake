@@ -95,7 +95,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   // Determine DataFrameSubFeed type of this DataFrameAction
   // This has to be done at runtime as it depends on the types of input & output DataObjects.
   // It is a "lazy val" so it is executed after inputs & outputs are defined by subclass initialization.
-  private[smartdatalake] lazy val subFeedType: Type = {
+  lazy val subFeedType: Type = {
     def explodeGenericType(subFeedTypes: Seq[Type]): Seq[Type] = {
       subFeedTypes.flatMap(tpe => if (tpe =:= typeOf[DataFrameSubFeed]) DataFrameSubFeed.getKnownSubFeedTypes else Seq(tpe))
     }
@@ -121,11 +121,11 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     logger.info(s"($id) selected subFeedType ${commonType.typeSymbol.name}")
     commonType
   }
-  private[smartdatalake] implicit lazy val subFeedHelper: DataFrameSubFeedCompanion = {
+  implicit lazy val subFeedHelper: DataFrameSubFeedCompanion = {
     ScalaUtil.companionOf[DataFrameSubFeedCompanion](subFeedType)
   }
 
-  private[smartdatalake] override def subFeedConverter: SubFeedConverter[DataFrameSubFeed] = subFeedHelper
+  override def subFeedConverter: SubFeedConverter[DataFrameSubFeed] = subFeedHelper
 
   private[smartdatalake] override def createRuntimeData: RuntimeData = {
     // use AsynchronousRuntimeData for streaming execution modes
@@ -492,7 +492,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
    *
    * @return outputDataFrameMap and outputPartitionValues of last transformer
    */
-  private[smartdatalake] def applyTransformers(transformers: Seq[GenericDfsTransformerDef], inputPartitionValues: Seq[PartitionValues], inputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
+  def applyTransformers(transformers: Seq[GenericDfsTransformerDef], inputPartitionValues: Seq[PartitionValues], inputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
     val inputDfsMap = inputSubFeeds.map(subFeed => (subFeed.dataObjectId.id, subFeed.dataFrame.get)).toMap
     // the executionModeResultOptions are the same on all input SubFeeds, as the ExecutionModeResult is applied to all of them
     val executionModeResultOptions = inputSubFeeds.find(_.dataObjectId == getMainInput.id)

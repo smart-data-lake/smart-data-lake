@@ -58,7 +58,7 @@ case class DummyEngineTestDataObject(override val id: DataObjectId)(implicit ins
 
   // unused abstract members of CanCreateDataFrame/CanWriteDataFrame
   override def getDataFrame(partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext): GenericDataFrame = throw new NotImplementedError()
-  override private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = throw new NotImplementedError()
+  override def getSubFeed(partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = throw new NotImplementedError()
   override def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = throw new NotImplementedError()
 }
 
@@ -75,7 +75,7 @@ case class DummyMissingEngineTestDataObject(override val id: DataObjectId)(impli
   override protected def engineNotFoundHint: String = "Add a dummy engine module."
 
   override def getDataFrame(partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext): GenericDataFrame = throw new NotImplementedError()
-  override private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = throw new NotImplementedError()
+  override def getSubFeed(partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = throw new NotImplementedError()
   override def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = throw new NotImplementedError()
 }
 

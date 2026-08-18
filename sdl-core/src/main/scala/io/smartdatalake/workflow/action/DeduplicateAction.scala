@@ -167,7 +167,7 @@ case class DeduplicateAction(
   // Output columns are needed in order to generate update condition for SaveModeMergeOptions. Unfortunately they are not available here. A variable is needed which gets updated in transform(...).
   private var outputCols: Set[String] = Set()
 
-  private[smartdatalake] override val handleRecursiveInputsAsSubFeeds: Boolean = false
+  override val handleRecursiveInputsAsSubFeeds: Boolean = false
 
   // DataFrame created by DeduplicateAction should not be passed on to the next Action, but must be recreated from the DataObject.
 
@@ -202,7 +202,7 @@ case class DeduplicateAction(
     transformers.foreach(_.prepare(id))
   }
 
-  private[smartdatalake] override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
+  override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
     val timestamp = Timestamp.valueOf(context.referenceTimestamp.getOrElse(LocalDateTime.now))
 
     val deduplicateTransformer =

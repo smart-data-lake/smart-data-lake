@@ -67,12 +67,12 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
     else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
   }
 
-  override private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+  override def getSubFeed(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     if (subFeedType =:= typeOf[ScalaSubFeed]) ScalaSubFeed(Some(getScalaDataFrame(partitionValues)), id, partitionValues)
     else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
   }
 
-  override private[smartdatalake] def getSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[ScalaSubFeed])
+  override def getSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[ScalaSubFeed])
 
   def getScalaDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): ScalaDataFrame = {
     if (partitions.nonEmpty) {
@@ -115,7 +115,7 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
     }
   }
 
-  override private[smartdatalake] def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[ScalaSubFeed])
+  override def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[ScalaSubFeed])
 
   def writeScalaDataFrame(df: ScalaDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitionValues.flatMap(_.keys).distinct.diff(partitions).isEmpty, s"($id) partitionValues keys do not match partition columns") // assert partition keys match
@@ -236,7 +236,7 @@ case class MockScalaDataObject(override val id: DataObjectId, override val parti
     this
   }
 
-  override private[smartdatalake] def expectedPartitionsCondition: Option[String] = None
+  override def expectedPartitionsCondition: Option[String] = None
   override val metadata: Option[DataObjectMetadata] = None
 
   override var table: Table = Table(Some("mock"), tableName, primaryKey = primaryKey)

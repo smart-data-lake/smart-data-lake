@@ -439,7 +439,7 @@ case class ODataDataObject(
    *
    * This runs during the "prepare" operation of the DAG.
    */
-  override private[smartdatalake] def prepare(implicit context: ActionPipelineContext): Unit = {
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     validateConfiguration(context)
   }
@@ -594,7 +594,7 @@ case class ODataDataObject(
   /**
    * Runs operations after reading from [[DataObject]]
    */
-  override private[smartdatalake] def postRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+  override def postRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postRead(partitionValues)
 
     if (this.responseBuffer != null) {

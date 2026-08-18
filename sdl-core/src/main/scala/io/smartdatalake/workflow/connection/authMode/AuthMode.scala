@@ -39,7 +39,7 @@ trait AuthMode extends ParsableFromConfig[AuthMode] with ConfigHolder {
    * This method is called in prepare phase through the data object.
    * It allows to check configuration and setup variables.
    */
-  private[smartdatalake] def prepare(): Unit = ()
+  def prepare(): Unit = ()
 
   /**
    * This method is called after exec phase through the postExec method of the data object.

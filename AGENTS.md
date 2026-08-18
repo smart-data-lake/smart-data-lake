@@ -143,6 +143,27 @@ class MyDataObjectTest extends DataObjectTestSuite {
 
 ## Development Best Practices
 
+### Visibility: do not restrict it
+
+SDLB is a **library**. Everything a user might implement, override or call from their own project must be
+reachable from their own package. Do **not** add `private[smartdatalake]` (or `private[workflow]`, ...) to
+members of public traits and classes - especially not to abstract members, because a class outside
+`io.smartdatalake` then cannot implement them at all and fails to compile with
+*"class X needs to be abstract, missing implementations for ... private[package smartdatalake] def ..."*.
+The same holds for whole traits: a `private[smartdatalake] trait` cannot be mixed in by user code.
+
+Use `private`/`protected` for genuine implementation details of a single class, and keep the extension
+surface public: `DataObject` and its capability traits (`CanCreateDataFrame`, `CanWriteDataFrame`,
+`CanHandlePartitions`, `CanEvolveSchema`, `ExpectationValidation`, ...), `Action` and its base classes
+(`ActionSubFeedsImpl`, `DataFrameActionImpl`, `DataFrameOneToOneActionImpl`, `FileOneToOneActionImpl`,
+`ScriptActionImpl`), `ExecutionMode`, the transformer traits, `Connection`, `Expectation`, `HousekeepingMode`,
+`AuthMode`.
+
+`com.mycompany.sdlb.ExternalExtensionTest` (sdl-core tests) guards this: it implements a DataObject and an
+Action outside the `io.smartdatalake` package and parses them from config. If it stops compiling, a
+visibility restriction was reintroduced. See `docs/docs/reference/extending.md` for the user facing
+documentation of the extension points.
+
 ### License Headers
 Every source file MUST include GPLv3 license header (see existing files for template).
 
