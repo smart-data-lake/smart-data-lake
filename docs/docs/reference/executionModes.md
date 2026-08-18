@@ -287,14 +287,92 @@ This can be achieved by using FileIncrementalMoveMode. If option `archiveSubdire
 
 FileIncrementalMoveMode can be used with the file engine (see also [Execution engines](executionEngines.md)), but also with SparkFileDataObjects and the data frame engine.
 
-## Others
+## Implement your own execution mode
 
-### CustomMode
+If none of the built-in modes fits your selection logic, implement the trait `ExecutionMode` yourself.
+Your class is then referenced with its fully qualified class name as `type` in the configuration, exactly like a built-in mode,
+and its constructor parameters become configuration attributes, see [Extending SDLB](extending).
 
-This execution mode allows to implement arbitrary processing logic using Scala.
+The main method to override is `apply`. It is called in Init- and Exec-phase with the main input and output DataObject and the
+SubFeed of the main input, and returns an `ExecutionModeResult` describing the data to process:
 
-Implement trait `CustomModeLogic` by defining a function which receives main input and output DataObjects and returns an `ExecutionModeResult`.
-The result can contain input and output partition values, but also options which are passed to the transformations defined in the Action.
+| Result attribute | Description |
+| ---------------- | ----------- |
+| `inputPartitionValues` | Partition values selected for the main input. |
+| `outputPartitionValues` | Override of the partition values for the main output. If not set, they are derived from `inputPartitionValues`. |
+| `filters` | [Column filters](#column-filters) to apply to the inputs, at most one per column. |
+| `fileRefs` | Selected files for the main input, used by file based execution modes. |
+| `options` | Options passed on to the transformers and the Input/Output DataObjects of the Action. |
+
+Return `None` to leave the given partition values and filters untouched, e.g. if your mode only validates something.
+Set `mainInputOutputNeeded = true` if your logic needs the main input and output DataObject to be resolved.
+
+Example - an execution mode selecting the last n partitions of the main input:
+
+```scala
+package com.company.dataPipeline
+
+import com.typesafe.config.Config
+import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, ExecutionModeResult}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.CanHandlePartitions
+import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
+
+case class LastNPartitionsMode(nbOfPartitions: Int = 1) extends ExecutionMode {
+
+  override def mainInputOutputNeeded: Boolean = true
+
+  override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed,
+                     partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])
+                    (implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
+    val partitioned = mainInput match {
+      case partitioned: CanHandlePartitions => partitioned
+      case _ => throw ConfigurationException(s"($actionId) ${mainInput.id} does not support partitions")
+    }
+    val sortKey = (pv: PartitionValues) => partitioned.partitions.map(pv.elements.getOrElse(_, "").toString).mkString("|")
+    val selected = partitioned.listPartitions.sortBy(sortKey).takeRight(nbOfPartitions)
+    logger.info(s"($actionId) selected partition values ${selected.mkString(", ")}")
+    Some(ExecutionModeResult(inputPartitionValues = selected))
+  }
+}
+
+object LastNPartitionsMode extends FromConfigFactory[ExecutionMode] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): LastNPartitionsMode =
+    extract[LastNPartitionsMode](config)
+}
+```
+
+Configure it on an Action with the fully qualified class name:
+
+```
+  copy-departures {
+    type = CopyAction
+    inputId = int-departures
+    outputId = btl-departures
+    executionMode = {
+      type = com.company.dataPipeline.LastNPartitionsMode
+      nbOfPartitions = 3
+    }
+  }
+```
+
+Beside `apply` the following hooks can be overridden:
+
+* `prepare` - validate the configuration in Prepare-phase.
+* `preInit` - initialize state before the Action is initialized, e.g. from the DataObject state of the previous run.
+* `postExec` - react after the output was written, e.g. to move or delete processed files.
+* `isAsynchronous` / `isStreamingMode` - declare a streaming mode running asynchronously.
+
+If you only need to select partition values, [CustomPartitionMode](#custompartitionmode) is the smaller alternative:
+it needs no configuration object, just a class implementing `CustomPartitionModeLogic`.
+
+:::caution
+`CustomMode`, which wrapped a `CustomModeLogic` class behind a `className` attribute, is deprecated since version 2.8.2.
+Implement `ExecutionMode` directly as shown above and use your class name as `type` instead.
+:::
 
 
 

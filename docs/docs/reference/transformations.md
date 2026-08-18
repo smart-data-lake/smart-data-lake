@@ -62,6 +62,7 @@ The following predefined 1-to-1 transformations are supported:
 
 ## Custom Transformations
 When these predefined transformations are not enough, you can easily write your own _Custom Transformations_.
+To implement a reusable transformer with its own configuration attributes instead of a class referenced by `className`, see [Extending SDLB](extending).
 SDLB currently supports SQL, Scala and Python transformations, depending on the complexity and needed libraries.
 
 The following custom transformations are available.
@@ -88,6 +89,9 @@ The type of the transformer needs to match your action.
 This is also apparent in the [Configuration Schema Viewer](../../json-schema-viewer):  
 1-to-1 transformers are listed under 1-to-1 actions, i.e. CopyAction.  
 Many-to-many transformers are only listed under many-to-many actions, i.e. CustomDataFrameAction.
+
+The transformer must also match the [Execution Engine](executionEngines) of the action. The *Generic* and SQL transformers run on any DataFrame engine,
+while a transformer typed to classic Spark, e.g. ScalaClassSparkDfTransformer or the Python transformers, needs the Spark engine and is not available with the Spark Connect engine.
 :::
 
 ### SQL

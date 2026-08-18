@@ -59,7 +59,16 @@ const sidebars = {
       'reference/runState',
       {'SDLB objects' : [
         'reference/dataObjects',
-        'reference/actions',
+        {
+          type: 'category',
+          label: 'Actions',
+          link: {type: 'doc', id: 'reference/actions'},
+          items: [
+            'reference/actions/deduplicateAction',
+            'reference/actions/historizeAction',
+            'reference/actions/customDataFrameAction',
+          ],
+        },
       ]},
       {'Hocon Configuration' : [
         'reference/hoconOverview',
@@ -74,6 +83,7 @@ const sidebars = {
       'reference/executionEngines',
       'reference/executionModes',
       'reference/transformations',
+      'reference/extending',
       'reference/agents',
       //'reference/schemaEvolution',
       //'reference/housekeeping',
