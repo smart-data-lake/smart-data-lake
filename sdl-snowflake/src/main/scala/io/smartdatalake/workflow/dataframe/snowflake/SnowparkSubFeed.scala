@@ -262,10 +262,10 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
-  override def timestampSubtract(column: GenericColumn, duration: Duration): GenericColumn = {
+  override def timestampAdd(column: GenericColumn, duration: Duration): GenericColumn = {
     column match {
       case snowparkColumn: SnowparkColumn =>
-        SnowparkColumn(functions.dateadd("microsecond", functions.lit(-(duration.toNanos / 1000)), snowparkColumn.inner))
+        SnowparkColumn(functions.dateadd("microsecond", functions.lit(duration.toNanos / 1000), snowparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }

@@ -277,12 +277,12 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
     }
   }
 
-  def timestampSubtract(column: GenericColumn, duration: Duration): GenericColumn = {
+  def timestampAdd(column: GenericColumn, duration: Duration): GenericColumn = {
     column match {
       case scalaColumn: ScalaAbstractColumn =>
-        ScalaUnaryExpr(scalaColumn, "timestampSubtract", _.map {
-          case ts: Timestamp => Timestamp.from(ts.toInstant.minus(duration))
-          case v => throw new IllegalStateException(s"Invalid value for 'timestampSubtract' function: $v. Only Timestamp values are supported.")
+        ScalaUnaryExpr(scalaColumn, "timestampAdd", _.map {
+          case ts: Timestamp => Timestamp.from(ts.toInstant.plus(duration))
+          case v => throw new IllegalStateException(s"Invalid value for 'timestampAdd' function: $v. Only Timestamp values are supported.")
         }, Some(ScalaTimestampDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }

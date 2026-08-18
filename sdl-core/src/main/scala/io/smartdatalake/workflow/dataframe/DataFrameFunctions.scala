@@ -47,10 +47,16 @@ trait DataFrameFunctions {
   def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn
 
   /**
+   * Add a fixed duration to a timestamp column. The duration might be negative.
+   * Note that the resolution of the duration is limited to microseconds by most engines.
+   */
+  def timestampAdd(column: GenericColumn, duration: Duration): GenericColumn
+
+  /**
    * Subtract a fixed duration from a timestamp column.
    * Note that the resolution of the duration is limited to microseconds by most engines.
    */
-  def timestampSubtract(column: GenericColumn, duration: Duration): GenericColumn
+  def timestampSubtract(column: GenericColumn, duration: Duration): GenericColumn = timestampAdd(column, duration.negated)
 
   /**
    * Construct array from given columns and removing null values

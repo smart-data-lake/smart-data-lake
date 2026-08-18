@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObje
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.historization.{Historization, HistorizationRecordOperations}
+import io.smartdatalake.util.historization.{CdcHistorizeMode, Historization, HistorizationRecordOperations, HistorizeMode, IncrementalHistorizeMode}
 import io.smartdatalake.util.misc.GenericSchemaUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef}
@@ -65,6 +65,10 @@ import scala.reflect.runtime.universe.Type
  *
  * If you still have a legacy full historization table, migration to incremental historization should happen
  * automatically. The missing hash column is detected and added to existing data.
+ *
+ * By default the validity of a new version starts at the reference timestamp of the run. If the input contains the
+ * timestamp of the last change in the source system, it can be used instead by setting sourceTimestampColumn, so
+ * that the history reflects the time axis of the source system.
  *
  * Example:
  * {{{
@@ -124,14 +128,19 @@ import scala.reflect.runtime.universe.Type
  *   are ignored, and if several change events exist for the same primary key only the last one is historized. The
  *   order of the change events is defined by column `_change_ordinal`, or `_commit_timestamp` if it is missing.
  *   The CDC columns themselves are not written to the output DataObject.
- * @param mergeModeCDCTimestampColumn
- *   Optional column holding the timestamp of the change in the source system, used as start of validity of the new
- *   version instead of the runs reference timestamp. If empty (default), column `_commit_timestamp` is used if the
- *   input has one, otherwise the reference timestamp. If set, the column must exist and be of type timestamp.
- *   Only used with SDLBs standard CDC columns, see mergeModeCDCAutoDetect.
- * @param mergeModeCDCUseSourceTimestamp
- *   Set to false to always use the runs reference timestamp as start of validity of new versions, e.g. to ignore
- *   mergeModeCDCTimestampColumn and column `_commit_timestamp`. Default is true.
+ * @param mergeModeCDCTimestampAutoDetect
+ *   If true (default), column `_commit_timestamp` is used as sourceTimestampColumn, if the input delivers change
+ *   events using SDLBs standard CDC columns (see mergeModeCDCAutoDetect) and sourceTimestampColumn is not set. Set
+ *   to false to start the validity of new versions at the runs reference timestamp instead. Note that there is no
+ *   auto detection of a source timestamp column outside of CDC historization.
+ * @param sourceTimestampColumn
+ *   Optional column holding the timestamp of the last change of the record in the source system. If set, the
+ *   validity of a new version starts at this timestamp instead of the runs reference timestamp, e.g. the history
+ *   reflects the time axis of the source system. The column must exist in the input and be of type timestamp.
+ *   Note that the column itself is not historized: it is excluded from change detection and not written to the
+ *   output DataObject. Copy it to a column with another name in a transformer if you want to keep it.
+ *   Records arriving late, e.g. having a source timestamp older than the version they replace, are delayed to the
+ *   next tick on the time axis after that version was captured, in order to avoid negative validity intervals.
  * @param checkInputUnique
  *   If true, validates that input records have unique primary keys according to output DataObject
  *   primary key before historization. This is a fail-fast mechanism to detect data quality issues
@@ -156,8 +165,8 @@ case class HistorizeAction(
                             mergeModeCDCColumn: Option[String] = None,
                             mergeModeCDCDeletedValue: Option[String] = None,
                             mergeModeCDCAutoDetect: Boolean = true,
-                            mergeModeCDCTimestampColumn: Option[String] = None,
-                            mergeModeCDCUseSourceTimestamp: Boolean = true,
+                            mergeModeCDCTimestampAutoDetect: Boolean = true,
+                            sourceTimestampColumn: Option[String] = None,
                             checkInputUnique: Boolean = false,
                             timeAxisUnit: Duration = Duration.ofMillis(1),
                             override val cacheOutput: Boolean = false,
@@ -175,48 +184,34 @@ case class HistorizeAction(
   override val outputs: Seq[TransactionalTableDataObject] = Seq(output)
 
   /**
-   * Resolved configuration of mergeModeCDC, see [[resolveCdcMode]].
-   *
-   * @param changeTypeColName name of the column holding the change type/operation
-   * @param deletedValue value of changeTypeColName marking a record as deleted
-   * @param isStandardCdc true if the input uses SDLBs standard CDC columns, see [[CdcChangeType]].
-   *                      Only then change events are prepared by [[Historization.prepareCdcInput]].
-   * @param orderColName optional column defining the order of change events of the same primary key
-   * @param eventTimestampColName optional column holding the timestamp of the change in the source system,
-   *                              used as start of validity of the new version
-   * @param metadataColNames CDC metadata columns of the input which must not be written to the output DataObject.
-   *                         Note that this includes CDC columns which are not used, e.g. the commit timestamp if
-   *                         mergeModeCDCUseSourceTimestamp=false.
-   */
-  private case class CdcMode(
-      changeTypeColName: String,
-      deletedValue: String,
-      isStandardCdc: Boolean,
-      orderColName: Option[String] = None,
-      eventTimestampColName: Option[String] = None,
-      metadataColNames: Seq[String] = Seq()
-  ) {
-    def deletedRecordsCondition(implicit f: DataFrameFunctions): GenericColumn =
-      f.col(changeTypeColName) === f.lit(deletedValue)
-  }
-
-  /**
-   * Determine if and how mergeModeCDC is used.
+   * Determine the historization strategy to use.
    * This is done on configuration only in preInit phase, and refined as soon as the input schema is known, as
    * SDLBs standard CDC columns are detected by looking at the input schema, see mergeModeCDCAutoDetect.
    */
-  private def resolveCdcMode(inputSchema: Option[GenericSchema]): Option[CdcMode] = {
+  private def resolveMode(inputSchema: Option[GenericSchema]): HistorizeMode = {
     def colExists(colName: String) = inputSchema.exists(GenericSchemaUtil.columnExists(_, colName))
     def isTimestampCol(colName: String) = inputSchema.forall(
       _.fields.filter(f => if (Environment.caseSensitive) f.name == colName else f.name.equalsIgnoreCase(colName))
         .forall(_.dataType.typeName.toLowerCase.startsWith("timestamp"))
     )
     // note that CDC historization can not compare records, so it is not auto-enabled if a historizeWhitelist is set
-    val autoDetect = mergeModeCDCAutoDetect && historizeWhitelist.isEmpty && colExists(Environment.cdcChangeTypeColumnName)
+    val autoDetectCdc = mergeModeCDCAutoDetect && historizeWhitelist.isEmpty && colExists(Environment.cdcChangeTypeColumnName)
     val changeTypeColNameOpt = mergeModeCDCColumn
-      .orElse(if (autoDetect) Some(Environment.cdcChangeTypeColumnName) else None)
+      .orElse(if (autoDetectCdc) Some(Environment.cdcChangeTypeColumnName) else None)
+    val isStandardCdc = changeTypeColNameOpt.contains(Environment.cdcChangeTypeColumnName)
+    // the source timestamp column is never auto-detected, except for the commit timestamp of standard CDC columns
+    val sourceTimestampColName = sourceTimestampColumn.map { colName =>
+      if (inputSchema.isDefined) { // the input schema is not yet known in preInit phase
+        assert(colExists(colName), s"($id) sourceTimestampColumn '$colName' not found in input schema")
+        assert(isTimestampCol(colName), s"($id) sourceTimestampColumn '$colName' must be of type timestamp")
+      }
+      colName
+    }.orElse(
+      Some(Environment.cdcCommitTimestampColumnName)
+        .filter(_ => isStandardCdc && mergeModeCDCTimestampAutoDetect)
+        .filter(colName => colExists(colName) && isTimestampCol(colName))
+    )
     changeTypeColNameOpt.map { changeTypeColName =>
-      val isStandardCdc = changeTypeColName == Environment.cdcChangeTypeColumnName
       assert(mergeModeCDCDeletedValue.isDefined || isStandardCdc,
         s"($id) mergeModeCDCDeletedValue must be set when mergeModeCDCColumn is defined")
       assert(historizeWhitelist.isEmpty, s"($id) historizeWhitelist cannot be set when using mergeModeCDC")
@@ -224,31 +219,23 @@ case class HistorizeAction(
       val orderColName = if (isStandardCdc) {
         Seq(Environment.cdcChangeOrdinalColumnName, Environment.cdcCommitTimestampColumnName).find(colExists)
       } else None
-      val eventTimestampColName = if (isStandardCdc && mergeModeCDCUseSourceTimestamp) {
-        mergeModeCDCTimestampColumn match {
-          case Some(colName) => // an explicitly configured column must exist and hold timestamps
-            if (inputSchema.isDefined) { // the input schema is not yet known in preInit phase
-              assert(colExists(colName), s"($id) mergeModeCDCTimestampColumn '$colName' not found in input schema")
-              assert(isTimestampCol(colName), s"($id) mergeModeCDCTimestampColumn '$colName' must be of type timestamp")
-            }
-            Some(colName)
-          case None => Some(Environment.cdcCommitTimestampColumnName)
-            .filter(colName => colExists(colName) && isTimestampCol(colName))
-        }
-      } else None
       // all CDC metadata columns of the input are removed on write, also if they are not used for historization
-      val metadataColNames = (changeTypeColName +:
+      val cdcMetadataColNames = (changeTypeColName +:
         (if (isStandardCdc) {
-          Seq(Environment.cdcCommitTimestampColumnName, Environment.cdcChangeOrdinalColumnName).filter(colExists) ++
-            eventTimestampColName
+          Seq(Environment.cdcCommitTimestampColumnName, Environment.cdcChangeOrdinalColumnName).filter(colExists)
         } else Seq())).distinct
-      CdcMode(changeTypeColName, mergeModeCDCDeletedValue.getOrElse(CdcChangeType.delete), isStandardCdc, orderColName,
-        eventTimestampColName, metadataColNames)
-    }
+      CdcHistorizeMode(changeTypeColName, mergeModeCDCDeletedValue.getOrElse(CdcChangeType.delete), isStandardCdc,
+        orderColName, sourceTimestampColName, cdcMetadataColNames, this)
+    }.getOrElse(IncrementalHistorizeMode(sourceTimestampColName, this))
   }
 
-  // resolved CDC configuration, initialized in preInit and refined in transform when the input schema is known
-  private var _cdcMode: Option[CdcMode] = None
+  // historization strategy, initialized in preInit and refined in transform when the input schema is known
+  private var _mode: Option[HistorizeMode] = None
+  private def mode: HistorizeMode = _mode.getOrElse {
+    val resolvedMode = resolveMode(None)
+    _mode = Some(resolvedMode)
+    resolvedMode
+  }
 
   // saveMode options need ActionPipelineContext to initialize
   private var _saveModeOptions: Option[SaveModeOptions] = None
@@ -256,66 +243,10 @@ case class HistorizeAction(
     assert(_saveModeOptions.isDefined, s"($id) SaveModeOptions not initialized")
     _saveModeOptions
   }
-  private def initSaveModeOptions(implicit context: ActionPipelineContext): Unit =
-    _saveModeOptions = if (_cdcMode.isDefined) {
-      val cdcMode = _cdcMode.get
-      // customize update/insert condition
-      val updateCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateClose}'")
-      val updateCols = Seq(Environment.delimitedColumnName)
-      val insertCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.insertNew}'")
-      val insertColsToIgnore = Historization.historizeOperationColName +: cdcMode.metadataColNames
-      val insertValuesOverride = Map(Historization.historizeDummyColName -> "true")
-      val sqlReferenceTimestamp = Timestamp.valueOf(getReferenceTimestamp)
-      // different condition for closed and half-closed intervals
-      val mergeTimePredicate = if (cdcMode.eventTimestampColName.isDefined) {
-        // the validity of a new version starts at the timestamp of the change event, which is different for every
-        // record. It is not available as column of the merge statement, but the delimited timestamp of the record to
-        // close is derived from it, see Historization.incrementalCDCHistorize.
-        if (timeAxisUnitOpt.isDefined)
-          s"new.${Environment.delimitedColumnName} between existing.${Environment.capturedColumnName}" +
-            s" AND existing.${Environment.delimitedColumnName}"
-        else
-          s"existing.${Environment.capturedColumnName} <= new.${Environment.delimitedColumnName}" +
-            s" AND new.${Environment.delimitedColumnName} < existing.${Environment.delimitedColumnName}"
-      } else if (timeAxisUnitOpt.isDefined)
-        s"timestamp'$sqlReferenceTimestamp' between existing.${Environment.capturedColumnName}" +
-          s" AND existing.${Environment.delimitedColumnName}"
-      else
-        s"existing.${Environment.capturedColumnName} <= timestamp'$sqlReferenceTimestamp'" +
-          s" AND timestamp'$sqlReferenceTimestamp' < existing.${Environment.delimitedColumnName}"
-      val additionalMergePredicate =
-        Some((s"existing.${Historization.historizeDummyColName} = new.${Historization.historizeDummyColName} AND $mergeTimePredicate" +:
-            mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
-      Some(SaveModeMergeOptions(
-          updateCondition = updateCondition,
-          updateColumns = updateCols,
-          insertCondition = insertCondition,
-          insertColumnsToIgnore = insertColsToIgnore,
-          insertValuesOverride = insertValuesOverride,
-          additionalMergePredicate = additionalMergePredicate
-        ))
-
-    } else {
-      // customize update condition
-      val updateCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateClose}'")
-      val updateCols =
-        if (output.isTableExisting && output.getDataFrame(Seq(), subFeedType).schema.columnExists(Historization.historizeHashColName))
-          Seq(Environment.delimitedColumnName)
-        else Seq(Environment.delimitedColumnName, Historization.historizeHashColName)
-      val updateExistingCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.updateExisting}'")
-      val insertCondition = Some(s"${Historization.historizeOperationColName} = '${HistorizationRecordOperations.insertNew}'")
-      val insertColsToIgnore = Seq(Historization.historizeOperationColName)
-      val additionalMergePredicate = Some((s"new.${Environment.capturedColumnName} = existing.${Environment.capturedColumnName}" +:
-          mergeModeAdditionalJoinPredicate.toSeq).reduce(_ + " and " + _))
-      Some(SaveModeMergeOptions(
-          updateCondition = updateCondition,
-          updateColumns = updateCols,
-          updateExistingCondition = updateExistingCondition,
-          insertCondition = insertCondition,
-          insertColumnsToIgnore = insertColsToIgnore,
-          additionalMergePredicate = additionalMergePredicate
-        ))
-    }
+  private def initSaveModeOptions(implicit context: ActionPipelineContext): Unit = {
+    val schema = if (output.isTableExisting) Some(output.getDataFrame(Seq(), subFeedType).schema) else None
+    _saveModeOptions = Some(mode.saveModeOptions(schema))
+  }
 
   // Output is used as recursive input in DeduplicateAction to get existing data.
   // This override is needed to force tick-tock write operation.
@@ -329,6 +260,11 @@ case class HistorizeAction(
   // historize black/white list
   require(historizeWhitelist.isEmpty || historizeBlacklist.isEmpty,
     s"($id) HistorizeWhitelist and historizeBlacklist mustn't be used at the same time")
+  // the source timestamp column is not historized, so it can not be part of the columns to compare
+  require(
+    sourceTimestampColumn.isEmpty || !historizeWhitelist.exists(_.exists(c => columnNameEquals(c, sourceTimestampColumn.get))),
+    s"($id) sourceTimestampColumn mustn't be part of historizeWhitelist, as it is not historized"
+  )
   // primary key
   require(output.table.primaryKey.isDefined, s"($id) Primary key must be defined for output DataObject")
 
@@ -337,7 +273,7 @@ case class HistorizeAction(
   override val transformerSubFeedSupportedTypes: Seq[Type] =
     transformerDefs.map(_.getSubFeedSupportedType) // historize transformer can be ignored as it is generic
 
-  private val timeAxisUnitOpt = {
+  private[smartdatalake] val timeAxisUnitOpt = {
     assert(!timeAxisUnit.isNegative, s"($id) timeAxisUnit must be 0 or a positive duration, but is $timeAxisUnit")
     Some(timeAxisUnit).filter(!_.isZero)
   }
@@ -359,25 +295,22 @@ case class HistorizeAction(
 
   override def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = {
     super.preInit(subFeeds, dataObjectsState)
-    // initialize with the CDC configuration known without input schema. It is refined in transform, see initCdcMode.
-    _cdcMode = resolveCdcMode(None)
+    // initialize with the strategy known without input schema. It is refined in transform, see initMode.
+    _mode = Some(resolveMode(None))
     initSaveModeOptions
   }
 
   /**
-   * Detect SDLBs standard CDC columns in the input schema and adapt saveModeOptions accordingly.
+   * Detect SDLBs standard CDC columns in the input schema and adapt the historization strategy accordingly.
    * This can not be done in preInit, as the input schema is not yet known there. It must be done before the
    * transformers are applied, as saveModeOptions are used to initialize the output DataObject and to convert the
    * DataFrame to the target schema, which both happens after the transformation.
    */
-  private def initCdcMode(inputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): Unit = {
-    val cdcMode = resolveCdcMode(inputSubFeed.schemaOpt)
-    if (cdcMode != _cdcMode) {
-      cdcMode.filter(_.isStandardCdc).foreach(m =>
-        logger.info(s"($id) using CDC historization with columns ${m.metadataColNames.mkString(", ")}" +
-          m.eventTimestampColName.map(c => s", validity of new versions starts at $c").getOrElse(""))
-      )
-      _cdcMode = cdcMode
+  private def initMode(inputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): Unit = {
+    val resolvedMode = resolveMode(inputSubFeed.schemaOpt)
+    if (!_mode.contains(resolvedMode)) {
+      resolvedMode.logInfo()
+      _mode = Some(resolvedMode)
       initSaveModeOptions
     }
   }
@@ -385,6 +318,7 @@ case class HistorizeAction(
   private[smartdatalake] override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
     val capturedTs = Timestamp.valueOf(getReferenceTimestamp)
     val pks = output.table.primaryKey.get // existence is validated earlier
+    val historizeMode = mode
 
     // get existing data
     // Note that HistorizeAction with mergeModeEnabled=false needs to read/write all existing data for tick-tock operation,
@@ -392,35 +326,18 @@ case class HistorizeAction(
     val existingDf = if (output.isTableExisting) Some(output.getDataFrame(Seq(), subFeedType)) else None
 
     // historize
-    val historizeTransformer = if (_cdcMode.isDefined) {
-      val cdcMode = _cdcMode.get
-      new GenericDfTransformerDef {
-        override val name = "incrementalCDCHistorize"
+    val historizeTransformer = new GenericDfTransformerDef {
+      override val name: String = historizeMode.transformerName
 
-        override def transform(
-            actionId: ActionId,
-            partitionValues: Seq[PartitionValues],
-            df: GenericDataFrame,
-            dataObjectId: DataObjectId,
-            previousTransformerName: Option[String],
-            executionModeResultOptions: Map[String, String]
-        )(implicit context: ActionPipelineContext): GenericDataFrame =
-          incrementalCDCHistorizeDataFrame(existingDf, pks, cdcMode, capturedTs, df)
-      }
-    } else {
-      new GenericDfTransformerDef {
-        override val name = "incrementalHistorize"
-
-        override def transform(
-            actionId: ActionId,
-            partitionValues: Seq[PartitionValues],
-            df: GenericDataFrame,
-            dataObjectId: DataObjectId,
-            previousTransformerName: Option[String],
-            executionModeResultOptions: Map[String, String]
-        )(implicit context: ActionPipelineContext): GenericDataFrame =
-          incrementalHistorizeDataFrame(existingDf, pks, capturedTs, df)
-      }
+      override def transform(
+          actionId: ActionId,
+          partitionValues: Seq[PartitionValues],
+          df: GenericDataFrame,
+          dataObjectId: DataObjectId,
+          previousTransformerName: Option[String],
+          executionModeResultOptions: Map[String, String]
+      )(implicit context: ActionPipelineContext): GenericDataFrame =
+        historizeMode.historize(existingDf, df, pks, capturedTs)
     }
     transformerDefs :+ historizeTransformer
   }
@@ -428,7 +345,7 @@ case class HistorizeAction(
   override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit
       context: ActionPipelineContext
   ): DataFrameSubFeed = {
-    initCdcMode(inputSubFeed)
+    initMode(inputSubFeed)
     applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
   }
 
@@ -437,87 +354,11 @@ case class HistorizeAction(
   ): Map[PartitionValues, PartitionValues] =
     applyTransformers(getTransformers, partitionValues, executionModeResultOptions)
 
-  private def incrementalHistorizeDataFrame(
-      existingDf: Option[GenericDataFrame],
-      pks: Seq[String],
-      refTimestamp: Timestamp,
-      newDf: GenericDataFrame
-  )(implicit context: ActionPipelineContext): GenericDataFrame = {
-
-    // Check input uniqueness if requested, otherwise just drop duplicates according to primary key.
-    // Note that drop duplicate might be non-deterministic and cause attributes switching in history with every run.
-    if (checkInputUnique && context.isExecPhase) {
-      validateInputUniqueness(newDf, pks)
-    }
-    val newFeedDf = if (!checkInputUnique) newDf.dropDuplicates(pks) else newDf
-
-    // if context is init, check if column needs to be added -> save in needsHashColumn
-    if (!context.isExecPhase) existingDfNeedsHashColumn = existingDf match {
-      case Some(df) => Some(!GenericSchemaUtil.columnExists(df.schema, Historization.historizeHashColName))
-      case _        => Some(false)
-    }
-
-    // if output exists we have to do historization, otherwise we just transform the new data into historized form
-    if (existingDf.isDefined) {
-      if (context.isExecPhase) ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, Environment.capturedColumnName)
-      // historize
-
-      val addExistingDfHashColumn =
-        existingDfNeedsHashColumn.getOrElse(throw new IllegalStateException("HistorizeAction not correctly initialized"))
-      // note that schema evolution is done by output DataObject
-      Historization.incrementalHistorize(existingDf.get, newFeedDf, pks, refTimestamp, timeAxisUnitOpt, historizeWhitelist,
-        historizeBlacklist,
-        addExistingDfHashColumn)
-    } else Historization.getInitialHistoryWithHashCol(newFeedDf, refTimestamp, historizeWhitelist, historizeBlacklist)
-  }
-
-  private var existingDfNeedsHashColumn: Option[Boolean] = None
-
-  private def incrementalCDCHistorizeDataFrame(
-      existingDf: Option[GenericDataFrame],
-      pks: Seq[String],
-      cdcMode: CdcMode,
-      refTimestamp: Timestamp,
-      newDf: GenericDataFrame
-  )(implicit context: ActionPipelineContext): GenericDataFrame = {
-    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
-    import functions._
-    val deletedRecordsCondition = cdcMode.deletedRecordsCondition
-
-    // reduce the change events to the last event per primary key if SDLBs standard CDC columns are used
-    val cdcDf = if (cdcMode.isStandardCdc) {
-      Historization.prepareCdcInput(newDf, pks, cdcMode.changeTypeColName, cdcMode.orderColName)
-    } else newDf
-
-    // Check input uniqueness if requested (excluding deleted records)
-    if (checkInputUnique && context.isExecPhase) {
-      // For CDC mode, only validate non-deleted records
-      val nonDeletedDf = cdcDf.where(not(deletedRecordsCondition))
-      validateInputUniqueness(nonDeletedDf, pks)
-    }
-
-    // if output exists we have to do historization, otherwise we just transform the new data into historized form
-    if (existingDf.isDefined) {
-      // if the validity of new versions starts at the timestamp of the source system, existing data may be newer
-      // than the reference timestamp of this run, so the check is skipped
-      if (context.isExecPhase && cdcMode.eventTimestampColName.isEmpty) {
-        ActionHelper.checkDataFrameNotNewerThan(refTimestamp, existingDf.get, Environment.capturedColumnName)
-      }
-      // historize
-      // note that schema evolution is done by output DataObject
-      Historization.incrementalCDCHistorize(cdcDf, deletedRecordsCondition, refTimestamp, timeAxisUnitOpt,
-        cdcMode.eventTimestampColName)
-    } else {
-      Historization.getInitialHistoryWithDummyCol(cdcDf, refTimestamp, Some(deletedRecordsCondition),
-        cdcMode.eventTimestampColName)
-    }
-  }
-
   /**
    * Validates that the input DataFrame has unique primary keys. Throws an exception with details
    * about duplicate records if uniqueness is violated.
    */
-  private def validateInputUniqueness(df: GenericDataFrame, pks: Seq[String]): Unit = {
+  private[smartdatalake] def validateInputUniqueness(df: GenericDataFrame, pks: Seq[String]): Unit = {
     // Get duplicate records
     val duplicates = df.getNonuniqueRows(pks)
     val duplicateCount = duplicates.count
@@ -536,13 +377,15 @@ case class HistorizeAction(
     }
   }
 
-  private def getReferenceTimestamp(implicit context: ActionPipelineContext): LocalDateTime =
+  private[smartdatalake] def getReferenceTimestamp(implicit context: ActionPipelineContext): LocalDateTime =
     context.referenceTimestamp.getOrElse(LocalDateTime.now)
+
+  private def columnNameEquals(colName1: String, colName2: String): Boolean =
+    if (Environment.caseSensitive) colName1 == colName2 else colName1.equalsIgnoreCase(colName2)
 
   override private[smartdatalake] def reset(implicit context: ActionPipelineContext): Unit = {
     super.reset
-    existingDfNeedsHashColumn = None
-    _cdcMode = None
+    _mode = None
   }
 }
 

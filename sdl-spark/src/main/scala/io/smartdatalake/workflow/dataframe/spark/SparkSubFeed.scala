@@ -191,11 +191,11 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
-  override def timestampSubtract(column: GenericColumn, duration: Duration): GenericColumn = {
+  override def timestampAdd(column: GenericColumn, duration: Duration): GenericColumn = {
     column match {
       case sparkColumn: SparkColumn =>
         // Spark timestamps have microsecond resolution
-        SparkColumn(functions.timestamp_add("MICROSECOND", functions.lit(-(duration.toNanos / 1000)), sparkColumn.inner))
+        SparkColumn(functions.timestamp_add("MICROSECOND", functions.lit(duration.toNanos / 1000), sparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }

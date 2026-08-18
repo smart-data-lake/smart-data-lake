@@ -38,6 +38,7 @@ import org.slf4j.Logger
 
 import java.sql.Timestamp
 import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 
 /**
  * This trait defines tests for the behaviour of HistorizeAction. They can be used with various
@@ -318,6 +319,153 @@ trait HistorizeActionBehaviour extends GenericTestTool {
 
     }
 
+    test("historize using a source timestamp column") {
+
+      implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+      tgtConnection.foreach(instanceRegistry.register)
+      instanceRegistry.register(defaultEngineConnection)
+
+      implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(phase = ExecutionPhase.Exec)
+
+      // setup DataObjects
+      val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
+      val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
+      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      import helper.implicits._
+
+      // timestamps of the last change of the record in the source system. They are independent of the runs
+      // reference timestamp, as the source system changed the records before SDLB read them.
+      val now = LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS)
+      val srcTs1 = Timestamp.valueOf(now.minusDays(10))
+      val srcTs2 = Timestamp.valueOf(now.minusDays(8))
+      val srcTs3 = Timestamp.valueOf(now.minusDays(7))
+      val srcTsLate = Timestamp.valueOf(now.minusDays(9)) // older than the version it will replace
+      def previousTick(ts: Timestamp) = Timestamp.from(ts.toInstant.minusMillis(1))
+      def nextTick(ts: Timestamp) = Timestamp.from(ts.toInstant.plusMillis(1))
+      val doomsday = definitions.Environment.historizationUpperHorizonTimestamp
+      def historizeAction(actionId: String) =
+        HistorizeAction(actionId, srcDO.id, tgtDO.id, sourceTimestampColumn = Some(sourceTsCol))
+      def actualHistory = tgtDO.getDataFrame().drop(Historization.historizeHashColName)
+
+      // prepare & start 1st load
+      val action1 = historizeAction("ha")
+      val context1 = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action1))
+      val l1 = Seq(("doe", "john", 5, srcTs1)).toDF("lastname", "firstname", "rating", sourceTsCol)
+      srcDO.writeDataFrame(l1, Seq())(context1)
+      execHistorizeAction(action1, context1)
+
+      {
+        // the validity of the initial version starts at the source timestamp, which itself is not historized
+        val expected = Seq(("doe", "john", 5, srcTs1, doomsday)).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
+        val resultat = expected.isEqual(actualHistory)
+        if (!resultat) printFailedTestResultGdf("historize source timestamp 1st load", Seq())(actualHistory)(expected)
+        assert(resultat)
+        assert(!tgtDO.getDataFrame().columns.map(_.toLowerCase).contains(sourceTsCol))
+      }
+
+      // prepare & start 2nd load: the record is updated in the source system
+      val action2 = historizeAction("ha2")
+      val context2 = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action2))
+      val l2 = Seq(("doe", "john", 10, srcTs2)).toDF("lastname", "firstname", "rating", sourceTsCol)
+      srcDO.writeDataFrame(l2, Seq())(context2)
+      execHistorizeAction(action2, context2)
+
+      {
+        val expected = Seq(
+          ("doe", "john", 5, srcTs1, previousTick(srcTs2)),
+          ("doe", "john", 10, srcTs2, doomsday)
+        ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
+        val resultat = expected.isEqual(actualHistory)
+        if (!resultat) printFailedTestResultGdf("historize source timestamp 2nd load", Seq())(actualHistory)(expected)
+        assert(resultat)
+      }
+
+      // prepare & start 3rd load: only the source timestamp changed
+      val action3 = historizeAction("ha3")
+      val context3 = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action3))
+      val l3 = Seq(("doe", "john", 10, srcTs3)).toDF("lastname", "firstname", "rating", sourceTsCol)
+      srcDO.writeDataFrame(l3, Seq())(context3)
+      try execHistorizeAction(action3, context3)
+      catch {
+        // there is no record to historize, which some DataObjects report as no data to process
+        case _: NoDataToProcessWarning => ()
+      }
+
+      {
+        // the source timestamp column is not used for change detection, so no new version is created
+        val expected = Seq(
+          ("doe", "john", 5, srcTs1, previousTick(srcTs2)),
+          ("doe", "john", 10, srcTs2, doomsday)
+        ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
+        val resultat = expected.isEqual(actualHistory)
+        if (!resultat) printFailedTestResultGdf("historize source timestamp 3rd load", Seq())(actualHistory)(expected)
+        assert(resultat)
+      }
+
+      // prepare & start 4th load: a change arriving late, e.g. its source timestamp is older than the current version
+      val action4 = historizeAction("ha4")
+      val context4 = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action4))
+      val l4 = Seq(("doe", "john", 20, srcTsLate)).toDF("lastname", "firstname", "rating", sourceTsCol)
+      srcDO.writeDataFrame(l4, Seq())(context4)
+      execHistorizeAction(action4, context4)
+
+      {
+        // the new version is delayed to the next tick after the version it replaces, to avoid negative intervals
+        val expected = Seq(
+          ("doe", "john", 5, srcTs1, previousTick(srcTs2)),
+          ("doe", "john", 10, srcTs2, srcTs2),
+          ("doe", "john", 20, nextTick(srcTs2), doomsday)
+        ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
+        val resultat = expected.isEqual(actualHistory)
+        if (!resultat) printFailedTestResultGdf("historize source timestamp 4th load", Seq())(actualHistory)(expected)
+        assert(resultat)
+      }
+    }
+
+    test("historize a timestamp column without sourceTimestampColumn set") {
+
+      implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+      tgtConnection.foreach(instanceRegistry.register)
+      instanceRegistry.register(defaultEngineConnection)
+
+      implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(phase = ExecutionPhase.Exec)
+
+      // setup DataObjects
+      val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
+      val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
+      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      import helper.implicits._
+
+      val srcTs = Timestamp.valueOf(LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS).minusDays(10))
+
+      // prepare & start load without configuring sourceTimestampColumn
+      val refTimestamp1 = LocalDateTime.now()
+      val action1 = HistorizeAction("ha", srcDO.id, tgtDO.id)
+      val context1 = ScalaTestUtil.getDefaultActionPipelineContext
+        .copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec, currentAction = Some(action1))
+      val l1 = Seq(("doe", "john", 5, srcTs)).toDF("lastname", "firstname", "rating", sourceTsCol)
+      srcDO.writeDataFrame(l1, Seq())(context1)
+      execHistorizeAction(action1, context1)
+
+      {
+        // there is no auto detection of a source timestamp column: it is historized as normal attribute and the
+        // validity of the version starts at the runs reference timestamp
+        val expected = Seq(("doe", "john", 5, srcTs, Timestamp.valueOf(refTimestamp1),
+          definitions.Environment.historizationUpperHorizonTimestamp))
+          .toDF("lastname", "firstname", "rating", sourceTsCol, "dl_ts_captured", "dl_ts_delimited")
+        val actual = tgtDO.getDataFrame().drop(Historization.historizeHashColName)
+        val resultat = expected.isEqual(actual)
+        if (!resultat) printFailedTestResultGdf("historize without source timestamp", Seq())(actual)(expected)
+        assert(resultat)
+      }
+    }
+
     test("historize CDC change events of standard cdc columns") {
 
       implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -350,7 +498,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
         (3, 5, CdcChangeType.delete, commitTs1, 2)
       ).toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
       srcDO.writeDataFrame(l1, Seq())(context1)
-      execCdcHistorizeAction(action1, context1)
+      execHistorizeAction(action1, context1)
 
       {
         // deleted records are not part of the initial history, and the CDC columns are not written to the output
@@ -376,7 +524,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
         (99, 0, CdcChangeType.delete, commitTs2, 3)
       ).toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
       srcDO.writeDataFrame(l2, Seq())(context2)
-      execCdcHistorizeAction(action2, context2)
+      execHistorizeAction(action2, context2)
 
       {
         // the preimage is ignored, as its value is already in the history. The deleted record 99 has no version to
@@ -402,7 +550,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
         (1, 20, CdcChangeType.updatePostimage, commitTs3, 2)
       ).toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
       srcDO.writeDataFrame(l3, Seq())(context3)
-      execCdcHistorizeAction(action3, context3)
+      execHistorizeAction(action3, context3)
 
       {
         // only the last change event per primary key is historized, e.g. record 4 is created with rating 2
@@ -439,23 +587,23 @@ trait HistorizeActionBehaviour extends GenericTestTool {
 
       // prepare & start 1st load
       val refTimestamp1 = LocalDateTime.now()
-      val action1 = cdcHistorizeAction("ha", srcDO.id, tgtDO.id).copy(mergeModeCDCUseSourceTimestamp = false)
+      val action1 = cdcHistorizeAction("ha", srcDO.id, tgtDO.id).copy(mergeModeCDCTimestampAutoDetect = false)
       val context1 = ScalaTestUtil.getDefaultActionPipelineContext
         .copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec, currentAction = Some(action1))
       val l1 = Seq((1, 5, CdcChangeType.insert, commitTs, 0))
         .toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
       srcDO.writeDataFrame(l1, Seq())(context1)
-      execCdcHistorizeAction(action1, context1)
+      execHistorizeAction(action1, context1)
 
       // prepare & start 2nd load
       val refTimestamp2 = LocalDateTime.now()
-      val action2 = cdcHistorizeAction("ha2", srcDO.id, tgtDO.id).copy(mergeModeCDCUseSourceTimestamp = false)
+      val action2 = cdcHistorizeAction("ha2", srcDO.id, tgtDO.id).copy(mergeModeCDCTimestampAutoDetect = false)
       val context2 = ScalaTestUtil.getDefaultActionPipelineContext
         .copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec, currentAction = Some(action2))
       val l2 = Seq((1, 10, CdcChangeType.updatePostimage, commitTs, 0))
         .toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
       srcDO.writeDataFrame(l2, Seq())(context2)
-      execCdcHistorizeAction(action2, context2)
+      execHistorizeAction(action2, context2)
 
       {
         // the validity of the versions is defined by the reference timestamp of the runs, not by the commit timestamp
@@ -496,7 +644,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val l1 = Seq((1, 5, CdcChangeType.insert, commitTs, 0))
         .toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
       srcDO.writeDataFrame(l1, Seq())(context1)
-      execCdcHistorizeAction(action1, context1)
+      execHistorizeAction(action1, context1)
 
       {
         // the CDC columns are historized as normal attributes, and the reference timestamp defines the validity
@@ -512,6 +660,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
     }
   }
 
+  private def sourceTsCol = "last_updated"
   private def cdcChangeTypeCol = Environment.cdcChangeTypeColumnName
   private def cdcCommitTimestampCol = Environment.cdcCommitTimestampColumnName
   private def cdcChangeOrdinalCol = Environment.cdcChangeOrdinalColumnName
@@ -523,7 +672,10 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       instanceRegistry: InstanceRegistry
   ) = HistorizeAction(actionId, srcId, tgtId)
 
-  private def execCdcHistorizeAction(action: HistorizeAction, context: ActionPipelineContext): Unit = {
+  /**
+   * Execute all phases of a HistorizeAction on the input DataObject of the action.
+   */
+  private def execHistorizeAction(action: HistorizeAction, context: ActionPipelineContext): Unit = {
     val srcSubFeed = ScalaSubFeed(None, action.inputId, Seq())
     action.prepare(context.copy(phase = ExecutionPhase.Prepare))
     action.preInit(Seq(srcSubFeed), Seq())(context.copy(phase = ExecutionPhase.Init))

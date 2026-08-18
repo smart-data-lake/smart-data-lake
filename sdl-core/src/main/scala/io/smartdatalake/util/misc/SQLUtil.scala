@@ -71,7 +71,9 @@ object SQLUtil extends SmartDataLakeLogger {
       val additionalMergePredicateStr = saveModeOptions.additionalMergePredicate.map(p => s" AND $p").getOrElse("")
       val joinConditionStr = targetTable.primaryKey.get.map(quoteCaseSensitiveColumn).map(colName => s"new.$colName = existing.$colName").reduce(_ + " AND " + _)
       val updateExistingConditionStr = saveModeOptions.updateExistingCondition.map(c => s" AND $c").getOrElse("")
-      val updateExistingSpecStr = columns.diff(Seq(Historization.historizeOperationColName)).map(colName => s"existing.$colName = new.$colName").reduce(_ + ", " + _)
+      // columns which are not inserted into the target table do not exist there and can not be updated either
+      val updateExistingCols = columns.diff(Seq(Historization.historizeOperationColName)).diff(saveModeOptions.insertColumnsToIgnore)
+      val updateExistingSpecStr = updateExistingCols.map(colName => s"existing.$colName = new.$colName").reduce(_ + ", " + _)
 
       Some(s"""
          | MERGE INTO ${targetTable.fullName} as existing

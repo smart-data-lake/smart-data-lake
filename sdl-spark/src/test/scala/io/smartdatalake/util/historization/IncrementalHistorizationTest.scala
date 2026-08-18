@@ -24,13 +24,14 @@ import io.smartdatalake.testutils.spark.{SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.historization.HistorizationTestUtils._
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
-import io.smartdatalake.workflow.dataframe.DataFrameFunctions
+import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 import org.slf4j.Logger
 
+import java.sql.Timestamp
 import java.time.Duration
 
 /**
@@ -246,4 +247,93 @@ class IncrementalHistorizationTest extends AnyFunSuite with BeforeAndAfter with 
     assert(dfHistorized.as("a").join(dfHistorized.as("b"), col("a." + Environment.delimitedColumnName) === col("b." + Environment.capturedColumnName), "inner").count == 1)
   }
 
+  test("When using a source timestamp column, the validity of the new version starts at the source timestamp") {
+    val sourceTs = Timestamp.valueOf(referenceTimestampNew.minusDays(1)) // after the existing version was captured
+    val dfOldHist = toHistorizedDf(List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy")),
+      HistorizationPhase.Existing, withHashCol = true)
+    val dfNewFeed = toDataDf(List((123, "Egon", 23, "sick", sourceTs), (124, "Erna", 27, "healthy", sourceTs)),
+      colNames :+ sourceTsColName)
+
+    val dfHistorized = historize(dfOldHist, dfNewFeed).drop(Historization.historizeHashColName)
+
+    // the versions are delimited relative to the source timestamp, not to the reference timestamp of the run.
+    // Note that record 124 did not change: the source timestamp is not used for change detection.
+    val sourceTsPreviousTick = Timestamp.from(sourceTs.toInstant.minusMillis(1))
+    val dfExpected = toDataDf(Seq(
+      (123, "Egon", 23, "sick", sourceTs, HistorizationRecordOperations.updateClose, erfasstTimestampOldHistTs, sourceTsPreviousTick),
+      (123, "Egon", 23, "sick", sourceTs, HistorizationRecordOperations.insertNew, sourceTs, doomsdayTs)
+    ), historizedColNames)
+
+    val result = dfExpected.isEqual(dfHistorized)
+    if (!result) printFailedTestResult("Validity of new versions starts at the source timestamp")(dfHistorized)(dfExpected)
+    assert(result)
+  }
+
+  test("When using a source timestamp column, deleted records are delimited with the reference timestamp") {
+    val sourceTs = Timestamp.valueOf(referenceTimestampNew.minusDays(1))
+    val dfOldHist = toHistorizedDf(List((123, "Egon", 23, "healthy"), (124, "Erna", 27, "healthy")),
+      HistorizationPhase.Existing, withHashCol = true)
+    val dfNewFeed = toDataDf(List((124, "Erna", 27, "healthy", sourceTs)), colNames :+ sourceTsColName)
+
+    val dfHistorized = historize(dfOldHist, dfNewFeed).drop(Historization.historizeHashColName)
+
+    // a record deleted in the source system has no source timestamp, so the reference timestamp of the run is used
+    val dfExpected = toDataDf(Seq[(Int, String, java.lang.Integer, String, Timestamp, String, Timestamp, Timestamp)](
+      (123, "Egon", null, null, null, HistorizationRecordOperations.updateClose, erfasstTimestampOldHistTs,
+        getReferenceTimestampOldTs())
+    ), historizedColNames)
+
+    val result = dfExpected.isEqual(dfHistorized)
+    if (!result) printFailedTestResult("Deleted records are delimited with the reference timestamp")(dfHistorized)(dfExpected)
+    assert(result)
+  }
+
+  test("When a record arrives late, its new version starts at the next tick after the version it replaces") {
+    val sourceTs = Timestamp.valueOf(erfasstTimestampOldHist.minusDays(1)) // before the existing version was captured
+    val dfOldHist = toHistorizedDf(List((123, "Egon", 23, "healthy")), HistorizationPhase.Existing, withHashCol = true)
+    val dfNewFeed = toDataDf(List((123, "Egon", 23, "sick", sourceTs)), colNames :+ sourceTsColName)
+
+    val dfHistorized = historize(dfOldHist, dfNewFeed).drop(Historization.historizeHashColName)
+
+    // the new version is delayed, otherwise the existing version would be delimited before it was captured
+    val existingCapturedNextTick = Timestamp.from(erfasstTimestampOldHistTs.toInstant.plusMillis(1))
+    val dfExpected = toDataDf(Seq(
+      (123, "Egon", 23, "sick", sourceTs, HistorizationRecordOperations.updateClose, erfasstTimestampOldHistTs, erfasstTimestampOldHistTs),
+      (123, "Egon", 23, "sick", sourceTs, HistorizationRecordOperations.insertNew, existingCapturedNextTick, doomsdayTs)
+    ), historizedColNames)
+
+    val result = dfExpected.isEqual(dfHistorized)
+    if (!result) printFailedTestResult("Late arriving records start at the next tick")(dfHistorized)(dfExpected)
+    assert(result)
+  }
+
+  test("The initial history starts at the source timestamp") {
+    val sourceTs1 = Timestamp.valueOf(referenceTimestampNew.minusDays(1))
+    val sourceTs2 = Timestamp.valueOf(referenceTimestampNew.minusDays(5))
+    val dfNewFeed = toDataDf(List((123, "Egon", 23, "healthy", sourceTs1), (124, "Erna", 27, "healthy", sourceTs2)),
+      colNames :+ sourceTsColName)
+
+    val dfHistorized = Historization.getInitialHistoryWithHashCol(dfNewFeed, referenceTimestampNewTs, None, None,
+      Some(sourceTsColName)).drop(Historization.historizeHashColName)
+
+    val dfExpected = toDataDf(Seq(
+      (123, "Egon", 23, "healthy", sourceTs1, sourceTs1, doomsdayTs, HistorizationRecordOperations.insertNew),
+      (124, "Erna", 27, "healthy", sourceTs2, sourceTs2, doomsdayTs, HistorizationRecordOperations.insertNew)
+    ), colNames ++ Seq(sourceTsColName, Environment.capturedColumnName, Environment.delimitedColumnName,
+      Historization.historizeOperationColName))
+
+    val result = dfExpected.isEqual(dfHistorized)
+    if (!result) printFailedTestResult("The initial history starts at the source timestamp")(dfHistorized)(dfExpected)
+    assert(result)
+  }
+
+  private val sourceTsColName = "last_updated"
+
+  private val historizedColNames = colNames ++ Seq(sourceTsColName, Historization.historizeOperationColName,
+    Environment.capturedColumnName, Environment.delimitedColumnName)
+
+  private def historize(dfOldHist: GenericDataFrame, dfNewFeed: GenericDataFrame,
+                        timeAxisUnit: Option[Duration] = defaultTimeAxisUnit) =
+    Historization.incrementalHistorize(dfOldHist, dfNewFeed, primaryKeyColumns, referenceTimestampNewTs, timeAxisUnit,
+      None, None, addExistingDfHashColumn = false, sourceTimestampColName = Some(sourceTsColName))
 }

@@ -302,7 +302,9 @@ class DeltaLakeTableSparkClassicEngine(dataObject: DeltaLakeTableDataObject) ext
 
     // update existing clause if configured
     if(saveModeOptions.updateExistingCondition.isDefined) {
+      // columns which are not inserted into the target table do not exist there and can not be updated either
       val updateCols = df.columns.toSeq.diff(Seq(Historization.historizeOperationColName)).diff(additionalCols)
+        .diff(saveModeOptions.insertColumnsToIgnore)
       mergeStmt = mergeStmt.whenMatched(saveModeExpr.updateExistingConditionExpr.map(toSpark).getOrElse(lit(true))).update(updateCols.map(c => c -> col(s"new.$c")).toMap)
     }
 
