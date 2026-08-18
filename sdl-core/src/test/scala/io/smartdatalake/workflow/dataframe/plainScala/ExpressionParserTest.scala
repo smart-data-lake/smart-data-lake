@@ -65,6 +65,19 @@ class ExpressionParserTest extends AnyFunSuite {
     assert(greaterExpr.isInstanceOf[ScalaBinaryExpr])
     assert(greaterExpr.asInstanceOf[ScalaBinaryExpr].opName == "gt")
 
+    assert(evaluate("2 <= 2") == true)
+    assert(evaluate("3 <= 2") == false)
+    assert(evaluate("2 >= 2") == true)
+    assert(evaluate("2 >= 3") == false)
+
+    val lessOrEqualExpr = ExpressionParser.parse("2 <= 3")
+    assert(lessOrEqualExpr.isInstanceOf[ScalaBinaryExpr])
+    assert(lessOrEqualExpr.asInstanceOf[ScalaBinaryExpr].opName == "lteq")
+
+    val greaterOrEqualExpr = ExpressionParser.parse("3 >= 2")
+    assert(greaterOrEqualExpr.isInstanceOf[ScalaBinaryExpr])
+    assert(greaterOrEqualExpr.asInstanceOf[ScalaBinaryExpr].opName == "gteq")
+
     val nullSafeExpr = ExpressionParser.parse("2 <=> 2")
     assert(nullSafeExpr.isInstanceOf[ScalaBinaryExpr])
     assert(nullSafeExpr.asInstanceOf[ScalaBinaryExpr].opName == "equal null")

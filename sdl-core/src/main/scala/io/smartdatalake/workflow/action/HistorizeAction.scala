@@ -190,10 +190,7 @@ case class HistorizeAction(
    */
   private def resolveMode(inputSchema: Option[GenericSchema]): HistorizeMode = {
     def colExists(colName: String) = inputSchema.exists(GenericSchemaUtil.columnExists(_, colName))
-    def isTimestampCol(colName: String) = inputSchema.forall(
-      _.fields.filter(f => if (Environment.caseSensitive) f.name == colName else f.name.equalsIgnoreCase(colName))
-        .forall(_.dataType.typeName.toLowerCase.startsWith("timestamp"))
-    )
+    def isTimestampCol(colName: String) = inputSchema.forall(GenericSchemaUtil.columnIsTimestamp(_, colName))
     // note that CDC historization can not compare records, so it is not auto-enabled if a historizeWhitelist is set
     val autoDetectCdc = mergeModeCDCAutoDetect && historizeWhitelist.isEmpty && colExists(Environment.cdcChangeTypeColumnName)
     val changeTypeColNameOpt = mergeModeCDCColumn

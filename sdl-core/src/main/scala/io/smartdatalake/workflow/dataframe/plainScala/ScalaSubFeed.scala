@@ -158,7 +158,15 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def array_construct_compact(columns: GenericColumn*): ScalaAbstractColumn = throwNotImplementedError
 
-  def coalesce(columns: GenericColumn*): ScalaAbstractColumn = throwNotImplementedError
+  def coalesce(columns: GenericColumn*): ScalaAbstractColumn = {
+    require(columns.nonEmpty, "coalesce requires at least one argument")
+    val scalaColumns = columns.map {
+      case c: ScalaAbstractColumn => c
+      case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+    // the data type is the greater type of all columns, values are casted accordingly, see ScalaManyExpr
+    ScalaManyExpr(scalaColumns, "coalesce", _ => values => values.find(_.isDefined).flatten)
+  }
 
   def col(colName: String): ScalaAbstractColumn = ScalaColumnReference(colName)
 

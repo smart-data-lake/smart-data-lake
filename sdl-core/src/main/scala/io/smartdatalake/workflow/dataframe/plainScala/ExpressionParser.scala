@@ -57,7 +57,9 @@ object ExpressionParser {
     case object NullSafeEqual extends TokenType
     case object NotEqual extends TokenType
     case object LessThan extends TokenType
+    case object LessOrEqual extends TokenType
     case object GreaterThan extends TokenType
+    case object GreaterOrEqual extends TokenType
     case object LeftParen extends TokenType
     case object RightParen extends TokenType
     case object Comma extends TokenType
@@ -130,7 +132,8 @@ object ExpressionParser {
       var continue = true
       while (continue) {
         current.tokenType match {
-          case TokenType.Equal | TokenType.NullSafeEqual | TokenType.NotEqual | TokenType.LessThan | TokenType.GreaterThan =>
+          case TokenType.Equal | TokenType.NullSafeEqual | TokenType.NotEqual | TokenType.LessThan |
+               TokenType.LessOrEqual | TokenType.GreaterThan | TokenType.GreaterOrEqual =>
             val operator = current
             index += 1
             val right = parseAdditive()
@@ -434,7 +437,9 @@ object ExpressionParser {
         case TokenType.NullSafeEqual => leftCol <=> rightCol
         case TokenType.NotEqual => leftCol =!= rightCol
         case TokenType.LessThan => leftCol < rightCol
+        case TokenType.LessOrEqual => leftCol <= rightCol
         case TokenType.GreaterThan => leftCol > rightCol
+        case TokenType.GreaterOrEqual => leftCol >= rightCol
         case TokenType.And => leftCol.and(rightCol)
         case TokenType.Or => leftCol.or(rightCol)
         case _ => fail(s"Unsupported operator '${operator.text}'")
@@ -494,9 +499,15 @@ object ExpressionParser {
         case '<' if index + 2 < expression.length && expression.charAt(index + 1) == '=' && expression.charAt(index + 2) == '>' =>
           add(TokenType.NullSafeEqual, "<=>", index)
           index += 3
+        case '<' if index + 1 < expression.length && expression.charAt(index + 1) == '=' =>
+          add(TokenType.LessOrEqual, "<=", index)
+          index += 2
         case '<' =>
           add(TokenType.LessThan, "<", index)
           index += 1
+        case '>' if index + 1 < expression.length && expression.charAt(index + 1) == '=' =>
+          add(TokenType.GreaterOrEqual, ">=", index)
+          index += 2
         case '>' =>
           add(TokenType.GreaterThan, ">", index)
           index += 1

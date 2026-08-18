@@ -44,6 +44,20 @@ class DeduplicateWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogge
 
   }
 
+  test("deduplicate load mergeModeEnable sourceTimestampColumn") {
+    testDeduplicateWithMergeModeSourceTimestampColumn(
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
+    )
+  }
+
+  test("deduplicate load mergeModeEnable sourceTimestampColumn updateCapturedColumnOnlyWhenChanged") {
+    testDeduplicateWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
+    )
+  }
+
   test("deduplicate 1st 2nd load with transformer changing schema") {
     testDeduplicateWithTransformerChangingSchema(
       (id, registry) => MockSparkDataObject(id)(registry),

@@ -71,6 +71,14 @@ class SparkConnectDeduplicateActionTest extends AnyFunSuite
     testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(createSrcDataObject, createTgtDataObject)
   }
 
+  test("deduplicate load mergeModeEnable sourceTimestampColumn") {
+    testDeduplicateWithMergeModeSourceTimestampColumn(createSrcDataObject, createTgtDataObject)
+  }
+
+  test("deduplicate load mergeModeEnable sourceTimestampColumn updateCapturedColumnOnlyWhenChanged") {
+    testDeduplicateWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(createSrcDataObject, createTgtDataObject)
+  }
+
   test("deduplicate 1st 2nd load with transformer changing schema") {
     testDeduplicateWithTransformerChangingSchema(createSrcDataObject, createTgtDataObject)
   }

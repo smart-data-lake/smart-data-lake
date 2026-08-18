@@ -30,6 +30,15 @@ object GenericSchemaUtil {
   }
 
   /**
+   * Check if a column has a timestamp data type.
+   * Note that this returns true if the column does not exist, use [[columnExists]] to check that.
+   */
+  def columnIsTimestamp(schema: GenericSchema, colName: String): Boolean = {
+    schema.fields.filter(f => if (Environment.caseSensitive) f.name == colName else f.name.equalsIgnoreCase(colName))
+      .forall(_.dataType.typeName.toLowerCase.startsWith("timestamp"))
+  }
+
+  /**
    * Filters columns based on the provided criteria.
    *
    * @param schema            The generic schema containing columns.

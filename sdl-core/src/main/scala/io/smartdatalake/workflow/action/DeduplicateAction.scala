@@ -24,6 +24,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.evolution.SchemaEvolution
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.GenericSchemaUtil
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
@@ -46,6 +47,11 @@ import scala.reflect.runtime.universe.Type
  * Especially when using saveMode.Merge it is better to set [[Environment.capturedColumnName]] to
  * the last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to
  * enable this optimization.
+ *
+ * If the input contains the timestamp of the last change of the record in the source system, it can be used as
+ * [[Environment.capturedColumnName]] by setting sourceTimestampColumn, so that the output reflects the time axis of
+ * the source system instead of the schedule of the pipeline. updateCapturedColumnOnlyWhenChanged is normally not
+ * needed then, as the source timestamp is only moved forward if the source system changed the record anyway.
  *
  * DeduplicateAction needs a transactional table (e.g. [[TransactionalTableDataObject]]) as output
  * with defined primary keys. If output implements [[CanMergeDataFrame]], saveMode.
@@ -86,6 +92,21 @@ import scala.reflect.runtime.universe.Type
  *   Set to true to enable update Column [[Environment.capturedColumnName]] only if Record has
  *   changed in the source, instead of updating it with every execution (default=false). This
  *   results in much less records updated with saveMode.Merge.
+ *   Note that this is normally not needed if sourceTimestampColumn is set, see there.
+ * @param sourceTimestampColumn
+ *   Optional column holding the timestamp of the last change of the record in the source system. If set, it is used
+ *   as value for Column [[Environment.capturedColumnName]] instead of the runs reference timestamp. The column must
+ *   exist in the data to deduplicate and be of type timestamp. Records where it is null fall back to the runs
+ *   reference timestamp.
+ *   Note that the column itself is not written to the output DataObject, as its value is kept in
+ *   [[Environment.capturedColumnName]]. Copy it to a column with another name in a transformer if you want to keep it.
+ *   Records arriving late, e.g. having a source timestamp older than the record already stored, are not applied, so
+ *   that [[Environment.capturedColumnName]] always holds the latest version according to the source system.
+ *   Setting updateCapturedColumnOnlyWhenChanged = true is normally not needed together with sourceTimestampColumn:
+ *   [[Environment.capturedColumnName]] is moved forward only if the source system changed the record anyway, no
+ *   matter how it is set. What it changes is that existing records are updated only if the source timestamp
+ *   increased, instead of comparing all columns. This avoids rewriting records which the source system delivers
+ *   again with an unchanged timestamp, but a change which the source system did not timestamp is not applied.
  * @param mergeModeAdditionalJoinPredicate
  *   To optimize performance it might be interesting to limit the records read from the existing
  *   table data, e.g. it might be sufficient to use only the last 7 days. Specify a condition to
@@ -100,6 +121,7 @@ case class DeduplicateAction(
                               ignoreOldDeletedColumns: Boolean = false,
                               ignoreOldDeletedNestedColumns: Boolean = true,
                               updateCapturedColumnOnlyWhenChanged: Boolean = false,
+                              sourceTimestampColumn: Option[String] = None,
                               mergeModeAdditionalJoinPredicate: Option[String] = None,
                               override val cacheOutput: Boolean = false,
                               override val cacheInput: Boolean = false,
@@ -121,13 +143,23 @@ case class DeduplicateAction(
       s"($id) output DataObject must support SaveMode.Merge (implement CanMergeDataFrame)"
     )
     // customize update condition
+    val capturedCol = Environment.capturedColumnName
     val updateCondition = if (updateCapturedColumnOnlyWhenChanged) {
-      val (colsToUpdate, colsNew) = checkRecordChangedColumns.partition(outputCols.contains)
-      val colsToUpdateConditions = colsToUpdate.map(c => s"not(existing.$c <=> new.$c)") // comparing equality including null is complicated with standard sql
-      val colsNewCondition =
-        colsNew.map(c => s"new.$c is not null") // null is the default value of the new column, we need to update if the value in new data is not null
-      Some((colsToUpdateConditions ++ colsNewCondition).mkString(" or "))
-    } else None
+      if (sourceTimestampColumn.isDefined) {
+        // the source timestamp tells us when a record has changed, there is no need to compare all columns.
+        // Note that a change which the source system did not timestamp is not applied, see sourceTimestampColumn.
+        Some(s"new.$capturedCol > existing.$capturedCol")
+      } else {
+        val (colsToUpdate, colsNew) = checkRecordChangedColumns.partition(outputCols.contains)
+        val colsToUpdateConditions = colsToUpdate.map(c => s"not(existing.$c <=> new.$c)") // comparing equality including null is complicated with standard sql
+        val colsNewCondition =
+          colsNew.map(c => s"new.$c is not null") // null is the default value of the new column, we need to update if the value in new data is not null
+        Some((colsToUpdateConditions ++ colsNewCondition).mkString(" or "))
+      }
+    } else {
+      // records arriving late must not overwrite a newer version of the record, see sourceTimestampColumn
+      sourceTimestampColumn.map(_ => s"new.$capturedCol >= existing.$capturedCol")
+    }
     Some(SaveModeMergeOptions(updateCondition = updateCondition, additionalMergePredicate = mergeModeAdditionalJoinPredicate))
   }
   // DataFrame columns are needed in order to generate update condition for SaveModeMergeOptions. Unfortunately they are not available here. A variable is needed which gets updated in transform(...).
@@ -141,6 +173,9 @@ case class DeduplicateAction(
 
   // check preconditions
   require(output.table.primaryKey.isDefined, s"($id) Primary key must be defined for output DataObject")
+  // the value of the source timestamp column is kept in the captured column, so it can not be the captured column itself
+  require(!sourceTimestampColumn.exists(_.equalsIgnoreCase(Environment.capturedColumnName)),
+    s"($id) sourceTimestampColumn must not be ${Environment.capturedColumnName}")
 
   override val transformerSubFeedSupportedTypes: Seq[Type] =
     transformers.map(_.getSubFeedSupportedType) // deduplicate transformer can be ignored as it is generic
@@ -182,8 +217,10 @@ case class DeduplicateAction(
             dataObjectId: DataObjectId,
             previousTransformerName: Option[String],
             executionModeResultOptions: Map[String, String]
-        )(implicit context: ActionPipelineContext): GenericDataFrame =
-          DeduplicateAction.enhanceDataFrame(df, timestamp)
+        )(implicit context: ActionPipelineContext): GenericDataFrame = {
+          sourceTimestampColumn.foreach(DeduplicateAction.validateSourceTimestampColumn(actionId, df, _))
+          DeduplicateAction.enhanceDataFrame(df, timestamp, sourceTimestampColumn)
+        }
       }
 
     transformers :+ deduplicateTransformer
@@ -216,12 +253,13 @@ object DeduplicateAction extends FromConfigFactory[Action] {
       pks: Seq[String],
       refTimestamp: Timestamp,
       ignoreOldDeletedColumns: Boolean,
-      ignoreOldDeletedNestedColumns: Boolean
+      ignoreOldDeletedNestedColumns: Boolean,
+      sourceTimestampColumn: Option[String] = None
   )(df: GenericDataFrame): GenericDataFrame = {
     assert(!df.columns.contains(rnkColName), s"Column $rnkColName not allowed in DataFrame for DeduplicateAction")
 
     // enhance
-    val enhancedDf = enhanceDataFrame(df, refTimestamp)
+    val enhancedDf = enhanceDataFrame(df, refTimestamp, sourceTimestampColumn)
 
     // deduplicate
     if (existingDf.isDefined) {
@@ -255,11 +293,23 @@ object DeduplicateAction extends FromConfigFactory[Action] {
   }
 
   /**
-   * enhance DataFrame with captured column
+   * enhance DataFrame with captured column.
+   * Its value is taken from sourceTimestampColumn if defined, otherwise from the runs reference timestamp.
    */
-  def enhanceDataFrame(df: GenericDataFrame, refTimestamp: Timestamp): GenericDataFrame = {
+  def enhanceDataFrame(df: GenericDataFrame, refTimestamp: Timestamp, sourceTimestampColumn: Option[String] = None): GenericDataFrame = {
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
-    df.withColumn(Environment.capturedColumnName, functions.lit(refTimestamp))
+    import functions._
+    sourceTimestampColumn.map(colName =>
+      // the source timestamp column itself is not written to the output, its value is kept in the captured column
+      df.withColumn(Environment.capturedColumnName, coalesce(col(colName), lit(refTimestamp))).drop(colName)
+    ).getOrElse(df.withColumn(Environment.capturedColumnName, lit(refTimestamp)))
+  }
+
+  private[smartdatalake] def validateSourceTimestampColumn(actionId: ActionId, df: GenericDataFrame, colName: String): Unit = {
+    assert(GenericSchemaUtil.columnExists(df.schema, colName),
+      s"($actionId) sourceTimestampColumn '$colName' not found in columns to deduplicate (${df.columns.mkString(", ")})")
+    assert(GenericSchemaUtil.columnIsTimestamp(df.schema, colName),
+      s"($actionId) sourceTimestampColumn '$colName' must be of type timestamp")
   }
 
   private val rnkColName = "__rnk"

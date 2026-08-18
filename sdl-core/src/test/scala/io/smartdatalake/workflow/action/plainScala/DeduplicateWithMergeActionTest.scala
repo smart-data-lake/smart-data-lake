@@ -43,6 +43,20 @@ class DeduplicateWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogge
 
   }
 
+  test("deduplicate load mergeModeEnable sourceTimestampColumn") {
+    testDeduplicateWithMergeModeSourceTimestampColumn(
+      (id, _) => MockScalaDataObject(id),
+      (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
+    )
+  }
+
+  test("deduplicate load mergeModeEnable sourceTimestampColumn updateCapturedColumnOnlyWhenChanged") {
+    testDeduplicateWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(
+      (id, _) => MockScalaDataObject(id),
+      (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
+    )
+  }
+
   // SQLDfTransformer does not yet work with ScalaSubFeed
   ignore("deduplicate 1st 2nd load with transformer changing schema") {
     testDeduplicateWithTransformerChangingSchema(
