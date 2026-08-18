@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 // Note: this package is intentionally outside io.smartdatalake so it is NOT picked up by the classpath discovery
 // in Environment.schemaProviders (which scans package io.smartdatalake). It is only used through the global option override.
 package sdltest
