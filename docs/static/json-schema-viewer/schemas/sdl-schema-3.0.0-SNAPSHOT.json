@@ -5,33 +5,6 @@
   "id" : "sdl-schema-3.0.0-SNAPSHOT.json#",
   "definitions" : {
     "ExecutionMode" : {
-      "CustomMode" : {
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "const" : "CustomMode"
-          },
-          "className" : {
-            "type" : "string",
-            "description" : "class name implementing trait`CustomModeLogic`"
-          },
-          "alternativeOutputId" : {
-            "type" : "string",
-            "description" : "optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.  \nIt can be used to ensure processing over multiple actions in case of errors."
-          },
-          "options" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "string"
-            },
-            "description" : "Options specified in the configuration for this execution mode"
-          }
-        },
-        "title" : "CustomMode",
-        "required" : [ "type", "className" ],
-        "additionalProperties" : false,
-        "description" : "Execution mode to create custom execution mode logic in Scala/Java code.  \nImplement trait `CustomModeLogic` in a class on the classpath and reference it by `className` .  \nThe implementation receives the main input & output DataObject together with the given partition values and\nreturns an `ExecutionModeResult`, so it can freely select partition values, a data filter or file references.  \nUse this only if none of the built-in modes ( `PartitionDiffMode`, `DataFrameIncrementalMode`, `CustomPartitionMode`, ...) fits your selection logic. Example:\n```\nactions = {\n  copy-airports {\n    type = CopyAction\n    inputId = stg-airports\n    outputId = int-airports\n    executionMode = {\n      type = CustomMode\n      className = \"com.company.dataPipeline.SelectLatestPartitionMode\"\n      options = { lookbackDays = \"7\" }\n    }\n  }\n}\n```\n\n\nNOTE: Deprecated since 2.8.2. Implement `ExecutionMode` directly and use your class name as `type` in the\nconfiguration instead.\n\nSEE: `CustomPartitionMode` for the variant which only selects partition values."
-      },
       "CustomPartitionMode" : {
         "type" : "object",
         "properties" : {
@@ -1308,7 +1281,7 @@
         "title" : "DebeziumCdcDataObject",
         "required" : [ "type", "connectionId", "table" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type DebeziumCdcDataObject.  \nProvides details to access Change data over Debezium Engine.  \nNote that this implementation is not yet tested on production, and must therefore be seen as experimental.\n\nThe DataObject runs an embedded Debezium engine to read the change events of one database table. The returned\nDataFrame contains the columns of the changed row, followed by two SDLB metadata columns: `__commit_event` (create, update_preimage, update_postimage, delete or read) and `__event_timestamp` . Debezium's own envelope\nfields (before, after, source, op, ...) are not part of the result. Read offsets are stored in SDLBs state, so it\nsupports incremental output and should be used together with DataObjectStateIncrementalMode. Reading stops once no\nmore events arrive within `maxWaitTimeAfterLastBatchMilliSeconds` . If no event arrives at all, `schemaMin` is used\nas fallback schema for the empty DataFrame. Example:\n```\nconnections = {\n  dbz-postgres {\n    type = DebeziumConnection\n    dbEngine = \"postgresql\"\n    hostname = \"localhost\"\n    port = 5432\n    db = \"demo\"\n    authMode = { type = BasicAuthMode, user = \"###ENV#PG_USER###\", password = \"###ENV#PG_PWD###\" }\n  }\n}\ndataObjects = {\n  src-test {\n    type = DebeziumCdcDataObject\n    connectionId = dbz-postgres\n    table = { db = \"demo\", name = \"test\" }\n    debeziumProperties = {\n      \"plugin.name\" = \"pgoutput\"\n      \"schema.history.internal\" = \"io.debezium.storage.file.history.FileSchemaHistory\"\n      \"schema.history.internal.file.filename\" = \"/tmp/schemahistory.dat\"\n    }\n  }\n}\n```\n"
+        "description" : "`DataObject` of type DebeziumCdcDataObject.  \nProvides details to access Change data over Debezium Engine.  \nNote that this implementation is not yet tested on production, and must therefore be seen as experimental.\n\nThe DataObject runs an embedded Debezium engine to read the change events of one database table. The returned\nDataFrame contains the columns of the changed row, followed by three SDLB metadata columns: `_change_type` (insert, update_preimage, update_postimage, delete or read), `_commit_timestamp` and `_change_ordinal` .  \nThe naming of the metadata columns follows the change data feed of Delta Lake and Iceberg, see `CdcChangeType`.  \nThe result can be historized without further configuration by using HistorizeAction, see its documentation.  \nDebezium's own envelope\nfields (before, after, source, op, ...) are not part of the result. Read offsets are stored in SDLBs state, so it\nsupports incremental output and should be used together with DataObjectStateIncrementalMode. Reading stops once no\nmore events arrive within `maxWaitTimeAfterLastBatchMilliSeconds` . If no event arrives at all, `schemaMin` is used\nas fallback schema for the empty DataFrame. Example:\n```\nconnections = {\n  dbz-postgres {\n    type = DebeziumConnection\n    dbEngine = \"postgresql\"\n    hostname = \"localhost\"\n    port = 5432\n    db = \"demo\"\n    authMode = { type = BasicAuthMode, user = \"###ENV#PG_USER###\", password = \"###ENV#PG_PWD###\" }\n  }\n}\ndataObjects = {\n  src-test {\n    type = DebeziumCdcDataObject\n    connectionId = dbz-postgres\n    table = { db = \"demo\", name = \"test\" }\n    debeziumProperties = {\n      \"plugin.name\" = \"pgoutput\"\n      \"schema.history.internal\" = \"io.debezium.storage.file.history.FileSchemaHistory\"\n      \"schema.history.internal.file.filename\" = \"/tmp/schemahistory.dat\"\n    }\n  }\n}\n```\n"
       },
       "DeltaLakeTableDataObject" : {
         "type" : "object",
@@ -3623,8 +3596,6 @@
           },
           "executionMode" : {
             "oneOf" : [ {
-              "$ref" : "#/definitions/ExecutionMode/CustomMode"
-            }, {
               "$ref" : "#/definitions/ExecutionMode/CustomPartitionMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/DataFrameIncrementalMode"
@@ -3813,8 +3784,6 @@
           },
           "executionMode" : {
             "oneOf" : [ {
-              "$ref" : "#/definitions/ExecutionMode/CustomMode"
-            }, {
               "$ref" : "#/definitions/ExecutionMode/CustomPartitionMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/DataFrameIncrementalMode"
@@ -3998,8 +3967,6 @@
           },
           "executionMode" : {
             "oneOf" : [ {
-              "$ref" : "#/definitions/ExecutionMode/CustomMode"
-            }, {
               "$ref" : "#/definitions/ExecutionMode/CustomPartitionMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/DataFrameIncrementalMode"
@@ -4186,7 +4153,11 @@
           },
           "updateCapturedColumnOnlyWhenChanged" : {
             "type" : "boolean",
-            "description" : "Set to true to enable update Column`Environment.capturedColumnName` only if Record has\nchanged in the source, instead of updating it with every execution (default=false). This\nresults in much less records updated with saveMode.Merge."
+            "description" : "Set to true to enable update Column`Environment.capturedColumnName` only if Record has\nchanged in the source, instead of updating it with every execution (default=false). This\nresults in much less records updated with saveMode.Merge.  \nNote that this is normally not needed if sourceTimestampColumn is set, see there."
+          },
+          "sourceTimestampColumn" : {
+            "type" : "string",
+            "description" : "Optional column holding the timestamp of the last change of the record in the source system. If set, it is used\nas value for Column[[Environment.capturedColumnName]]instead of the runs reference timestamp. The column must\nexist in the data to deduplicate and be of type timestamp. Records where it is null fall back to the runs\nreference timestamp.  \nNote that the column itself is not written to the output DataObject, as its value is kept in[[Environment.capturedColumnName]]. Copy it to a column with another name in a transformer if you want to keep it.  \nRecords arriving late, e.g. having a source timestamp older than the record already stored, are not applied, so\nthat[[Environment.capturedColumnName]]always holds the latest version according to the source system.  \nSetting updateCapturedColumnOnlyWhenChanged = true is normally not needed together with sourceTimestampColumn:`Environment.capturedColumnName` is moved forward only if the source system changed the record anyway, no\nmatter how it is set. What it changes is that existing records are updated only if the source timestamp\nincreased, instead of comparing all columns. This avoids rewriting records which the source system delivers\nagain with an unchanged timestamp, but a change which the source system did not timestamp is not applied."
           },
           "mergeModeAdditionalJoinPredicate" : {
             "type" : "string",
@@ -4202,8 +4173,6 @@
           },
           "executionMode" : {
             "oneOf" : [ {
-              "$ref" : "#/definitions/ExecutionMode/CustomMode"
-            }, {
               "$ref" : "#/definitions/ExecutionMode/CustomPartitionMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/DataFrameIncrementalMode"
@@ -4257,7 +4226,7 @@
         "title" : "DeduplicateAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "This `Action` copies and deduplicates data between an input and output DataObject using\nDataFrames. Deduplication keeps the last record for every key, also after it has been deleted in\nthe source. The DataFrame might be transformed using SQL or DataFrame transformations. These\ntransformations are applied before the deduplication.\n\nDeduplicateAction adds an additional Column `Environment.capturedColumnName`. It contains the\ntimestamp of the last occurrence of the record in the source. This creates lots of updates.  \nEspecially when using saveMode.Merge it is better to set `Environment.capturedColumnName` to\nthe last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to\nenable this optimization.\n\nDeduplicateAction needs a transactional table (e.g. `TransactionalTableDataObject` ) as output\nwith defined primary keys. If output implements `CanMergeDataFrame`, saveMode.\n\nDeduplicateAction's input data must be unique across the primary key, otherwise the merge\nstatement creates errors like `DeltaUnsupportedOperationException: [DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE] Cannot perform Merge as multiple source rows matched and attempted to modify the same` .  \nThis can be achieved through adding a DeduplicateTransformer to transformers. Note that this is\nnot included by default in DeduplicateAction, as it is a performance intensive operation. Example:\n```\nactions = {\n  dedup-airports {\n    type = DeduplicateAction\n    inputId = stg-airports\n    outputId = int-airports\n    updateCapturedColumnOnlyWhenChanged = true\n    mergeModeAdditionalJoinPredicate = \"existing.dl_ts_captured > current_date - interval 7 days\"\n  }\n}\n```\n"
+        "description" : "This `Action` copies and deduplicates data between an input and output DataObject using\nDataFrames. Deduplication keeps the last record for every key, also after it has been deleted in\nthe source. The DataFrame might be transformed using SQL or DataFrame transformations. These\ntransformations are applied before the deduplication.\n\nDeduplicateAction adds an additional Column `Environment.capturedColumnName`. It contains the\ntimestamp of the last occurrence of the record in the source. This creates lots of updates.  \nEspecially when using saveMode.Merge it is better to set `Environment.capturedColumnName` to\nthe last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to\nenable this optimization.\n\nIf the input contains the timestamp of the last change of the record in the source system, it can be used as `Environment.capturedColumnName` by setting sourceTimestampColumn, so that the output reflects the time axis of\nthe source system instead of the schedule of the pipeline. updateCapturedColumnOnlyWhenChanged is normally not\nneeded then, as the source timestamp is only moved forward if the source system changed the record anyway.\n\nDeduplicateAction needs a transactional table (e.g. `TransactionalTableDataObject` ) as output\nwith defined primary keys. If output implements `CanMergeDataFrame`, saveMode.\n\nDeduplicateAction's input data must be unique across the primary key, otherwise the merge\nstatement creates errors like `DeltaUnsupportedOperationException: [DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE] Cannot perform Merge as multiple source rows matched and attempted to modify the same` .  \nThis can be achieved through adding a DeduplicateTransformer to transformers. Note that this is\nnot included by default in DeduplicateAction, as it is a performance intensive operation. Example:\n```\nactions = {\n  dedup-airports {\n    type = DeduplicateAction\n    inputId = stg-airports\n    outputId = int-airports\n    updateCapturedColumnOnlyWhenChanged = true\n    mergeModeAdditionalJoinPredicate = \"existing.dl_ts_captured > current_date - interval 7 days\"\n  }\n}\n```\n"
       },
       "FileTransferAction" : {
         "type" : "object",
@@ -4295,8 +4264,6 @@
           },
           "executionMode" : {
             "oneOf" : [ {
-              "$ref" : "#/definitions/ExecutionMode/CustomMode"
-            }, {
               "$ref" : "#/definitions/ExecutionMode/CustomPartitionMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/DataFrameIncrementalMode"
@@ -4443,7 +4410,19 @@
           },
           "mergeModeCDCDeletedValue" : {
             "type" : "string",
-            "description" : "Optional value of mergeModeCDCColumn that marks a record as deleted."
+            "description" : "Optional value of mergeModeCDCColumn that marks a record as deleted. It defaults to`delete` if SDLBs standard\nCDC columns are used, see mergeModeCDCAutoDetect."
+          },
+          "mergeModeCDCAutoDetect" : {
+            "type" : "boolean",
+            "description" : "If true (default), mergeModeCDC is enabled automatically if the input has a column`_change_type`, e.g. it\ndelivers change events using SDLBs standard CDC columns (see[[io.smartdatalake.definitions.CdcChangeType]]), as DebeziumCdcDataObject does. No further configuration is\nneeded in that case: records marked as`delete`close the existing version, records of type`update_preimage`are ignored, and if several change events exist for the same primary key only the last one is historized. The\norder of the change events is defined by column`_change_ordinal`, or`_commit_timestamp` if it is missing.  \nThe CDC columns themselves are not written to the output DataObject."
+          },
+          "mergeModeCDCTimestampAutoDetect" : {
+            "type" : "boolean",
+            "description" : "If true (default), column`_commit_timestamp` is used as sourceTimestampColumn, if the input delivers change\nevents using SDLBs standard CDC columns (see mergeModeCDCAutoDetect) and sourceTimestampColumn is not set. Set\nto false to start the validity of new versions at the runs reference timestamp instead. Note that there is no\nauto detection of a source timestamp column outside of CDC historization."
+          },
+          "sourceTimestampColumn" : {
+            "type" : "string",
+            "description" : "Optional column holding the timestamp of the last change of the record in the source system. If set, the\nvalidity of a new version starts at this timestamp instead of the runs reference timestamp, e.g. the history\nreflects the time axis of the source system. The column must exist in the input and be of type timestamp.  \nNote that the column itself is not historized: it is excluded from change detection and not written to the\noutput DataObject. Copy it to a column with another name in a transformer if you want to keep it.  \nRecords arriving late, e.g. having a source timestamp older than the version they replace, are delayed to the\nnext tick on the time axis after that version was captured, in order to avoid negative validity intervals."
           },
           "checkInputUnique" : {
             "type" : "boolean",
@@ -4464,8 +4443,6 @@
           },
           "executionMode" : {
             "oneOf" : [ {
-              "$ref" : "#/definitions/ExecutionMode/CustomMode"
-            }, {
               "$ref" : "#/definitions/ExecutionMode/CustomPartitionMode"
             }, {
               "$ref" : "#/definitions/ExecutionMode/DataFrameIncrementalMode"
@@ -4519,7 +4496,7 @@
         "title" : "HistorizeAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "This `Action` historizes data between an input and output DataObject using DataFrames.  \nHistorization creates a technical history of data by creating valid-from/to columns. The\nDataFrame might be transformed using SQL or DataFrame transformations. These transformations are\napplied before the deduplication.\n\nBy default, a history with closed intervals is created, e.g. valid-from and valid-to is\ninclusive. The time axis unit can be set by configuration attribute `timeAxisUnit` . It is used as\nthe offset between valid-to of the previous record and valid-from of the current record. A\nhistory with half-open intervals can be created by setting timeAxisUnit=0. In a half-open\ninterval valid-from is inclusive and valid-to is exclusive.\n\nHistorizeAction needs a transactional table (e.g. implementation of `TransactionalTableDataObject` ) as output with defined primary keys.\n\nSince SDLB version 3.0 incremental historization is used per default, and full historization is removed.  \nIncremental historization does not rewrite all data in output table.  \nIt still needs to join new data with all existing data, but uses hash values to minimize data\ntransfer. If you have change-data-capture (CDC) information available to identify deleted\nrecords, you can set mergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join\nbetween new and existing data. This is optimal from a performance perspective.\n\nIf you still have a legacy full historization table, migration to incremental historization should happen\nautomatically. The missing hash column is detected and added to existing data. Example:\n```\nactions = {\n  historize-airports {\n    type = HistorizeAction\n    inputId = stg-airports\n    outputId = int-airports\n    timeAxisUnit = 1d\n    historizeBlacklist = [last_updated]\n  }\n}\n```\n"
+        "description" : "This `Action` historizes data between an input and output DataObject using DataFrames.  \nHistorization creates a technical history of data by creating valid-from/to columns. The\nDataFrame might be transformed using SQL or DataFrame transformations. These transformations are\napplied before the deduplication.\n\nBy default, a history with closed intervals is created, e.g. valid-from and valid-to is\ninclusive. The time axis unit can be set by configuration attribute `timeAxisUnit` . It is used as\nthe offset between valid-to of the previous record and valid-from of the current record. A\nhistory with half-open intervals can be created by setting timeAxisUnit=0. In a half-open\ninterval valid-from is inclusive and valid-to is exclusive.\n\nHistorizeAction needs a transactional table (e.g. implementation of `TransactionalTableDataObject` ) as output with defined primary keys.\n\nSince SDLB version 3.0 incremental historization is used per default, and full historization is removed.  \nIncremental historization does not rewrite all data in output table.  \nIt still needs to join new data with all existing data, but uses hash values to minimize data\ntransfer. If you have change-data-capture (CDC) information available to identify deleted\nrecords, you can set mergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join\nbetween new and existing data. This is optimal from a performance perspective.\n\nIf the input delivers change events using SDLBs standard CDC columns `_change_type` , `_commit_timestamp` and `_change_ordinal` (as DebeziumCdcDataObject does), CDC historization is used without any further configuration,\nsee mergeModeCDCAutoDetect.\n\nIf you still have a legacy full historization table, migration to incremental historization should happen\nautomatically. The missing hash column is detected and added to existing data.\n\nBy default the validity of a new version starts at the reference timestamp of the run. If the input contains the\ntimestamp of the last change in the source system, it can be used instead by setting sourceTimestampColumn, so\nthat the history reflects the time axis of the source system. Example:\n```\nactions = {\n  historize-airports {\n    type = HistorizeAction\n    inputId = stg-airports\n    outputId = int-airports\n    timeAxisUnit = 1d\n    historizeBlacklist = [last_updated]\n  }\n}\n```\n"
       }
     },
     "HttpAuthMode" : {
