@@ -22,9 +22,6 @@ on:
         type: boolean
         default: false
 
-permissions:
-  contents: write
-
 jobs:
   build:
     if: ${{ !inputs.skipBuild }}
@@ -76,6 +73,9 @@ jobs:
     if: ${{ !cancelled() && (inputs.skipBuild || (needs.build.result == 'success' && startsWith(github.ref_name, 'develop'))) }}
 
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v5
