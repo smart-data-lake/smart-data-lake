@@ -72,3 +72,8 @@ atlassian-ide-plugin.xml
 /*/*.parquet
 /sdl-lang/exportedConfig.json
 /exportedConfig.json
+
+# npm auth for the @smart-data-lake GitHub package registry. docs/.npmrc is
+# tracked and only references ${TOKEN}; a repository-root .npmrc is a local
+# convenience file that tends to hold a literal token, so never commit it.
+/.npmrc

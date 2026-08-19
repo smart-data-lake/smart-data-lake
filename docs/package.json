@@ -23,14 +23,15 @@
     "@mui/joy": "^5.0.0-beta.52",
     "@mui/material": "^7.1.1",
     "@mui/system": "^7.1.1",
+    "@smart-data-lake/sdlb-schema-viewer": "2.0.1",
     "clsx": "^1.2.1",
     "d3": "7.x",
+    "docusaurus-plugin-image-zoom": "^3.0.1",
     "prism-react-renderer": "^2.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
-    "@smart-data-lake/sdlb-schema-viewer": "2.0.1"
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "^3.8.1",

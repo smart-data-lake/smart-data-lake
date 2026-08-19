@@ -9,7 +9,13 @@ const config = {
   url: 'https://www.smartdatalake.ch',
   baseUrl: '/',
   onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
+  // Reporting hooks for markdown live under markdown.hooks; the top-level
+  // onBrokenMarkdownLinks option is deprecated and removed in Docusaurus v4.
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
+  },
   favicon: 'img/favicon.ico',
   organizationName: 'smart-data-lake', // Usually your GitHub org/user name.
   projectName: 'smart-data-lake', // Usually your repo name.
@@ -36,6 +42,12 @@ const config = {
         },
       }),
     ],
+  ],
+
+  plugins: [
+    // Click-to-zoom for images in docs and blog posts, via medium-zoom.
+    // Configured under themeConfig.zoom below.
+    'docusaurus-plugin-image-zoom',
   ],
 
   themeConfig:
@@ -126,7 +138,9 @@ const config = {
         searchPagePath: 'search',
       },
       zoom: {
-        selector: '.markdown .nozoom',
+        // Every image in doc/blog content, except those opting out with
+        // <img class="nozoom" ...>. The plugin default is '.markdown img'.
+        selector: '.markdown img:not(.nozoom)',
         background: {
           light: 'rgb(255, 255, 255)',
           dark: 'rgb(50, 50, 50)'
