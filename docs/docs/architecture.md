@@ -19,16 +19,23 @@ SDLB is published as Maven artifacts on Maven Central.
 The SDLB versions are build with specific versions of Apache Spark and other libraries.
 This page gives an overview of the respective versions.
 
-### SDLB Version 1.X
-SDLB version 1.X used Apache Spark 2.X. 
-This branch of SDLB is no longer maintained.
-To profit from the latest development, please upgrade to a more recent version of SDLB.
+The following tables give an overview of dependency versions that are delivered with each major branch of SDLB.
+It is possible to customize dependencies and make Smart Data Lake Builder work with other version combinations,
+but this needs manual tuning of dependencies in your own maven project.
+In general, Java library versions are held as close as possible to the ones used in the corresponding Spark version.
+
+### SDLB Version 3.X
+
+SDLB version 3.X uses Apache Spark 4.X and requires Java 17+.
+Scala 2.12 is no longer supported; 3.X is built for Scala 2.13 only.
+
+| SDL Version | Java/Scala Version        | Hadoop Version | Spark Engine | Log4j  | Snowflake/Snowpark Engine | Delta Lake  | Iceberg |
+|-------------|---------------------------|----------------|--------------|--------|---------------------------|-------------|---------|
+| 3.0.X       | Java 17+, Scala 2.13      | 3.4.2          | 4.1.1        | 2.24.3 | 3.1.8 / 1.18.0            | 4.2.0       | 1.11.0  |
 
 ### SDLB Version 2.X
 
-The following table gives an overview of dependency versions that are delivered with each major branch of SDLB.
-
-| SDL Version | Java/Scala/Hadoop Version | Hadoop Version | Spark Engine | Log4j  | Snowflake/Snowpark Engine | Delta Lake  | Iceberg |
+| SDL Version | Java/Scala Version        | Hadoop Version | Spark Engine | Log4j  | Snowflake/Snowpark Engine | Delta Lake  | Iceberg |
 |-------------|---------------------------|----------------|--------------|--------|---------------------------|-------------|---------|
 | 2.8.X       | Java 8+, Scala 2.12/2.13  | 3.3.6          | 3.5.3        | 2.20.0 | 3.1.1  / 1.15.0 (*)       | 3.2.0       | 1.6.1   |
 | 2.7.X       | Java 8+, Scala 2.12/2.13  | 3.3.6          | 3.5.2        | 2.20.0 | 3.0.0  / 1.13.2 (*)       | 3.2.0       | 1.6.1   |
@@ -41,9 +48,10 @@ The following table gives an overview of dependency versions that are delivered 
 
 (*) Snowpark is not supported for Scala 2.13, see also this [note](https://github.com/snowflakedb/snowpark-java-scala?tab=readme-ov-file#prepare-your-local-environment).
 
-It's possible to customize dependencies and make Smart Data Lake Builder work with other version combinations, but this needs manual tuning of dependencies in your own maven project.
-
-In general, Java library versions are held as close as possible to the ones used in the corresponding Spark version.
+### SDLB Version 1.X
+SDLB version 1.X used Apache Spark 2.X. 
+This branch of SDLB is no longer maintained.
+To profit from the latest development, please upgrade to a more recent version of SDLB.
 
 ### Release Notes
 
@@ -51,13 +59,13 @@ See SDBL Release Notes including breaking changes on [Github](https://github.com
 
 ## Context
 
-<img src={require('./structurizr/diagramExports/container-001.png').default} onClick={(ev) => window.open(ev.target.src, '_blank')} />
-Legend: <img width="60%" style={{verticalAlign: 'top'}} src={require('./structurizr/diagramExports/container-001-legend.png').default} onClick={(ev) => window.open(ev.target.src, '_blank')} />
+![containers](./structurizr/diagramExports/container-001.png)
+Legend: <img width="60%" style={{verticalAlign: 'top'}} src={require('./structurizr/diagramExports/container-001-legend.png').default} />
 
 ## Components of an SDLB Job
 
-<img src={require('./structurizr/diagramExports/component-001.png').default} onClick={(ev) => window.open(ev.target.src, '_blank')} />
-Legend: <img width="60%" style={{verticalAlign: 'top'}} src={require('./structurizr/diagramExports/component-001-legend.png').default} onClick={(ev) => window.open(ev.target.src, '_blank')} />
+![components](./structurizr/diagramExports/component-001.png)
+Legend: <img width="60%" style={{verticalAlign: 'top'}} src={require('./structurizr/diagramExports/component-001-legend.png').default} />
 
 ## Cross cutting concerns
 
