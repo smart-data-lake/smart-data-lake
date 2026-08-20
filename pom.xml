@@ -518,7 +518,7 @@
         <maven-antrun.version>3.1.0</maven-antrun.version>
         <commons-crypto.version>1.1.0</commons-crypto.version>
         <commons-cli.version>1.10.0</commons-cli.version>
-        <bouncycastle.version>1.82</bouncycastle.version>
+        <bouncycastle.version>1.84</bouncycastle.version>
         <tink.version>1.16.0</tink.version>
         <datasketches.version>6.2.0</datasketches.version>
         <netty.version>4.2.7.Final</netty.version>
@@ -553,7 +553,7 @@
         <typesafe.config.version>1.4.3</typesafe.config.version>
         <kxbmap.configs.version>0.6.1</kxbmap.configs.version>
         <monix.version>3.4.1</monix.version>
-        <sshj.version>0.35.0</sshj.version>
+        <sshj.version>0.40.0</sshj.version>
         <snowflake-spark.version>3.1.8</snowflake-spark.version>
         <snowflake-snowpark.version>1.18.0</snowflake-snowpark.version>
         <delta.version>4.2.0</delta.version>
@@ -1303,9 +1303,15 @@
                 <version>${snappy.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.lz4</groupId>
+                <!--
+                  org.lz4:lz4-java is archived and its last release 1.8.1 stays vulnerable (GHSA-vqf4-7m7x-wgfc,
+                  GHSA-cmp6-m4wj-q63q, GHSA-xx22-p4ch-683r). at.yawk.lz4:lz4-java is the maintained fork Sonatype
+                  redirects to. It is a drop-in replacement (same net.jpountz.* classes), therefore org.lz4:lz4-java
+                  is excluded from spark-core and spark-sql below and declared as dependency in sdl-spark instead.
+                -->
+                <groupId>at.yawk.lz4</groupId>
                 <artifactId>lz4-java</artifactId>
-                <version>1.8.0</version>
+                <version>1.11.2</version>
             </dependency>
             <dependency>
                 <groupId>com.github.luben</groupId>
@@ -2738,6 +2744,11 @@
                 <version>${spark.version}</version>
                 <scope>${spark.deps.scope}</scope>
                 <exclusions>
+                    <!-- replaced by the maintained fork at.yawk.lz4:lz4-java, see dependency management above -->
+                    <exclusion>
+                        <groupId>org.lz4</groupId>
+                        <artifactId>lz4-java</artifactId>
+                    </exclusion>
                     <!--
                       Exclude hadoop-client-runtime from spark-*, as this is a shaded version with relocation.
                       We need the classes with original location for hadoop-azure otherwise there is ClassNotFoundException: org.apache.hadoop.util.WeakReferenceMap from hadoop-Azure AbfsClient.
@@ -2759,6 +2770,11 @@
                 <version>${spark.version}</version>
                 <scope>${spark.deps.scope}</scope>
                 <exclusions>
+                    <!-- replaced by the maintained fork at.yawk.lz4:lz4-java, see dependency management above -->
+                    <exclusion>
+                        <groupId>org.lz4</groupId>
+                        <artifactId>lz4-java</artifactId>
+                    </exclusion>
                     <!--
                       Exclude hadoop-client-runtime from spark-*, as this is a shaded version with relocation.
                       We need the classes with original location for hadoop-azure otherwise there is ClassNotFoundException: org.apache.hadoop.util.WeakReferenceMap from hadoop-Azure AbfsClient.
@@ -2896,6 +2912,27 @@
                 <groupId>io.delta</groupId>
                 <artifactId>delta-spark_${scala.minor.version}</artifactId>
                 <version>${delta.version}</version>
+            </dependency>
+
+            <!--
+              BouncyCastle arrives transitively with sshj. Manage it to a version without known
+              vulnerabilities (GHSA-574f-3g2m-x479, GHSA-c3fc-8qff-9hwx, GHSA-p93r-85wp-75v3 are
+              fixed in 1.84), as sshj still declares 1.80.
+            -->
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcpkix-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcutil-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
             </dependency>
 
             <!-- TEST dependencies -->

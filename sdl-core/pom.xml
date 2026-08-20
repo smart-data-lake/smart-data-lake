@@ -117,13 +117,6 @@
             <artifactId>sshj</artifactId>
             <version>${sshj.version}</version>
         </dependency>
-        <!-- sshj uses eddsa internally at runtime; not directly imported -->
-        <dependency>
-            <groupId>net.i2p.crypto</groupId>
-            <artifactId>eddsa</artifactId>
-            <version>0.3.0</version>
-            <scope>runtime</scope>
-        </dependency>
 
         <dependency>
             <groupId>org.scala-lang</groupId>
