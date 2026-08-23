@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.dataobject.generic
 
 import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.util.dag.DAGException
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.MetricsUtil.orderMetrics
 import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil, SmartDataLakeLogger}
@@ -32,6 +33,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import java.util.UUID
 import scala.reflect.runtime.universe.Type
+import scala.util.Try
 
 /**
  * A trait that allows for optional constraint validation and expectation evaluation and validation on write when implemented by a [[DataObject]].
@@ -113,14 +115,17 @@ trait ExpectationValidation {
         case partitionedDataObject: DataObject with CanHandlePartitions if partitionedDataObject.partitions.nonEmpty =>
           if (dfJob.isEmpty) throw ConfigurationException(s"($id) Can not calculate metrics for Expectations with scope=JobPartition on read")
           logger.info(s"($id) collecting aggregate column metrics ${aggExpressions.map(_.getName.getOrElse("<unnamed>")).distinct.mkString(", ")} for expectations with scope JobPartition")
-          val dfMetrics = dfJob.get.groupBy(partitionedDataObject.partitions.map(functions.col)).agg(deduplicate(aggExpressions))
-          val rawMetrics = dfMetrics.collect.map(row => dfMetrics.schema.columns.zip(row.toSeq).toMap)
-          val metrics = rawMetrics.flatMap { rawMetrics =>
-            val partitionValuesStr = partitionedDataObject.partitions.map(rawMetrics).map(_.toString).mkString(partitionDelimiter)
-            rawMetrics.view.filterKeys(!partitionedDataObject.partitions.contains(_)).toMap
-              .map { case (name, value) => (name + partitionDelimiter + partitionValuesStr, value) }
+          def collectMetrics(aggExpressionsToCollect: Seq[GenericColumn]): Map[String, Any] = {
+            val dfMetrics = dfJob.get.groupBy(partitionedDataObject.partitions.map(functions.col)).agg(deduplicate(aggExpressionsToCollect))
+            val rawMetrics = dfMetrics.collect.map(row => dfMetrics.schema.columns.zip(row.toSeq).toMap)
+            val metrics = rawMetrics.flatMap { rawMetrics =>
+              val partitionValuesStr = partitionedDataObject.partitions.map(rawMetrics).map(_.toString).mkString(partitionDelimiter)
+              rawMetrics.view.filterKeys(!partitionedDataObject.partitions.contains(_)).toMap
+                .map { case (name, value) => (name + partitionDelimiter + partitionValuesStr, value) }
+            }
+            metrics.toMap
           }
-          metrics.toMap
+          wrapConstraintOrExpectationException("Evaluating", "expectation", getExpectationProbes(aggExpressions)(collectMetrics))(collectMetrics(aggExpressions))
         case _ => throw new IllegalStateException(s"($id) Expectation with scope = JobPartition defined for unpartitioned DataObject")
       }
     } else Map()
@@ -139,9 +144,12 @@ trait ExpectationValidation {
   def calculateMetrics(df: GenericDataFrame, aggExpressions: Seq[GenericColumn], scope: ExpectationScope): Map[String, _] = {
     if (aggExpressions.nonEmpty) {
       logger.info(s"($id) collecting aggregate column metrics ${aggExpressions.map(_.getName.getOrElse("<unnamed>")).distinct.mkString(", ")} for expectations with scope $scope")
-      val dfMetrics = df.agg(deduplicate(aggExpressions))
-      dfMetrics.collect.map(row => dfMetrics.schema.columns.zip(row.toSeq).toMap).head
-        .view.mapValues(v => Option(v).getOrElse(None)).toMap // if value is null convert to None
+      def collectMetrics(aggExpressionsToCollect: Seq[GenericColumn]): Map[String, Any] = {
+        val dfMetrics = df.agg(deduplicate(aggExpressionsToCollect))
+        dfMetrics.collect.map(row => dfMetrics.schema.columns.zip(row.toSeq).toMap).head
+          .view.mapValues(v => Option(v).getOrElse(None)).toMap // if value is null convert to None
+      }
+      wrapConstraintOrExpectationException("Evaluating", "expectation", getExpectationProbes(aggExpressions)(collectMetrics))(collectMetrics(aggExpressions))
     } else Map()
   }
 
@@ -179,7 +187,7 @@ trait ExpectationValidation {
     // the evaluation of expectations is made using Spark expressions
     val evaluatedResults = expectationValidationCols.map {
       case (expectation, col) =>
-        val errorMsg = ExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some("expectations"), col.exprSql, defaultExpressionData)
+        val errorMsg = ExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some(s"expectations.${expectation.name}"), col.exprSql, defaultExpressionData)
         (expectation, errorMsg)
     }
     // summarize result per expectation. Note that an expectation with scope=JobPartition creates one validation column
@@ -208,18 +216,21 @@ trait ExpectationValidation {
     if (constraints.nonEmpty) {
       implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
       import functions._
-      // use primary key if defined
-      val pkCols = Some(this).collect { case tdo: TableDataObject => tdo }.flatMap(_.table.primaryKey)
-      // as alternative search all columns with simple datatype
-      val dfSimpleCols = df.schema.filter(_.dataType.isSimpleType).columns
-      // add validation as additional column
-      val validationErrorColumns = constraints.map(_.getValidationExceptionColumn(this.id, pkCols, dfSimpleCols))
-      val dfErrors = df
-        .withColumn("_validation_errors", array_construct_compact(validationErrorColumns.toIndexedSeq: _*))
-      // use column in where condition to avoid elimination by optimizer before dropping the column again.
-      dfErrors
-        .where(size(col("_validation_errors")) < lit(constraints.size + 1)) // this is always true - but we want to force evaluating column "_validation_errors" to throw exceptions
-        .drop("_validation_errors")
+      def setup(constraintsToValidate: Seq[Constraint]): GenericDataFrame = {
+        // use primary key if defined
+        val pkCols = Some(this).collect { case tdo: TableDataObject => tdo }.flatMap(_.table.primaryKey)
+        // as alternative search all columns with simple datatype
+        val dfSimpleCols = df.schema.filter(_.dataType.isSimpleType).columns
+        // add validation as additional column
+        val validationErrorColumns = constraintsToValidate.map(_.getValidationExceptionColumn(this.id, pkCols, dfSimpleCols))
+        val dfErrors = df
+          .withColumn("_validation_errors", array_construct_compact(validationErrorColumns.toIndexedSeq: _*))
+        // use column in where condition to avoid elimination by optimizer before dropping the column again.
+        dfErrors
+          .where(size(col("_validation_errors")) < lit(constraintsToValidate.size + 1)) // this is always true - but we want to force evaluating column "_validation_errors" to throw exceptions
+          .drop("_validation_errors")
+      }
+      wrapConstraintOrExpectationException("Setting up", "constraint", constraints.map(c => (c.name, () => setup(Seq(c)))))(setup(constraints))
     } else df
   }
 
@@ -227,8 +238,61 @@ trait ExpectationValidation {
 
   private def setupObservation(df: GenericDataFrame, expectationColumns: Seq[GenericColumn], isExecPhase: Boolean, pushDownTolerant: Boolean = false, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
     val observationName = this.id.id + "#" + UUID.randomUUID() + (if (pushDownTolerant) "!pushDownTolerant" else "")
-    val (dfObserved, observation) = df.setupObservation(observationName, expectationColumns, isExecPhase, this.forceGenericObservation || forceGenericObservation)
-    (dfObserved, observation)
+    def setup(columns: Seq[GenericColumn], registerObservation: Boolean) = df.setupObservation(observationName, columns, registerObservation, this.forceGenericObservation || forceGenericObservation)
+    // note that probes must not register the observation, as they are thrown away
+    val probes = getExpectationProbes(expectationColumns)(setup(_, false))
+    wrapConstraintOrExpectationException("Setting up", "expectation", probes)(setup(expectationColumns, isExecPhase))
+  }
+
+  /**
+   * Create the name and probe of every expectation involved in setting up or evaluating `columns`,
+   * as needed by [[wrapConstraintOrExpectationException]]. The name of an aggregate expression column is the name
+   * of the expectation it was created for.
+   */
+  private def getExpectationProbes(columns: Seq[GenericColumn])(setup: Seq[GenericColumn] => Any): Seq[(String, () => Any)] = {
+    columns.flatMap(column => column.getName.map(name => (name, () => setup(Seq(column)))))
+  }
+
+  /**
+   * Wrap exceptions of the compute engine thrown when setting up or evaluating constraints and expectations.
+   * The original exception, e.g. a Spark AnalysisException about an unresolved column, gives no hint that its origin
+   * is a constraint or expectation definition, which is misleading, see issue #982.
+   *
+   * @param activity    what was done when the exception was thrown, e.g. "Setting up" or "Evaluating".
+   * @param elementType "constraint" or "expectation".
+   * @param elements    name and probe of every constraint/expectation involved. A probe repeats the failed operation
+   *                    for one constraint/expectation only, in order to identify the one which failed.
+   */
+  private def wrapConstraintOrExpectationException[T](activity: String, elementType: String, elements: Seq[(String, () => Any)])(code: => T): T = {
+    try {
+      code
+    } catch {
+      // these exceptions are either control flow, or they already tell which constraint or expectation they originate from
+      case e: DAGException => throw e
+      case e: ConfigurationException => throw e
+      case e: ConstraintValidationException => throw e
+      case e: ExpectationValidationException => throw e
+      case e: Exception =>
+        val (origin, configurationPath) = getFailedElementNames(elements) match {
+          case Seq(name) => (s"$elementType '$name'", s"${elementType}s.$name")
+          case Seq() => (s"${elementType}s", s"${elementType}s")
+          case names => (s"one of the ${elementType}s ${names.map(name => s"'$name'").mkString(", ")}", s"${elementType}s")
+        }
+        throw ConfigurationException(s"($id) $activity $origin failed - ${e.getClass.getSimpleName}: ${e.getMessage}", Some(configurationPath), e)
+    }
+  }
+
+  /**
+   * Identify the constraints/expectations which are the origin of a failed operation by repeating it for each of them
+   * separately. If this is not conclusive, all of them are returned as potential origin.
+   */
+  private def getFailedElementNames(elements: Seq[(String, () => Any)]): Seq[String] = {
+    val names = elements.map(_._1).distinct
+    if (names.size <= 1) names
+    else {
+      val failedNames = elements.filter { case (_, probe) => Try(probe()).isFailure }.map(_._1).distinct
+      if (failedNames.nonEmpty) failedNames else names
+    }
   }
 }
 
