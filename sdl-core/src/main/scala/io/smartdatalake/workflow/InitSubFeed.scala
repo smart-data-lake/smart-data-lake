@@ -35,6 +35,7 @@ case class InitSubFeed(override val dataObjectId: DataObjectId,
                        override val partitionValues: Seq[PartitionValues],
                        override val isSkipped: Boolean = false,
                        override val metrics: Option[MetricsMap] = None,
+                       override val expectationsResult: Option[Map[String, String]] = None,
                        override val executionModeResultOptions: Map[String, String] = Map()
                       )
   extends SubFeed {

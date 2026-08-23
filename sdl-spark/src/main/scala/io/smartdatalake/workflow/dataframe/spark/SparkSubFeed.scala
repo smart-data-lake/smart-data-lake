@@ -61,13 +61,14 @@ case class SparkSubFeed(@transient override val dataFrame: Option[SparkDataFrame
                         override val filters: Seq[ColumnFilter] = Seq(),
                         @transient override val observation: Option[DataFrameObservation] = None,
                         override val metrics: Option[MetricsMap] = None,
+                        override val expectationsResult: Option[Map[String, String]] = None,
                         @transient override val keptSchema: Option[GenericSchema] = None,
                         override val executionModeResultOptions: Map[String, String] = Map()
                        )
   extends DataFrameSubFeed {
   @transient override val tpe: Type = typeOf[SparkSubFeed]
   override def toOutput(dataObjectId: DataObjectId): SparkSubFeed = {
-    this.copy(dataFrame = None, filters = Seq(), isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None, executionModeResultOptions = Map())
+    this.copy(dataFrame = None, filters = Seq(), isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, expectationsResult = None, keptSchema = None, executionModeResultOptions = Map())
   }
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
     val (dataFrame, schema) = other match {

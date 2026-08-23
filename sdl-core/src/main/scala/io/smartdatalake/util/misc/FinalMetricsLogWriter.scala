@@ -141,6 +141,7 @@ object LogExtractor extends SmartDataLakeLogger {
       MetricsLog(data_object_id = result.dataObjectId.id, start_tstmp = Timestamp.valueOf(info.startTstmp.get),
         num_tasks = numTasks, files_written = filesWritten, records_written = recordsWritten,
         metrics = filteredMetrics.view.mapValues(_.toString).toMap,
+        expectations_result = result.expectationsResult.getOrElse(Map()),
         partition_values = result.partitionValues.map(_.getMapString))
     }
     ActionLog(executionId.runId, Timestamp.valueOf(context.runStartTime), actionId.id
@@ -193,6 +194,9 @@ case class ActionLog(
  * @param files_written number of files that were written to the DataObject
  * @param records_written number of records that were written to the DataObject
  * @param metrics other metrics collected when the DataObject was written
+ * @param expectations_result result of validating the expectations of the DataObject, e.g. "ok", "warn" or "error" per
+ *                            expectation name, see [[io.smartdatalake.workflow.dataobject.expectation.ExpectationResult]].
+ *                            Expectations without a compare value configured (attribute `expectation`) are not validated and not listed.
  * @param partition_values partitions that have been written to the DataObject
  */
 case class MetricsLog(
@@ -202,5 +206,6 @@ case class MetricsLog(
                        files_written: Option[Long],
                        records_written: Option[Long],
                        metrics: Map[String, String],
+                       expectations_result: Map[String, String],
                        partition_values: Seq[Map[String, String]]
                      )

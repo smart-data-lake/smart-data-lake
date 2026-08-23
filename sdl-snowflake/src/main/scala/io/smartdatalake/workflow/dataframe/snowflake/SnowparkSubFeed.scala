@@ -42,6 +42,7 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
                            override val filters: Seq[ColumnFilter] = Seq(),
                            @transient override val observation: Option[DataFrameObservation] = None,
                            override val metrics: Option[MetricsMap] = None,
+                           override val expectationsResult: Option[Map[String, String]] = None,
                            @transient override val keptSchema: Option[GenericSchema] = None,
                            override val executionModeResultOptions: Map[String, String] = Map()
                           )
@@ -50,7 +51,7 @@ case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDat
   override val tpe: Type = typeOf[SnowparkSubFeed]
 
   override def toOutput(dataObjectId: DataObjectId): SnowparkSubFeed = {
-    this.copy(dataFrame = None, filters = Seq(), isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None, executionModeResultOptions = Map())
+    this.copy(dataFrame = None, filters = Seq(), isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, expectationsResult = None, keptSchema = None, executionModeResultOptions = Map())
   }
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {

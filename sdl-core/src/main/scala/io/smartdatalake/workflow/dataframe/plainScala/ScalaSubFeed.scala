@@ -46,6 +46,7 @@ case class ScalaSubFeed(@transient override val dataFrame: Option[ScalaDataFrame
                         override val filters: Seq[ColumnFilter] = Seq(),
                         @transient override val observation: Option[DataFrameObservation] = None,
                         override val metrics: Option[MetricsMap] = None,
+                        override val expectationsResult: Option[Map[String, String]] = None,
                         @transient override val keptSchema: Option[GenericSchema] = None,
                         override val executionModeResultOptions: Map[String, String] = Map()
                        ) extends DataFrameSubFeed {
@@ -58,7 +59,7 @@ case class ScalaSubFeed(@transient override val dataFrame: Option[ScalaDataFrame
 
   override def withSchema(schema: Option[GenericSchema]): ScalaSubFeed = this.copy(dataFrame = None, keptSchema = schema)
 
-  override def toOutput(dataObjectId: SdlConfigObject.DataObjectId): ScalaSubFeed = this.copy(dataFrame = None, filters = Seq(), isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, keptSchema = None, executionModeResultOptions = Map())
+  override def toOutput(dataObjectId: SdlConfigObject.DataObjectId): ScalaSubFeed = this.copy(dataFrame = None, filters = Seq(), isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, expectationsResult = None, keptSchema = None, executionModeResultOptions = Map())
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): ScalaSubFeed = {
     val (dataFrame, schema) = other match {

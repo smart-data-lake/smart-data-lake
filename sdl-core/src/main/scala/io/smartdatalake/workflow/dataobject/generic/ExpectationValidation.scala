@@ -149,7 +149,12 @@ trait ExpectationValidation {
     aggExpressions.groupBy(_.getName).map(_._2.head).toSeq // remove potential duplicates
   }
 
-  def validateExpectations(subFeedType: Type, dfJob: Option[GenericDataFrame], dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobAndInputMetrics: Map[String, _], additionalExpectations: Seq[BaseExpectation] = Seq(), enrichmentFunc: Map[String, _] => Map[String, _], scopeJobOnly: Boolean = false, loggerContext: String)(implicit context: ActionPipelineContext): (Map[String, _], Seq[ExpectationValidationException]) = {
+  /**
+   * Evaluate and validate expectations.
+   * @return the consolidated metrics, the validation result per expectation name (see [[ExpectationResult]]),
+   *         and the exceptions of failed expectations with severity=Error.
+   */
+  def validateExpectations(subFeedType: Type, dfJob: Option[GenericDataFrame], dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobAndInputMetrics: Map[String, _], additionalExpectations: Seq[BaseExpectation] = Seq(), enrichmentFunc: Map[String, _] => Map[String, _], scopeJobOnly: Boolean = false, loggerContext: String)(implicit context: ActionPipelineContext): (Map[String, _], Map[String, String], Seq[ExpectationValidationException]) = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
     val expectationsToValidate = (expectations ++ additionalExpectations)
       .filter(e => !scopeJobOnly || e.scope == ExpectationScope.Job)
@@ -172,11 +177,19 @@ trait ExpectationValidation {
     }
     if (logger.isDebugEnabled) logger.debug(s"($id) updated metrics before validation: ${metrics.map { case (k, v) => s"$k=$v" }.mkString(" ")}")
     // the evaluation of expectations is made using Spark expressions
-    val validationResults = expectationValidationCols.map {
+    val evaluatedResults = expectationValidationCols.map {
       case (expectation, col) =>
         val errorMsg = ExpressionUtil.evaluate[DefaultExpressionData, String](this.id, Some("expectations"), col.exprSql, defaultExpressionData)
         (expectation, errorMsg)
-    }.toMap.filter(_._2.nonEmpty).view.mapValues(_.get).toMap // keep only failed results
+    }
+    // summarize result per expectation. Note that an expectation with scope=JobPartition creates one validation column
+    // per partition value, in which case the worst result is reported.
+    val expectationsResult = evaluatedResults.groupBy(_._1)
+      .map { case (expectation, results) =>
+        val result = if (results.forall(_._2.isEmpty)) ExpectationResult.Ok else ExpectationResult.failed(expectation.failedSeverity)
+        (expectation.name, result)
+      }
+    val validationResults = evaluatedResults.toMap.filter(_._2.nonEmpty).view.mapValues(_.get).toMap // keep only failed results
     // log all failed results (before throwing exception)
     validationResults
       .foreach(result => result._1.failedSeverity match {
@@ -188,7 +201,7 @@ trait ExpectationValidation {
     if (errors.nonEmpty) logger.error(s"($id) Expectation validation failed with metrics " + orderMetrics(updatedMetrics).map { case (k, v) => s"$k=$v" }.mkString(" "))
     val exceptions = errors.map(result => ExpectationValidationException(result._2)).toSeq
     // return consolidated and updated metrics
-    (updatedMetrics, exceptions)
+    (updatedMetrics, expectationsResult, exceptions)
   }
 
   private def setupConstraintsValidation(df: GenericDataFrame): GenericDataFrame = {

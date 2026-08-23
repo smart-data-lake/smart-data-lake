@@ -41,6 +41,7 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
                        override val isSkipped: Boolean = false,
                        fileRefMapping: Option[Seq[FileRefMapping]] = None,
                        override val metrics: Option[MetricsMap] = None,
+                       override val expectationsResult: Option[Map[String, String]] = None,
                        override val executionModeResultOptions: Map[String, String] = Map()
 )
   extends SubFeed {
@@ -69,7 +70,7 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
   }
 
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = {
-    this.copy(fileRefs = None, fileRefMapping = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, metrics = None, executionModeResultOptions = Map())
+    this.copy(fileRefs = None, fileRefMapping = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, metrics = None, expectationsResult = None, executionModeResultOptions = Map())
   }
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
