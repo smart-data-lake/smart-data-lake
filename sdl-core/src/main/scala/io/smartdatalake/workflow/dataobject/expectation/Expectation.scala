@@ -151,6 +151,25 @@ object ExpectationSeverity extends Enumeration {
 }
 
 /**
+ * Result of validating an expectation, as reported in `SubFeed.expectationsResult` and logged by [[io.smartdatalake.util.misc.FinalMetricsLogWriter]].
+ * Expectations without a compare value configured (attribute `expectation`) are not validated and have no result.
+ */
+object ExpectationResult {
+  /**
+   * The validation condition of the expectation was fulfilled.
+   */
+  val Ok: String = "ok"
+
+  /**
+   * The validation condition of the expectation was not fulfilled. The result depends on the expectations `failedSeverity`.
+   */
+  def failed(failedSeverity: ExpectationSeverity): String = failedSeverity match {
+    case ExpectationSeverity.Warn => "warn"
+    case ExpectationSeverity.Error => "error"
+  }
+}
+
+/**
  * Default implementation for getValidationErrorColumn for metric of type `any`.
  */
 trait ExpectationOneMetricDefaultImpl { this: Expectation =>

@@ -480,6 +480,8 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter with Smar
     assert(dfActionLog.select($"run_id", $"action_id", $"attempt_id", $"state").as[(Long, String, Int, String)].collect().toSet == Set((1L, "act", 1, "SUCCEEDED")))
     val dfMetricsLog = sdlb.instanceRegistry.get[TransactionalTableDataObject with CanCreateSparkDataFrame](DataObjectId("metricsLog")).getSparkDataFrame()
     assert(dfMetricsLog.select($"run_id", $"action_id", $"data_object_id", $"records_written").as[(Long, String, String, Long)].collect().toSet == Set((1L, "act", "tgt", 1L)))
+    // expectation countNotValidated has no compare value configured and is therefore not listed
+    assert(dfMetricsLog.select($"expectations_result").as[Map[String, String]].collect().toSeq == Seq(Map("countOk" -> "ok", "countWarn" -> "warn")))
 
     // check StateUploader retry
     val uiBackend2 = Environment._globalConfig.uiBackend.get.copy(baseUrl = "https://localhost/good/post/no_auth?tenant=1&repo=abc")

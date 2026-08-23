@@ -145,6 +145,10 @@ class StateMigratorDef4To5 extends StateMigratorDef with SmartDataLakeLogger {
  *   of the Action which created the SubFeed.
  *   No transformation of existing content is needed: the attribute is missing in older state files and defaults to
  *   an empty Map when read.
+ * - SubFeeds got a new attribute `expectationsResult`, holding the validation result per expectation of the DataObject
+ *   the SubFeed was written to.
+ *   No transformation of existing content is needed: the attribute is missing in older state files and defaults to
+ *   None when read.
  * - the SubFeed attribute `filter: Option[String]` is replaced by `filters: Seq[ColumnFilter]`.
  *   The column a legacy filter belongs to is not known, so legacy filters are dropped. This is safe because SubFeeds
  *   read from the state are output SubFeeds of completed Actions, and only filters with propagate=true are passed on
@@ -164,7 +168,8 @@ class StateMigratorDef5To6 extends StateMigratorDef with SmartDataLakeLogger {
     }, s"Version should be equals or less than $versionFrom")
 
     // drop the legacy SubFeed attribute `filter`, which is only ever a string.
-    // executionModeResultOptions needs no transformation, it defaults to an empty Map when missing.
+    // executionModeResultOptions and expectationsResult need no transformation, they default to an empty Map
+    // respectively None when missing.
     val migratedJson = json.removeField {
       case (name, JString(_)) if name == "filter" =>
         logger.debug("dropping legacy SubFeed attribute 'filter' during state migration")

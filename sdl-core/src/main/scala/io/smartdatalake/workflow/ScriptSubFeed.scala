@@ -40,6 +40,7 @@ case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
                          override val isDAGStart: Boolean = false,
                          override val isSkipped: Boolean = false,
                          override val metrics: Option[MetricsMap] = None,
+                         override val expectationsResult: Option[Map[String, String]] = None,
                          override val executionModeResultOptions: Map[String, String] = Map()
                         )
   extends SubFeed {
@@ -52,7 +53,7 @@ case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
     this.copy(partitionValues = updatedPartitionValues)
   }
   override def toOutput(dataObjectId: DataObjectId): ScriptSubFeed = {
-    this.copy(dataObjectId = dataObjectId, parameters = None, isDAGStart = false, isSkipped = false, metrics = None, executionModeResultOptions = Map())
+    this.copy(dataObjectId = dataObjectId, parameters = None, isDAGStart = false, isSkipped = false, metrics = None, expectationsResult = None, executionModeResultOptions = Map())
   }
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
     case subFeed: ScriptSubFeed =>
