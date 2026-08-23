@@ -374,7 +374,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
           .format(readFormat)
           .options(readOptions ++ incrementalOutputOptions)
           .optionalSchema(schemaOpt)
-          // spark-xml is a V1 source and only supports one path, which must be given as option...
+          // V1 sources only support one path, which must be given as option...
           .option("path", hadoopPath.toString)
           .load()
       } else {
@@ -391,7 +391,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
           .filter{case (_,path) => filesystem.globStatus(new Path(path,fileName)).nonEmpty} // filter empty path to avoid NullPointerException in DataFrame
         val dfOpt: Option[DataFrame] = if (pathsToRead.nonEmpty) Some(
           pathsToRead.map { case (pv, path) =>
-            partitions.foldLeft(reader.option("path", path.toString).load()) { // spark-xml is a V1 source and only supports one path, which must be given as option...
+            partitions.foldLeft(reader.option("path", path.toString).load()) { // V1 sources only support one path, which must be given as option...
               case (df, partition) => df.withColumn(partition, lit(pv(partition).toString))
             }
           }.reduce(_ unionByName _)

@@ -50,16 +50,16 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
   testsFor(readEmptySources(createDataObject, ".xml"))
   testsFor(validateSchemaMinOnWrite(createDataObjectWithSchemaMin, ".xml"))
 
-  // note that spark-xml doesn't support reading and writing partitioned xml data.
-  // SDL implements custom logic to read partitioned xml data
-  test("XML files partitioned") {
+  // note that the XML data source is a Spark DataSource V1, which has limited support for reading partitioned data.
+  // SDL implements custom logic to read partitioned xml data, see SparkFileDataObject.getContentV1
+  test("XML files partitioned, written partition by partition") {
     val tempDir = Files.createTempDirectory("xml")
 
     val data1 = Seq(("A", "1", "-"), ("B", "2", null))
     val df1 = data1.toDF("h1", "h2", "h3")
     val pv1 = Seq(PartitionValues(Map("h1" -> "A")), PartitionValues(Map("h1" -> "B")))
 
-    // Partitions have to be written manually as spark-xml doesn't support writing partitions
+    // write each partition separately to simulate xml data partitioned by another tool
     val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), schema = Some(SparkSchema(df1.schema)),
       filenameColumn = Some("_filename"), xmlOptions = Some(Map("rowTag" -> "entry")))
     dataObj.writeDataFrameToPath(SparkDataFrame(df1.where($"h1" === "A")), new Path(dataObj.hadoopPath, "h1=A"), SDLSaveMode.Overwrite)
@@ -79,6 +79,26 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
     assert(dfResult2.columns.toSet == Set("h1", "h2", "h3", "_filename"))
     assert(dfResult2.drop("_filename").equal(df1))
     assert(dfResult2.where($"_filename".isNull).isEmpty)
+  }
+
+  test("XML files partitioned, written with partitionBy") {
+    val tempDir = Files.createTempDirectory("xml")
+
+    val data1 = Seq(("A", "1", "-"), ("B", "2", null))
+    val df1 = data1.toDF("h1", "h2", "h3")
+    val pv1 = Seq(PartitionValues(Map("h1" -> "A")), PartitionValues(Map("h1" -> "B")))
+
+    val dataObj = XmlFileDataObject(id = "test1", path = escapedFilePath(tempDir.toFile.getPath), partitions = Seq("h1"),
+      schema = Some(SparkSchema(df1.schema)), filenameColumn = Some("_filename"), xmlOptions = Some(Map("rowTag" -> "entry")))
+    dataObj.writeSparkDataFrame(df1, pv1)
+
+    assert(dataObj.listPartitions.toSet == pv1.toSet)
+    assert(dataObj.getFileRefs(pv1).size == 2)
+
+    val dfResult = dataObj.getSparkDataFrame(pv1)(contextExec).cache()
+    assert(dfResult.columns.toSet == Set("h1", "h2", "h3", "_filename"))
+    assert(dfResult.drop("_filename").equal(df1))
+    assert(dfResult.where($"_filename".isNull).isEmpty)
   }
 
   test("Simple XML file") {
@@ -211,5 +231,5 @@ class XmlFileDataObjectTest extends DataObjectTestSuite with SparkFileDataObject
   }
 
   override def createFile(path: String, data: DataFrame): Unit =
-    data.write.format("com.databricks.spark.xml").option("rowTag", "entry").save(path)
+    data.write.format("xml").option("rowTag", "entry").save(path)
 }

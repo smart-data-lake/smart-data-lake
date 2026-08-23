@@ -42,11 +42,15 @@ import org.apache.spark.sql.DataFrame
  *
  * Reading and writing details are delegated to Apache Spark [[org.apache.spark.sql.DataFrameReader]]
  * and [[org.apache.spark.sql.DataFrameWriter]] respectively. The reader and writer implementations are provided by
- * the [[https://github.com/databricks/spark-xml databricks spark-xml]] project.
- * Note that writing XML-file partitioned is not supported by spark-xml.
+ * Sparks built-in XML data source, see [[https://spark.apache.org/docs/latest/sql-data-sources-xml.html]].
  *
  * The most important entry in `xmlOptions` is `rowTag`, which selects the XML element that is mapped to one row of the
  * resulting DataFrame. Nested elements become structs and arrays, so a transformer is normally needed to flatten them.
+ *
+ * Rows read can be validated against an XSD schema by setting the `rowValidationXSDPath` option. The XSD file is read
+ * through the Hadoop filesystem, so a full path can be given, e.g. `dbfs:/demos/xml/invoice.xsd`.
+ * Note that this is independent of deriving the schema of this DataObject from an XSD file, which is done with the
+ * `xsdfile` schema provider, see also `schema` attribute.
  *
  * Example:
  * {{{
@@ -80,7 +84,7 @@ case class XmlFileDataObject(override val id: DataObjectId,
                             (@transient implicit override val instanceRegistry: InstanceRegistry)
   extends SparkFileDataObject {
 
-  override val format = "com.databricks.spark.xml"
+  override val format = "xml"
 
   // this is only needed for FileRef actions
   override val fileName: String = "*.xml*"
@@ -88,15 +92,9 @@ case class XmlFileDataObject(override val id: DataObjectId,
   override val options: Map[String, String] = Map("pathGlobFilter" -> fileName) ++ xmlOptions.getOrElse(Map())
 
   override def writeSparkDataFrameToPath(df: DataFrame, path: Path, finalSaveMode: SDLSaveMode)(implicit context: ActionPipelineContext): MetricsMap = {
-    assert(partitions.isEmpty, "writing XML-Files with partitions is not supported by spark-xml")
     // Needed in Spark 4.1, see WoodstoxXMLOutputFactory for details
     System.setProperty("javax.xml.stream.XMLOutputFactory", classOf[WoodstoxXMLOutputFactory].getName)
-    val metrics = super.writeSparkDataFrameToPath(df, path, finalSaveMode)
-    // add file extension to files, as spark-xml does not out-of-the-box
-    filesystem.globStatus(new Path(path, "part-*"), (path: Path) => !path.getName.contains("."))
-      .foreach(f => filesystem.rename(f.getPath, f.getPath.suffix(fileName.replace("*", ""))))
-    // return
-    metrics
+    super.writeSparkDataFrameToPath(df, path, finalSaveMode)
   }
 }
 

@@ -30,7 +30,7 @@ import org.apache.spark.sql.types.StructType
  * [[SchemaProvider]] implementation for Spark Connect.
  * Discovered on the classpath by [[io.smartdatalake.definitions.Environment.schemaProviders]].
  *
- * The Spark Connect client does not have the classic Spark (catalyst), spark-avro, spark-xml and JSON schema
+ * The Spark Connect client does not have the classic Spark (catalyst), spark-avro, XSD and JSON schema
  * converter libraries on its classpath. Therefore only the schema provider types that can be parsed with the Spark
  * Connect client alone are supported:
  * - [[SchemaProviderType.DDL]]     - parsed with [[StructType.fromDDL]]
