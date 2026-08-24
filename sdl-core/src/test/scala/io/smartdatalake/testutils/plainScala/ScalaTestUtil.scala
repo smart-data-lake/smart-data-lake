@@ -55,8 +55,9 @@ object ScalaTestUtil extends SmartDataLakeLogger {
       application = "appTest",
       executionId = SDLExecutionId.executionId1,
       instanceRegistry = instanceRegistry,
-      referenceTimestamp = Some(LocalDateTime.now()),
       appConfig = SmartDataLakeBuilderConfig("feedTest", Some("appTest")),
+      runStartTime = LocalDateTime.now(),
+      attemptStartTime = LocalDateTime.now(),
       phase = ExecutionPhase.Init,
       globalConfig = GlobalConfig()
     )

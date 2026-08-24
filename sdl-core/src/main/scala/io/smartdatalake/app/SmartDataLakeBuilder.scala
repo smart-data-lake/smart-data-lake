@@ -332,7 +332,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     startRun(
       runState.appConfig,
       recoveryExecutionId,
-      runState.runStartTime,
+      // keep the start time of the run being recovered, but start a new attempt now
+      runStartTime = runState.runStartTime,
+      attemptStartTime = LocalDateTime.now,
       actionsToSkip = actionsToSkip,
       initialSubFeeds = initialSubFeeds,
       dataObjectsState = dataObjectsState,
@@ -510,15 +512,14 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // create and execute DAG
     logger.info(s"starting application ${appConfig.appName} runId=${executionId.runId} attemptId=${executionId.attemptId}")
     val context = ActionPipelineContext(
-      appConfig.feedSel,
-      appConfig.appName,
-      executionId,
-      instanceRegistry,
-      referenceTimestamp = Some(LocalDateTime.now),
-      appConfig,
-      runStartTime,
-      attemptStartTime,
-      simulation,
+      feed = appConfig.feedSel,
+      application = appConfig.appName,
+      executionId = executionId,
+      instanceRegistry = instanceRegistry,
+      appConfig = appConfig,
+      runStartTime = runStartTime,
+      attemptStartTime = attemptStartTime,
+      simulation = simulation,
       actionsSelected = actionIdsSelected,
       actionsSkipped = actionsToSkip,
       globalConfig = globalConfig
@@ -593,7 +594,6 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       application = appConfig.appName,
       executionId = executionId,
       instanceRegistry = instanceRegistry,
-      referenceTimestamp = Some(LocalDateTime.now),
       appConfig = appConfig.getStdAppConfig(),
       runStartTime = runStartTime,
       attemptStartTime = attemptStartTime,

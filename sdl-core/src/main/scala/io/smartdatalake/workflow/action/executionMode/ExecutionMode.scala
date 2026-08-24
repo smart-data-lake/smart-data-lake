@@ -252,14 +252,14 @@ case class ExecutionModeResult( inputPartitionValues: Seq[PartitionValues] = Seq
  * @param givenPartitionValues Partition values specified with command line (start action) or passed from previous action
  * @param isStartNode True if the current action is a start node of the DAG.
  */
-case class DefaultExecutionModeExpressionData( feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Option[Timestamp]
+case class DefaultExecutionModeExpressionData( feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Timestamp
                                              , runStartTime: Timestamp, attemptStartTime: Timestamp
                                              , givenPartitionValues: Seq[Map[String,String]], isStartNode: Boolean) {
   override def toString: String = ProductUtil.formatObj(this)
 }
 object DefaultExecutionModeExpressionData {
   def from(context: ActionPipelineContext): DefaultExecutionModeExpressionData = {
-    DefaultExecutionModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
+    DefaultExecutionModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, Timestamp.valueOf(context.referenceTimestamp)
       , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), isStartNode = false)
   }
 }

@@ -28,6 +28,11 @@ HistorizeAction adds the following technical columns to the output:
 
 The names of `dl_ts_captured` and `dl_ts_delimited` can be changed globally with the SDLB parameters `capturedColumnName` and `delimitedColumnName`, the upper horizon with `historizationUpperHorizonTimestamp`.
 
+The value written to `dl_ts_captured` is the reference timestamp of the run.
+It defaults to the start time of the run, so it stays stable over all attempts of a run, and it can be overridden with the SDLB parameter `referenceTimestamp`, e.g. `referenceTimestamp = "2024-01-01 00:00:00"`.
+This is useful for initial loads, where the data should be dated to the publishing time of the source instead of the processing time in SDLB.
+Note that a reference timestamp older than an existing `dl_ts_captured` is rejected, unless `sourceTimestampColumn` is set.
+
 The current version of the data is therefore selected with:
 
 ```sql
@@ -58,7 +63,26 @@ dataObjects {
 }
 ```
 
-Assume the first run at `2024-03-01 04:00:00` delivers two airports, and the second run at `2024-03-02 04:00:00` delivers a new name for `LSZB` and no longer delivers `LSGG`.
+Assume the first run at `2024-03-01 04:00:00` gets these two airports from the input `stg-airports`:
+
+| ident | name |
+| ----- | ---- |
+| LSZB | Bern Belp |
+| LSGG | Geneva Airport |
+
+Both are new, so the output `int-airports` holds one open version per record:
+
+| ident | name | dl_ts_captured | dl_ts_delimited |
+| ----- | ---- | -------------- | --------------- |
+| LSZB | Bern Belp | 2024-03-01 04:00:00 | 9999-12-31 00:00:00 |
+| LSGG | Geneva Airport | 2024-03-01 04:00:00 | 9999-12-31 00:00:00 |
+
+The second run at `2024-03-02 04:00:00` delivers a new name for `LSZB` and no longer delivers `LSGG`:
+
+| ident | name |
+| ----- | ---- |
+| LSZB | Bern Belp Airport |
+
 The resulting history is:
 
 | ident | name | dl_ts_captured | dl_ts_delimited |
@@ -78,7 +102,8 @@ By default a history with **closed intervals** is created: both `dl_ts_captured`
     timeAxisUnit = 1d
 ```
 
-Setting `timeAxisUnit = 0` creates a history with **half-open intervals**, where valid-from is inclusive and valid-to is exclusive. The previous version is then closed with exactly the timestamp at which the new version starts:
+Setting `timeAxisUnit = 0` creates a history with **half-open intervals**, where valid-from is inclusive and valid-to is exclusive. The previous version is then closed with exactly the timestamp at which the new version starts.
+With the same two runs as in the basic example above, `LSZB` looks like this (`LSGG` is closed by the same rule, at `2024-03-02 04:00:00`):
 
 | ident | name | dl_ts_captured | dl_ts_delimited |
 | ----- | ---- | -------------- | --------------- |
@@ -161,6 +186,62 @@ Set `mergeModeCDCAutoDetect = false` to switch this behaviour off and treat the 
 :::info
 Intermediate states of a record within the same batch are not historized: if a record is changed twice before SDLB reads the events, only the last state becomes a version. Read more often to get a finer grained history.
 :::
+
+#### Example
+
+The same airports as in the basic example, but delivered as change events by `ext-debezium-airports`. Note how the validity intervals follow the commit timestamps of the source database and not the times SDLB ran.
+
+The first run at `2024-03-02 04:00:00` reads the initial snapshot the source took at `2024-03-01 22:00:00`, which already reflects that `LSZR` was deleted:
+
+| ident | name | `_change_type` | `_commit_timestamp` | `_change_ordinal` |
+| ----- | ---- | -------------- | ------------------- | ----------------- |
+| LSZB | Bern Belp | read | 2024-03-01 22:00:00 | 0 |
+| LSGG | Geneva Airport | read | 2024-03-01 22:00:00 | 1 |
+| LSZR | St. Gallen Altenrhein | delete | 2024-03-01 22:00:00 | 2 |
+
+`LSZR` has no version to close, so it does not enter the history at all. The CDC columns themselves are not written to the output:
+
+| ident | name | dl_ts_captured | dl_ts_delimited |
+| ----- | ---- | -------------- | --------------- |
+| LSZB | Bern Belp | 2024-03-01 22:00:00 | 9999-12-31 00:00:00 |
+| LSGG | Geneva Airport | 2024-03-01 22:00:00 | 9999-12-31 00:00:00 |
+
+The second run at `2024-03-06 04:00:00` reads an update of `LSZB` and two deletes, all committed at `2024-03-05 09:15:00`:
+
+| ident | name | `_change_type` | `_commit_timestamp` | `_change_ordinal` |
+| ----- | ---- | -------------- | ------------------- | ----------------- |
+| LSZB | Bern Belp | update_preimage | 2024-03-05 09:15:00 | 0 |
+| LSZB | Bern Belp Airport | update_postimage | 2024-03-05 09:15:00 | 1 |
+| LSGG | Geneva Airport | delete | 2024-03-05 09:15:00 | 2 |
+| LSZA | Lugano | delete | 2024-03-05 09:15:00 | 3 |
+
+The preimage of `LSZB` is ignored, as that value is already the current version in the history. `LSZA` was never delivered before, so its delete is a no-op:
+
+| ident | name | dl_ts_captured | dl_ts_delimited |
+| ----- | ---- | -------------- | --------------- |
+| LSZB | Bern Belp | 2024-03-01 22:00:00 | 2024-03-05 09:14:59.999 |
+| LSZB | Bern Belp Airport | 2024-03-05 09:15:00 | 9999-12-31 00:00:00 |
+| LSGG | Geneva Airport | 2024-03-01 22:00:00 | 2024-03-05 09:14:59.999 |
+
+The third run at `2024-03-09 04:00:00` reads a batch which creates and immediately updates `LSZH`, all committed at `2024-03-08 17:40:00`:
+
+| ident | name | `_change_type` | `_commit_timestamp` | `_change_ordinal` |
+| ----- | ---- | -------------- | ------------------- | ----------------- |
+| LSZH | Zurich | insert | 2024-03-08 17:40:00 | 0 |
+| LSZH | Zurich Airport | update_postimage | 2024-03-08 17:40:00 | 1 |
+| LSZB | Bern Airport | update_postimage | 2024-03-08 17:40:00 | 2 |
+
+Only the last change event per primary key is historized, so `LSZH` gets a single version carrying the name it ended up with. The intermediate name `Zurich` is lost, which is the trade-off described above:
+
+| ident | name | dl_ts_captured | dl_ts_delimited |
+| ----- | ---- | -------------- | --------------- |
+| LSZB | Bern Belp | 2024-03-01 22:00:00 | 2024-03-05 09:14:59.999 |
+| LSZB | Bern Belp Airport | 2024-03-05 09:15:00 | 2024-03-08 17:39:59.999 |
+| LSZB | Bern Airport | 2024-03-08 17:40:00 | 9999-12-31 00:00:00 |
+| LSGG | Geneva Airport | 2024-03-01 22:00:00 | 2024-03-05 09:14:59.999 |
+| LSZH | Zurich Airport | 2024-03-08 17:40:00 | 9999-12-31 00:00:00 |
+
+Setting `mergeModeCDCTimestampAutoDetect = false` would instead start every new version at the reference timestamp of the run, e.g. `2024-03-09 04:00:00` for the third run, which puts the history back on the time axis of the pipeline.
 
 ### With a custom CDC column
 

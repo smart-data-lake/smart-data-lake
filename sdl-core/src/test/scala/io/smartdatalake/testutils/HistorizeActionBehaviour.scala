@@ -85,7 +85,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val refTimestamp1 = LocalDateTime.now()
       val action1 = HistorizeAction("ha", srcDO.id, tgtDO.id)
       val context1 =
-        ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec,
+        ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec,
           currentAction = Some(action1))
       val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
       srcDO.writeDataFrame(l1, Seq())
@@ -109,7 +109,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val refTimestamp2 = LocalDateTime.now()
       val action2 = HistorizeAction("ha2", srcDO.id, tgtDO.id)
       val context2 =
-        ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec,
+        ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp2, phase = ExecutionPhase.Exec,
           currentAction = Some(action2))
       val l2 = Seq(("doe", "john", 10)).toDF("lastname", "firstname", "rating")
       srcDO.writeDataFrame(l2, Seq())
@@ -135,7 +135,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val refTimestamp3 = LocalDateTime.now()
       val action3 = HistorizeAction("ha3", srcDO.id, tgtDO.id)
       val context3 =
-        ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec,
+        ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp3, phase = ExecutionPhase.Exec,
           currentAction = Some(action3))
       val l3 = Seq(("doe", "john", 10, "test")).toDF("lastname", "firstname", "rating", "test")
       srcDO.writeDataFrame(l3, Seq())
@@ -160,6 +160,55 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       }
     }
 
+    test("historize load using the reference timestamp overridden by SDLB parameter") {
+
+      implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+      tgtConnection.foreach(instanceRegistry.register)
+      instanceRegistry.register(defaultEngineConnection)
+
+      // override the reference timestamp of the run, e.g. to date an initial load to the publishing
+      // time of the source instead of the processing time in SDLB, see issue #427.
+      val overrideTimestamp = LocalDateTime.of(2026, 8, 24, 10, 0, 0)
+      val previousReferenceTimestamp = Environment._referenceTimestamp
+      Environment._referenceTimestamp = Some(Some(overrideTimestamp))
+      try {
+
+        implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
+          .copy(phase = ExecutionPhase.Exec)
+
+        // setup DataObjects
+        val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
+        val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
+        val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+        import helper.implicits._
+
+        // prepare & start load. Note that runStartTime is *not* the expected captured timestamp here.
+        val action1 = HistorizeAction("ha", srcDO.id, tgtDO.id)
+        val context1 = ScalaTestUtil.getDefaultActionPipelineContext
+          .copy(runStartTime = LocalDateTime.now(), phase = ExecutionPhase.Exec, currentAction = Some(action1))
+        context1.referenceTimestamp shouldBe overrideTimestamp
+        val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
+        srcDO.writeDataFrame(l1, Seq())
+        val srcSubFeed = ScalaSubFeed(None, "src1", Seq())
+        action1.prepare(context1.copy(phase = ExecutionPhase.Prepare))
+        action1.preInit(Seq(srcSubFeed), Seq())(context1.copy(phase = ExecutionPhase.Init))
+        action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
+        action1.exec(Seq(srcSubFeed))(context1)
+
+        {
+          val expected = Seq(("doe", "john", 5, Timestamp.valueOf(overrideTimestamp), definitions.Environment.historizationUpperHorizonTimestamp))
+            .toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
+          val actual = tgtDO.getDataFrame()
+            .drop(Historization.historizeHashColName)
+          val resultat = expected.isEqual(actual)
+          if (!resultat) printFailedTestResultGdf("historize load with overridden reference timestamp", Seq())(actual)(expected)
+          assert(resultat)
+        }
+      } finally {
+        Environment._referenceTimestamp = previousReferenceTimestamp
+      }
+    }
+
     test("historize load using merge CDC") {
 
       implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
@@ -180,7 +229,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val action1 =
         HistorizeAction("ha", srcDO.id, tgtDO.id, mergeModeCDCColumn = Some("operation"), mergeModeCDCDeletedValue = Some("deleted"))
       val context1 =
-        ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec,
+        ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec,
           currentAction = Some(action1))
       val l1 = Seq(("doe", "john", 5, "new"), ("pan", "peter", 5, "new")).toDF("lastname", "firstname", "rating", "operation")
       srcDO.writeDataFrame(l1, Seq())
@@ -207,7 +256,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val action2 =
         HistorizeAction("ha2", srcDO.id, tgtDO.id, mergeModeCDCColumn = Some("operation"), mergeModeCDCDeletedValue = Some("deleted"))
       val context2 =
-        ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec,
+        ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp2, phase = ExecutionPhase.Exec,
           currentAction = Some(action2))
       val l2 = Seq(("doe", "john", 10, "updated"), ("pan", "peter", 5, "deleted")).toDF("lastname", "firstname", "rating", "operation")
       srcDO.writeDataFrame(l2, Seq())
@@ -235,7 +284,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val action3 =
         HistorizeAction("ha3", srcDO.id, tgtDO.id, mergeModeCDCColumn = Some("operation"), mergeModeCDCDeletedValue = Some("deleted"))
       val context3 =
-        ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec,
+        ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp3, phase = ExecutionPhase.Exec,
           currentAction = Some(action3))
       val l3 = Seq(("doe", "john", 10, "test", "updated")).toDF("lastname", "firstname", "rating", "test", "operation")
       srcDO.writeDataFrame(l3, Seq())(context3)
@@ -276,7 +325,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
 
       // prepare & start 1st load
       val refTimestamp1 = LocalDateTime.now()
-      val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+      val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
       val action1 = HistorizeAction("ha",
         inputId = srcDO.id,
         outputId = tgtDO.id,
@@ -297,7 +346,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
 
       // prepare & start 2nd load
       val refTimestamp2 = LocalDateTime.now()
-      val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+      val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp2, phase = ExecutionPhase.Exec)
       val action2 = HistorizeAction("ha",
         inputId = srcDO.id,
         outputId = tgtDO.id
@@ -351,7 +400,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // prepare & start 1st load
       val action1 = historizeAction("ha")
       val context1 = ScalaTestUtil.getDefaultActionPipelineContext
-        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action1))
+        .copy(runStartTime = LocalDateTime.now(), phase = ExecutionPhase.Exec, currentAction = Some(action1))
       val l1 = Seq(("doe", "john", 5, srcTs1)).toDF("lastname", "firstname", "rating", sourceTsCol)
       srcDO.writeDataFrame(l1, Seq())(context1)
       execHistorizeAction(action1, context1)
@@ -368,7 +417,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // prepare & start 2nd load: the record is updated in the source system
       val action2 = historizeAction("ha2")
       val context2 = ScalaTestUtil.getDefaultActionPipelineContext
-        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action2))
+        .copy(runStartTime = LocalDateTime.now(), phase = ExecutionPhase.Exec, currentAction = Some(action2))
       val l2 = Seq(("doe", "john", 10, srcTs2)).toDF("lastname", "firstname", "rating", sourceTsCol)
       srcDO.writeDataFrame(l2, Seq())(context2)
       execHistorizeAction(action2, context2)
@@ -386,7 +435,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // prepare & start 3rd load: only the source timestamp changed
       val action3 = historizeAction("ha3")
       val context3 = ScalaTestUtil.getDefaultActionPipelineContext
-        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action3))
+        .copy(runStartTime = LocalDateTime.now(), phase = ExecutionPhase.Exec, currentAction = Some(action3))
       val l3 = Seq(("doe", "john", 10, srcTs3)).toDF("lastname", "firstname", "rating", sourceTsCol)
       srcDO.writeDataFrame(l3, Seq())(context3)
       try execHistorizeAction(action3, context3)
@@ -409,7 +458,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // prepare & start 4th load: a change arriving late, e.g. its source timestamp is older than the current version
       val action4 = historizeAction("ha4")
       val context4 = ScalaTestUtil.getDefaultActionPipelineContext
-        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action4))
+        .copy(runStartTime = LocalDateTime.now(), phase = ExecutionPhase.Exec, currentAction = Some(action4))
       val l4 = Seq(("doe", "john", 20, srcTsLate)).toDF("lastname", "firstname", "rating", sourceTsCol)
       srcDO.writeDataFrame(l4, Seq())(context4)
       execHistorizeAction(action4, context4)
@@ -448,7 +497,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val refTimestamp1 = LocalDateTime.now()
       val action1 = HistorizeAction("ha", srcDO.id, tgtDO.id)
       val context1 = ScalaTestUtil.getDefaultActionPipelineContext
-        .copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec, currentAction = Some(action1))
+        .copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec, currentAction = Some(action1))
       val l1 = Seq(("doe", "john", 5, srcTs)).toDF("lastname", "firstname", "rating", sourceTsCol)
       srcDO.writeDataFrame(l1, Seq())(context1)
       execHistorizeAction(action1, context1)
@@ -491,7 +540,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // prepare & start 1st load: initial snapshot of the source table, including a record deleted in the meantime
       val action1 = cdcHistorizeAction("ha", srcDO.id, tgtDO.id)
       val context1 = ScalaTestUtil.getDefaultActionPipelineContext
-        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action1))
+        .copy(runStartTime = LocalDateTime.now(), phase = ExecutionPhase.Exec, currentAction = Some(action1))
       val l1 = Seq(
         (1, 5, CdcChangeType.read, commitTs1, 0),
         (2, 5, CdcChangeType.read, commitTs1, 1),
@@ -516,7 +565,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // record which never existed
       val action2 = cdcHistorizeAction("ha2", srcDO.id, tgtDO.id)
       val context2 = ScalaTestUtil.getDefaultActionPipelineContext
-        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action2))
+        .copy(runStartTime = LocalDateTime.now(), phase = ExecutionPhase.Exec, currentAction = Some(action2))
       val l2 = Seq(
         (1, 5, CdcChangeType.updatePreimage, commitTs2, 0),
         (1, 10, CdcChangeType.updatePostimage, commitTs2, 1),
@@ -543,7 +592,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // prepare & start 3rd load: several change events for the same primary key in one batch
       val action3 = cdcHistorizeAction("ha3", srcDO.id, tgtDO.id)
       val context3 = ScalaTestUtil.getDefaultActionPipelineContext
-        .copy(referenceTimestamp = Some(LocalDateTime.now()), phase = ExecutionPhase.Exec, currentAction = Some(action3))
+        .copy(runStartTime = LocalDateTime.now(), phase = ExecutionPhase.Exec, currentAction = Some(action3))
       val l3 = Seq(
         (4, 1, CdcChangeType.insert, commitTs3, 0),
         (4, 2, CdcChangeType.updatePostimage, commitTs3, 1),
@@ -589,7 +638,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val refTimestamp1 = LocalDateTime.now()
       val action1 = cdcHistorizeAction("ha", srcDO.id, tgtDO.id).copy(mergeModeCDCTimestampAutoDetect = false)
       val context1 = ScalaTestUtil.getDefaultActionPipelineContext
-        .copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec, currentAction = Some(action1))
+        .copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec, currentAction = Some(action1))
       val l1 = Seq((1, 5, CdcChangeType.insert, commitTs, 0))
         .toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
       srcDO.writeDataFrame(l1, Seq())(context1)
@@ -599,7 +648,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val refTimestamp2 = LocalDateTime.now()
       val action2 = cdcHistorizeAction("ha2", srcDO.id, tgtDO.id).copy(mergeModeCDCTimestampAutoDetect = false)
       val context2 = ScalaTestUtil.getDefaultActionPipelineContext
-        .copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec, currentAction = Some(action2))
+        .copy(runStartTime = refTimestamp2, phase = ExecutionPhase.Exec, currentAction = Some(action2))
       val l2 = Seq((1, 10, CdcChangeType.updatePostimage, commitTs, 0))
         .toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
       srcDO.writeDataFrame(l2, Seq())(context2)
@@ -640,7 +689,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val refTimestamp1 = LocalDateTime.now()
       val action1 = HistorizeAction("ha", srcDO.id, tgtDO.id, mergeModeCDCAutoDetect = false)
       val context1 = ScalaTestUtil.getDefaultActionPipelineContext
-        .copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec, currentAction = Some(action1))
+        .copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec, currentAction = Some(action1))
       val l1 = Seq((1, 5, CdcChangeType.insert, commitTs, 0))
         .toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol)
       srcDO.writeDataFrame(l1, Seq())(context1)
@@ -709,7 +758,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       import helper.implicits._
 
       // define DAG
-      val context1: ActionPipelineContext = context.copy(referenceTimestamp = Some(LocalDateTime.now()))
+      val context1: ActionPipelineContext = context.copy(runStartTime = LocalDateTime.now())
       val action1 = HistorizeAction("ha", srcDO.id, tgt1DO.id)
       instanceRegistry.register(action1)
       val action2 =
@@ -733,7 +782,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // start second load -> updated record
       val l2 = Seq(("doe", "john", 10)).toDF("lastname", "firstname", "rating")
       srcDO.writeDataFrame(l2, Seq())
-      val context2: ActionPipelineContext = context.copy(referenceTimestamp = Some(LocalDateTime.now()))
+      val context2: ActionPipelineContext = context.copy(runStartTime = LocalDateTime.now())
       dag.prepare(context2.copy(phase = ExecutionPhase.Prepare))
       dag.init(context2.copy(phase = ExecutionPhase.Init))
       val r2 = dag.exec(context2)
@@ -743,7 +792,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       assert(!r2.head.isSkipped)
 
       // start third load with same record again -> should be skipped, because merge mode should detect that there is no change, so there is no changed record in tgt1
-      val context3: ActionPipelineContext = context.copy(referenceTimestamp = Some(LocalDateTime.now()))
+      val context3: ActionPipelineContext = context.copy(runStartTime = LocalDateTime.now())
       dag.prepare(context3.copy(phase = ExecutionPhase.Prepare))
       dag.init(context3.copy(phase = ExecutionPhase.Init))
       val r3 = dag.exec(context3)
@@ -777,7 +826,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
 
       // prepare & start 1st load without merge mode
       val refTimestamp1 = LocalDateTime.now()
-      val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+      val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
 
       // create a legacy historized dataframe without dl_hash column, and write to target
       val l1 = Seq((1, "doe", "john", 5, Timestamp.valueOf(refTimestamp1), Environment.historizationUpperHorizonTimestamp))
@@ -790,7 +839,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // prepare & start load with merge mode and migrate existing data to merge mode
       val refTimestamp2 = LocalDateTime.now()
       val action2 = HistorizeAction("ha2", inputId = srcDO.id, outputId = tgtDO.id)
-      val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec,
+      val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp2, phase = ExecutionPhase.Exec,
         currentAction = Some(action2))
 
       val l2 = Seq((1, "doe", "john", 4)).toDF("id", "lastname", "firstname", "rating")

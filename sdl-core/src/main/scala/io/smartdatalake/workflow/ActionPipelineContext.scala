@@ -21,6 +21,7 @@ package io.smartdatalake.workflow
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
@@ -37,10 +38,10 @@ import java.time.LocalDateTime
  * @param application application name of the run
  * @param executionId SDLExecutionId of this runs. Contains runId and attemptId. Both stay 1 if state is not enabled.
  * @param instanceRegistry registry of all SmartDataLake objects parsed from the config
- * @param referenceTimestamp timestamp used as reference in certain actions (e.g. HistorizeAction)
  * @param appConfig the command line parameters parsed into a [[SmartDataLakeBuilderConfig]] object
- * @param runStartTime start time of the run
- * @param attemptStartTime start time of attempt
+ * @param runStartTime start time of the run. On recovery of a failed run this is restored from the
+ *                     state file, so it stays stable over all attempts of the same run.
+ * @param attemptStartTime start time of the current attempt of the run
  * @param simulation true if this is a simulation run
  * @param phase current execution phase
  * @param cacheRegistry Keeps track of DataFrames cached by Actions with cacheOutput=true, so that they can be released
@@ -64,10 +65,9 @@ case class ActionPipelineContext (
                                    feed: String, application: String, executionId: SDLExecutionId,
                                    @transient
                                    instanceRegistry: InstanceRegistry,
-                                   referenceTimestamp: Option[LocalDateTime] = None,
                                    appConfig: SmartDataLakeBuilderConfig, // application config is needed to persist action dag state for recovery
-                                   runStartTime: LocalDateTime = LocalDateTime.now(),
-                                   attemptStartTime: LocalDateTime = LocalDateTime.now(),
+                                   runStartTime: LocalDateTime,
+                                   attemptStartTime: LocalDateTime,
                                    simulation: Boolean = false,
                                    phase: ExecutionPhase = ExecutionPhase.Prepare,
                                    cacheRegistry: DataFrameCacheRegistry = new DataFrameCacheRegistry(),
@@ -87,7 +87,15 @@ case class ActionPipelineContext (
     currentAction.map(_.getEngineConnection(instanceRegistry))
   }
 
-  def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
+  /**
+   * Timestamp used as reference in certain actions, e.g. the value written to the captured column by
+   * [[io.smartdatalake.workflow.action.HistorizeAction]] and
+   * [[io.smartdatalake.workflow.action.DeduplicateAction]].
+   *
+   * This defaults to `runStartTime`, so it stays stable over all attempts of the same run. It can be
+   * overridden by the SDLB parameter `referenceTimestamp`, see [[Environment.referenceTimestamp]].
+   */
+  val referenceTimestamp: LocalDateTime = Environment.referenceTimestamp.getOrElse(runStartTime)
 
   def isExecPhase: Boolean = phase == ExecutionPhase.Exec
 

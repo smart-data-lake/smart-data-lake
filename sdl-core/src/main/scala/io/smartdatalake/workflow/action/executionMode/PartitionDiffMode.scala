@@ -206,7 +206,7 @@ object PartitionDiffMode extends FromConfigFactory[ExecutionMode] {
  * @param selectedInputPartitionValues  input partition values selected by PartitionDiffMode
  * @param selectedOutputPartitionValues output partition values selected by PartitionDiffMode
  */
-case class PartitionDiffModeExpressionData(feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Option[Timestamp]
+case class PartitionDiffModeExpressionData(feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Timestamp
                                            , runStartTime: Timestamp, attemptStartTime: Timestamp
                                            , givenPartitionValues: Seq[Map[String, String]], inputPartitionValues: Seq[Map[String, String]], outputPartitionValues: Seq[Map[String, String]]
                                            , selectedInputPartitionValues: Seq[Map[String, String]], selectedOutputPartitionValues: Seq[Map[String, String]]) {
@@ -215,7 +215,7 @@ case class PartitionDiffModeExpressionData(feed: String, application: String, ru
 
 object PartitionDiffModeExpressionData {
   def from(context: ActionPipelineContext): PartitionDiffModeExpressionData = {
-    PartitionDiffModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
+    PartitionDiffModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, Timestamp.valueOf(context.referenceTimestamp)
       , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), Seq(), Seq(), Seq(), Seq())
   }
 }

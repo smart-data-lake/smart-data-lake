@@ -66,7 +66,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id)
     val l1 = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())(context1)
@@ -91,7 +91,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp2, phase = ExecutionPhase.Exec)
     val l2 = Seq(("doe", "john", 10), ("pan", "peter", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l2, Seq())(context1)
     action1.exec(Seq(ScalaSubFeed(None, "src1", Seq())))(context2)
@@ -130,7 +130,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 1st load
     // note: pass the actual subFeedType as subFeedTypeForValidation, as the default (SparkSubFeed) might not be on the classpath
-    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(LocalDateTime.now), phase = ExecutionPhase.Exec)
+    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = LocalDateTime.now, phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, transformers = Seq(FilterTransformer(filterClause = "lastname='jonson'", subFeedTypeForValidation = subFeedType.typeSymbol.fullName)))
     val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
 
@@ -164,7 +164,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction(
       "dda",
       srcDO.id,
@@ -193,7 +193,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp2, phase = ExecutionPhase.Exec)
     val l2 = Seq(("doe", "john", 10), ("pan", "peter", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l2, Seq())(context1)
     action1.exec(Seq(ScalaSubFeed(None, "src1", Seq())))(context2)
@@ -272,7 +272,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id)
     val l1 = Seq(
       ("doe",  "john",   5),
@@ -299,7 +299,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp2, phase = ExecutionPhase.Exec)
     val l2 = Seq(
       ("doe", "john",  10),
       ("pan", "peter", 5)
@@ -324,7 +324,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 3rd load with schema evolution
     val refTimestamp3 = LocalDateTime.now()
-    val context3 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
+    val context3 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp3, phase = ExecutionPhase.Exec)
     val l3 = Seq(
       ("doe", "john", 11)
     ).toDF("lastname", "firstname", "rating2")
@@ -363,7 +363,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, updateCapturedColumnOnlyWhenChanged = true)
     val l1 = Seq(
       ("doe",  "john",   Some(5)),
@@ -394,7 +394,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp2, phase = ExecutionPhase.Exec)
     val l2 =
       Seq(
         ("doe", "john",   Some(10)),
@@ -424,7 +424,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 3rd load with schema evolution
     val refTimestamp3 = LocalDateTime.now()
-    val context3 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
+    val context3 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp3, phase = ExecutionPhase.Exec)
     val l3 = Seq(("doe", "john", 11)).toDF("lastname", "firstname", "rating2")
     srcDO.writeDataFrame(l3, Seq())(context3)
     action1.init(Seq(srcSubFeed))(context3.copy(phase = ExecutionPhase.Init))
@@ -467,7 +467,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, sourceTimestampColumn = Some(sourceTsCol))
     val l1 = Seq(
       ("doe", "john",   Some(5), Some(srcTs1)),
@@ -496,7 +496,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp2, phase = ExecutionPhase.Exec)
     val l2 = Seq(
       ("doe",  "john",   Some(10), Some(srcTs2)),    // changed in the source system
       ("pan",  "peter",  Some(99), Some(srcTsLate)), // arriving late, must not be applied
@@ -541,7 +541,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, sourceTimestampColumn = Some(sourceTsCol),
       updateCapturedColumnOnlyWhenChanged = true)
     val l1 = Seq(
@@ -555,7 +555,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp2, phase = ExecutionPhase.Exec)
     val l2 = Seq(
       ("doe", "john",  10, srcTs1), // the source system did not increase its timestamp, the record is not updated
       ("pan", "peter", 5,  srcTs2)  // the source system marks the record as changed
@@ -594,7 +594,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
-    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
+    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
     val action1 = DeduplicateAction(
       "dda",
       srcDO.id,
@@ -627,7 +627,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
     // prepare & start 2nd load
     val refTimestamp2 = LocalDateTime.now()
-    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
+    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp2, phase = ExecutionPhase.Exec)
     val l2 = Seq(
       ("doe", "john",  10),
       ("pan", "peter", 5)

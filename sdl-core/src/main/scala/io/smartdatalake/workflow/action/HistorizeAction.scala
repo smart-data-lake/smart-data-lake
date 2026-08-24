@@ -375,7 +375,7 @@ case class HistorizeAction(
   }
 
   private[smartdatalake] def getReferenceTimestamp(implicit context: ActionPipelineContext): LocalDateTime =
-    context.referenceTimestamp.getOrElse(LocalDateTime.now)
+    context.referenceTimestamp
 
   private def columnNameEquals(colName1: String, colName2: String): Boolean =
     if (Environment.caseSensitive) colName1 == colName2 else colName1.equalsIgnoreCase(colName2)
