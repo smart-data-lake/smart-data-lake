@@ -23,7 +23,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.evolution.SchemaEvolution.listFind
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
-import io.smartdatalake.util.spark.dataset
+import io.smartdatalake.util.spark.{SparkColumnCommentUtil, dataset}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
@@ -147,6 +147,9 @@ case class SparkDataFrame(override val inner: DataFrame) extends GenericDataFram
   override def uncache: GenericDataFrame = SparkDataFrame(inner.unpersist())
 
   override def as(alias: String): GenericDataFrame = SparkDataFrame(inner.as(alias))
+
+  override def enrichColumnCommentsFromUdfs: GenericDataFrame =
+    SparkDataFrame(SparkColumnCommentUtil.enrichColumnCommentsFromUdfs(inner))
 
   override def showString(options: Map[String, String] = Map()): String = {
     val numRows = options.get("numRows").map(_.toInt).getOrElse(10)

@@ -78,6 +78,27 @@ These columns descriptions will be rendered as markdown-table, and are also show
 
 Lets add an additional comment for column `dep_name` to the markdown.
 
+## Document columns in the code
+
+Writing column descriptions in a markdown file works for any DataObject, but it separates the description from the
+code that creates the column. If a column is created from a Scala case class, it is nicer to document it right where
+it is defined, in the ScalaDoc of that case class:
+
+```scala
+/**
+ * A geo location enriched from an address.
+ *
+ * @param lat  Latitude in decimal degrees, WGS84.
+ * @param lon  Longitude in decimal degrees, WGS84.
+ */
+case class GeoLocation(lat: Double, lon: Double)
+```
+
+The `@param` descriptions are used as column comments - for the `caseClass` schema provider, for case classes
+returned by user defined functions, and for transformation methods declaring a `Dataset[<CaseClass>]` return value.
+See [Column descriptions from ScalaDoc](/docs/reference/schema#column-descriptions-from-scaladoc)
+for details, in particular the compiler plugin your project needs for this to work.
+
 ## Generate schema and statistics metadata
 
 What would be a DataObject configuration viewer without possibility to see structured DataObject schemas.
