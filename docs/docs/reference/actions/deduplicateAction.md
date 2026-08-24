@@ -50,7 +50,27 @@ dataObjects {
 }
 ```
 
-Assume the source delivers the airport `LSZB` with an updated name in a later run, and no longer delivers `LSGG`:
+Assume the first run at `2024-03-01 04:00:00` gets these two airports from the input `stg-airports`:
+
+| ident | name |
+| ----- | ---- |
+| LSZB | Bern Belp |
+| LSGG | Geneva Airport |
+
+Both are new, so both are inserted into the output `int-airports`:
+
+| ident | name | dl_ts_captured |
+| ----- | ---- | -------------- |
+| LSZB | Bern Belp | 2024-03-01 04:00:00 |
+| LSGG | Geneva Airport | 2024-03-01 04:00:00 |
+
+The second run at `2024-03-02 04:00:00` delivers a new name for `LSZB` and no longer delivers `LSGG`:
+
+| ident | name |
+| ----- | ---- |
+| LSZB | Bern Belp Airport |
+
+The output then contains:
 
 | ident | name | dl_ts_captured |
 | ----- | ---- | -------------- |
@@ -87,6 +107,7 @@ Use the table alias `existing` to reference columns of the existing table data:
 ## Following the time axis of the source system
 
 By default `dl_ts_captured` is set to the reference timestamp of the run, so it reflects the schedule of the pipeline rather than the source system.
+The reference timestamp defaults to the start time of the run and can be overridden with the SDLB parameter `referenceTimestamp`, e.g. `referenceTimestamp = "2024-01-01 00:00:00"`.
 If the input contains the timestamp of the last change of a record, e.g. `last_updated`, set `sourceTimestampColumn` to use that value instead:
 
 ```

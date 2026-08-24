@@ -33,7 +33,6 @@ import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanMerg
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import java.sql.Timestamp
-import java.time.LocalDateTime
 import scala.reflect.runtime.universe.Type
 
 /**
@@ -203,7 +202,7 @@ case class DeduplicateAction(
   }
 
   override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = {
-    val timestamp = Timestamp.valueOf(context.referenceTimestamp.getOrElse(LocalDateTime.now))
+    val timestamp = Timestamp.valueOf(context.referenceTimestamp)
 
     val deduplicateTransformer =
       // deduplication & schema evolution is done by merge stmt, only captured column needs to be added before

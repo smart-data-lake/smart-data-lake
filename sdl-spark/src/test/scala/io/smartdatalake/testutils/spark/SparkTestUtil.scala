@@ -108,8 +108,9 @@ object SparkTestUtil extends SmartDataLakeLogger with Equality {
       application = "appTest",
       executionId = SDLExecutionId.executionId1,
       instanceRegistry = instanceRegistry,
-      referenceTimestamp = Some(LocalDateTime.now()),
       appConfig = SmartDataLakeBuilderConfig("feedTest", Some("appTest")),
+      runStartTime = LocalDateTime.now(),
+      attemptStartTime = LocalDateTime.now(),
       phase = ExecutionPhase.Init,
       globalConfig = globalConfig
     )

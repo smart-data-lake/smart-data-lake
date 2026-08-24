@@ -57,7 +57,8 @@ object ConfigToolbox {
   def getDefaultActionPipelineContext(instanceRegistry : InstanceRegistry) : ActionPipelineContext = {
     val globalConfig = GlobalConfig()
     val name = "interactive"
-    val context = ActionPipelineContext(name, name, SDLExecutionId.executionId1, instanceRegistry, Some(LocalDateTime.now()), SmartDataLakeBuilderConfig(name, Some(name)), phase = ExecutionPhase.Exec, globalConfig = globalConfig)
+    val startTime = LocalDateTime.now()
+    val context = ActionPipelineContext(name, name, SDLExecutionId.executionId1, instanceRegistry, SmartDataLakeBuilderConfig(name, Some(name)), runStartTime = startTime, attemptStartTime = startTime, phase = ExecutionPhase.Exec, globalConfig = globalConfig)
     context
   }
 

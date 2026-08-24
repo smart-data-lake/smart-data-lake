@@ -146,7 +146,7 @@ trait SmartDataLakeBuilderBehaviour extends Assertions {
     assert(!tgt2DO.isTableExisting)
 
     // check latest state
-    {
+    val failedAttemptState = {
       val stateStore = getStateStore(appName)
       val stateFile = stateStore.getLatestStateId().get
       val runState = stateStore.recoverRunState(stateFile)
@@ -155,6 +155,7 @@ trait SmartDataLakeBuilderBehaviour extends Assertions {
       val resultActionsState = runState.actionsState.view.mapValues(_.state).toMap
       val expectedActionsState = Map((action1.id, RuntimeEventState.SUCCEEDED), (action2fail.id, RuntimeEventState.FAILED))
       assert(resultActionsState == expectedActionsState)
+      runState
     }
 
     // reset actions in registry
@@ -187,6 +188,10 @@ trait SmartDataLakeBuilderBehaviour extends Assertions {
       assert(resultActionsState == expectedActionsState)
       assert(runState.actionsState.head._2.results.head.partitionValues == selectedPartitions)
       assert(filesystem.listStatus(new Path(statePath, "current")).map(_.getPath).isEmpty)
+      // the recovered attempt keeps the start time of the run, but starts a new attempt. As the reference timestamp
+      // of a run is derived from runStartTime, this is what keeps it stable over the attempts of a run, see issue #427.
+      assert(runState.runStartTime == failedAttemptState.runStartTime)
+      assert(runState.attemptStartTime.isAfter(failedAttemptState.attemptStartTime))
     }
 
     // test and reset SDLPlugin config
