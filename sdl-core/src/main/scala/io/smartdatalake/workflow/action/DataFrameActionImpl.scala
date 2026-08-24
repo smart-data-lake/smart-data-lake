@@ -310,11 +310,13 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   override def postprocessOutputSubFeedCustomized(subFeed: DataFrameSubFeed, inputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     assert(subFeed.dataFrame.isDefined)
     val output = outputs.find(_.id == subFeed.dataObjectId).get
+    // Document columns created by user defined functions returning a case class with the ScalaDoc of that case class.
+    val commentedSubFeed = subFeed.withDataFrame(subFeed.dataFrame.map(_.enrichColumnCommentsFromUdfs))
     // propagate the filters of the main input SubFeed to this output, restricted to the columns it has
-    val outputSubFeed = updateOutputFilters(subFeed, inputSubFeeds)
+    val outputSubFeed = updateOutputFilters(commentedSubFeed, inputSubFeeds)
     // initialize outputs
     if (context.phase == ExecutionPhase.Init) {
-      output.init(subFeed.dataFrame.get, subFeed.partitionValues, saveModeOptions)
+      output.init(commentedSubFeed.dataFrame.get, commentedSubFeed.partitionValues, saveModeOptions)
     }
     // apply expectation validation
     output match {
@@ -324,7 +326,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         val additionalJobAggExpressionColumns = additionalJobExpectations.flatMap(_.getAggExpressionColumns(evDataObject.id))
         val forceGenericObservation = additionalJobExpectations.exists(!_.calculateAsJobDataFrameObservation)
         // setup output observation
-        val (dfExpectations, outputObservations) = evDataObject.setupConstraintsAndJobExpectations(subFeed.dataFrame.get, additionalJobAggExpressionColumns = additionalJobAggExpressionColumns, forceGenericObservation = forceGenericObservation)
+        val (dfExpectations, outputObservations) = evDataObject.setupConstraintsAndJobExpectations(commentedSubFeed.dataFrame.get, additionalJobAggExpressionColumns = additionalJobAggExpressionColumns, forceGenericObservation = forceGenericObservation)
         // Link output observations with sibling input observations so engine-specific observations (e.g. SparkObservation)
         // can extract combined metrics. Default implementation is a no-op; overridden by SparkObservation.
         outputObservations.foreach { obs =>

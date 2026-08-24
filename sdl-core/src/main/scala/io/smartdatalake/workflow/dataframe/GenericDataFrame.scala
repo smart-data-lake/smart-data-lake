@@ -112,6 +112,13 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def as(alias: String): GenericDataFrame
 
+  /**
+   * Add column comments from the ScalaDoc of case classes returned by user defined functions used in this DataFrame.
+   * Existing comments are never overwritten.
+   * The default implementation is a no-op, as this is only implemented for the Spark engine.
+   */
+  def enrichColumnCommentsFromUdfs: GenericDataFrame = this
+
   // instantiate subfeed helper
   private lazy val functions = DataFrameSubFeed.getFunctions(subFeedType)
 

@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action.spark.customlogic
 
 import io.smartdatalake.util.misc._
-import io.smartdatalake.util.spark.SparkProductUtil
+import io.smartdatalake.util.spark.{SparkColumnCommentUtil, SparkProductUtil}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
@@ -109,14 +109,31 @@ private[smartdatalake] object SparkTransformMappers {
       if (returnType =:= typeOf[Map[String, DataFrame]]) {
         result.asInstanceOf[Map[String, DataFrame]]
       } else if (returnType <:< typeOf[Map[String, Dataset[_]]]) {
-        result.asInstanceOf[Map[String, Dataset[_]]].view.mapValues(_.toDF()).toMap
+        val dsType = datasetTypeArg(returnType.typeArgs(1))
+        result.asInstanceOf[Map[String, Dataset[_]]].view.mapValues(ds => toCommentedDf(ds, dsType)).toMap
       } else if (returnType =:= typeOf[DataFrame]) {
         Map(outputName -> result.asInstanceOf[DataFrame])
       } else if (returnType <:< typeOf[Dataset[_]]) {
-        Map(outputName -> result.asInstanceOf[Dataset[_]].toDF())
+        Map(outputName -> toCommentedDf(result.asInstanceOf[Dataset[_]], datasetTypeArg(returnType)))
       } else {
         throw new IllegalStateException(s"Custom transform function has unsupported return type $returnType")
       }
+    }
+
+    /**
+     * Convert a typed Dataset to a DataFrame, documenting its columns with the ScalaDoc of the case class.
+     * The type has to be taken from the signature of the transformation method, as `Dataset.toDF` loses it.
+     */
+    private def toCommentedDf(ds: Dataset[_], dsType: Option[universe.Type]): DataFrame = {
+      val df = ds.toDF()
+      dsType.map(SparkColumnCommentUtil.enrichColumnCommentsFromCaseClass(df, _)).getOrElse(df)
+    }
+
+    /**
+     * Get the element type of a `Dataset[T]`, using the base type so that subtypes of Dataset also work.
+     */
+    private def datasetTypeArg(tpe: universe.Type): Option[universe.Type] = {
+      tpe.baseType(typeOf[Dataset[_]].typeSymbol).typeArgs.headOption
     }
   }
 
