@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions._
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
-import io.smartdatalake.testutils.{TableDataObjectBehaviour, TableDataObjectTestParams}
+import io.smartdatalake.testutils.{CatalogMetadataBehaviour, CatalogMetadataTestParams, TableDataObjectBehaviour, TableDataObjectTestParams}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, SparkHdfsUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection, HadoopFileConnection, IcebergTableConnection}
@@ -41,7 +41,7 @@ import java.nio.file.Files
  * plus Iceberg-specific tests (create from parquet files, hadoop catalog, ...).
  */
 class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with SmartDataLakeLogger
-  with SparkTestTool with TableDataObjectBehaviour {
+  with SparkTestTool with TableDataObjectBehaviour with CatalogMetadataBehaviour {
   private implicit val implLogger: Logger = logger
 
   protected implicit val session: SparkSession = IcebergTestUtils.session
@@ -422,4 +422,20 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     }
   }
 
+  // shared behaviours for managing tables in the catalog at deployment time, see issue #1129.
+  // Note that Iceberg has no primary or foreign key constraints.
+
+  private def createCatalogMetadataDataObject(id: String, params: CatalogMetadataTestParams, registry: InstanceRegistry): IcebergTableDataObject = {
+    val table = params.createTable(catalog = Some("iceberg1"), db = Some("default"))
+    IcebergTableDataObject(id, path = Some(tempPath + s"/${table.fullName}"), table = table,
+      metadata = params.dataObjectMetadata)(registry)
+  }
+
+  test("create a missing table") {
+    testCreateMissingTable(createCatalogMetadataDataObject)
+  }
+
+  test("evolve the schema of an existing table") {
+    testEvolveSchema(createCatalogMetadataDataObject)
+  }
 }

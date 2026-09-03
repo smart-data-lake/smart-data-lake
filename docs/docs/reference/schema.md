@@ -126,7 +126,7 @@ Use sdl-parent as maven "parent pom", or add the plugin to your project as follo
 
 Note that column comments are not written to the catalog during a normal SDLB run.
 Table metadata can only change when the configuration or the code changes, so it is applied at
-deployment time instead - see [Applying table metadata to the catalog](#applying-table-metadata-to-the-catalog).
+deployment time instead - see [Managing tables in the catalog at deploy time](#managing-tables-in-the-catalog-at-deploy-time).
 
 Limitations:
 * Only UDFs created with the typed API, e.g. `udf((x: String) => MyCaseClass(x))`, carry the type information
@@ -134,12 +134,13 @@ Limitations:
 * Python UDFs are not supported.
 * The Spark Connect engine is not supported.
 
-## Applying table metadata to the catalog
+## Managing tables in the catalog at deploy time
 
-Table metadata - the table comment from `metadata.description`, the column comments and the primary key -
-is *not* written to the catalog during a normal SDLB run. It can only change when the configuration or the
-code changes, so writing it on every run causes unnecessary load on the catalog and races with concurrent
-write operations. It is applied at deployment time in two steps instead.
+The tables of a data pipeline - their schema, the table comment from `metadata.description`, the column
+comments and the primary and foreign keys - are *not* created or updated in the catalog during a normal SDLB
+run. They can only change when the configuration or the code changes, so writing them on every run causes
+unnecessary load on the catalog and races with concurrent write operations. They are managed at deployment
+time in two steps instead.
 
 **1. Export the schemas on the development environment.** A dry-run with schema export writes the schema of
 every output DataObject, including the column comments SDLB assembled from `schemaMin`, from the Markdown
@@ -159,7 +160,7 @@ global {
 }
 ```
 
-**2. Apply the metadata on the target environment.** `DataObjectSchemaExporter` reads the desired state from
+**2. Apply the changes on the target environment.** `DataObjectSchemaExporter` reads the desired state from
 the configuration and from the exported schema files, compares it with the catalog and writes only what
 differs:
 
@@ -176,9 +177,42 @@ java -cp sdlb.jar io.smartdatalake.meta.configexporter.DataObjectSchemaExporter 
 Applying is idempotent: running it twice makes no second change. Column descriptions defined with `@column`
 in the Markdown description files override the comments from the exported schema.
 
-This is supported by table DataObjects implementing `CanHandleCatalogMetadata`, currently
-`DeltaLakeTableDataObject`, `IcebergTableDataObject` and `SnowflakeTableDataObject`. Other DataObjects are
-skipped. The primary key is only applied for tables with `table.createAndReplacePrimaryKey = true`.
+The following changes are applied:
+
+| Change | Applied when |
+| --- | --- |
+| create a missing table | the DataObject implements `CanHandleTableSchema` and a schema was exported for it |
+| add a new column, change a data type | the DataObject implements `CanHandleTableSchema` |
+| make a column nullable which is not written anymore | the DataObject implements `CanHandleTableSchema` |
+| table comment, column comments | the DataObject implements `CanHandleCatalogMetadata` |
+| primary key | `table.createAndReplacePrimaryKey = true` |
+| foreign keys | `table.createAndReplaceForeignKeys = true` |
+
+Columns are never dropped - a column which is not written anymore is made nullable instead, so that existing
+data is kept and new records can be written without it. This is the same behaviour as the schema evolution
+of an SDLB run, see [Schema Evolution](#schema-evolution). Note that changing the data type of a column needs
+the table property `delta.enableTypeWidening` on Delta Lake tables, and that a database can refuse a data type
+change which would lose data.
+
+A missing table is created by writing an empty DataFrame with the exported schema, so it gets the same
+location, partitioning and options as it would get from the first run of the data pipeline. Primary key
+columns are made not null if `table.createAndReplacePrimaryKey` is set.
+
+Foreign keys are applied in a second phase, after all tables of the configuration have been created with
+their primary keys, as a foreign key can only reference an existing primary key. The referenced table is
+`foreignKeys.table` in the database `foreignKeys.db`, which defaults to the database of this table.
+
+Support by DataObject:
+
+| DataObject | Table & schema | Comments | Primary key | Foreign keys |
+| --- | --- | --- | --- | --- |
+| `DeltaLakeTableDataObject` | yes | yes | yes (Databricks) | yes (Databricks) |
+| `IcebergTableDataObject` | yes | yes | - | - |
+| `JdbcTableDataObject` | yes | yes, if the JDBC driver supports `COMMENT ON` | yes | yes |
+| `SnowflakeTableDataObject` | - | yes | yes | - |
+
+Other DataObjects are skipped. Note that primary and foreign keys are informational constraints on Databricks
+Unity Catalog: they are not enforced, and they are not available on open source Delta Lake.
 
 
 <!-- TODO Review all below -->

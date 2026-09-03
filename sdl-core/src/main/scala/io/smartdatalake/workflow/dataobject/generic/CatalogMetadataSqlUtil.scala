@@ -24,8 +24,8 @@ import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchemaUtil}
 import scala.util.Try
 
 /**
- * Implementation of [[CanHandleCatalogMetadata]] for catalogs using Spark SQL syntax, e.g. Delta Lake
- * and Iceberg tables.
+ * Implementation of [[CanHandleCatalogMetadata]] and [[CanHandleTableSchema]] for catalogs using Spark SQL
+ * syntax, e.g. Delta Lake and Iceberg tables.
  *
  * All statements address the table by its fully qualified name and none of them changes the current
  * catalog or schema of the session, see [[CanHandleCatalogMetadata]].
@@ -60,5 +60,23 @@ object CatalogMetadataSqlUtil extends SmartDataLakeLogger {
         s" COMMENT '${SQLUtil.escapeSqlStringLiteral(comment)}'"
       SQLUtil.execSql(stmt, sql, loggerContext)
     }
+  }
+
+  /**
+   * Apply schema changes with "ALTER TABLE" statements, see [[CanHandleTableSchema]].
+   */
+  def applySchemaChanges(table: Table, changes: Seq[TableSchemaChange], sql: String => Unit, loggerContext: String): Unit = {
+    changes.map(getSchemaChangeStmt(table, _)).foreach(SQLUtil.execSql(_, sql, loggerContext))
+  }
+
+  private[smartdatalake] def getSchemaChangeStmt(table: Table, change: TableSchemaChange): String = change match {
+    case AddColumn(columnPath, dataType, comment) =>
+      val commentStmt = comment.map(c => s" COMMENT '${SQLUtil.escapeSqlStringLiteral(c)}'").getOrElse("")
+      s"ALTER TABLE ${table.fullName} ADD COLUMNS (${GenericSchemaUtil.formatColumnPath(columnPath)} ${dataType.sql}$commentStmt)"
+    case ChangeColumnType(columnPath, dataType, _) =>
+      s"ALTER TABLE ${table.fullName} ALTER COLUMN ${GenericSchemaUtil.formatColumnPath(columnPath)} TYPE ${dataType.sql}"
+    case ChangeColumnNullable(columnPath, nullable) =>
+      val nullableStmt = if (nullable) "DROP NOT NULL" else "SET NOT NULL"
+      s"ALTER TABLE ${table.fullName} ALTER COLUMN ${GenericSchemaUtil.formatColumnPath(columnPath)} $nullableStmt"
   }
 }

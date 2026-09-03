@@ -30,14 +30,12 @@ import java.sql.SQLException
 case class PrimaryKeyDefinition(pkColumns: Seq[String], pkName: Option[String] = None)
 
 /**
- * This trait defines the general approach to handle constraints such as primary and foreign keys
- * within a TransactionalTableDataObject.
+ * This trait defines the general approach to handle primary key constraints within a
+ * TransactionalTableDataObject. Foreign keys are handled by [[CanHandleForeignKeys]].
  *
  * Note that constraints are not applied during a normal SDLB run. They are applied at deployment time by
- * DataObjectSchemaExporter, see [[CanHandleCatalogMetadata]].
- *
- * Foreign keys (see [[Table.foreignKeys]]) are currently metadata for the data catalog only, no DDL is
- * generated for them. See issue #1129.
+ * DataObjectSchemaExporter, see [[CanHandleCatalogMetadata]], and only if [[Table.createAndReplacePrimaryKey]]
+ * is set to true.
  */
 trait CanHandleConstraints { self: TransactionalTableDataObject =>
   def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition]

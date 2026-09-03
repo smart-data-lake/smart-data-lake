@@ -140,7 +140,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
     with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput with CanHandleConstraints
-    with CanHandleCatalogMetadata
+    with CanHandleForeignKeys with CanHandleCatalogMetadata with CanHandleTableSchema
     with HasEngineImplementation[DeltaLakeTableEngine] {
 
   /**
@@ -350,6 +350,47 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   override def setColumnComments(comments: Map[Seq[String], String])(implicit context: ActionPipelineContext): Unit =
     CatalogMetadataSqlUtil.setColumnComments(table, comments, engine.sql, s"($id) ")
+
+  override def applySchemaChanges(changes: Seq[TableSchemaChange])(implicit context: ActionPipelineContext): Unit =
+    CatalogMetadataSqlUtil.applySchemaChanges(table, changes, engine.sql, s"($id) ")
+
+  /**
+   * Read the foreign keys from INFORMATION_SCHEMA, joining the columns of the foreign key with the columns of
+   * the referenced primary key by their position in the constraint.
+   *
+   * Note that foreign keys are informational constraints of Databricks Unity Catalog,
+   * they are not available on open source Delta Lake.
+   */
+  override def getExistingForeignKeys(implicit context: ActionPipelineContext): Seq[ForeignKeyDefinition] = {
+    val catalogConstraint = table.catalog.map(c => s" and fk.TABLE_CATALOG = '${c.toLowerCase}'").getOrElse("")
+    val schemaConstraint = table.db.map(d => s" and fk.TABLE_SCHEMA = '${d.toLowerCase}'").getOrElse("")
+    val query =
+      "select rc.CONSTRAINT_NAME, fk.COLUMN_NAME, pk.TABLE_CATALOG, pk.TABLE_SCHEMA, pk.TABLE_NAME, pk.COLUMN_NAME" +
+        " from INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc" +
+        " join INFORMATION_SCHEMA.KEY_COLUMN_USAGE fk on fk.CONSTRAINT_CATALOG = rc.CONSTRAINT_CATALOG" +
+        " and fk.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA and fk.CONSTRAINT_NAME = rc.CONSTRAINT_NAME" +
+        " join INFORMATION_SCHEMA.KEY_COLUMN_USAGE pk on pk.CONSTRAINT_CATALOG = rc.UNIQUE_CONSTRAINT_CATALOG" +
+        " and pk.CONSTRAINT_SCHEMA = rc.UNIQUE_CONSTRAINT_SCHEMA and pk.CONSTRAINT_NAME = rc.UNIQUE_CONSTRAINT_NAME" +
+        " and pk.ORDINAL_POSITION = fk.ORDINAL_POSITION" +
+        s" where fk.TABLE_NAME = '${table.name.toLowerCase}'" + schemaConstraint + catalogConstraint
+    val rows = engine.sql(query).collect
+    rows.groupBy(row => row.getAs[String](0)).toSeq.map { case (constraintName, constraintRows) =>
+      val columns = constraintRows.map(row => row.getAs[String](1) -> row.getAs[String](5)).toMap
+      // the catalog is only used if this table defines one, so that the name matches the defined foreign keys
+      val referencedCatalog = if (table.catalog.isDefined) Option(constraintRows.head.getAs[String](2)) else None
+      val referencedTable = Table(catalog = referencedCatalog,
+        db = Option(constraintRows.head.getAs[String](3)), name = constraintRows.head.getAs[String](4))
+      ForeignKeyDefinition(columns, referencedTable.fullName, Option(constraintName))
+    }
+  }
+
+  override def dropForeignKeyConstraint(constraintName: String)(implicit context: ActionPipelineContext): Unit = {
+    SQLUtil.execSql(s"ALTER TABLE ${table.fullName} DROP CONSTRAINT $constraintName", engine.sql, s"($id) ")
+  }
+
+  override def createForeignKeyConstraint(foreignKey: ForeignKeyDefinition)(implicit context: ActionPipelineContext): Unit = {
+    SQLUtil.execSql(SQLUtil.createForeignKeyStatement(table.fullName, foreignKey), engine.sql, s"($id) ")
+  }
 }
 
 object DeltaLakeTableDataObject extends FromConfigFactory[DataObject] {

@@ -22,7 +22,7 @@ import io.smartdatalake.definitions.{Environment, SaveModeMergeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataobject.generic.{DataObjectEngine, Table}
+import io.smartdatalake.workflow.dataobject.generic.{DataObjectEngine, ForeignKeyDefinition, Table}
 import org.slf4j.Logger
 
 object SQLUtil extends SmartDataLakeLogger {
@@ -109,6 +109,19 @@ object SQLUtil extends SmartDataLakeLogger {
    */
   def sparkQuoteSQLIdentifier(column: String): String = {
     s"`$column`"
+  }
+
+  /**
+   * Create a SQL statement to add a foreign key constraint.
+   * The columns of the foreign key and the referenced columns are listed in the same order,
+   * see [[ForeignKeyDefinition.columns]].
+   */
+  def createForeignKeyStatement(tableName: String, foreignKey: ForeignKeyDefinition, quoteCaseSensitiveColumn: String => String = identity): String = {
+    val constraintName = foreignKey.name.getOrElse(throw new IllegalArgumentException(s"Constraint name missing for ${foreignKey.describe}"))
+    val columns = foreignKey.columns.toSeq
+    s"ALTER TABLE $tableName ADD CONSTRAINT $constraintName" +
+      s" FOREIGN KEY (${columns.map(c => quoteCaseSensitiveColumn(c._1)).mkString(", ")})" +
+      s" REFERENCES ${foreignKey.referencedTable} (${columns.map(c => quoteCaseSensitiveColumn(c._2)).mkString(", ")})"
   }
 
   /**

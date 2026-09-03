@@ -25,7 +25,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
-import io.smartdatalake.workflow.dataobject.generic.PrimaryKeyDefinition
+import io.smartdatalake.workflow.dataobject.generic.{ForeignKeyDefinition, PrimaryKeyDefinition}
 import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
@@ -189,9 +189,47 @@ case class JdbcTableConnection(
   // The implementation to get the PK is not in the Catalog in order to use the JDBC standard method getPrimaryKeys
   // and not having to adapt the Query for different DBs.
   def getJdbcPrimaryKey(catalogOption: Option[String], schemaOption: Option[String], tableName: String): Option[PrimaryKeyDefinition] = {
-    val (catalog, schema) = (catalogOption.getOrElse(""), schemaOption.getOrElse(""))
-    val resultSet: ResultSet = connectionMetadata.getPrimaryKeys(catalog, schema, tableName)
+    val resultSet: ResultSet = connectionMetadata.getPrimaryKeys(normalizeMetadataIdentifier(catalogOption).orNull,
+      normalizeMetadataIdentifier(schemaOption).orNull, normalizeMetadataIdentifier(tableName))
     this.catalog.handlePrimaryKeyResultSet(resultSet)
+  }
+
+  /**
+   * Normalize an identifier to the case the database stores it in, so that it can be used to query the JDBC
+   * metadata, e.g. [[DatabaseMetaData.getColumns]]. Unquoted identifiers are stored uppercase by many
+   * databases (e.g. HSQLDB, Oracle, SAP HANA) and lowercase by others (e.g. PostgreSQL), while quoted
+   * identifiers are stored as written.
+   */
+  def normalizeMetadataIdentifier(identifier: String): String = {
+    if (catalog.isQuotedIdentifier(identifier)) catalog.removeQuotes(identifier)
+    else if (connectionMetadata.storesUpperCaseIdentifiers()) identifier.toUpperCase
+    else if (connectionMetadata.storesLowerCaseIdentifiers()) identifier.toLowerCase
+    else identifier
+  }
+
+  def normalizeMetadataIdentifier(identifier: Option[String]): Option[String] = identifier.map(normalizeMetadataIdentifier)
+
+  // The implementation to get the foreign keys uses the JDBC standard method getImportedKeys,
+  // so that the query doesn't need to be adapted for different DBs.
+  def getJdbcForeignKeys(catalogOption: Option[String], schemaOption: Option[String], tableName: String): Seq[ForeignKeyDefinition] = {
+    val resultSet: ResultSet = connectionMetadata.getImportedKeys(normalizeMetadataIdentifier(catalogOption).orNull,
+      normalizeMetadataIdentifier(schemaOption).orNull, normalizeMetadataIdentifier(tableName))
+    this.catalog.handleForeignKeyResultSet(resultSet)
+  }
+
+  /**
+   * Read the comment of a table from the JDBC metadata (REMARKS).
+   * Note that not all JDBC drivers return the comment of a table.
+   */
+  def getJdbcTableComment(schemaOption: Option[String], tableName: String): Option[String] = {
+    val resultSet: ResultSet = connectionMetadata.getTables(null, normalizeMetadataIdentifier(schemaOption).orNull,
+      normalizeMetadataIdentifier(tableName), null)
+    try {
+      if (resultSet.next()) Option(resultSet.getString("REMARKS")).filter(_.nonEmpty)
+      else None
+    } finally {
+      resultSet.close()
+    }
   }
 }
 
