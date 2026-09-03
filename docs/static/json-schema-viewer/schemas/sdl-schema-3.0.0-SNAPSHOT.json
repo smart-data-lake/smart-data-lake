@@ -5680,7 +5680,7 @@
           },
           "createAndReplacePrimaryKey" : {
             "type" : "boolean",
-            "description" : "Parameter to define if the primary key should be created and updated\naccording to the SDLB configuration (=TRUE), or if they are configured just\nfor information purposes (=FALSE). It defaults to false. For the creation / replacement to work,\nat least one primary Key column must be defined.  \nAs of now, this feature is only available for JdbcTableDataObject. Using it in other DataObjects\nwill have no effect."
+            "description" : "Parameter to define if the primary key should be created and updated\naccording to the SDLB configuration (=TRUE), or if they are configured just\nfor information purposes (=FALSE). It defaults to false. For the creation / replacement to work,\nat least one primary Key column must be defined.  \nPrimary keys are created at deployment time by DataObjectSchemaExporter,\nsee[[io.smartdatalake.workflow.dataobject.generic.CanHandleConstraints]]for the DataObjects supporting it. Using it in other DataObjects will have no effect.  \nIt also makes the primary key columns not null when creating or evolving\nthe table schema, see`io.smartdatalake.workflow.dataobject.generic.CanHandleTableSchema`."
           },
           "primaryKeyConstraintName" : {
             "type" : "string",
@@ -5716,7 +5716,11 @@
               "additionalProperties" : false,
               "description" : "Foreign key definition."
             },
-            "description" : "optional sequence of foreign key definitions.  \nThis is used as metadata for a data catalog.  \nEach foreign key in the .conf files is an object with the following properties:\n{db: string, table: string , name: string map: Map[String]}, whereas a Map[String] is simply\na further object of the type {<local_column_name>:string, <external_column_name>:string}. For example:\nforeignKeys = [\n{\ndb = \"OPTIONAL_DB_name\"\ntable = \"table_id\"\ncolumns = {\n\"local_column_name\": \"external_column_name\"\n}\nname = \"OPTIONAL_key_name\"\n}\n]"
+            "description" : "optional sequence of foreign key definitions.  \nThis is used as metadata for a data catalog, and to create foreign key\nconstraints if`createAndReplaceForeignKeys` is set to true."
+          },
+          "createAndReplaceForeignKeys" : {
+            "type" : "boolean",
+            "description" : "Parameter to define if the foreign keys should be created and updated\naccording to the SDLB configuration (=TRUE), or if they are configured just\nfor information purposes (=FALSE). It defaults to false.  \nForeign keys are created at deployment time by DataObjectSchemaExporter,\nsee`io.smartdatalake.workflow.dataobject.generic.CanHandleForeignKeys`.  \nNote that the referenced table must exist and have a primary key on the\nreferenced columns.  \nEach foreign key in the .conf files is an object with the following properties:\n{db: string, table: string , name: string map: Map[String]}, whereas a Map[String] is simply\na further object of the type {<local_column_name>:string, <external_column_name>:string}. For example:\nforeignKeys = [\n{\ndb = \"OPTIONAL_DB_name\"\ntable = \"table_id\"\ncolumns = {\n\"local_column_name\": \"external_column_name\"\n}\nname = \"OPTIONAL_key_name\"\n}\n]"
           },
           "catalog" : {
             "type" : "string",
