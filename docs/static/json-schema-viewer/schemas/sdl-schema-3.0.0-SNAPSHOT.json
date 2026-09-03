@@ -1391,10 +1391,6 @@
             "type" : "boolean",
             "description" : "If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error."
           },
-          "updateColumnComments" : {
-            "type" : "boolean",
-            "description" : "If set to false, the column comments (read from the provided schema) will only be updated for newly created columns.  \nIf set to true, the column comments from the provided schema will be updated every time the pipeline runs, which results in\na lower performance since a column comparison is needed. Defaults to \"false\"."
-          },
           "retentionPeriod" : {
             "type" : "integer",
             "description" : "Optional delta lake retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted."
@@ -1421,7 +1417,7 @@
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
-            "description" : "metadata of the table. NOTE: if the value metadata.description is set, the table.db and the table.catalog\nattributes are required as the pipeline will try to add the description to the catalog."
+            "description" : "metadata of the table. metadata.description is applied as table comment in the catalog\nby the DataObjectSchemaExporter, see also `io.smartdatalake.workflow.dataobject.generic.CanHandleCatalogMetadata`."
           }
         },
         "title" : "DeltaLakeTableDataObject",
@@ -3089,10 +3085,6 @@
               "$ref" : "#/definitions/GenericDfTransformer/WhitelistTransformer"
             } ],
             "description" : "An optional transformer that is applied on read. This is often used to adapt Snowflakes Decimal datatype to more accurate IntegralTypes like Long, Integer, Byte."
-          },
-          "syncComments" : {
-            "type" : "boolean",
-            "description" : "Defines if the comments defined in the schema should be synched the Snowflake table.  \nPlease note that this can be an expensive operation, and it only works if using Spark as an execution engine."
           },
           "expectedPartitionsCondition" : {
             "type" : "string",
