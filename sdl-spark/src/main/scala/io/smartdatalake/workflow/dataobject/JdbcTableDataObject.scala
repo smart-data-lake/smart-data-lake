@@ -30,9 +30,9 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
-import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.{GenericDataType, GenericSchema}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkField, SparkSchema}
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkDataType, SparkField, SparkSchema}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
@@ -135,7 +135,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
     with CanHandlePartitions with CanEvolveSchema with CanMergeDataFrame
-    with CanCreateIncrementalOutput with ExpectationValidation with CanHandleConstraints {
+    with CanCreateIncrementalOutput with ExpectationValidation with CanHandleConstraints
+    with CanHandleForeignKeys with CanHandleCatalogMetadata with CanHandleTableSchema {
 
   /**
    * Connection defines driver, url and db in central location
@@ -547,7 +548,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
         connection.execWithJdbcConnection { con =>
           var rs: ResultSet = null
           try {
-            rs = con.getMetaData.getColumns(null, connection.catalog.removeQuotes(table.db.get), connection.catalog.removeQuotes(table.name), null)
+            // identifiers must be given in the case the database stores them in, see normalizeMetadataIdentifier
+            rs = con.getMetaData.getColumns(null, connection.normalizeMetadataIdentifier(table.db.get), connection.normalizeMetadataIdentifier(table.name), null)
             class RsIterator(rs: ResultSet) extends Iterator[ResultSet] {
               def hasNext: Boolean = rs.next()
               def next(): ResultSet = rs
@@ -558,7 +560,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
             if (rs != null) rs.close()
           }
         }
-      }.toOption else None
+      }.toOption.filter(_.nonEmpty) else None
       // otherwise make empty query and use resultset metadata
       if (_cachedJdbcColumnMetadata.isEmpty) {
         val metadataQuery = table.query.getOrElse(s"select * from ${table.fullName}") + " where 1=0"
@@ -604,6 +606,100 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
     connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
   }
+
+  override def getExistingForeignKeys(implicit context: ActionPipelineContext): Seq[ForeignKeyDefinition] = {
+    connection.getJdbcForeignKeys(table.catalog, table.db, table.name)
+  }
+
+  override def dropForeignKeyConstraint(constraintName: String)(implicit context: ActionPipelineContext): Unit = {
+    connection.catalog.dropForeignKeyConstraint(table.fullName, constraintName)
+  }
+
+  override def createForeignKeyConstraint(foreignKey: ForeignKeyDefinition)(implicit context: ActionPipelineContext): Unit = {
+    connection.catalog.createForeignKeyConstraint(table.fullName, foreignKey, quoteCaseSensitiveColumn(_))
+  }
+
+  override def getTableComment(implicit context: ActionPipelineContext): Option[String] = {
+    connection.getJdbcTableComment(table.db, table.name)
+  }
+
+  override def setTableComment(comment: String)(implicit context: ActionPipelineContext): Unit = {
+    connection.execJdbcStatement(connection.catalog.getCommentOnTableSql(table.fullName, comment))
+  }
+
+  /**
+   * Read the column comments from the JDBC metadata (REMARKS).
+   * Note that not all JDBC drivers return the comments of the columns. If they are not returned, the comments
+   * are written on every "apply" of DataObjectSchemaExporter, as it can not detect that they are up to date.
+   */
+  override def getColumnComments(implicit context: ActionPipelineContext): Map[Seq[String], String] = {
+    jdbcColumnMetadata.toSeq.flatten.flatMap(col => col.comment.map(comment => Seq(col.name) -> comment)).toMap
+  }
+
+  override def setColumnComments(comments: Map[Seq[String], String])(implicit context: ActionPipelineContext): Unit = {
+    comments.foreach { case (columnPath, comment) =>
+      assert(columnPath.size == 1, s"($id) can not set the comment of nested column ${columnPath.mkString(".")}, jdbc tables have no nested columns")
+      connection.execJdbcStatement(connection.catalog.getCommentOnColumnSql(table.fullName, quoteCaseSensitiveColumn(columnPath.head), comment))
+    }
+    resetCachedSchema()
+  }
+
+  /**
+   * The schema of the existing table, with the nullability taken from the jdbc metadata,
+   * as Spark doesn't know if a field is nullable in the database.
+   */
+  override def getCurrentSchema(implicit context: ActionPipelineContext): Option[GenericSchema] = {
+    getExistingSchema.map { schema =>
+      SparkSchema(StructType(schema.map(field =>
+        getJdbcColumn(field.name).flatMap(_.isNullable).map(nullable => field.copy(nullable = nullable)).getOrElse(field)
+      )))
+    }
+  }
+
+  /**
+   * Create the table with the given schema, like it would be created on the first write,
+   * see also attribute `createSql` to create it with a custom statement.
+   */
+  override def createTable(schema: GenericSchema)(implicit context: ActionPipelineContext): Unit = {
+    val sparkSchema = schema.convert(writeSubFeedSupportedTypes.head) match {
+      case sparkSchema: SparkSchema => sparkSchema.inner
+      case otherSchema => throw new IllegalStateException(s"($id) can not create table from schema of type ${otherSchema.getClass.getSimpleName}")
+    }
+    connection.createTableFromSchema(table.fullName, sparkSchema, options)
+    resetCachedSchema()
+    cachedIsTableExisting = None
+    require(isTableExisting, s"($id) Strangely table ${table.fullName} doesn't exist even though we tried to create it")
+  }
+
+  /**
+   * Apply the schema changes with "alter table" statements, see [[CanHandleTableSchema]].
+   * This is the deployment time counterpart of the schema evolution applied on write when
+   * `allowSchemaEvolution` is set.
+   */
+  override def applySchemaChanges(changes: Seq[TableSchemaChange])(implicit context: ActionPipelineContext): Unit = {
+    changes.foreach { change =>
+      assert(change.columnPath.size == 1, s"($id) can not change nested column ${change.columnName}, jdbc tables have no nested columns")
+      val column = quoteCaseSensitiveColumn(change.columnPath.head)
+      val sql = change match {
+        // note that getSqlType creates a nullable column, which is needed as existing records have no value for it
+        case AddColumn(_, dataType, _) => connection.catalog.getAddColumnSql(table.fullName, column, connection.catalog.getSqlType(toSparkDataType(dataType)))
+        case ChangeColumnType(_, dataType, _) => connection.catalog.getAlterColumnSql(table.fullName, column, connection.catalog.getSqlType(toSparkDataType(dataType)))
+        case ChangeColumnNullable(_, nullable) => connection.catalog.getAlterColumnNullableSql(table.fullName, column, nullable)
+      }
+      connection.execJdbcStatement(sql)
+    }
+    resetCachedSchema()
+  }
+
+  private def toSparkDataType(dataType: GenericDataType): DataType = dataType match {
+    case sparkDataType: SparkDataType => sparkDataType.inner
+    case otherDataType => throw new IllegalStateException(s"($id) unsupported data type ${otherDataType.getClass.getSimpleName}")
+  }
+
+  private def resetCachedSchema(): Unit = {
+    cachedExistingSchema = None
+    _cachedJdbcColumnMetadata = None
+  }
 }
 
 private[smartdatalake] case class JdbcColumn(name: String,
@@ -612,7 +708,8 @@ private[smartdatalake] case class JdbcColumn(name: String,
                                              dbTypeName: Option[String] = None,
                                              precision: Option[Int] = None,
                                              scale: Option[Int] = None,
-                                             isNullable: Option[Boolean] = None) {
+                                             isNullable: Option[Boolean] = None,
+                                             comment: Option[String] = None) {
   def nameEquals(other: JdbcColumn): Boolean = {
     if (this.isNameCaseSensitiv || other.isNameCaseSensitiv) this.name.equals(other.name)
     else this.name.equalsIgnoreCase(other.name)
@@ -630,7 +727,7 @@ private[smartdatalake] object JdbcColumn {
   def from(rs: ResultSet): JdbcColumn = {
     val name = rs.getString("COLUMN_NAME")
     val isNameCaseSensitiv = name != name.toUpperCase || SQLUtil.hasIdentifierSpecialChars(name)
-    JdbcColumn(name, isNameCaseSensitiv, None, Option(rs.getString("DATA_TYPE")), Option(rs.getInt("COLUMN_SIZE")), Option(rs.getInt("DECIMAL_DIGITS")), Some(rs.getInt("NULLABLE")>0))
+    JdbcColumn(name, isNameCaseSensitiv, None, Option(rs.getString("DATA_TYPE")), Option(rs.getInt("COLUMN_SIZE")), Option(rs.getInt("DECIMAL_DIGITS")), Some(rs.getInt("NULLABLE")>0), Option(rs.getString("REMARKS")).filter(_.nonEmpty))
   }
 }
 

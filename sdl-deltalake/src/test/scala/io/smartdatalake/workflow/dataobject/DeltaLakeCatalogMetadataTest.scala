@@ -20,7 +20,10 @@ package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.spark.SparkTestUtil
+import io.smartdatalake.testutils.{CatalogMetadataBehaviour, CatalogMetadataTestParams}
 import io.smartdatalake.util.hdfs.{HdfsUtil, SparkHdfsUtil}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.dataobject.generic.{CatalogMetadataApplier, Table}
@@ -35,17 +38,20 @@ import java.nio.file
 import java.nio.file.Files
 
 /**
- * Test applying table metadata to the catalog at deployment time, see issues #1121 and #1127.
+ * Test applying table metadata to the catalog at deployment time, see issues #1121, #1127 and #1129.
  *
  * Note that no catalog metadata is written during a normal SDLB run anymore. It is applied by
  * DataObjectSchemaExporter, which uses [[CatalogMetadataApplier]].
  */
-class DeltaLakeCatalogMetadataTest extends AnyFunSuite with BeforeAndAfterAll {
+class DeltaLakeCatalogMetadataTest extends AnyFunSuite with BeforeAndAfterAll with SmartDataLakeLogger
+  with CatalogMetadataBehaviour {
 
   protected implicit val session: SparkSession = DeltaLakeTestUtils.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val context: ActionPipelineContext =
     SparkTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+
+  override def defaultEngineConnection: Connection with EngineConnection = SparkTestUtil.defaultSparkConnection
 
   val tempDir: file.Path = Files.createTempDirectory("catalogMetadata")
   val tempPath: String = tempDir.toAbsolutePath.toString
@@ -122,5 +128,25 @@ class DeltaLakeCatalogMetadataTest extends AnyFunSuite with BeforeAndAfterAll {
     // writing the DataFrame and postWrite must not set the table comment anymore
     dataObject.postWrite(Seq())
     assert(dataObject.getTableComment.isEmpty)
+  }
+
+  // shared behaviours for managing tables in the catalog at deployment time, see issue #1129.
+  // Note that primary and foreign keys are informational constraints of Databricks Unity Catalog,
+  // they can not be tested with open source Delta Lake.
+
+  private def createCatalogMetadataDataObject(id: String, params: CatalogMetadataTestParams, registry: InstanceRegistry): DeltaLakeTableDataObject = {
+    val table = params.createTable(db = Some(deltaDb))
+    DeltaLakeTableDataObject(id, path = Some(s"$tempPath/${table.fullName}"), table = table,
+      metadata = params.dataObjectMetadata)(registry)
+  }
+
+  test("create a missing table") {
+    testCreateMissingTable(createCatalogMetadataDataObject)
+  }
+
+  test("evolve the schema of an existing table") {
+    // changing the data type of a column needs the table property delta.enableTypeWidening,
+    // otherwise Delta Lake rejects it with DELTA_UNSUPPORTED_ALTER_TABLE_CHANGE_COL_OP
+    testEvolveSchema(createCatalogMetadataDataObject, testChangeDataType = false)
   }
 }

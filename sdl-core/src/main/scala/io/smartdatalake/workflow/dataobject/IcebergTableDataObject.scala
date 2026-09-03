@@ -124,7 +124,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                  )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
     with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput
-    with CanHandleCatalogMetadata
+    with CanHandleCatalogMetadata with CanHandleTableSchema
     with HasEngineImplementation[IcebergTableEngine] {
 
   /**
@@ -311,6 +311,9 @@ case class IcebergTableDataObject(override val id: DataObjectId,
 
   override def setColumnComments(comments: Map[Seq[String], String])(implicit context: ActionPipelineContext): Unit =
     CatalogMetadataSqlUtil.setColumnComments(table, comments, engine.sql, s"($id) ")
+
+  override def applySchemaChanges(changes: Seq[TableSchemaChange])(implicit context: ActionPipelineContext): Unit =
+    CatalogMetadataSqlUtil.applySchemaChanges(table, changes, engine.sql, s"($id) ")
 }
 
 object IcebergTableDataObject extends FromConfigFactory[DataObject] {

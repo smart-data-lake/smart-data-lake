@@ -18,9 +18,9 @@
  */
 package io.smartdatalake.workflow.connection.jdbc
 
-import io.smartdatalake.util.misc.{JdbcExecution, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{JdbcExecution, SQLUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.dataobject.generic.PrimaryKeyDefinition
+import io.smartdatalake.workflow.dataobject.generic.{ForeignKeyDefinition, PrimaryKeyDefinition}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
@@ -87,6 +87,15 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
     sql.replace(quoteIdentifier(column), column)
   }
 
+  // create ddl to set the comment of a table.
+  // "COMMENT ON" is standard SQL and supported by most databases, but e.g. not by MySQL and MS SQL Server.
+  def getCommentOnTableSql(tableName: String, comment: String): String =
+    s"COMMENT ON TABLE $tableName IS '${SQLUtil.escapeSqlStringLiteral(comment)}'"
+
+  // create ddl to set the comment of a column
+  def getCommentOnColumnSql(tableName: String, column: String, comment: String): String =
+    s"COMMENT ON COLUMN $tableName.$column IS '${SQLUtil.escapeSqlStringLiteral(comment)}'"
+
   def isDbExisting(db: String): Boolean
 
   def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String], logging: Boolean = true): Unit = {
@@ -101,6 +110,14 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
       val stmt: String = f"ALTER TABLE $tableName DROP CONSTRAINT $constraintName"
       connection.execJdbcStatement(stmt, logging = logging)
     }
+  }
+
+  def createForeignKeyConstraint(tableName: String, foreignKey: ForeignKeyDefinition, quoteCaseSensitiveColumn: String => String, logging: Boolean = true): Unit = {
+    connection.execJdbcStatement(SQLUtil.createForeignKeyStatement(tableName, foreignKey, quoteCaseSensitiveColumn), logging = logging)
+  }
+
+  def dropForeignKeyConstraint(tableName: String, constraintName: String, logging: Boolean = true): Unit = {
+    connection.execJdbcStatement(f"ALTER TABLE $tableName DROP CONSTRAINT $constraintName", logging = logging)
   }
 
   def isTableExisting(tableName: String): Boolean = {
@@ -126,6 +143,26 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
   protected def evalRecordExists( rs:ResultSet ) : Boolean = {
     rs.next
     rs.getInt(1) == 1
+  }
+
+  /**
+   * Convert the result of [[java.sql.DatabaseMetaData.getImportedKeys]] into foreign key definitions.
+   * Note that the referenced table is qualified with its schema, but not with its catalog, as
+   * JdbcTableDataObject does not use a catalog.
+   */
+  def handleForeignKeyResultSet(resultSet: ResultSet): Seq[ForeignKeyDefinition] = {
+    var rows: Seq[(Option[String], String, String, String)] = Seq()
+    while (resultSet.next()) {
+      val referencedTable = Seq(Option(resultSet.getString("PKTABLE_SCHEM")), Option(resultSet.getString("PKTABLE_NAME")))
+        .flatten.mkString(".")
+      rows = rows :+ (Option(resultSet.getString("FK_NAME")), resultSet.getString("FKCOLUMN_NAME"),
+        resultSet.getString("PKCOLUMN_NAME"), referencedTable)
+    }
+    rows.groupBy { case (fkName, _, _, referencedTable) => (fkName, referencedTable) }.toSeq
+      .map { case ((fkName, referencedTable), constraintRows) =>
+        ForeignKeyDefinition(constraintRows.map { case (_, fkColumn, pkColumn, _) => fkColumn -> pkColumn }.toMap,
+          referencedTable, fkName)
+      }
   }
 
   def handlePrimaryKeyResultSet(resultSet: ResultSet): Option[PrimaryKeyDefinition] = {
