@@ -28,7 +28,7 @@ import scala.reflect.runtime.universe._
 
 /**
  * Base type for DataTypes of ScalaDataFrame columns.
- * The supported types are Int, Double, String, Boolean, Timestamp and Array.
+ * The supported types are Int, Double, String, Boolean, Timestamp, Array and Map.
  * Additionally, there is Null type for special cases where expressions have no type, e.g. lit(null).
  */
 abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSimpleDataType {
@@ -268,6 +268,32 @@ case class ScalaArrayDataType(elementType: Option[ScalaDataType[_]]) extends Sca
   override def isSimpleType: Boolean = false
 }
 
+case class ScalaMapDataType(keyType: Option[ScalaDataType[_]], valueType: Option[ScalaDataType[_]]) extends ScalaDataType[Map[_, _]] {
+
+  override def typeName: String = "map"
+
+  private object MapOrdering extends Ordering[Map[_, _]] {
+    // maps are not sortable, this implementation only distinguishes equal from not equal
+    def compare(x: Map[_, _], y: Map[_, _]): Int = if (x == y) 0 else 1
+  }
+
+  def ordering: Ordering[Option[Map[_, _]]] = Ordering.Option(MapOrdering)
+
+  def getCastFunction(fromDataType: ScalaDataType[_]): Any => Map[_, _] = {
+    fromDataType match {
+      case ScalaNullDataType => _ => null
+    }
+  }
+
+  def getGreaterType(other: ScalaDataType[_]): ScalaDataType[_] = this
+
+  override def isNumeric: Boolean = false
+
+  override def isImpreciseNumeric: Boolean = false
+
+  override def isSimpleType: Boolean = false
+}
+
 /**
  * This is a special DataType for the case where expressions have no type, e.g. lit(null).
  * It is not intended to be used as a column data type, but only as a placeholder for null literals in expressions.
@@ -298,9 +324,10 @@ object ScalaDataType {
       case cls if cls == classOf[Double] || cls == classOf[java.lang.Double] => ScalaDoubleDataType
       case cls if cls == classOf[Boolean] || cls == classOf[java.lang.Boolean] => ScalaBooleanDataType
       case cls if cls == classOf[Timestamp] => ScalaTimestampDataType
+      case cls if classOf[scala.collection.Map[_, _]].isAssignableFrom(cls) => ScalaMapDataType(None, None)
       case cls if classOf[Iterable[_]].isAssignableFrom(cls) => ScalaArrayDataType(None)
       case _ =>
-        throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String, Boolean, Timestamp and Array. Could not match with class ${cls.getName}")
+        throw new Exception(s"A ScalaDataframe only accepts values of type Int, Double, String, Boolean, Timestamp, Array and Map. Could not match with class ${cls.getName}")
     }
   }
 

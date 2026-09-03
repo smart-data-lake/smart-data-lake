@@ -235,4 +235,24 @@ class ExpressionParserTest extends AnyFunSuite {
   test("column reference with alias") {
     assert(evaluate("test.a = 42") == true)
   }
+
+  test("create map") {
+    assert(evaluate("map('dt','20201101')") == Map("dt" -> "20201101"))
+  }
+
+  test("reject map with odd number of arguments") {
+    assertThrows[IllegalArgumentException](ExpressionParser.parse("map('dt')"))
+  }
+
+  test("access map value with brackets") {
+    val mapCol = ScalaColumn("elements", Seq(Map("dt" -> "20201101")))
+    assert(evaluate("elements['dt'] = '20201101'", Seq(mapCol)).contains(true))
+    // a missing key evaluates to null
+    assert(evaluate("elements['unknown']", Seq(mapCol)).isEmpty)
+  }
+
+  test("access map value with dot notation") {
+    val mapCol = ScalaColumn("elements", Seq(Map("dt" -> "20201101")))
+    assert(evaluate("elements.dt >= '20201201'", Seq(mapCol)).contains(false))
+  }
 }

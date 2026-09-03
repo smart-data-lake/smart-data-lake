@@ -225,6 +225,14 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
     ScalaDataType.getFor(cls.getOrElse(classOf[Null])).createLiteral(value)
   }
 
+  def map(columns: GenericColumn*): ScalaAbstractColumn = {
+    val scalaColumns = columns.map {
+      case c: ScalaAbstractColumn => c
+      case other => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+    ScalaMapExpr(scalaColumns)
+  }
+
   def mapType(keyType: GenericDataType, valueType: GenericDataType): GenericDataType with GenericMapDataType = throwNotImplementedError
 
   def max(column: GenericColumn): ScalaAbstractColumn = column match {

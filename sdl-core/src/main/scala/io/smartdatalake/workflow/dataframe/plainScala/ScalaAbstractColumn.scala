@@ -43,6 +43,19 @@ object ScalaAbstractColumn {
       case _ => (None, raw)
     }
   }
+
+  /**
+   * A qualified column reference `x.y` can also address the value of key `y` in the map column `x`,
+   * e.g. `elements.dt`. This is the plain-Scala engine's equivalent of Sparks dot notation for maps and structs,
+   * limited to maps as there is no struct data type.
+   */
+  private[plainScala] def getMapValueColumn(df: ScalaDataFrame, colName: String, key: String): Option[ScalaColumn[_]] = {
+    df.cols.find(c => c.getName.contains(colName) && c.dataType.isInstanceOf[ScalaMapDataType])
+      .map { mapCol =>
+        val valueExpr = ScalaMapValueExpr(mapCol, key)
+        valueExpr.toScalaColumn(valueExpr.data.toIndexedSeq)
+      }
+  }
 }
 
 abstract class ScalaAbstractColumn extends GenericColumn {
@@ -71,6 +84,7 @@ abstract class ScalaAbstractColumn extends GenericColumn {
             .getOrElse(throw ColumnNotFoundException(name, df.cols.map(_.definition.name)))
         case (Some(alias), name) =>
           df.cols.find(c => (c.getName.contains(name) || name == "*") && c.definition.dataFrameAlias.contains(alias))
+            .orElse(ScalaAbstractColumn.getMapValueColumn(df, alias, name))
             .getOrElse(throw ColumnNotFoundException(s"$alias.$name", df.cols.map(_.definition.getFullName())))
       }
       (raw, dfCol.asInstanceOf[ScalaColumn[Any]]) //TODO: can be removed when we switch to Scala 2.13, because of improved type inference
@@ -128,28 +142,28 @@ abstract class ScalaAbstractColumn extends GenericColumn {
   override def >(other: GenericColumn): ScalaAbstractColumn = {
 
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "gt", dt => optionalizeBinaryFunc(dt.numeric.gt), Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "gt", dt => optionalizeBinaryFunc((a, b) => dt.ordering.gt(Some(a), Some(b))), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def <(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "lt", dt => optionalizeBinaryFunc(dt.numeric.lt), Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "lt", dt => optionalizeBinaryFunc((a, b) => dt.ordering.lt(Some(a), Some(b))), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def >=(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "gteq", dt => optionalizeBinaryFunc(dt.numeric.gteq), Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "gteq", dt => optionalizeBinaryFunc((a, b) => dt.ordering.gteq(Some(a), Some(b))), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def <=(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "lteq", dt => optionalizeBinaryFunc(dt.numeric.lteq), Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "lteq", dt => optionalizeBinaryFunc((a, b) => dt.ordering.lteq(Some(a), Some(b))), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
@@ -237,7 +251,10 @@ abstract class ScalaAbstractColumn extends GenericColumn {
 
   override def desc: GenericColumn = throw new NotImplementedError("Method 'desc' is not yet supported, as sorting of DataFrames is not yet implemented")
 
-  override def apply(extraction: Any): ScalaAbstractColumn = throw new NotImplementedError("The 'apply' method is not applicable")
+  /**
+   * Extract the value of a map column for the given key, e.g. `elements['dt']`.
+   */
+  override def apply(extraction: Any): ScalaAbstractColumn = ScalaMapValueExpr(this, extraction)
 
   /**
    * Name for this column/expression, which is used for the output column name in the resulting DataFrame.
@@ -300,8 +317,9 @@ case class ScalaBinaryExpr(left: ScalaAbstractColumn, right: ScalaAbstractColumn
     assert(left.data.size == right.data.size, s"Size of left data (${left.data.size}) must be equal to size of right data (${right.data.size})")
     val funcDataType = left.dataType.getGreaterType(right.dataType)
     val func: (Option[Any], Option[Any]) => Option[Any] = funcCreator(funcDataType.asInstanceOf[ScalaDataType[Any]])
-    val castLeft = if (dataType != left.dataType && fixedDataType.isEmpty) dataType.getCastFunction(left.dataType) else (x: Any) => x
-    val castRight = if (dataType != right.dataType && fixedDataType.isEmpty) dataType.getCastFunction(right.dataType) else (x: Any) => x
+    // both operands are cast to the common data type of the operation, which is not the same as the result data type, e.g. for comparisons
+    val castLeft = if (funcDataType != left.dataType) funcDataType.getCastFunction(left.dataType) else (x: Any) => x
+    val castRight = if (funcDataType != right.dataType) funcDataType.getCastFunction(right.dataType) else (x: Any) => x
     (left.data zip right.data).map(pair => func(pair._1.map(castLeft), pair._2.map(castRight)))
   }
 
@@ -326,6 +344,66 @@ case class ScalaUnaryExpr(in: ScalaAbstractColumn, opName: String, func: Option[
   override def dataType: ScalaDataType[_] = fixedDataType.getOrElse(in.dataType)
 
   override def data: Seq[Option[_]] = in.data.map(func)
+
+  override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
+    aggregator(in.visit(visitorFunc, aggregator), visitorFunc(this))
+  }
+}
+
+/**
+ * Map creation expression, see [[ScalaSubFeed.map]].
+ * The columns alternate between key and value, e.g. map('k1', v1, 'k2', v2).
+ * Note: entries with a null key are omitted, as in Sparks map function.
+ *
+ * @param cols key and value expressions
+ */
+case class ScalaMapExpr(cols: Seq[ScalaAbstractColumn]) extends ScalaAbstractColumn {
+  require(cols.size % 2 == 0, s"The map function needs an even number of arguments alternating between key and value, but got ${cols.size}")
+  private val keyCols = cols.zipWithIndex.collect { case (col, idx) if idx % 2 == 0 => col }
+  private val valueCols = cols.zipWithIndex.collect { case (col, idx) if idx % 2 == 1 => col }
+
+  // the data types are resolved lazily, as they are not known at construction time, e.g. for column references not yet bound to a DataFrame
+  lazy val dataType: ScalaMapDataType = ScalaMapDataType(commonDataType(keyCols), commonDataType(valueCols))
+
+  private def commonDataType(cols: Seq[ScalaAbstractColumn]): Option[ScalaDataType[_]] = {
+    cols.map(_.dataType).distinct match {
+      case Seq(dataType) => Some(dataType)
+      case dataTypes => throw new IllegalArgumentException(s"All keys resp. values of the map function must have the same data type, but found: ${dataTypes.mkString(", ")}")
+    }
+  }
+
+  override def data: Seq[Option[_]] = {
+    assert(cols.map(_.data.size).distinct.size == 1, s"Size of all columns must be equal, but got sizes: ${cols.map(c => s"'${c.getName.getOrElse("col")}': ${c.data.size}").mkString(", ")}")
+    val keyData = keyCols.map(_.data).transpose
+    val valueData = valueCols.map(_.data).transpose
+    (keyData zip valueData).map { case (keys, values) =>
+      Some((keys zip values).collect { case (Some(key), value) => (key, value.getOrElse(null)) }.toMap)
+    }
+  }
+
+  override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
+    (cols.map(_.visit(visitorFunc, aggregator)) :+ visitorFunc(this))
+      .reduce(aggregator)
+  }
+}
+
+/**
+ * Extract the value of a map expression for a given key, e.g. `elements['dt']` or `elements.dt`.
+ *
+ * @param in  map expression
+ * @param key key to look up in the map
+ */
+case class ScalaMapValueExpr(in: ScalaAbstractColumn, key: Any) extends ScalaAbstractColumn {
+  override def dataType: ScalaDataType[_] = in.dataType match {
+    case ScalaMapDataType(_, Some(valueType)) => valueType
+    // the value type is unknown for maps created from data, e.g. a case class attribute of type Map -> infer it from the data
+    case _ => data.flatten.headOption.map(v => ScalaDataType.getFor(v.getClass)).getOrElse(ScalaNullDataType)
+  }
+
+  override def data: Seq[Option[_]] = in.data.map(_.flatMap {
+    case map: scala.collection.Map[_, _] => map.asInstanceOf[scala.collection.Map[Any, Any]].get(key).flatMap(Option(_))
+    case value => throw new IllegalArgumentException(s"Cannot extract key '$key' from value '$value' of data type ${in.dataType.typeName}, expected a map")
+  })
 
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
     aggregator(in.visit(visitorFunc, aggregator), visitorFunc(this))
