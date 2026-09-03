@@ -68,7 +68,8 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfterAll
     val table = Table(db = Some(deltaDb), name = s"behaviour_$id", primaryKey = params.primaryKey)
     DeltaLakeTableDataObject(id, path = Some(tempPath + s"/${table.fullName}"), partitions = params.partitions,
       options = params.options, table = table, constraints = params.constraints, expectations = params.expectations,
-      saveMode = params.saveMode, allowSchemaEvolution = params.allowSchemaEvolution)(registry)
+      saveMode = params.saveMode, allowSchemaEvolution = params.allowSchemaEvolution,
+      housekeepingMode = params.housekeepingMode)(registry)
   }
 
   /** creates a managed table (no path defined) */
@@ -76,7 +77,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfterAll
     val table = Table(db = Some(deltaDb), name = s"behaviour_managed_$id", primaryKey = params.primaryKey)
     DeltaLakeTableDataObject(id, partitions = params.partitions, options = params.options, table = table,
       constraints = params.constraints, expectations = params.expectations, saveMode = params.saveMode,
-      allowSchemaEvolution = params.allowSchemaEvolution)(registry)
+      allowSchemaEvolution = params.allowSchemaEvolution, housekeepingMode = params.housekeepingMode)(registry)
   }
 
   test("CustomDf2DeltaTable") {
@@ -109,6 +110,14 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite with BeforeAndAfterAll
 
   test("SaveMode overwrite partitions dynamically") {
     testOverwritePartitionsDynamically(createExternalTableDataObject)
+  }
+
+  test("housekeeping partition retention") {
+    testHousekeepingPartitionRetention(createExternalTableDataObject)
+  }
+
+  test("housekeeping partition archive") {
+    testHousekeepingPartitionArchive(createExternalTableDataObject)
   }
 
   test("SaveMode overwrite and delete partition on managed table") {

@@ -69,7 +69,8 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
     val table = Table(catalog = Some("iceberg1"), db = Some("default"), name = s"behaviour_$id", primaryKey = params.primaryKey)
     IcebergTableDataObject(id, path = Some(tempPath + s"/${table.fullName}"), partitions = params.partitions,
       options = params.options, table = table, constraints = params.constraints, expectations = params.expectations,
-      saveMode = params.saveMode, allowSchemaEvolution = params.allowSchemaEvolution)(registry)
+      saveMode = params.saveMode, allowSchemaEvolution = params.allowSchemaEvolution,
+      housekeepingMode = params.housekeepingMode)(registry)
   }
 
   test("Write data") {
@@ -95,6 +96,11 @@ class IcebergTableDataObjectTest extends AnyFunSuite with BeforeAndAfter with Sm
 
   test("SaveMode overwrite partitions dynamically") {
     testOverwritePartitionsDynamically(createTableDataObject)
+  }
+
+  // PartitionArchiveMode is not tested, as IcebergTableDataObject does not implement movePartitions
+  test("housekeeping partition retention") {
+    testHousekeepingPartitionRetention(createTableDataObject)
   }
 
   test("SaveMode append") {

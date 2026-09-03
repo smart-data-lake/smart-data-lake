@@ -47,7 +47,8 @@ case class TableDataObjectTestParams(
     allowSchemaEvolution: Boolean = false,
     options: Map[String, String] = Map(),
     expectations: Seq[Expectation] = Seq(),
-    constraints: Seq[Constraint] = Seq()
+    constraints: Seq[Constraint] = Seq(),
+    housekeepingMode: Option[HousekeepingMode] = None
 )
 
 /**
@@ -85,8 +86,10 @@ trait TableDataObjectBehaviour extends GenericTestTool {
   /**
    * Copy data from a source DataObject to the table DataObject using CopyAction, then check data and table statistics.
    * @param expectColumnStats set to false for engines not supporting column statistics
+   * @param expectTableStats set to false for DataObjects not implementing table statistics
    */
-  def testCopyLoad(createSrcDataObject: SourceDataObjectFactory, createTgtDataObject: TableDataObjectFactory, expectColumnStats: Boolean = true): Unit = {
+  def testCopyLoad(createSrcDataObject: SourceDataObjectFactory, createTgtDataObject: TableDataObjectFactory,
+                   expectColumnStats: Boolean = true, expectTableStats: Boolean = true): Unit = {
     val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
     implicit val registry: InstanceRegistry = instanceRegistry
     implicit val context: ActionPipelineContext = contextInit
@@ -110,7 +113,7 @@ trait TableDataObjectBehaviour extends GenericTestTool {
     assert(resultat)
 
     // check statistics
-    assert(tgtDO.getStats().apply(TableStatsType.NumRows.toString) == 2)
+    if (expectTableStats) assert(tgtDO.getStats().apply(TableStatsType.NumRows.toString) == 2)
     if (expectColumnStats) {
       val colStats = tgtDO.getColumnStats()
       assert(colStats.apply("num").get(ColumnStatsType.Max.toString).contains(1))
@@ -146,10 +149,10 @@ trait TableDataObjectBehaviour extends GenericTestTool {
     assert(resultat)
 
     // move partition
-    assert(tgtDO.listPartitions.map(_.elements).toSet == Set(Map("num" -> "0"), Map("num" -> "1")))
+    assert(tgtDO.listPartitions(contextExec).map(_.elements).toSet == Set(Map("num" -> "0"), Map("num" -> "1")))
     if (testMovePartitions) {
-      tgtDO.movePartitions(Seq((PartitionValues(Map("num" -> "0")), PartitionValues(Map("num" -> "2")))))
-      assert(tgtDO.listPartitions.map(_.elements).toSet == Set(Map("num" -> "1"), Map("num" -> "2")))
+      tgtDO.movePartitions(Seq((PartitionValues(Map("num" -> "0")), PartitionValues(Map("num" -> "2")))))(contextExec)
+      assert(tgtDO.listPartitions(contextExec).map(_.elements).toSet == Set(Map("num" -> "1"), Map("num" -> "2")))
     }
   }
 
@@ -240,7 +243,7 @@ trait TableDataObjectBehaviour extends GenericTestTool {
     if (!resultat) printFailedTestResultGdf("testOverwriteAndDeletePartition 1st load", Seq())(actual)(df1)
     assert(resultat)
 
-    assert(tgtDO.listPartitions.toSet == Set(PartitionValues(Map("type" -> "ext")), PartitionValues(Map("type" -> "int"))))
+    assert(tgtDO.listPartitions(contextExec).toSet == Set(PartitionValues(Map("type" -> "ext")), PartitionValues(Map("type" -> "int"))))
 
     // 2nd load: overwrite partition type=ext
     val df2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 1))
@@ -254,8 +257,8 @@ trait TableDataObjectBehaviour extends GenericTestTool {
     assert(resultat2)
 
     // delete partition
-    tgtDO.deletePartitions(Seq(PartitionValues(Map("type" -> "int"))))
-    assert(tgtDO.listPartitions == Seq(PartitionValues(Map("type" -> "ext"))))
+    tgtDO.deletePartitions(Seq(PartitionValues(Map("type" -> "int"))))(contextExec)
+    assert(tgtDO.listPartitions(contextExec) == Seq(PartitionValues(Map("type" -> "ext"))))
   }
 
   /**
@@ -282,7 +285,7 @@ trait TableDataObjectBehaviour extends GenericTestTool {
     if (!resultat) printFailedTestResultGdf("testOverwritePartitionsDynamically 1st load", Seq())(actual)(df1)
     assert(resultat)
 
-    assert(tgtDO.listPartitions.toSet == Set(PartitionValues(Map("type" -> "ext")), PartitionValues(Map("type" -> "int"))))
+    assert(tgtDO.listPartitions(contextExec).toSet == Set(PartitionValues(Map("type" -> "ext")), PartitionValues(Map("type" -> "int"))))
 
     // 2nd load: dynamically overwrite partition type=ext
     val df2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 1))
@@ -293,6 +296,65 @@ trait TableDataObjectBehaviour extends GenericTestTool {
     val resultat2 = expected2.isEqual(actual2)
     if (!resultat2) printFailedTestResultGdf("testOverwritePartitionsDynamically 2nd load", Seq())(actual2)(expected2)
     assert(resultat2)
+  }
+
+  /**
+   * Housekeeping with [[PartitionRetentionMode]]: after every write, partitions not fulfilling the
+   * retention condition are deleted.
+   */
+  def testHousekeepingPartitionRetention(createTgtDataObject: TableDataObjectFactory): Unit = {
+    val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
+    implicit val registry: InstanceRegistry = instanceRegistry
+    implicit val context: ActionPipelineContext = contextInit
+
+    val tgtDO = registerDataObject(createTgtDataObject("tgt1",
+      TableDataObjectTestParams(partitions = Seq("dt"), housekeepingMode = Some(PartitionRetentionMode("elements.dt >= 20201201"))), instanceRegistry))
+    val helper = DataFrameSubFeed.getCompanion(tgtDO.getSubFeedSupportedTypes.head)
+    import helper.implicits._
+
+    tgtDO.prepare // this also validates the retentionCondition expression
+    val df1 = Seq(("20201101", "doe", "john", 5), ("20201201", "einstein", "albert", 2))
+      .toDF("dt", "lastname", "firstname", "rating")
+    tgtDO.init(df1, Seq())
+    tgtDO.writeDataFrame(df1, Seq())(contextExec)
+    assert(tgtDO.listPartitions(contextExec).toSet == Set(PartitionValues(Map("dt" -> "20201101")), PartitionValues(Map("dt" -> "20201201"))))
+
+    tgtDO.postWrite(Seq())(contextExec) // exec housekeeping
+
+    assert(tgtDO.listPartitions(contextExec) == Seq(PartitionValues(Map("dt" -> "20201201"))))
+  }
+
+  /**
+   * Housekeeping with [[PartitionArchiveMode]]: after every write, old partitions are moved into an archive partition.
+   * Note that this needs movePartitions to be implemented by the DataObject, see also `testCopyLoadPartitioned`.
+   */
+  def testHousekeepingPartitionArchive(createTgtDataObject: TableDataObjectFactory): Unit = {
+    val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
+    implicit val registry: InstanceRegistry = instanceRegistry
+    implicit val context: ActionPipelineContext = contextInit
+
+    val tgtDO = registerDataObject(createTgtDataObject("tgt1", TableDataObjectTestParams(partitions = Seq("dt"),
+      housekeepingMode = Some(PartitionArchiveMode(archivePartitionExpression = Some("map('dt','20201101')")))), instanceRegistry)) // always archive to 20201101
+    val helper = DataFrameSubFeed.getCompanion(tgtDO.getSubFeedSupportedTypes.head)
+    import helper.implicits._
+
+    tgtDO.prepare // this also validates the archivePartitionExpression
+    val df1 = Seq(("20201101", "doe", "john", 5), ("20201201", "einstein", "albert", 2))
+      .toDF("dt", "lastname", "firstname", "rating")
+    tgtDO.init(df1, Seq())
+    tgtDO.writeDataFrame(df1, Seq())(contextExec)
+    assert(tgtDO.listPartitions(contextExec).toSet == Set(PartitionValues(Map("dt" -> "20201101")), PartitionValues(Map("dt" -> "20201201"))))
+
+    tgtDO.postWrite(Seq())(contextExec) // exec housekeeping
+
+    // no records are lost, only the value of the partition column changed
+    assert(tgtDO.listPartitions(contextExec) == Seq(PartitionValues(Map("dt" -> "20201101"))))
+    val expected = Seq(("20201101", "doe", "john", 5), ("20201101", "einstein", "albert", 2))
+      .toDF("dt", "lastname", "firstname", "rating")
+    val actual = tgtDO.getDataFrame()(contextExec)
+    val resultat = expected.isEqual(actual)
+    if (!resultat) printFailedTestResultGdf("testHousekeepingPartitionArchive", Seq())(actual)(expected)
+    assert(resultat)
   }
 
   /**
@@ -343,6 +405,8 @@ trait TableDataObjectBehaviour extends GenericTestTool {
     // first load
     val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
       .toDF("type", "lastname", "firstname", "rating")
+    tgtDO.prepare
+    tgtDO.init(df1, Seq()) // create the table, DataObjects writing with a merge statement can not create it on write
     tgtDO.writeDataFrame(df1, Seq())(contextExec)
     val actual = tgtDO.getDataFrame()(contextExec)
     val resultat = df1.isEqual(actual)
@@ -380,6 +444,8 @@ trait TableDataObjectBehaviour extends GenericTestTool {
     // first load
     val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
       .toDF("type", "lastname", "firstname", "rating")
+    tgtDO.prepare
+    tgtDO.init(df1, Seq()) // create the table, DataObjects writing with a merge statement can not create it on write
     tgtDO.writeDataFrame(df1, Seq())(contextExec)
     val actual = tgtDO.getDataFrame()(contextExec)
     val resultat = df1.isEqual(actual)
@@ -389,6 +455,7 @@ trait TableDataObjectBehaviour extends GenericTestTool {
     // 2nd load: merge data by primary key with different schema
     val df2 = Seq(("ext", "doe", "john", 10), ("int", "emma", "brown", 7))
       .toDF("type", "lastname", "firstname", "rating2")
+    tgtDO.init(df2, Seq()) // DataObjects evolving the schema with DDL statements add the new column in init phase
     tgtDO.writeDataFrame(df2, Seq())(contextExec)
     val actual2 = tgtDO.getDataFrame()(contextExec)
     val expected2 = Seq(("ext", "doe", "john", Some(5), Some(10)), ("ext", "smith", "peter", Some(3), None), ("int", "emma", "brown", None, Some(7)))
@@ -414,6 +481,8 @@ trait TableDataObjectBehaviour extends GenericTestTool {
     // first load
     val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
       .toDF("type", "lastname", "firstname", "rating")
+    tgtDO.prepare
+    tgtDO.init(df1, Seq()) // create the table, DataObjects writing with a merge statement can not create it on write
     tgtDO.writeDataFrame(df1, Seq())(contextExec)
     val actual = tgtDO.getDataFrame()(contextExec)
     val resultat = df1.isEqual(actual)
@@ -534,8 +603,10 @@ trait TableDataObjectBehaviour extends GenericTestTool {
 
   /**
    * Check metrics returned by writing to the table DataObject with CopyAction.
+   * @param expectBytesWritten set to false for engines not reporting written bytes, e.g. JDBC writes
    */
-  def testWriteMetrics(createSrcDataObject: SourceDataObjectFactory, createTgtDataObject: TableDataObjectFactory): Unit = {
+  def testWriteMetrics(createSrcDataObject: SourceDataObjectFactory, createTgtDataObject: TableDataObjectFactory,
+                       expectBytesWritten: Boolean = true): Unit = {
     val (instanceRegistry, contextInit, contextExec) = setupRegistryAndContext()
     implicit val registry: InstanceRegistry = instanceRegistry
     implicit val context: ActionPipelineContext = contextInit
@@ -553,7 +624,7 @@ trait TableDataObjectBehaviour extends GenericTestTool {
     val srcSubFeed = ScalaSubFeed(None, srcDO.id, Seq())
     val tgtSubFeed = action.exec(Seq(srcSubFeed))(contextExec.copy(currentAction = Some(action))).head
     assert(!tgtSubFeed.metrics.flatMap(_.get("records_written")).contains(0), "records_written should be >0 or removed")
-    assert(!tgtSubFeed.metrics.flatMap(_.get("bytes_written")).contains(0), "bytes_written should be >0 or removed")
+    if (expectBytesWritten) assert(!tgtSubFeed.metrics.flatMap(_.get("bytes_written")).contains(0), "bytes_written should be >0 or removed")
     assert(!tgtSubFeed.metrics.flatMap(_.get("no_data")).contains(true), "no_data should not be true")
     assert(tgtSubFeed.metrics.flatMap(_.get("count")).contains(3))
     assert(tgtSubFeed.metrics.flatMap(_.get("rows_inserted")).contains(3))

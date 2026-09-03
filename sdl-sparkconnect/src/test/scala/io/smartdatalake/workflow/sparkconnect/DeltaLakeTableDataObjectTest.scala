@@ -57,7 +57,7 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite
     DeltaLakeTableDataObject(id, partitions = params.partitions, options = params.options,
       table = Table(Some("default"), s"sdlb_tdo_behaviour_$id", primaryKey = params.primaryKey),
       constraints = params.constraints, expectations = params.expectations, saveMode = params.saveMode,
-      allowSchemaEvolution = params.allowSchemaEvolution)(registry)
+      allowSchemaEvolution = params.allowSchemaEvolution, housekeepingMode = params.housekeepingMode)(registry)
 
   test("CustomDf2DeltaTable") {
     // no column statistics with the Spark Connect engine
@@ -82,6 +82,14 @@ class DeltaLakeTableDataObjectTest extends AnyFunSuite
 
   test("SaveMode overwrite partitions dynamically") {
     testOverwritePartitionsDynamically(createTableDataObject)
+  }
+
+  test("housekeeping partition retention") {
+    testHousekeepingPartitionRetention(createTableDataObject)
+  }
+
+  test("housekeeping partition archive") {
+    testHousekeepingPartitionArchive(createTableDataObject)
   }
 
   test("SaveMode append") {
