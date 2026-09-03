@@ -32,11 +32,11 @@ cd "$(dirname "$0")"
 
 
 if [ -z "${SPARK_VERSION:-}" ]; then
-  export SPARK_VERSION=4.1.1
+  export SPARK_VERSION=4.1.3
 fi
 SPARK_DIST=spark-${SPARK_VERSION}-bin-hadoop3
 SPARK_MINOR_VERSION=${SPARK_VERSION%.*}
-DELTA_VERSION=4.2.0
+DELTA_VERSION=4.4.0
 ICEBERG_VERSION=1.11.0
 ICEBERG_WAREHOUSE=$(pwd)/iceberg-warehouse
 
@@ -54,9 +54,9 @@ fi
 
 # Add delta lake jars to the server classpath. Note that using the --packages option instead does not work,
 # as jars submitted with --packages are not visible to the classloader loading the session catalog plugin.
-if [ ! -f "$SPARK_HOME/jars/delta-spark_4.1_2.13-${DELTA_VERSION}.jar" ]; then
+if [ ! -f "$SPARK_HOME/jars/delta-spark_${SPARK_MINOR_VERSION}_2.13-${DELTA_VERSION}.jar" ]; then
   echo "downloading delta-spark libraries"
-  wget -q -P "$SPARK_HOME/jars" https://repo1.maven.org/maven2/io/delta/delta-spark_4.1_2.13/${DELTA_VERSION}/delta-spark_4.1_2.13-${DELTA_VERSION}.jar
+  wget -q -P "$SPARK_HOME/jars" https://repo1.maven.org/maven2/io/delta/delta-spark_${SPARK_MINOR_VERSION}_2.13/${DELTA_VERSION}/delta-spark_${SPARK_MINOR_VERSION}_2.13-${DELTA_VERSION}.jar
   wget -q -P "$SPARK_HOME/jars" https://repo1.maven.org/maven2/io/delta/delta-storage/${DELTA_VERSION}/delta-storage-${DELTA_VERSION}.jar
 fi
 
