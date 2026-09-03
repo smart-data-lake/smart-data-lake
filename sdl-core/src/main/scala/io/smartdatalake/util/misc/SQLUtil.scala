@@ -44,6 +44,24 @@ object SQLUtil extends SmartDataLakeLogger {
   }
 
   /**
+   * Create a SQL update statement to move all records of one partition into another partition, by updating
+   * the value of the partition columns. This is used to archive partitions by housekeeping, see [[io.smartdatalake.workflow.dataobject.generic.PartitionArchiveMode]].
+   *
+   * Note that for table based DataObjects no data is moved physically, only the value of the partition columns changes.
+   * If the target partition exists already, the records are merged into it.
+   */
+  def createMovePartitionStatement(tableName: String, partitionValuesFrom: PartitionValues, partitionValuesTo: PartitionValues, quoteCaseSensitiveColumn: String => String): String = {
+    assert(partitionValuesFrom.nonEmpty, "Partition values to move must not be empty!")
+    assert(partitionValuesFrom.keys == partitionValuesTo.keys,
+      s"Source and target partition values must have the same set of partition columns defined ($partitionValuesFrom -> $partitionValuesTo)!")
+    val partitionCols = partitionValuesFrom.keys.toSeq
+    def condition(pv: PartitionValues, col: String) = s"${quoteCaseSensitiveColumn(col)} = '${escapeSqlStringLiteral(pv(col).toString)}'"
+    val setStr = partitionCols.map(c => condition(partitionValuesTo, c)).mkString(", ")
+    val whereStr = partitionCols.map(c => condition(partitionValuesFrom, c)).mkString(" and ")
+    s"update $tableName set $setStr where $whereStr"
+  }
+
+  /**
    * Create a SQL merge statement for given saveModeOptions
    */
   def createMergeStatement(targetTable: Table, columns: Seq[String], tmpTableName: String, saveModeOptions: SaveModeMergeOptions, quoteCaseSensitiveColumn: String => String): String = {

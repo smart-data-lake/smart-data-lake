@@ -18,24 +18,33 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.testutils.custom.TestCustomDfsTransformer
-import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool}
-import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
+import io.smartdatalake.testutils.{DataObjectTestSuite, TableDataObjectBehaviour, TableDataObjectTestParams}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcTableConnection}
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.generic.Table
-import org.slf4j.{Logger, LoggerFactory}
+import org.slf4j.Logger
 
 import java.nio.file.Files
 
-class JdbcTableDataObjectTest extends DataObjectTestSuite with SparkTestTool {
+/**
+ * Tests JdbcTableDataObject against an in-memory HSQLDB. Behaviours shared with the other table DataObjects
+ * are instantiated from TableDataObjectBehaviour, the remaining tests cover JDBC specifics like queries,
+ * pre/post SQL and virtual partitions.
+ */
+class JdbcTableDataObjectTest extends DataObjectTestSuite with SparkTestTool
+  with SmartDataLakeLogger with TableDataObjectBehaviour {
 
-  @transient implicit private lazy val logger: Logger = LoggerFactory.getLogger(getClass.getName)
+  @transient implicit private lazy val implicitLogger: Logger = logger
 
   import session.implicits._
 
@@ -43,6 +52,24 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with SparkTestTool {
   private val tempDir = Files.createTempDirectory("test")
 
   loggEnv
+
+  override def defaultEngineConnection: Connection with EngineConnection = SparkTestUtil.defaultSparkConnection
+
+  private def createSrcDataObject(id: String, registry: InstanceRegistry) = MockSparkDataObject(id)(registry)
+
+  /**
+   * Creates the JdbcTableDataObject under test and drops its table, so every behaviour starts with an empty database.
+   * Note that the behaviour tests reuse the same DataObject ids, and therefore also the same table names.
+   */
+  private def createTableDataObject(id: String, params: TableDataObjectTestParams, registry: InstanceRegistry): JdbcTableDataObject = {
+    registry.register(jdbcConnection)
+    val table = Table(db = Some("public"), name = s"behaviour_$id", primaryKey = params.primaryKey)
+    val dataObject = JdbcTableDataObject(id, table = table, connectionId = jdbcConnection.id,
+      virtualPartitions = params.partitions, saveMode = params.saveMode, allowSchemaEvolution = params.allowSchemaEvolution,
+      constraints = params.constraints, expectations = params.expectations, housekeepingMode = params.housekeepingMode)(registry)
+    dataObject.dropTable(contextExec)
+    dataObject
+  }
 
   test("write and read jdbc table") {
     instanceRegistry.register(jdbcConnection)
@@ -270,67 +297,6 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with SparkTestTool {
     dataObject.getSparkDataFrame().select($"abc").collect()
   }
 
-  test("SaveMode merge") {
-    instanceRegistry.register(jdbcConnection)
-    val targetTable = Table(db = Some("public"), name = "test_merge", query = None, primaryKey = Some(Seq("type", "lastname", "firstname")))
-    val targetDO = JdbcTableDataObject("jdbcDO1", table = targetTable, connectionId = "jdbcCon1", saveMode = SDLSaveMode.Merge, jdbcOptions = Map("createTableColumnTypes" -> "type varchar(255), lastname varchar(255), firstname varchar(255)"))
-    targetDO.dropTable
-
-    // first load
-    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.prepare
-    targetDO.initSparkDataFrame(df1, Seq())
-    targetDO.writeSparkDataFrame(df1)
-    val actual = targetDO.getSparkDataFrame()(contextExec)
-    val resultat = df1.equal(actual)
-    if (!resultat) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
-    assert(resultat)
-
-    // 2nd load: merge data by primary key
-    val df2 = Seq(("ext", "doe", "john", 10), ("int", "emma", "brown", 7))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.writeSparkDataFrame(df2)
-    val actual2 = targetDO.getSparkDataFrame()(contextExec)
-    val expected2 = Seq(("ext", "doe", "john", 10), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7))
-      .toDF("type", "lastname", "firstname", "rating")
-    val resultat2 = expected2.equal(actual2)
-    if (!resultat2) printFailedTestResultDs("SaveMode merge")(actual2)(expected2)
-    assert(resultat2)
-  }
-
-  test("SaveMode merge with schema evolution") {
-    instanceRegistry.register(jdbcConnection)
-    val targetTable = Table(db = Some("public"), name = "test_merge", query = None, primaryKey = Some(Seq("type", "lastname", "firstname")))
-    val targetDO = JdbcTableDataObject("jdbcDO1", table = targetTable, connectionId = "jdbcCon1", allowSchemaEvolution = true, saveMode = SDLSaveMode.Merge, jdbcOptions = Map("createTableColumnTypes" -> "type varchar(255), lastname varchar(255), firstname varchar(255)"))
-    targetDO.dropTable
-
-    // first load
-    val df1 = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3))
-      .toDF("type", "lastname", "firstname", "rating")
-    targetDO.prepare
-    targetDO.initSparkDataFrame(df1, Seq())
-    targetDO.writeSparkDataFrame(df1)
-    val actual = targetDO.getSparkDataFrame()(contextExec)
-    val resultat = df1.equal(actual)
-    if (!resultat) printFailedTestResultDs("Df2HiveTable")(actual)(df1)
-    assert(resultat)
-
-    // 2nd load: merge data by primary key with different schema
-    // - column 'rating' deleted -> existing records will keep column rating untouched (values are preserved and not set to null), new records will get new column rating set to null.
-    // - column 'rating2' added -> existing records will get new column rating2 set to null
-    val df2 = Seq(("ext", "doe", "john", 10), ("int", "emma", "brown", 7))
-      .toDF("type", "lastname", "firstname", "rating2")
-    targetDO.initSparkDataFrame(df2, Seq())
-    targetDO.writeSparkDataFrame(df2)
-    val actual2 = targetDO.getSparkDataFrame()(contextExec)
-    val expected2 = Seq(("ext", "doe", "john", Some(5), Some(10)), ("ext", "smith", "peter", Some(3), None), ("int", "emma", "brown", None, Some(7)))
-      .toDF("type", "lastname", "firstname", "rating", "rating2")
-    val resultat2 = expected2.equal(actual2)
-    if (!resultat2) printFailedTestResultDs("SaveMode merge")(actual2)(expected2)
-    assert(resultat2)
-  }
-
   test("incremental output mode") {
 
     // create data object
@@ -366,19 +332,6 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with SparkTestTool {
     targetDO.getSparkDataFrame()(contextExec).count() shouldEqual 5
   }
 
-  test("write to jdbc table with different order of columns") {
-    instanceRegistry.register(jdbcConnection)
-    val table = Table(Some("public"), "table1")
-    val dataObject = JdbcTableDataObject("jdbcDO1", table = table, connectionId = "jdbcCon1")
-    dataObject.dropTable
-    val df = Seq(("ext", "doe", "john", 5), ("ext", "smith", "peter", 3), ("int", "emma", "brown", 7)).toDF("type", "lastname", "firstname", "rating")
-    val dfColumnsSwitched = df.select("type", "rating", "firstname", "lastname")
-    dataObject.initSparkDataFrame(df, Seq())
-    dataObject.writeSparkDataFrame(dfColumnsSwitched, Seq())
-    val dfRead = dataObject.getSparkDataFrame(Seq())(contextExec)
-    assert(dfRead.getSymmetricDifference(df).isEmpty)
-  }
-
   // see logs to manually assure that no temp table is created and the configuration is correct.
   test("write to jdbc table with directTableOverwrite=true") {
     instanceRegistry.register(jdbcConnection.copy(directTableOverwrite = true))
@@ -392,34 +345,95 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with SparkTestTool {
     assert(dfRead.getSymmetricDifference(df).isEmpty)
   }
 
-  test("write partitioned jdbc, copy to hive and delete partition") {
-
+  test("move virtual partitions with multiple partition columns") {
     instanceRegistry.register(jdbcConnection)
-    val srcTable = Table(Some("public"), "table1", None, Some(Seq("lastname", "firstname")))
-    val srcDO = JdbcTableDataObject(id="jdbcDO1", table = srcTable, connectionId = "jdbcCon1",
-      virtualPartitions = Seq("lastname"),
-      jdbcOptions = Map("createTableColumnTypes" -> "lastname varchar(255), firstname varchar(255), rating INTEGER"))
-    srcDO.dropTable
-    instanceRegistry.register(srcDO)
+    val table = Table(Some("public"), "table_move_partitions")
+    val dataObject = JdbcTableDataObject("jdbcDO1", table = table, connectionId = "jdbcCon1",
+      virtualPartitions = Seq("dt", "region"),
+      jdbcOptions = Map("createTableColumnTypes" -> "dt varchar(255), region varchar(255), lastname varchar(255)"))
+    dataObject.dropTable
 
-    val tgtDO = MockSparkDataObject(id = "tgt",
-      partitions = Seq("lastname"), primaryKey = Some(Seq("lastname", "firstname")))
-      .register
+    val df = Seq(("20201101", "ch", "doe", 5), ("20201201", "ch", "einstein", 2), ("20201201", "de", "smith", 3))
+      .toDF("dt", "region", "lastname", "rating")
+    dataObject.initSparkDataFrame(df, Seq())
+    dataObject.writeSparkDataFrame(df)
 
-    // prepare data
-    val dfSrc = Seq(("dau", "bob", 10),
-      ("doe", "john", 5))
-      .toDF("lastname", "firstname", "rating")
-    srcDO.initSparkDataFrame(dfSrc, Seq())
-    srcDO.writeSparkDataFrame(dfSrc, Seq())
+    // move dt=20201101/region=ch into the existing partition dt=20201201/region=ch
+    dataObject.movePartitions(Seq(
+      PartitionValues(Map("dt" -> "20201101", "region" -> "ch")) -> PartitionValues(Map("dt" -> "20201201", "region" -> "ch"))
+    ))(contextExec)
 
-    val action = CopyAction("copy", srcDO.id, tgtDO.id)
-    val srcSubFeed = SparkSubFeed(None, "jdbcDO1", Seq())
-    action.exec(Seq(srcSubFeed))(contextExec).head
+    assert(dataObject.listPartitions(contextExec).toSet == Set(
+      PartitionValues(Map("dt" -> "20201201", "region" -> "ch")),
+      PartitionValues(Map("dt" -> "20201201", "region" -> "de"))
+    ))
+    val actual = dataObject.getSparkDataFrame()(contextExec)
+    val expected = Seq(("20201201", "ch", "doe", 5), ("20201201", "ch", "einstein", 2), ("20201201", "de", "smith", 3))
+      .toDF("dt", "region", "lastname", "rating")
+    assert(actual.getSymmetricDifference(expected).isEmpty)
+  }
 
-    assert(tgtDO.listPartitions.toSet == Set(PartitionValues(Map("lastname" -> "dau")), PartitionValues(Map("lastname" -> "doe"))))
-    tgtDO.deletePartitions(Seq(PartitionValues(Map("lastname" -> "doe"))))
-    assert(tgtDO.listPartitions == Seq(PartitionValues(Map("lastname" -> "dau"))))
+  //////////////////////////////////////////////////////////////////////////////////////
+  // Behaviours shared with the other table DataObjects, see TableDataObjectBehaviour.
+  //
+  // Not instantiated for JdbcTableDataObject:
+  // - testOverwriteAndDeletePartition / testOverwritePartitionsDynamically / testNoDataToProcessWarningOnEmptyWrite:
+  //   they rely on option partitionOverwriteMode, which JdbcTableDataObject does not implement.
+  // - testOverwriteWithDifferentSchema / testAppendWithDifferentSchema: they expect deleted columns to disappear,
+  //   while JdbcTableDataObject keeps them and makes them nullable, see evolveTableSchema.
+  // - the incremental output behaviours: JdbcTableDataObject implements incremental output with a
+  //   high-water-mark expression evaluated on read (incrementalOutputExpr) instead of table versions,
+  //   see the JDBC specific test "incremental output mode" above.
+  //////////////////////////////////////////////////////////////////////////////////////
+
+  test("write data") {
+    // JdbcTableDataObject implements neither table nor column statistics
+    testCopyLoad(createSrcDataObject, createTableDataObject, expectColumnStats = false, expectTableStats = false)
+  }
+
+  test("write data partitioned") {
+    testCopyLoadPartitioned(createSrcDataObject, createTableDataObject)
+  }
+
+  test("SaveMode append") {
+    testAppend(createTableDataObject)
+  }
+
+  test("SaveMode merge") {
+    testMerge(createTableDataObject)
+  }
+
+  test("SaveMode merge with schema evolution") {
+    testMergeWithSchemaEvolution(createTableDataObject)
+  }
+
+  test("SaveMode merge with updateCols") {
+    testMergeWithUpdateColumns(createTableDataObject)
+  }
+
+  test("write with different order of columns") {
+    testWriteWithDifferentColumnOrder(createTableDataObject)
+  }
+
+  test("constraints validation") {
+    testConstraints(createSrcDataObject, createTableDataObject)
+  }
+
+  test("returns correct metrics") {
+    // Spark reports no written bytes for JDBC writes
+    testWriteMetrics(createSrcDataObject, createTableDataObject, expectBytesWritten = false)
+  }
+
+  test("copy load expectations test") {
+    testCopyLoadWithExpectations(createSrcDataObject, createTableDataObject)
+  }
+
+  test("housekeeping partition retention") {
+    testHousekeepingPartitionRetention(createTableDataObject)
+  }
+
+  test("housekeeping partition archive") {
+    testHousekeepingPartitionArchive(createTableDataObject)
   }
 
 }

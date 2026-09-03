@@ -58,7 +58,7 @@ class IcebergTableDataObjectTest extends AnyFunSuite
     IcebergTableDataObject(id, partitions = params.partitions, options = params.options,
       table = Table(catalog = Some(SparkConnectTestUtil.icebergCatalog), db = Some("default"), name = s"sdlb_iceberg_behaviour_$id", primaryKey = params.primaryKey),
       constraints = params.constraints, expectations = params.expectations, saveMode = params.saveMode,
-      allowSchemaEvolution = params.allowSchemaEvolution)(registry)
+      allowSchemaEvolution = params.allowSchemaEvolution, housekeepingMode = params.housekeepingMode)(registry)
 
   test("Write data") {
     testCopyLoad(createSrcDataObject, createTableDataObject)
@@ -83,6 +83,11 @@ class IcebergTableDataObjectTest extends AnyFunSuite
 
   test("SaveMode overwrite partitions dynamically") {
     testOverwritePartitionsDynamically(createTableDataObject)
+  }
+
+  // PartitionArchiveMode is not tested, as IcebergTableDataObject does not implement movePartitions
+  test("housekeeping partition retention") {
+    testHousekeepingPartitionRetention(createTableDataObject)
   }
 
   test("SaveMode append") {

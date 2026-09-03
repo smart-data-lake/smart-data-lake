@@ -112,6 +112,10 @@ import scala.util.{Failure, Success, Try}
  *                              Normally this can be just a column name, e.g. an id or updated timestamp which is continually increasing.
  * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
  * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
+ * @param housekeepingMode Optional definition of a housekeeping mode applied after every write.
+ *                         E.g. it can be used to clean up or archive virtual partitions, see [[HousekeepingMode]].
+ *                         Note that housekeeping works on `virtualPartitions`, so these need to be defined.
+ *                         Default is None.
  */
 case class JdbcTableDataObject(override val id: DataObjectId,
                                createSql: Option[String] = None,
@@ -131,6 +135,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                virtualPartitions: Seq[String] = Seq(),
                                override val expectedPartitionsCondition: Option[String] = None,
                                incrementalOutputExpr: Option[String] = None,
+                               override val housekeepingMode: Option[HousekeepingMode] = None,
                                override val metadata: Option[DataObjectMetadata] = None
                               )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
@@ -172,6 +177,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   assert(saveMode==SDLSaveMode.Append || saveMode==SDLSaveMode.Overwrite || saveMode==SDLSaveMode.Merge, s"($id) Only saveMode Append, Overwrite and Merge are supported.")
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
+    // prepare housekeeping mode and validate lazy parsed schemas
+    super.prepare
 
     // test connection
     try {
@@ -528,6 +535,29 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   override def deletePartitions(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     if (partitionValues.nonEmpty) {
       connection.execJdbcStatement(deletePartitionsStatement(partitionValues))
+    }
+  }
+
+  /**
+   * Move virtual partitions by updating the partition columns with an "update" statement.
+   * All updates are executed in one transaction.
+   *
+   * Note that in contrast to file based DataObjects no data is moved physically, only the value of the
+   * virtual partition columns changes. If the target partition exists already, the records are merged into it.
+   */
+  override def movePartitions(partitionValues: Seq[(PartitionValues, PartitionValues)])(implicit context: ActionPipelineContext): Unit = {
+    if (partitionValues.nonEmpty) {
+      val transaction = connection.beginTransaction()
+      try {
+        partitionValues.foreach { case (pvFrom, pvTo) =>
+          transaction.execJdbcStatement(SQLUtil.createMovePartitionStatement(table.fullName, pvFrom, pvTo, quoteCaseSensitiveColumn(_)))
+        }
+        transaction.commit()
+      } catch {
+        case e: SQLException =>
+          transaction.rollback()
+          throw e
+      }
     }
   }
 
