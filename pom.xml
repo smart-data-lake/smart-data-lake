@@ -421,7 +421,7 @@
         <jetty.deps.scope>compile</jetty.deps.scope>
         <scala.minor.version>2.13</scala.minor.version>
         <scala.version>${scala.minor.version}.12</scala.version>
-        <spark.version>4.1.1</spark.version>
+        <spark.version>4.1.3</spark.version>
         <!-- this sdl-specific extensions should match the minor version of property spark.version -->
         <spark-extensions.version>4.1.0-SNAPSHOT</spark-extensions.version>
         <spark.minor.version>4.1</spark.minor.version>
@@ -556,7 +556,7 @@
         <sshj.version>0.40.0</sshj.version>
         <snowflake-spark.version>3.1.8</snowflake-spark.version>
         <snowflake-snowpark.version>1.18.0</snowflake-snowpark.version>
-        <delta.version>4.2.0</delta.version>
+        <delta.version>4.4.0</delta.version>
         <iceberg.version>1.11.0</iceberg.version>
         <bigquery.version>0.42.1</bigquery.version>
 
