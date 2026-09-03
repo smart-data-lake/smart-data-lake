@@ -124,16 +124,61 @@ Use sdl-parent as maven "parent pom", or add the plugin to your project as follo
 ```
 :::
 
-Note that the column comments have to be persisted by the target DataObject to be visible in the UI,
-as `DataObjectSchemaExporter` reads the schema back from the DataObject.
-This is supported by table DataObjects, e.g. `DeltaLakeTableDataObject` with `updateColumnComments = true`,
-but not by plain file DataObjects.
+Note that column comments are not written to the catalog during a normal SDLB run.
+Table metadata can only change when the configuration or the code changes, so it is applied at
+deployment time instead - see [Applying table metadata to the catalog](#applying-table-metadata-to-the-catalog).
 
 Limitations:
 * Only UDFs created with the typed API, e.g. `udf((x: String) => MyCaseClass(x))`, carry the type information
   needed to find the case class. A UDF declaring its return type explicitly does not.
 * Python UDFs are not supported.
 * The Spark Connect engine is not supported.
+
+## Applying table metadata to the catalog
+
+Table metadata - the table comment from `metadata.description`, the column comments and the primary key -
+is *not* written to the catalog during a normal SDLB run. It can only change when the configuration or the
+code changes, so writing it on every run causes unnecessary load on the catalog and races with concurrent
+write operations. It is applied at deployment time in two steps instead.
+
+**1. Export the schemas on the development environment.** A dry-run with schema export writes the schema of
+every output DataObject, including the column comments SDLB assembled from `schemaMin`, from the Markdown
+description files and from the ScalaDoc of case classes, to `global.dataObjectsSchemaSource`:
+
+```bash
+sdlb --config config/ --feed-sel '.*' --test dry-run-with-schema-export
+```
+
+This is a dry-run: it executes the prepare- and init-phase only and does not write any data. Because the
+schemas come from the init-phase and not from the catalog, this works even if the tables do not exist yet.
+Commit the resulting schema files together with the configuration.
+
+```hocon
+global {
+  dataObjectsSchemaSource = "file:./schema"
+}
+```
+
+**2. Apply the metadata on the target environment.** `DataObjectSchemaExporter` reads the desired state from
+the configuration and from the exported schema files, compares it with the catalog and writes only what
+differs:
+
+```bash
+# report what would change, without changing anything
+java -cp sdlb.jar io.smartdatalake.meta.configexporter.DataObjectSchemaExporter \
+  --config config/ --mode plan --descriptionPath ./description
+
+# apply the changes
+java -cp sdlb.jar io.smartdatalake.meta.configexporter.DataObjectSchemaExporter \
+  --config config/ --mode apply --descriptionPath ./description
+```
+
+Applying is idempotent: running it twice makes no second change. Column descriptions defined with `@column`
+in the Markdown description files override the comments from the exported schema.
+
+This is supported by table DataObjects implementing `CanHandleCatalogMetadata`, currently
+`DeltaLakeTableDataObject`, `IcebergTableDataObject` and `SnowflakeTableDataObject`. Other DataObjects are
+skipped. The primary key is only applied for tables with `table.createAndReplacePrimaryKey = true`.
 
 
 <!-- TODO Review all below -->

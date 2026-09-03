@@ -19,6 +19,10 @@
 package io.smartdatalake.meta.configexporter
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataobject.generic.CatalogMetadataApplier
+import org.apache.hadoop.conf.Configuration
 import io.smartdatalake.config.exporter.ExportWriter
 import io.smartdatalake.config.exporter.ExportWriter.formatSchema
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException}
@@ -34,8 +38,34 @@ import scopt.OptionParser
 import java.time.LocalDateTime
 import scala.util.{Failure, Success, Try}
 
+/**
+ * What DataObjectSchemaExporter should do.
+ */
+object ExporterMode extends Enumeration {
+  type ExporterMode = Value
+
+  /**
+   * Read the schemas and statistics of the DataObjects and write them to the configured targets.
+   */
+  val Export: ExporterMode = Value("export")
+
+  /**
+   * Read the desired table metadata from the configuration and the exported schema files, and write it
+   * to the catalog. This is the deployment time counterpart of "--test dry-run-with-schema-export".
+   */
+  val Apply: ExporterMode = Value("apply")
+
+  /**
+   * Like [[Apply]], but only report the changes which would be applied, without changing the catalog.
+   */
+  val Plan: ExporterMode = Value("plan")
+}
+
 case class DataObjectSchemaExporterConfig(configPaths: Seq[String] = null,
+                                          mode: ExporterMode.Value = ExporterMode.Export,
                                           targets: Seq[String] = Seq("./schema"),
+                                          source: Option[String] = None,
+                                          descriptionPath: Option[String] = None,
                                           includeRegex: String = ".*",
                                           excludeRegex: Option[String] = None,
                                           withStats: Boolean = true,
@@ -56,6 +86,18 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
       .required()
       .action((value, c) => c.copy(configPaths = value.split(',').toIndexedSeq))
       .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
+    opt[String]("mode")
+      .action((value, c) => c.copy(mode = ExporterMode.withName(value)))
+      .valueName("<export|apply|plan>")
+      .text("export: read schemas and statistics of the DataObjects and write them to the target (default). " +
+        "apply: write the table metadata (comments, primary keys) from the configuration and the exported schemas to the catalog. " +
+        "plan: report the changes 'apply' would make, without changing the catalog.")
+    opt[String]("source")
+      .action((value, c) => c.copy(source = Some(value)))
+      .text("Source URI to read exported schemas from in mode apply/plan. Defaults to global.dataObjectsSchemaSource.")
+    opt[String]('d', "descriptionPath")
+      .action((value, c) => c.copy(descriptionPath = Some(value)))
+      .text("Path of the directory containing the Markdown description files of the DataObjects. Column descriptions defined there with @column are applied as column comments in mode apply/plan.")
     opt[String]('p', "exportPath")
       .action((value, c) => c.copy(targets = Seq(value)))
       .text("Deprecated: Use target instead. Path to export schema and statistics to.")
@@ -94,9 +136,13 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     parser.parse(args, DataObjectSchemaExporterConfig()) match {
       case Some(exporterConfig) =>
 
-        // export data object schemas and statistics to json format
         logger.info(s"starting with configuration ${ProductUtil.formatObj(exporterConfig)}")
-        exportSchemaAndStats(exporterConfig)
+        exporterConfig.mode match {
+          // export data object schemas and statistics to json format
+          case ExporterMode.Export => exportSchemaAndStats(exporterConfig)
+          // write table metadata to the catalog, or report what would be written
+          case ExporterMode.Apply | ExporterMode.Plan => applyCatalogMetadata(exporterConfig)
+        }
 
       case None =>
         logAndThrowException(s"Aborting $appType after error", new ConfigurationException("Couldn't set command line parameters correctly."))
@@ -167,6 +213,60 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
         }
       }
     }
+  }
+
+  /**
+   * Write the table metadata defined in the configuration and in the exported schemas to the catalog,
+   * or report the changes which would be applied in mode plan.
+   *
+   * The schemas are read from `source`, which defaults to `global.dataObjectsSchemaSource`. They are
+   * created by an SDLB dry-run using "--test dry-run-with-schema-export", so that the column comments
+   * are available even if the tables do not exist yet in the environment where the dry-run is executed.
+   */
+  def applyCatalogMetadata(config: DataObjectSchemaExporterConfig): Unit = {
+
+    val isPlan = config.mode == ExporterMode.Plan
+
+    // get DataObjects
+    val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(config.configPaths)
+    implicit val hadoopConf: Configuration = globalConfig.getHadoopConfiguration
+    val startTime = LocalDateTime.now()
+    implicit val context: ActionPipelineContext = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, registry, SmartDataLakeBuilderConfig("DataObjectSchemaExporter", Some("DataObjectSchemaExporter")), runStartTime = startTime, attemptStartTime = startTime, phase = ExecutionPhase.Init, globalConfig = globalConfig)
+    val dataObjects = registry.getDataObjects
+      .filter(d => d.id.id.matches(config.includeRegex) && (config.excludeRegex.isEmpty || !d.id.id.matches(config.excludeRegex.get)))
+
+    // schemas exported by a previous dry-run, used to get the column comments
+    val source = config.source.orElse(globalConfig.dataObjectsSchemaSource)
+    val schemaWriter = source.map(ExportWriter.apply(_, config.configPaths, globalConfig.uiBackend.map(_.client), Some(hadoopConf)))
+    if (schemaWriter.isEmpty) logger.warn("Neither --source nor global.dataObjectsSchemaSource is defined, no column comments will be applied")
+    def readSchema(dataObjectId: DataObjectId): Option[GenericSchema] =
+      schemaWriter.flatMap(_.readLatestSchema(dataObjectId)).map(ExportWriter.parseSchema(_)._1)
+
+    // column descriptions from the Markdown description files override the exported schema comments
+    val columnDescriptions = config.descriptionPath.map(path => ColumnDescriptionParser.parse(path)).getOrElse(Map())
+      .map { case (dataObjectId, descriptions) =>
+        dataObjectId -> descriptions.map { case (name, d) => ColumnDescriptionParser.toColumnPath(name) -> d }
+      }
+
+    val applier = new CatalogMetadataApplier(readSchema, columnDescriptions)
+    logger.info(s"${if (isPlan) "Planning" else "Applying"} catalog metadata for ${dataObjects.size} DataObjects")
+
+    val changed = dataObjects.flatMap { dataObject =>
+      try {
+        applier.plan(dataObject).filterNot(_.isEmpty).map { changes =>
+          logger.info(s"(${dataObject.id}) ${if (isPlan) "would apply" else "applying"}:\n  ${changes.describe.mkString("\n  ")}")
+          if (!isPlan) applier.apply(dataObject, changes)
+          dataObject.id
+        }
+      } catch {
+        case ex: Exception =>
+          logger.error(s"(${dataObject.id}) ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+          if (config.stopOnError) throw ex else None
+      }
+    }
+
+    if (changed.isEmpty) logger.info("Catalog metadata is up to date, nothing to apply")
+    else logger.info(s"${if (isPlan) "Would change" else "Changed"} catalog metadata of ${changed.size} DataObjects: ${changed.map(_.id).mkString(", ")}")
   }
 
   private[configexporter] def getCurrentVersion = System.currentTimeMillis() / 1000

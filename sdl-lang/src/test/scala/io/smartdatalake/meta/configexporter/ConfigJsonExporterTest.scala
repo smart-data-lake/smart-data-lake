@@ -41,10 +41,9 @@ class ConfigJsonExporterTest extends AnyFunSuite {
     assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "lineNumber" === JInt(112))
     assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "endLineNumber" === JNothing)
     assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "path" === JString("dagexporterTest.conf"))
-    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" \ "a" === JString("Beschreibung A"))
-    assert((actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" \ "b.[].b1").asInstanceOf[
-      JString
-    ].s.linesIterator.toSeq === Seq("Beschreibung B1", "2nd line B1 text"))
+    // column descriptions are not part of the exported config anymore, they are applied to the catalog and
+    // exported with the schema by DataObjectSchemaExporter, see ColumnDescriptionParserTest.
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" === JNothing)
     assert(((actualJsonOutput \ "actions" \ "actionId6" \ "transformers")(0) \ "_parameters")(0) \ "name" === JString("session"))
     assert((actualJsonOutput \ "actions" \ "actionId8" \ "transformers")(0) \ "_sourceDoc" ===
       JString("Documentation for TestTransformer.  \nThis should be exported by ConfigJsonExporter!"))

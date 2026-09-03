@@ -39,11 +39,63 @@ mvn -B test -pl sdl-core -Dsuites=io.smartdatalake.workflow.dataobject.AccessTab
 
 ### Waiting for long-running builds
 
-A full reactor build takes ~10 minutes, so it is usually started in the background. When polling for its
-completion, **do not detect the running build with `pgrep -f "<some part of the maven command line>"`**: the
-polling shell's own command line contains that pattern, so `pgrep` matches itself and reports "still running"
-forever. Detect completion from the build output instead, e.g. by grepping the log for
-`BUILD SUCCESS|BUILD FAILURE`, or by waiting on the process/job directly.
+A full reactor build takes ~10 minutes, so it is usually started in the background, redirecting to a log file.
+
+**Wait for it with a single blocking command that returns the result**, not with repeated progress checks:
+
+```bash
+# one call: blocks until done, then prints the verdict and any real compile errors
+until grep -qE "BUILD SUCCESS|BUILD FAILURE" build.log 2>/dev/null; do sleep 15; done
+echo "=== RESULT ==="
+grep -m1 -E "BUILD SUCCESS|BUILD FAILURE" build.log
+grep -E "\[ERROR\].*\.scala" build.log | head -20
+```
+
+Anti-patterns that waste a lot of time and context — all observed in practice:
+
+- **Polling in a loop of separate tool calls** (`tail -1 build.log`, then again, then again...). Each call costs a
+  round trip and tells you nothing actionable; a build that is "still compiling sdl-spark" needs no decision from
+  you. Issue *one* blocking wait and read the result.
+- **Launching a background waiter and then immediately checking on it.** The waiter returns via its own completion
+  notification; querying the log right after starting it just re-polls by hand. Either block in the foreground
+  (with a generous timeout) or start the waiter and genuinely do something else until it reports.
+- **Detecting the running build with `pgrep -f "<part of the maven command line>"`**: the polling shell's own
+  command line contains that pattern, so `pgrep` matches itself and reports "still running" forever.
+- **Matching on `ERROR` alone to decide the build finished.** Every build logs
+  `'dependencies.dependency.version' for org.scalactic/org.scalatest ... is missing` while resolving the invalid
+  third-party POM of `com.databricks:databricks-dbutils-scala`. These lines are harmless and appear long before the
+  build ends. Match `BUILD SUCCESS|BUILD FAILURE` for completion, and `\[ERROR\].*\.scala` for real compile errors.
+
+Note that maven's elapsed time and `ps` timings are unreliable under WSL on `/mnt/c`; judge progress from the log
+file's content and mtime, not from process elapsed time.
+
+### Which modules to build
+
+`mvn -pl <module>` alone fails for modules whose SDLB dependencies are not installed in `~/.m2`
+(`Cannot access sonatype-snapshots ... in offline mode`). Use `-pl <module> -am` so the dependencies are built in
+the same reactor, or `mvn install` them first. `sdl-lang` depends on nearly every other module, so
+`-pl sdl-lang -am` is effectively a full build.
+
+**Do not combine `-Dsuites=` with `-am`.** The suite filter is applied to *every* module in the reactor, and the
+first module that does not contain the named class aborts the run:
+
+```
+*** RUN ABORTED ***
+Unable to load a Suite class... Missing class: io.smartdatalake.workflow.dataobject.MyTest
+```
+
+So to run one suite in a module whose dependencies are not installed yet, install the reactor first and then run
+the suite against the installed artifacts:
+
+```bash
+mvn -o -B install -DskipTests -Dlicense.skip=true -Dmaven.source.skip=true \
+  -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
+mvn -o -B test -pl sdl-deltalake -Dsuites=io.smartdatalake.workflow.dataobject.MyTest
+```
+
+A wrong FQCN in `-Dsuites` fails the same way (`RUN ABORTED ... Missing class`), so verify it rather than
+guessing from the file path - the package does not always mirror the directory, e.g.
+`FactoryMethodCompletenessTest` lives in `io.smartdatalake.config`, not `io.smartdatalake.meta`.
 
 ## Configuration Patterns
 

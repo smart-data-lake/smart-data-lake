@@ -90,7 +90,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
       .text("Whether to add an additional property 'origin' including source filename and line number to first class configuration objects.")
     opt[String]('d', "descriptionPath")
       .action((value, c) => c.copy(descriptionPath = Some(value)))
-      .text("Path to markdown files that contain column descriptions of DataObjects. If set, the exported config is enriched with the column descriptions.")
+      .text("Path to the markdown description files of the DataObjects. Used together with --uploadDescriptions to upload them to the visualizer backend. Note that the column descriptions defined there with @column are applied to the catalog and exported with the schema by DataObjectSchemaExporter, they are not part of the exported config anymore.")
     opt[Unit]("uploadDescriptions")
       .action((_, c) => c.copy(uploadDescriptions = true))
       .text("Upload description markdown files to visualizer backend.")
@@ -188,8 +188,6 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
     sdlConfig = configKeysToRemove.foldLeft(sdlConfig)((config, key) => config.withoutPath(key))
     // enrich origin of first class config objects
     if (config.enrichOrigin) sdlConfig = enrichOrigin(config.configPaths, sdlConfig)
-    // enrich optional column description from description files
-    config.descriptionPath.foreach(path => sdlConfig = enrichColumnDescription(path, sdlConfig))
     // enrich optional source documentation for custom classes from scaladoc
     sdlConfig = enrichCustomClassScalaDoc(sdlConfig)
     // enrich optional custom transformer parameter info
@@ -290,47 +288,6 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
             }
         }
     }
-  }
-
-  private def enrichColumnDescription(descriptionPath: String, config: Config)(implicit hadoopConf: Configuration): Config = {
-    val columnDescriptionRegex = """\s*@column\s+["`']?([^\s"`']+)["`']?\s+(.*)""".r.anchored
-    var enrichedConfig = config
-    val hadoopPath = new Path(descriptionPath, ConfigParser.CONFIG_SECTION_DATAOBJECTS)
-    implicit val filesystem: FileSystem = Environment.fileSystemFactory.getFileSystem(hadoopPath, hadoopConf)
-
-    logger.info(s"Searching DataObject description files in $hadoopPath")
-    RemoteIteratorWrapper(filesystem.listStatusIterator(hadoopPath)).filterNot(_.isDirectory)
-      .filter(_.getPath.getName.endsWith(".md")).toSeq // only Markdown files
-      .foreach { p =>
-        val dataObjectId = p.getPath.getName.split('.').head
-        val dataObjectPath = s"${ConfigParser.CONFIG_SECTION_DATAOBJECTS}.$dataObjectId"
-        if (enrichedConfig.hasPath(dataObjectPath)) {
-          val descriptions = HdfsUtil.readHadoopFile(p.getPath).linesIterator.foldLeft((Seq[(String, String)](), false)) {
-            // if new column description tag, add new column description
-            case ((descriptions, _), columnDescriptionRegex(name, description)) =>
-              (descriptions :+ (name, description.trim), true)
-            // if new header tag and column description open, close column description
-            case ((descriptions, true), line) if line.startsWith("#") =>
-              (descriptions, false)
-            // if last column description open, add line to last column description text
-            case ((descriptions, true), line) =>
-              val (lastName, lastDesc) = descriptions.last
-              (descriptions.init :+ (lastName, (lastDesc + System.lineSeparator() + line.trim).trim), true)
-            // if last column description closed, ignore line
-            case ((descriptions, false), _) =>
-              (descriptions, false)
-          }._1.filter(_._2.nonEmpty).toMap
-          if (descriptions.nonEmpty) {
-            logger.info(s"(${DataObjectId(dataObjectId)}) Merging ${descriptions.size} column descriptions")
-            enrichedConfig = enrichedConfig.withValue(s"$dataObjectPath._columnDescriptions", ConfigValueFactory.fromMap(descriptions.asJava))
-          }
-        } else {
-          logger.error(s"(${DataObjectId(dataObjectId)}) Markdown file found, but DataObject does not exist in configuration")
-        }
-      }
-
-    // return
-    enrichedConfig
   }
 
   private def enrichCustomTransformerParameters(config: Config): Config = {

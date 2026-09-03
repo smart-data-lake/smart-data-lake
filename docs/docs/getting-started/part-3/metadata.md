@@ -74,7 +74,9 @@ Let's edit therefore file `viz/dataObjects/btl-distance.md`.
 
 The existing file already contains some examples to create titles, tables and include images.
 And there is an example of a special syntax to create column descriptions using `@column` keyword.
-These columns descriptions will be rendered as markdown-table, and are also shown as column comments in the schema.
+These column descriptions are applied as column comments by `DataObjectSchemaExporter`, see
+[Applying table metadata to the catalog](/docs/reference/schema#applying-table-metadata-to-the-catalog),
+and are therefore shown as column comments in the schema. They override a comment coming from the schema itself.
 
 Lets add an additional comment for column `dep_name` to the markdown.
 
@@ -113,6 +115,22 @@ To start the _DataObjectSchemaExporter_ and also the previously mentioned _Confi
 Export configuration, schema and statistics at least with every release of your data pipelines.
 For this you can easily add _ConfigJsonExporter_ and _DataObjectSchemaExporter_ command line tool in the corresponding release pipeline. 
 :::
+
+## Write the metadata into the data catalog
+
+The descriptions above document your pipeline in the SDLB UI. To make them visible in the data catalog
+itself - as table and column comments on the tables SDLB writes - run _DataObjectSchemaExporter_ in `apply`
+mode as part of your deployment. This is a deployment step and not part of a normal SDLB run, so that
+running a pipeline does not repeatedly write to the catalog:
+
+```
+java -cp sdlb.jar io.smartdatalake.meta.configexporter.DataObjectSchemaExporter \
+  --config config/ --mode plan
+```
+
+`--mode plan` reports what would change without changing anything; `--mode apply` writes the changes.
+See [Applying table metadata to the catalog](/docs/reference/schema#applying-table-metadata-to-the-catalog)
+for the full flow, including how to export the schemas of tables that do not exist yet.
 
 ## SDLB UI
 

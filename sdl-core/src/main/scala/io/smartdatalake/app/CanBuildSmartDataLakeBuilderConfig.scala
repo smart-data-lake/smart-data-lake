@@ -84,7 +84,13 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
 
   val appName: String = applicationName.getOrElse(feedSel)
 
-  def isDryRun: Boolean = test.contains(TestMode.DryRun)
+  def isDryRun: Boolean = test.exists(Seq(TestMode.DryRun, TestMode.DryRunWithSchemaExport).contains)
+
+  /**
+   * true if the schemas of the output DataObjects should be exported at the end of this (dry) run,
+   * see [[TestMode.DryRunWithSchemaExport]].
+   */
+  def isSchemaExport: Boolean = test.contains(TestMode.DryRunWithSchemaExport)
 
   @JsonIgnore
   def getHoconConfig(validateCompletness: Boolean = true)(implicit hadoopConfiguration: Configuration): Config = {

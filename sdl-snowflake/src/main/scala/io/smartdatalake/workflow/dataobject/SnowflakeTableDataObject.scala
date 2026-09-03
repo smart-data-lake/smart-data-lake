@@ -34,7 +34,7 @@ import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import io.smartdatalake.workflow.connection.SnowflakeConnection
 import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSchema, SnowparkSubFeed}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
-import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
+import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema, GenericSchemaUtil}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame, SparkSaveMode}
@@ -90,8 +90,6 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param connectionId The SnowflakeTableConnection to use for the table
  * @param virtualPartitions Virtual partition columns. Note that Snowflake has no partition concept, and SDLB is emulating partitions on its own.
  * @param readTransformer   An optional transformer that is applied on read. This is often used to adapt Snowflakes Decimal datatype to more accurate IntegralTypes like Long, Integer, Byte.
- * @param syncComments   Defines if the comments defined in the schema should be synched the Snowflake table.
- *                       Please note that this can be an expensive operation, and it only works if using Spark as an execution engine.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
@@ -113,11 +111,11 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     sparkOptions: Map[String, String] = Map(),
                                     virtualPartitions: Seq[String] = Seq(),
                                     readTransformer: Option[GenericDfTransformer] = None,
-                                    syncComments: Boolean = false,
                                     override val expectedPartitionsCondition: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
+    with CanHandleCatalogMetadata
     with CanHandlePartitions with ExpectationValidation with CanHandleConstraints {
 
   val connection: SnowflakeConnection = getConnection[SnowflakeConnection](connectionId)
@@ -145,7 +143,6 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   private val instanceSparkOptions = connection.sparkOptions ++ sparkOptions
 
-  private var columnComments: Map[String, String] = Map()
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
@@ -185,7 +182,6 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       val targetSchemaWithMetadata = SparkSchemaUtil.mergeSchemaMetadata(sparkSchemaMin.inner, df.schema)
       SparkSubFeed.getSparkSession.createDataFrame(df.rdd, targetSchemaWithMetadata)//workaround to replace the schema in the DF
     } else df
-    columnComments = SparkSchemaUtil.columnsComments(dfTarget.schema).map(kv => (kv._1.mkString("."), kv._2))
     var finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
     // TODO: merge mode not yet implemented
@@ -209,12 +205,6 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
         .mode(SparkSaveMode.from(finalSaveMode))
         .save()
     )
-    
-    //table comment
-    metadata.flatMap(_.description).foreach { comment =>
-      val sql = s"comment on table ${table.fullName} is '$comment';"
-      connection.execJdbcStatement(sql)
-    }
 
 
     // return
@@ -377,11 +367,29 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit =
     connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
 
+  // Note that table metadata (table comment, column comments, primary key) is not applied here anymore,
+  // it is applied at deployment time by DataObjectSchemaExporter, see CanHandleCatalogMetadata.
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
-    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint
-    if (syncComments) {
-      columnComments.foreach(columnComment => connection.execJdbcStatement(s"comment on column ${table.fullName}.${columnComment._1} is '${columnComment._2}';"))
+  }
+
+  override def getTableComment(implicit context: ActionPipelineContext): Option[String] = {
+    val catalogConstraint = table.catalog.map(c => s" and TABLE_CATALOG = '$c'").getOrElse("")
+    val schemaConstraint = table.db.map(d => s" and TABLE_SCHEMA = '$d'").getOrElse("")
+    val query = s"select COMMENT from INFORMATION_SCHEMA.TABLES where TABLE_NAME = '${table.name}'" +
+      schemaConstraint + catalogConstraint
+    connection.execJdbcQuery(query, rs => if (rs.next()) Option(rs.getString(1)) else None)
+  }
+
+  override def setTableComment(comment: String)(implicit context: ActionPipelineContext): Unit = {
+    connection.execJdbcStatement(s"comment on table ${table.fullName} is '${SQLUtil.escapeSqlStringLiteral(comment)}'")
+  }
+
+  override def setColumnComments(comments: Map[Seq[String], String])(implicit context: ActionPipelineContext): Unit = {
+    comments.foreach { case (columnPath, comment) =>
+      connection.execJdbcStatement(
+        s"comment on column ${table.fullName}.${GenericSchemaUtil.formatColumnPath(columnPath)} is '${SQLUtil.escapeSqlStringLiteral(comment)}'"
+      )
     }
   }
 }

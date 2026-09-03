@@ -32,6 +32,12 @@ case class PrimaryKeyDefinition(pkColumns: Seq[String], pkName: Option[String] =
 /**
  * This trait defines the general approach to handle constraints such as primary and foreign keys
  * within a TransactionalTableDataObject.
+ *
+ * Note that constraints are not applied during a normal SDLB run. They are applied at deployment time by
+ * DataObjectSchemaExporter, see [[CanHandleCatalogMetadata]].
+ *
+ * Foreign keys (see [[Table.foreignKeys]]) are currently metadata for the data catalog only, no DDL is
+ * generated for them. See issue #1129.
  */
 trait CanHandleConstraints { self: TransactionalTableDataObject =>
   def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition]
@@ -47,18 +53,17 @@ trait CanHandleConstraints { self: TransactionalTableDataObject =>
     def createOrReplacePrimaryKeyConstraint(implicit context: ActionPipelineContext): Unit = {
       val definedPrimaryKeyOp: Option[Seq[String]] = table.primaryKey
       val existingPrimaryKeyOp: Option[PrimaryKeyDefinition] =  getExistingPKConstraint(table.catalog, table.db, table.name)
+      def normalize(cols: Seq[String]): Set[String] = cols.map(_.toLowerCase).toSet
       (definedPrimaryKeyOp, existingPrimaryKeyOp) match {
         case (None, _) =>
           logger.warn(f"$id parameter createAndReplacePrimaryKey not needed as there are no primary Key columns defined!")
         case (Some(pkcols), None) => createPrimaryKeyConstraint(table.fullName, pkConstraintName, pkcols)
-        case (Some(definedPkCols), Some(existingPkCols)) if definedPkCols.toSet.map((s: String) => s.toLowerCase).diff(existingPkCols.pkColumns.toSet.map((s: String) => s.toLowerCase)).nonEmpty =>
+        case (Some(definedPkCols), Some(existingPkCols)) if normalize(definedPkCols) == normalize(existingPkCols.pkColumns) =>
+          logger.debug(s"($id) primary key constraint is already up to date")
+        case (Some(definedPkCols), Some(existingPkCols)) =>
           if (existingPkCols.pkName.isEmpty) throw new SQLException(f"$id: The Primary key in the database already has some columns, but the constraint name returned by the database is null. The PK cannot be updated!")
           dropPrimaryKeyConstraint(table.fullName, existingPkCols.pkName.get)
           createPrimaryKeyConstraint(table.fullName, pkConstraintName, definedPkCols)
-        case t =>
-          throw new IllegalStateException(s"$id: Unexpected state $t in primary key constraint handling." +
-            s" Both defined and existing primary keys are present but identical," +
-            s" or neither defined keys nor existing keys are present but not handled by other cases.")
       }
     }
 
