@@ -40,9 +40,37 @@ DELTA_VERSION=4.4.0
 ICEBERG_VERSION=1.11.0
 ICEBERG_WAREHOUSE=$(pwd)/iceberg-warehouse
 
+# Mirrors to get the Spark distribution from, in the order they are tried.
+# dlcdn.apache.org is by far the fastest, but only keeps the latest patch release of each minor version.
+# The archive mirrors keep all releases, but downloading from them can take half an hour.
+SPARK_MIRRORS=(
+  "https://dlcdn.apache.org/spark"
+  "https://archive.apache.org/dist/spark"
+  "https://dist.apache.org/repos/dist/release/spark"
+)
+
+# Downloads ${SPARK_DIST}.tgz from the first mirror that has it. The mirrors are tried by downloading and not
+# by checking the file with a HEAD request first, as dlcdn.apache.org does not answer HEAD requests reliably.
+download_spark_dist() {
+  local mirror url
+  for mirror in "${SPARK_MIRRORS[@]}"; do
+    url="${mirror}/spark-${SPARK_VERSION}/${SPARK_DIST}.tgz"
+    if [ "$mirror" != "${SPARK_MIRRORS[0]}" ]; then
+      echo "WARNING: could not download spark-${SPARK_VERSION} from ${SPARK_MIRRORS[0]}, which only keeps the latest patch release."
+      echo "WARNING: downloading from $mirror instead, this is slow and can take up to half an hour."
+    fi
+    echo "downloading $url"
+    if wget -nv --progress=dot:giga --tries=2 --connect-timeout=30 --read-timeout=120 "$url"; then
+      return 0
+    fi
+    rm -f "${SPARK_DIST}.tgz" # cleanup partial download
+  done
+  echo "ERROR: could not download ${SPARK_DIST}.tgz from any of the mirrors: ${SPARK_MIRRORS[*]}" >&2
+  return 1
+}
+
 if [ ! -d "$SPARK_DIST" ]; then
-  echo "downloading https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/${SPARK_DIST}.tgz"
-  wget -nv --progress=dot:giga https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/${SPARK_DIST}.tgz
+  download_spark_dist
   tar -xzf ${SPARK_DIST}.tgz
   rm ${SPARK_DIST}.tgz
 fi
