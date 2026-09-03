@@ -64,6 +64,11 @@ trait DataFrameFunctions {
   def array_construct_compact(columns: GenericColumn*): GenericColumn
   def array(columns: GenericColumn*): GenericColumn
   def struct(columns: GenericColumn*): GenericColumn
+
+  /**
+   * Construct a map from given columns, alternating between key and value, e.g. map('k1', v1, 'k2', v2).
+   */
+  def map(columns: GenericColumn*): GenericColumn
   def expr(sqlExpr: String): GenericColumn
   def not(column: GenericColumn): GenericColumn
   def count(column: GenericColumn): GenericColumn

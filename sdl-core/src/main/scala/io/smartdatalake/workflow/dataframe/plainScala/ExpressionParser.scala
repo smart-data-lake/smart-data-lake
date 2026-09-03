@@ -62,6 +62,8 @@ object ExpressionParser {
     case object GreaterOrEqual extends TokenType
     case object LeftParen extends TokenType
     case object RightParen extends TokenType
+    case object LeftBracket extends TokenType
+    case object RightBracket extends TokenType
     case object Comma extends TokenType
     case object Between extends TokenType
     case object Is extends TokenType
@@ -202,8 +204,25 @@ object ExpressionParser {
           val right = parseUnary().toColumn(functions)
           ParsedColumn(functions.lit(0) - right)
         case _ =>
-          parsePrimary()
+          parsePostfix()
       }
+    }
+
+    /**
+     * Parse element access of a map column, e.g. `elements['dt']`.
+     */
+    private def parsePostfix(): ParsedValue = {
+      var value = parsePrimary()
+      while (current.tokenType == TokenType.LeftBracket) {
+        index += 1
+        val key = parsePrimary() match {
+          case ParsedLiteral(literal) => literal
+          case _ => fail("Element access only supports a literal key")
+        }
+        expect(TokenType.RightBracket, "]")
+        value = ParsedColumn(value.toColumn(functions).apply(key))
+      }
+      value
     }
 
     private def parsePrimary(): ParsedValue = {
@@ -333,7 +352,13 @@ object ExpressionParser {
       val resolved = candidates.view.flatMap(method => buildInvocationArguments(method, args).map(method -> _)).headOption
       resolved match {
         case Some((method, invocationArgs)) =>
-          val result = method.invoke(functions, invocationArgs.toIndexedSeq: _*)
+          val result = try {
+            method.invoke(functions, invocationArgs.toIndexedSeq: _*)
+          } catch {
+            // unwrap the reflection exception to keep the error message of the function
+            case ex: java.lang.reflect.InvocationTargetException =>
+              throw ExpressionParserException(s"Function '$functionName' failed with ${ex.getCause.getClass.getSimpleName}: ${ex.getCause.getMessage}", position)
+          }
           result match {
             case col: GenericColumn => col
             case _ => throw ExpressionParserException(s"Function '$functionName' does not return a column", position)
@@ -474,6 +499,12 @@ object ExpressionParser {
           index += 1
         case ')' =>
           add(TokenType.RightParen, ")", index)
+          index += 1
+        case '[' =>
+          add(TokenType.LeftBracket, "[", index)
+          index += 1
+        case ']' =>
+          add(TokenType.RightBracket, "]", index)
           index += 1
         case '+' =>
           add(TokenType.Plus, "+", index)

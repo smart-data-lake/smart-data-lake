@@ -260,6 +260,10 @@ object SparkConnectSubFeed extends DataFrameSubFeedCompanion {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     SparkConnectColumn(functions.struct(columns.map(_.asInstanceOf[SparkConnectColumn].inner):_*))
   }
+  override def map(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SparkConnectColumn(functions.map(columns.map(_.asInstanceOf[SparkConnectColumn].inner):_*))
+  }
   override def expr(sqlExpr: String): GenericColumn = SparkConnectColumn(functions.expr(sqlExpr))
 
   override def when(condition: GenericColumn, value: GenericColumn): GenericColumn with GenericWhen = {

@@ -264,6 +264,10 @@ object SparkSubFeed extends DataFrameSubFeedCompanion {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
     SparkColumn(functions.struct(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
   }
+  override def map(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SparkColumn(functions.map(columns.map(_.asInstanceOf[SparkColumn].inner):_*))
+  }
   override def expr(sqlExpr: String): GenericColumn = SparkColumn(functions.expr(sqlExpr))
 
   override def when(condition: GenericColumn, value: GenericColumn): GenericColumn with GenericWhen = {

@@ -239,6 +239,13 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
     SnowparkColumn(functions.object_construct(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
   }
+  /**
+   * Snowflake has no map type, the nearest equivalent is an OBJECT with the given key/value pairs (Snowpark API)
+   */
+  override def map(columns: GenericColumn*): SnowparkColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    SnowparkColumn(functions.object_construct(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
+  }
   override def expr(sqlExpr: String): SnowparkColumn = SnowparkColumn(functions.sqlExpr(sqlExpr))
 
   override def when(condition: GenericColumn, value: GenericColumn): SnowparkColumn with SnowparkWhen = {
