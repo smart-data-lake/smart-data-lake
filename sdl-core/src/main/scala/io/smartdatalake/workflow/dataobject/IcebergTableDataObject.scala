@@ -124,6 +124,7 @@ case class IcebergTableDataObject(override val id: DataObjectId,
                                  )(@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
     with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput
+    with CanHandleCatalogMetadata
     with HasEngineImplementation[IcebergTableEngine] {
 
   /**
@@ -301,6 +302,15 @@ case class IcebergTableDataObject(override val id: DataObjectId,
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     sqlOpt.foreach(stmt => SQLUtil.execSqlBasedOnTable(stmt, table, engine.sql, s"($id) "))
   }
+
+  override def getTableComment(implicit context: ActionPipelineContext): Option[String] =
+    CatalogMetadataSqlUtil.getTableComment(table, engine.sql)
+
+  override def setTableComment(comment: String)(implicit context: ActionPipelineContext): Unit =
+    CatalogMetadataSqlUtil.setTableComment(table, comment, engine.sql, s"($id) ")
+
+  override def setColumnComments(comments: Map[Seq[String], String])(implicit context: ActionPipelineContext): Unit =
+    CatalogMetadataSqlUtil.setColumnComments(table, comments, engine.sql, s"($id) ")
 }
 
 object IcebergTableDataObject extends FromConfigFactory[DataObject] {

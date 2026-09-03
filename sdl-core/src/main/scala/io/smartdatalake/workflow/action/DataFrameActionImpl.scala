@@ -317,6 +317,10 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     // initialize outputs
     if (context.phase == ExecutionPhase.Init) {
       output.init(commentedSubFeed.dataFrame.get, commentedSubFeed.partitionValues, saveModeOptions)
+      // collect the schema to be exported at the end of a dry-run with schema export
+      if (context.appConfig.isSchemaExport) {
+        context.schemaExportRegistry.register(output.id, commentedSubFeed.dataFrame.get.schema)
+      }
     }
     // apply expectation validation
     output match {

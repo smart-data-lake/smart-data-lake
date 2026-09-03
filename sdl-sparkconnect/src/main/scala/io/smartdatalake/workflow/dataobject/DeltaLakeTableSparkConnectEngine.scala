@@ -185,7 +185,6 @@ class DeltaLakeTableSparkConnectEngine(dataObject: DeltaLakeTableDataObject) ext
       dfWriter.saveAsTable(table.fullName)
     }
 
-    if (dataObject.updateColumnComments) logger.warn(s"($id) updateColumnComments is not supported with the Spark Connect engine")
 
     // get delta table operational metrics
     // Note: there is no QueryExecutionListener to collect Spark stage metrics on the Spark Connect client side, delta operation metrics only.

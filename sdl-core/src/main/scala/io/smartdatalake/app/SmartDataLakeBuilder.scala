@@ -23,6 +23,7 @@ import io.smartdatalake.communication.statusinfo.StatusInfoServer
 import io.smartdatalake.communication.statusinfo.api.SnapshotStatusInfoListener
 import io.smartdatalake.communication.statusinfo.websocket.IncrementalStatusInfoListener
 import io.smartdatalake.config.SdlConfigObject.ActionId
+import io.smartdatalake.config.exporter.ExportWriter
 import io.smartdatalake.config.{ConfigParser, ConfigurationException, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.LogUtils.debugLog
@@ -76,6 +77,17 @@ object TestMode extends Enumeration {
    * phase, but not the "exec" phase of an SDLB run.
    */
   val DryRun: app.TestMode.Value = Value("dry-run")
+
+  /**
+   * Like [[DryRun]], but additionally exports the schemas of all output DataObjects to
+   * `global.dataObjectsSchemaSource`. The schemas are taken from the init phase and therefore include
+   * the column comments assembled by SDLB, e.g. from schemaMin or from the ScalaDoc of case classes
+   * returned by user defined functions.
+   *
+   * Use this on a development environment to create the schema files needed by DataObjectSchemaExporter
+   * to apply table metadata to the catalog of a target environment at deployment time.
+   */
+  val DryRunWithSchemaExport: app.TestMode.Value = Value("dry-run-with-schema-export")
 }
 
 /**
@@ -173,9 +185,10 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         .text(s"Hadoop path to save run state files. Must be set to enable recovery in case of failures."),
       opt[String]("test")
         .action((arg, config) => config.withTest(Some(TestMode.withName(arg))))
-        .valueName("<config|dry-run>")
+        .valueName("<config|dry-run|dry-run-with-schema-export>")
         .text(
-          "Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage"
+          "Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage, " +
+            "dry-run-with-schema-export -> like dry-run, and export the schemas of the output DataObjects to global.dataObjectsSchemaSource"
         ),
       help("help").text("Display the help text."),
       version("version").text("Display version information.")
@@ -554,6 +567,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         actionDAGRun.prepare(context)
         actionDAGRun.init(context)
         if (appConfig.isDryRun) { // stop here if only dry-run
+          if (appConfig.isSchemaExport) exportDataObjectSchemas(context)
           logger.info(s"${appConfig.test.get}-Test successful")
           return (Seq(), RunStatistics.empty)
         }
@@ -571,6 +585,37 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
 
     // return result statistics as string
     (finalSubFeeds, actionDAGRun.getStatistics(context))
+  }
+
+  /**
+   * Export the schemas collected during the init phase to `global.dataObjectsSchemaSource`,
+   * see [[TestMode.DryRunWithSchemaExport]].
+   *
+   * The exported files are read back by [[GlobalConfig.getSchemaFromSource]] for dry-runs on a local
+   * environment, and by DataObjectSchemaExporter to apply table metadata to a catalog at deployment time.
+   */
+  private[smartdatalake] def exportDataObjectSchemas(context: ActionPipelineContext): Unit = {
+    val globalConfig = context.globalConfig
+    val target = globalConfig.dataObjectsSchemaSource.getOrElse(
+      throw ConfigurationException(
+        s"global.dataObjectsSchemaSource must be defined to use --test ${TestMode.DryRunWithSchemaExport}"
+      )
+    )
+    val schemas = context.schemaExportRegistry.getSchemas
+    if (schemas.isEmpty) {
+      logger.warn(s"No DataObject schemas collected, nothing to export to '$target'")
+    } else {
+      val writer = ExportWriter.apply(
+        target,
+        backendClient = globalConfig.uiBackend.map(_.client),
+        hadoopConfig = Some(context.hadoopConf)
+      )
+      val version = System.currentTimeMillis() / 1000
+      schemas.foreach { case (dataObjectId, schema) =>
+        writer.writeSchema(ExportWriter.formatSchema(Some(schema), None), dataObjectId, version)
+      }
+      logger.info(s"Exported ${schemas.size} DataObject schemas to '$target'")
+    }
   }
 
   private[smartdatalake] def agentExec(

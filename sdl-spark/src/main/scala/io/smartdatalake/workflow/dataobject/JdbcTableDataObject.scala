@@ -188,7 +188,6 @@ case class JdbcTableDataObject(override val id: DataObjectId,
     }
 
     //If enabled, create or replace the primary Key of the table
-    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint
 
     // test partition columns exist
     if (virtualPartitions.nonEmpty && isTableExisting) {

@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.app.TestMode
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.hdfs.{HdfsUtil, SparkHdfsUtil}
@@ -25,6 +26,7 @@ import io.smartdatalake.util.spark.SparkSchemaUtil
 import io.smartdatalake.workflow.action.CopyAction
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
+import io.smartdatalake.workflow.dataframe.GenericSchemaUtil
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.DeltaLakeTestUtils.deltaDb
 import io.smartdatalake.workflow.dataobject.generic.Table
@@ -48,6 +50,9 @@ class DeltaLakeUdfColumnCommentTest extends AnyFunSuite with BeforeAndAfterAll {
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
   implicit val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
+  // init phase context of a "--test dry-run-with-schema-export" run, which collects the schemas to export
+  val contextInitExport: ActionPipelineContext =
+    contextInit.copy(appConfig = contextInit.appConfig.copy(test = Some(TestMode.DryRunWithSchemaExport)))
 
   import session.implicits._
 
@@ -67,17 +72,26 @@ class DeltaLakeUdfColumnCommentTest extends AnyFunSuite with BeforeAndAfterAll {
     srcDO.writeSparkDataFrame(Seq("Bern", "Zurich").toDF("city"), Seq(), isRecursiveInput = false, None)(contextExec)
 
     val table = Table(db = Some(deltaDb), name = "udf_comments")
-    val tgtDO = DeltaLakeTableDataObject("tgt1", path = Some(tempPath + s"/${table.fullName}"), table = table,
-      updateColumnComments = true)
+    val tgtDO = DeltaLakeTableDataObject("tgt1", path = Some(tempPath + s"/${table.fullName}"), table = table)
     instanceRegistry.register(tgtDO)
     tgtDO.dropTable
 
     val transformer = ScalaClassSparkDfTransformer(className = classOf[DeltaTestGeoUdfTransformer].getName)
     val action = CopyAction("udfComments", srcDO.id, tgtDO.id, transformers = Seq(transformer))
-    action.init(Seq(SparkSubFeed(None, srcDO.id, Seq())))(contextInit)
+    action.init(Seq(SparkSubFeed(None, srcDO.id, Seq())))(contextInitExport)
     action.exec(Seq(SparkSubFeed(None, srcDO.id, Seq())))(contextExec)
 
-    // read the schema back from the delta table - this is what DataObjectSchemaExporter exports for the UI
+    // the init phase schema is what a dry-run exports for the UI and for DataObjectSchemaExporter
+    val exportedSchema = contextInitExport.schemaExportRegistry.getSchemas.get(tgtDO.id)
+    assert(exportedSchema.isDefined, "no schema was collected for export")
+    val exportedComments = GenericSchemaUtil.columnComments(exportedSchema.get)
+      .map { case (path, c) => path.mkString(".") -> c }
+    assert(exportedComments.get("geo").contains("A geo location enriched from an address."))
+    assert(exportedComments.get("geo.lat").contains("Latitude in decimal degrees, WGS84."))
+    assert(exportedComments.get("geo.lon").contains("Longitude in decimal degrees, WGS84."))
+    assert(exportedComments.get("geo.tags.key").contains("The tag key."))
+
+    // a newly created table persists the comments of the written schema, no catalog DDL is needed for that
     val tableSchema = session.table(table.fullName).schema
     val comments = SparkSchemaUtil.columnsComments(tableSchema).map { case (path, c) => path.mkString(".") -> c }
     assert(comments.get("geo").contains("A geo location enriched from an address."))

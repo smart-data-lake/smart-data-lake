@@ -241,12 +241,6 @@ class DeltaLakeTableSparkClassicEngine(dataObject: DeltaLakeTableDataObject) ext
         .saveAsTable(table.fullName)
     )
 
-    //if the flag is set, update comments of existing columns (one by one)
-    if (updateColumnComments) {
-      val columnsToUpdate = SparkSchemaUtil.identifyMissingComments(targetDf.schema, session.table(table.fullName).schema).map(kv => (kv._1.mkString("."), kv._2))
-      updateExistingColumnComments(columnsToUpdate)
-    }
-
     // get delta table operational metrics
     val dfHistory = deltaTable.history(1)
     if (logger.isDebugEnabled) dfHistory.show(false)

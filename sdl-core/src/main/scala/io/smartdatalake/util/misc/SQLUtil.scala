@@ -112,14 +112,40 @@ object SQLUtil extends SmartDataLakeLogger {
   }
 
   /**
-   * Execute a SQL statement, prefixed by USE CATALOG/USE SCHEMA statements based on the configured table.
-   * Preserves the semantics of SparkQueryUtil.executeSqlStatementBasedOnTable.
+   * Escape a string to be used as SQL string literal, e.g. a table or column comment.
+   */
+  def escapeSqlStringLiteral(str: String): String = str.replace("'", "''")
+
+  /**
+   * Execute a SQL statement as is.
+   * Use this for SDLB generated statements, which address the table by its fully qualified name, see [[Table.fullName]].
+   */
+  def execSql(stmt: String, execFun: String => Unit, loggerContext: String): Unit = {
+    try {
+      logger.info(s"${loggerContext}Executing SQL statement: $stmt")
+      execFun(stmt)
+    } catch {
+      case e: Exception =>
+        logger.warn(s"${loggerContext}Error in SQL statement '$stmt':\n${e.getMessage}")
+        throw e
+    }
+  }
+
+  /**
+   * Execute a user defined SQL statement, prefixed by a USE statement based on the configured table.
+   * This allows the user to use unqualified table names in the statement, which are then resolved
+   * against the catalog and schema of the configured table.
+   *
+   * Note that the USE statement changes the current catalog and schema of the shared session for all
+   * statements following in that session. For SDLB generated statements use [[execSql]] with a fully
+   * qualified table name instead.
    */
   def execSqlBasedOnTable(stmt: String, table: Table, execSql: String => Unit, loggerContext: String)(implicit context: ActionPipelineContext): Unit = {
     try {
+      // Note that "USE <catalog>.<schema>" is supported by open source Spark and Databricks,
+      // in contrast to "USE CATALOG <catalog>" which is Databricks/Unity Catalog syntax only.
       val newStmt = Seq(
-        table.catalog.map(cat => s"USE CATALOG $cat"),
-        table.db.map(db => s"USE SCHEMA $db"),
+        Some(table.getDbName).filter(_.nonEmpty).map(namespace => s"USE $namespace"),
         Some(stmt)
       ).flatten
       logger.info(s"${loggerContext}Executing SQL statements: ${newStmt.mkString("; ")}")

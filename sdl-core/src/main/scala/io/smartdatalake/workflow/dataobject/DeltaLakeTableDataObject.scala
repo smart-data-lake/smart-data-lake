@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
-import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues, UCFileSystemFactory}
+import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.DeltaLakeTableConnection
@@ -96,9 +96,6 @@ import scala.util.Try
  * @param expectations List of [[Expectation]]s to enforce when writing to this data object. Expectations are checks based on aggregates over all rows of a dataset.
  * @param saveMode     [[SDLSaveMode]] to use when writing files, default is "Overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
- * @param updateColumnComments If set to false, the column comments (read from the provided schema) will only be updated for newly created columns.
- *                             If set to true, the column comments from the provided schema will be updated every time the pipeline runs, which results in
- *                             a lower performance since a column comparison is needed. Defaults to "false".
  * @param retentionPeriod Optional delta lake retention threshold in hours. Files required by the table for reading versions younger than retentionPeriod will be preserved and the rest of them will be deleted.
  * @param minVacuumInterval Optional String to determine the minimum time interval between two vacuum operations. If the parameter is set,
  *                          SDLB will look at the last vacuum-execution time in the table and compare it to the current time. If the parameter is not set or if a vacuum has never happened, it will vacuum the table.
@@ -110,8 +107,8 @@ import scala.util.Try
  *                         E.g. it can be used to clean up, archive and compact partitions.
  *                         See HousekeepingMode for available implementations. Default is None.
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
- * @param metadata metadata of the table. NOTE: if the value metadata.description is set, the table.db and the table.catalog
- *                  attributes are required as the pipeline will try to add the description to the catalog.
+ * @param metadata metadata of the table. metadata.description is applied as table comment in the catalog
+ *                 by the DataObjectSchemaExporter, see also [[io.smartdatalake.workflow.dataobject.generic.CanHandleCatalogMetadata]].
  *
  * @note DeltaLake needs the spark properties spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension and
  *       spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog. They are added automatically
@@ -134,7 +131,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     override val postWriteSql: Option[String] = None,
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     override val allowSchemaEvolution: Boolean = false,
-                                    updateColumnComments: Boolean = false,
                                     retentionPeriod: Option[Int] = None, // hours
                                     minVacuumInterval: Option[String] = None,
                                     connectionId: Option[ConnectionId] = None,
@@ -144,6 +140,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanMergeDataFrame with CanEvolveSchema with CanHandlePartitions
     with HasHadoopStandardFilestore with ExpectationValidation with CanCreateIncrementalOutput with CanHandleConstraints
+    with CanHandleCatalogMetadata
     with HasEngineImplementation[DeltaLakeTableEngine] {
 
   /**
@@ -200,12 +197,6 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     require(isDbExisting, s"($id) DB ${table.getDbName} doesn't exist (needs to be created manually).")
-    metadata.flatMap(_.description).foreach(_ => {
-      require(table.db.isDefined && table.catalog.isDefined,
-        "Since the attribute metadata.description is set, you must also define a " +
-          "table.db and a table.catalog in order to add a the tableComment" +
-          "to the catalog")
-    })
     // engine-specific preparation, e.g. checking spark options and initializing external table path with classic Spark engine
     engine.prepare()
     filterExpectedPartitionValues(Seq()) // validate expectedPartitionsCondition
@@ -234,10 +225,11 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
     super.preWrite
   }
 
+  // Note that table metadata (table comment, column comments, primary key) is not applied here anymore.
+  // It can only change when the configuration or the code changes, so it is applied at deployment time by
+  // DataObjectSchemaExporter, see CanHandleCatalogMetadata.
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
-    if (table.createAndReplacePrimaryKey && UCFileSystemFactory.isDatabricksEnv) createOrReplacePrimaryKeyConstraint
-    metadata.flatMap(_.description).foreach {addTableComment}
   }
 
   /**
@@ -342,25 +334,22 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit = {
     val query = f"ALTER TABLE $tableName DROP CONSTRAINT $constraintName".toLowerCase
-    SQLUtil.execSqlBasedOnTable(query, table, engine.sql, s"($id) ")
+    SQLUtil.execSql(query, engine.sql, s"($id) ")
   }
 
   def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit = {
     val query = f"ALTER TABLE $tableName ADD CONSTRAINT $constraintName PRIMARY KEY (${cols.mkString(",")}) RELY"
-    SQLUtil.execSqlBasedOnTable(query, table, engine.sql, s"($id) ")
+    SQLUtil.execSql(query, engine.sql, s"($id) ")
   }
 
-  def addTableComment(comment: String)(implicit context: ActionPipelineContext): Unit = {
-    val query = f"ALTER TABLE ${table.name} SET TBLPROPERTIES ('comment' = '$comment');"
-    SQLUtil.execSqlBasedOnTable(query, table, engine.sql, s"($id) ")
-  }
+  override def getTableComment(implicit context: ActionPipelineContext): Option[String] =
+    CatalogMetadataSqlUtil.getTableComment(table, engine.sql)
 
-  def updateExistingColumnComments(comments: Map[String, String])(implicit context: ActionPipelineContext): Unit = {
-    comments.foreach( comment => {
-      val query = f"ALTER TABLE ${table.name} ALTER COLUMN ${comment._1} COMMENT '${comment._2}';"
-      SQLUtil.execSqlBasedOnTable(query, table, engine.sql, s"($id) ")
-    })
-  }
+  override def setTableComment(comment: String)(implicit context: ActionPipelineContext): Unit =
+    CatalogMetadataSqlUtil.setTableComment(table, comment, engine.sql, s"($id) ")
+
+  override def setColumnComments(comments: Map[Seq[String], String])(implicit context: ActionPipelineContext): Unit =
+    CatalogMetadataSqlUtil.setColumnComments(table, comments, engine.sql, s"($id) ")
 }
 
 object DeltaLakeTableDataObject extends FromConfigFactory[DataObject] {
