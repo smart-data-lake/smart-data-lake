@@ -20,10 +20,10 @@ All HOCON features are supported, as SDLB uses the original HOCON parser from li
 
 The configuration is located in the downloaded code under the config folder. Configuration can be split across configuration files as you like.
 For this tutorial we will use departures.conf, airports.conf, btl.conf and a global.conf file.
-To walk through part-1 of this tutorial, please reset the existing departures/airports/btl.conf with the following cmd:
+To walk through part-1 of this tutorial, please reset departures/airports/btl.conf to empty configuration files with the following cmd:
 
 ```
-pushd config && cp config.template departures.conf && cp config.template airports.conf && cp config.template btl.conf && popd
+./prepare.sh 1
 ```
 
 A data pipeline is composed of at least two entities: *DataObjects* and *Actions*.
@@ -33,7 +33,7 @@ In every data pipeline, you will have at least one *DataObject* for your input a
 If you have more than one action, you will also have at least one *DataObject* for each intermediary step between two actions.
 
 In our case, in order to get our departure data, we are going to build one action. Hence, we need one DataObject for our input, and one for our output.
-Create a directory called config in your current working directory and an empty file called application.conf. This is where we will define our data pipeline.
+The command above created the empty file `config/departures.conf`. This is where we will define our data pipeline.
 
 ## Define departures objects
 Add the following lines to your departures.conf file:
@@ -42,7 +42,7 @@ Add the following lines to your departures.conf file:
     
       ext-departures {
         type = WebserviceFileDataObject
-        url = "https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1696854853&end=1697027653"
+        url = "https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1630200800&end=1630310979"
         timeouts {
           connectionTimeoutMs = 3000
           readTimeoutMs = 200000
@@ -56,10 +56,25 @@ Add the following lines to your departures.conf file:
       
     }
 ```
-:::caution
-Note that the API Call **may freeze** as the timestamps provided under **begin=1696854853&end=1697027653** get older. When that's the case, simply replace them with more recent timestamps.
-You can go on https://www.epochconverter.com/ and set "end" to the current time in seconds and "begin" to the current time in seconds minus 2 days.
-At this stage in the guide, the capabilities of our dataObject  ext-departures are somewhat limited as you need to provide to it the exact url of the data you want to download.
+:::caution The time window has to be recent and short
+The timestamps above are from August 2021 and the webservice will refuse them with
+`403 You cannot access historical flights`. Without an account, opensky-network.org limits queries by
+*recency* as well as by *interval length*: the window has to start within the last few days, and an interval
+of 12 hours is still served while 18 hours is not. Editing the numbers to an older but narrower window does
+not help - both limits apply.
+
+Instead of computing epoch seconds by hand, let `prepare.sh` rewrite the window in your
+`config/departures.conf` to the last 6 hours:
+
+```
+./prepare.sh --fix-timestamps
+```
+
+Run it again whenever a run starts failing with a 403. It only ever touches the activated
+`config/departures.conf`, never the solution files of this guide.
+
+At this stage in the guide, the capabilities of our dataObject ext-departures are somewhat limited as you need
+to provide to it the exact url of the data you want to download.
 In part 3 of this guide we will make our DataObject much smarter and these steps won't be needed anymore.
 :::
 
@@ -88,7 +103,7 @@ Instead of writing *stg-departures* again,
 we used the placeholder *~\{id}* which gets replaced by the DataObject-ID. Don't forget to surround that placeholder
 with double quotes so that it is interpreted as a string.
 We defined a relative path - it is relative to the working directory SDLB is started in. 
-The working directory has been set to the *data* directory in the Dockerfile by setting the JVM Property 
+The container's entrypoint sets the working directory to the *data* directory by setting the JVM Property 
 ```
 -Duser.dir=/mnt/data
 ```
@@ -156,7 +171,7 @@ This time, we add another volume with your config-file and tell SDLB to use it w
 ./startJob.sh --config /mnt/config --feed-sel download
 ```
 
-After executing it, you will see the file *data/stg_departures/result.json* has been replaced with the output of your pipeline.
+After executing it, you will see the file *data/stg-departures/result.json* has been replaced with the output of your pipeline.
 
 :::caution
 Since both web servers are freely available on the internet, **a rate limiting applies**. https://opensky-network.org/ will stop responding if you make too many calls.

@@ -67,10 +67,11 @@ Lets now add some descriptions, tags and other metadata to our configuration fil
 
 ## Create comprehensive documentation using markdown files
 
-Additionally, we want to create a comprehensive documentation for DataObject `btl-distance`, as the logic could need some explanation.
+Additionally, we want to create a comprehensive documentation for DataObject `btl-distances`, as the logic could need some explanation.
 For this we will write a separate markdown file. The UI will search markdown files for configuration objects according to the
-following path convention: `[dataObjects|actions|connections]/<id>.md`.
-Let's edit therefore file `viz/dataObjects/btl-distance.md`.
+following path convention: `[dataObjects|actions|connections]/<id>.md`, below the directory passed as `--descriptionPath` to
+_ConfigJsonExporter_. In this project that directory is `viz/description`.
+Let's edit therefore file `viz/description/dataObjects/btl-distances.md`.
 
 The existing file already contains some examples to create titles, tables and include images.
 And there is an example of a special syntax to create column descriptions using `@column` keyword.
@@ -126,7 +127,7 @@ not repeatedly write to the catalog:
 
 ```
 java -cp sdlb.jar io.smartdatalake.meta.configexporter.DataObjectSchemaExporter \
-  --config config/ --mode plan
+  --config ./config,./envConfig/dev.conf --mode plan
 ```
 
 `--mode plan` reports what would change without changing anything; `--mode apply` writes the changes.

@@ -133,26 +133,19 @@ to see all options that are available. For your convenience, here is the current
 -n, --name <value>       Optional name of the application. If not specified feed-sel is used.
 -c, --config <file1>[,<file2>...]
                          One or multiple configuration files or directories containing configuration files, separated by comma. Entries must be valid Hadoop URIs or a special URI with scheme "cp" which is treated as classpath entry.
---partition-values <partitionColName>=<partitionValue>[,<partitionValue>,...]
+-o, --config-value-overwrite <nested.key>=<value>
+                         Overwrite configuration value at given nested key. Note that it is not recommended to overwrite array values. Use overwrite together with hocon substitution for this.
+-p, --partition-values <partitionColName>=<partitionValue>[,<partitionValue>,...]
                          Partition values to process for one single partition column.
---multi-partition-values <partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>[;(<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>;...]
-                         Partition values to process for multiple partitoin columns.
+-m, --multi-partition-values <partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>[;(<partitionColName1>=<partitionValue>,<partitionColName2>=<partitionValue>;...]
+                         Partition values to process for multiple partition columns.
 -s, --streaming          Enable streaming mode for continuous processing.
---parallelism <int>      Parallelism for DAG run.
---state-path <path>      Path to save run state files. Must be set to enable recovery in case of failures.
---override-jars <jar1>[,<jar2>...]
-                         Comma separated list of jar filenames for child-first class loader. The jars must be present in classpath.
---test <config|dry-run>  Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage
+--parallelism <int>      Max number of parallel executed SDLB actions.
+--state-path <path>      Hadoop path to save run state files. Must be set to enable recovery in case of failures.
+--test <config|dry-run|dry-run-with-schema-export>
+                         Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage, dry-run-with-schema-export -> like dry-run, and export the schemas of the output DataObjects to global.dataObjectsSchemaSource
 --help                   Display the help text.
 --version                Display version information.
--m, --master <value>     The Spark master URL passed to SparkContext (default=local[*], yarn, spark://HOST:PORT, mesos://HOST:PORT, k8s://HOST:PORT).
--x, --deploy-mode <value>
-                         The Spark deploy mode passed to SparkContext (default=client, cluster).
--d, --kerberos-domain <value>
-                         Kerberos-Domain for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.
--u, --username <value>   Kerberos username for authentication (USERNAME@KERBEROS-DOMAIN) in local mode.
--k, --keytab-path <value>
-                         Path to the Kerberos keytab file for authentication in local mode.
 ```
 
 One popular option is to use regular expressions to execute multiple feeds together.
@@ -183,7 +176,7 @@ If you know Apache Spark, this column will look very familiar to you.
 After that, the query fails, because it only finds that column with error messages instead of the actual data.
 
 One way to get a better error message is to tell Spark that it should promptly fail when reading a corrupt file.
-You can do that with the option [jsonOptions](https://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=2-13-3),
+You can do that with the option [jsonOptions](https://smartdatalake.ch/json-schema-viewer/index.html#viewer-page?v=3-0),
 which allows you to directly pass on settings to Spark.
 
 In our case, we would end up with a faulty DataObject that looks like this:
