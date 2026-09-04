@@ -70,11 +70,10 @@ To use the Java Code in our sdl-spark docker image, we have to compile it.
 You have already done this in the [setup](../setup.md), but let's review this step again. It can be done by using a maven docker image as follows.
 
 ```
-mkdir .mvnrepo
 ./buildJob.sh
 ```
 
-or you can also use maven directly if you have Java SDK and Maven installed
+or you can also use maven directly if you have a Java 17 SDK and Maven installed
 
 ```
 mvn package
