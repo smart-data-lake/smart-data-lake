@@ -1885,6 +1885,14 @@
             "type" : "string",
             "description" : "Optional expression to use for creating incremental output with DataObjectStateIncrementalMode.  \nThe expression is used to get the high-water-mark for the incremental update state.  \nNormally this can be just a column name, e.g. an id or updated timestamp which is continually increasing."
           },
+          "housekeepingMode" : {
+            "oneOf" : [ {
+              "$ref" : "#/definitions/HousekeepingMode/PartitionArchiveMode"
+            }, {
+              "$ref" : "#/definitions/HousekeepingMode/PartitionRetentionMode"
+            } ],
+            "description" : "Optional definition of a housekeeping mode applied after every write.  \nE.g. it can be used to clean up or archive virtual partitions, see[[HousekeepingMode]].  \nNote that housekeeping works on`virtualPartitions` , so these need to be defined.  \nDefault is None."
+          },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
             "description" : "Additional metadata for the DataObject"
