@@ -23,20 +23,27 @@ The site is called [openskynetwork](https://openskynetwork.github.io/opensky-api
 and it provides you with a free REST-Interface for getting departures by airport.
 Notice that you need the ICAO identifier of Tom's airport to get the right parameters.
 You know that Tom lives near Bern, Switzerland. A quick web search shows you that the identifier is
-*LSZB*. Let's focus on some specific time period for now to have reproducible results.
+*LSZB*. The time period is given as two unix timestamps, *begin* and *end*.
 You end up with the following REST-URL:
 
 ```
-    https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1696854853&end=1697027653
+    https://opensky-network.org/api/flights/departure?airport=LSZB&begin=1630200800&end=1630310979
 ```
 
-When you run this in your web-browser, you will get a response in the JSON Format.
+:::caution
+Without an account the webservice only answers for a *recent* and *short* time period - a window starting
+more than a few days ago is refused with `403 You cannot access historical flights`, and so is an interval
+longer than about 12 hours. The timestamps above are from August 2021 and will therefore not work as they
+are. We come back to this when we build the pipeline, see [Get Departures](part-1/get-departures.md).
+:::
+
+When you run this in your web-browser with a recent time window, you will get a response in the JSON Format.
 For each record, it contains the ICAO identifier of the airport where the plane is flying to in the field
 *estArrivalAirport*. That's a good start! 
 
 :::info
 Notice that the result of this JSON-call is exactly what was downloaded in the previous step into 
-the folder *data/stg_departures/result.json*.
+the folder *data/stg-departures/result.json*.
 :::
 
 ### airports.csv
@@ -46,7 +53,7 @@ It hosts a csv-file called *airports.csv* which contains what you need.
 
 :::info
 Notice that this CSV-File is exactly what was downloaded in the previous step into
-the folder *data/stg_airports/result.csv*.
+the folder *data/stg-airports/result.csv*.
 :::
 
 ## Next step

@@ -7,9 +7,9 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 ## Build from Source Code
-In the [getting started guide](../getting-started/setup.md) we used Docker to get you up to speed quickly.
-If you take a closer look at the [Dockerfile](https://github.com/smart-data-lake/getting-started/blob/master/Dockerfile), 
-you will see that we simply execute Apache Maven for you to build the jar file and configure an appropriate entrypoint for the container. 
+In the [getting started guide](../getting-started/setup.md) we used containers to get you up to speed quickly.
+If you take a closer look at the [Dockerfile](https://github.com/smart-data-lake/getting-started/blob/master/spark/Dockerfile), 
+you will see that we simply execute Apache Maven for you to collect the libraries and configure an appropriate entrypoint for the container. 
  
 In a real world project, you probably want more control over the build process, this page helps you in this case.
  
@@ -29,8 +29,24 @@ SDL Version 2.x
 - Scala 2.12 (Spark 3 doesn't support scala 2.11 anymore)
 - Maven 3.0 (or higher)
 
+SDL Version 3.x
+- *Spark 4.x*
+- JDK >= 17 (Spark 4 doesn't support JDK 11 anymore)
+- Scala 2.13 (Spark 4 doesn't support scala 2.12 anymore). SDL 3.x publishes `_2.13` artifacts only, there are no `scala-2.12` / `scala-2.13` build profiles anymore.
+- Maven 3.0 (or higher)
+
 :::tip
-If you don't have strong reasons to still use Spark 2.X, you should use the latest version of Smart Data Lake Builder which comes with Spark 3.X.
+Use the latest version of Smart Data Lake Builder if you don't have strong reasons to stay on an older Spark version.
+:::
+
+:::caution Migrating from 2.x
+Beside Scala and JDK, the following changes affect every downstream project:
+- `LocalSmartDataLakeBuilder` and `SparkSmartDataLakeBuilder` were removed. Use `DefaultSmartDataLakeBuilder`,
+  see [Command Line](commandLine.md).
+- Spark support was split out of `sdl-core` into `sdl-spark`. Declare `sdl-spark` if you use Spark
+  DataObjects, Actions or transformers.
+- The Spark session is configured by an engine connection instead of `global.spark-options`,
+  see [Execution Engines](executionEngines.md).
 :::
 
 ### Releases and snapshots
@@ -52,7 +68,7 @@ You start a new Maven project and define our `sdl-parent` as your projects paren
         If version cannot be resolved, make sure maven central repository is defined in settings.xml and the corresponding profile activated.
         If version in IntelliJ still cannot be resolved, a restart of IntelliJ might help!
     -->
-    <version>2.1.1</version>
+    <version>3.0.0</version>
 </parent>
 ```
 
@@ -78,7 +94,7 @@ An example would be:
 #
 # Build stage
 #
-FROM docker.io/maven:3.6.0-jdk-11-slim AS build
+FROM docker.io/maven:3-eclipse-temurin-17 AS build
 COPY src /home/app/src
 COPY pom.xml /home/app
 RUN mvn --quiet -f /home/app/pom.xml -Pcopy-libs package
@@ -87,11 +103,14 @@ RUN mvn --quiet -f /home/app/pom.xml -Pcopy-libs package
 # Package stage
 # Note that *.jar is provided to the docker image through /mnt/lib and added to the class-path for SDL.
 #
-FROM docker.io/openjdk:11-jre-slim
+FROM docker.io/eclipse-temurin:17
 COPY --from=build /home/app/target/lib/*.jar /opt/app/lib/
-COPY --from=build /home/app/src/main/resources/log4j.properties /home/app/lib/
-ENTRYPOINT ["java","-D${CONFIG_OVERWRITE}", "-Duser.dir=/mnt/data","-Dlog4j.configuration=file:/home/app/lib/log4j.properties","-cp","/opt/app/lib/*:/mnt/lib/*","io.smartdatalake.app.LocalSmartDataLakeBuilder"]
+COPY --from=build /home/app/src/main/resources/log4j2.yml /home/app/lib/
+ENTRYPOINT ["java","-D${CONFIG_OVERWRITE}", "-Duser.dir=/mnt/data","-Dlog4j.configurationFile=file:/home/app/lib/log4j2.yml","-cp","/opt/app/lib/*:/mnt/lib/*","io.smartdatalake.app.DefaultSmartDataLakeBuilder"]
 ```
+
+Note that Spark on JDK 17 needs a list of `--add-opens=java.base/...` options. The getting-started image passes
+them from its entrypoint script rather than from the `ENTRYPOINT` above.
 
 Custom Scala Classes for e.g. DataObjects and Transformers, can be build seperately and mounted into the container (into `/mnt/lib`). 
 
@@ -118,4 +137,4 @@ podman build -t sdl-spark .
 </Tabs>
 
 
-An example including the log4j.properties is also provided in the [getting-started](https://github.com/smart-data-lake/getting-started.git). 
+An example including the log4j configuration is also provided in the [getting-started](https://github.com/smart-data-lake/getting-started.git) repository, see `spark/Dockerfile` and `spark/entrypoint.sh`. 

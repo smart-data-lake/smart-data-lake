@@ -51,7 +51,21 @@ While you're at it, rename it to `historize-airports` to reflect its new functio
   }
 ```
 
-With historization, this table will now get two additional columns called `dl_ts_captured` and `dl_ts_delimited`.
+With historization, this table will now get two additional columns called `dl_ts_captured` and `dl_ts_delimited`,
+plus a technical column `dl_hash`.
+
+Note that `HistorizeAction` always writes with an SQL merge statement - it merges changed records into the output
+instead of rewriting the whole table. Merge needs the additional column `dl_hash`, which SDLB maintains to detect
+changed records efficiently.
+
+:::info Merge Mode
+Deduplicate/HistorizeAction merge changed data into the output DataObject, rather than overwriting it.
+The output DataObject must implement the CanMergeDataFrame interface (also called trait in Scala) for this - if it
+doesn't, SDLB stops with `output DataObject must support SaveMode.Merge (implement CanMergeDataFrame)`.
+DeltaLakeTableDataObject will then create a complex SQL-Upsert statement to merge new and changed data into
+existing output data.
+:::
+
 Schema evolution of existing tables will be explained later, so for now, just delete the table and it's data for the DataObject `int-airports` through spark-shell and SDLB's scala interface :
 ```
 sdlb.dataObjects.intAirports.dataObject.dropTable
@@ -90,11 +104,12 @@ sdlb.dataObjects.intAirports.printSchema
     |-- longitude_deg: string (nullable = true)
     |-- dl_ts_captured: timestamp (nullable = true)
     |-- dl_ts_delimited: timestamp (nullable = true)
+    |-- dl_hash: integer (nullable = true)
 ```
 
 If you look at the data, there should be only one record per object for now, as we didn't run our data pipeline with historical data yet.
 ```
-  dataIntAirports.get.orderBy($"ident",$"dl_ts_captured").show
+  sdlb.dataObjects.intAirports.get.drop("dl_hash").orderBy($"ident",$"dl_ts_captured").show
 ```
 
 ```
@@ -111,36 +126,11 @@ If you look at the data, there should be only one record per object for now, as 
 
 Let's try to simulate the historization process by loading a historical state of the data and see if any of the airports have changed since then.
 For this, drop table `int-airports` again.
-Then, delete all files in `data/stg-airport` and copy the historical `result.csv` from the folder `data/stg-airports-fallback` into the folder `data/stg-airports`.
+Then, delete all files in `data/stg-airports` and copy the historical `result.csv` from the folder `data/stg-airports-fallback` into the folder `data/stg-airports`.
 
 Now start the action `historize-airports` (and only historize-airports) again to do an "initial load".
 Remember how you do that? That's right, you can define a single action with `--feed-sel ids:historize-airports`.  
 Afterward, start actions `download-airports` and `historize-airports` by using the parameter `--feed-sel 'ids:(download|historize)-airports'` to download fresh data and build up the airport history.
-
-Uff, getting error `AnalysisException: [UNSUPPORTED_OVERWRITE.TABLE] Can't overwrite the target that is also being read from`.
-Recent versions of Delta Lake don't like if we overwrite a table "also being read from". Unfortunately this is what HistoryAction does.
-It reads the historical data from the table, and adds new records for data changed in the current snapshot.
-By default, this happens by overwriting the whole table. This is not optimal from a performance point of view, but there was no other way to change data with Hive tables.
-As Delta Lake supports merge statement, we can add `mergeModeEnable = true` to our HistorizeAction configuration as follows:
-```
-  historize-airports {
-    type = HistorizeAction
-    inputId = stg-airports
-    outputId = int-airports    
-    mergeModeEnable = true
-    ...
-  }
-```
-
-:::info Merge Mode
-`mergeModeEnable = true` tells Deduplicate/HistorizeAction to merge changed data into the output DataObject, instead of overwriting the whole DataObject.
-The output DataObject must implement CanMergeDataFrame interface (also called trait in Scala) for this. 
-DeltaLakeTableDataObject will then create a complex SQL-Upsert statement to merge new and changed data into existing output data.
-:::
-
-Uff, getting error `'SchemaViolationException: (DataObject~int-airports) Schema does not match schema defined on write:` with `superfluousCols=dl_hash`?
-This is due to merge mode needing an additional column `dl_hash` to efficiently check for changed data.
-Drop table `int-airports` again, then startJob `--feed-sel ids:historize-airports` and afterward `--feed-sel 'ids:(download|historize)-airports'`.
 
 Now check in spark-shell again, and you'll find several airports that have changed between the initial and the current state:
 ```
@@ -212,10 +202,13 @@ The HistorizeAction needs to join all existing data with the new input data and 
 If Spark joins data, it needs two processing stages and a shuffle in between to do so (you can read more about this in various Spark tutorials).
 There is a Spark property we can tune for small datasets to reduce the number of tasks created.
 The default value is to create 200 tasks in each shuffle. With our dataset, 2 tasks should be enough already.
-You can tune this by setting the following property in global.spark-options of global.conf configuration file:
+You can tune this by setting the following property in the `sparkOptions` of the engine connection
+`default-engine` in the global.conf configuration file, where it is already set:
 ```
     "spark.sql.shuffle.partitions" = 2
 ```
+See [Delta Lake - a better data format](delta-lake-format.md) for the full engine connection definition,
+and [Execution Engines](/docs/reference/executionEngines) for the reference documentation.
 
 :::
 
@@ -234,7 +227,7 @@ Add a primary key to the table definition of `int-departures`:
 
 Change the type of action `prepare-departures` from `CopyAction`, this time to `DeduplicateAction` and rename it to `deduplicate-departures`, again to reflect its new type.
 It also needs an additional transformers to calculate the new primary key column `dt` derived from the column `firstseen`, and to make sure input data is unique across the primary key of the output DataObject.
-Finally, we need to set `mergeModeEnable = true` and `updateCapturedColumnOnlyWhenChanged = true`.
+Finally, we need to set `updateCapturedColumnOnlyWhenChanged = true`.
 
 The `deduplicate-departures` Action definition should then look as follows: 
 ```
@@ -242,7 +235,6 @@ The `deduplicate-departures` Action definition should then look as follows:
     type = DeduplicateAction
     inputId = stg-departures
     outputId = int-departures
-    mergeModeEnable = true
     updateCapturedColumnOnlyWhenChanged = true
     transformers = [{
       type = SQLDfTransformer
@@ -319,7 +311,9 @@ sdlb.dataObjects.intDepartures.get
     ...
 ```
 
-Note that DeduplicateAction assumes that input data is already unique across the given primary key. With `mergeModeEnable = true` we even get errors otherwise.
+Note that DeduplicateAction assumes that input data is already unique across the given primary key.
+Since the output is written with a merge statement, non-unique input fails with
+`DeltaUnsupportedOperationException: [DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE] Cannot perform Merge as multiple source rows matched and attempted to modify the same target row`.
 DeduplicateAction doesn't deduplicate your input data by default, because deduplication is costly and data often is already unique.
 In our example we have duplicates in the input data set, and added the DeduplicateTransformer to our input data.
 Instead of using DeduplicateTransformer, we could also implement our own deduplicate logic using the Scala Spark API with ScalaCodeSparkDfTransformer as follows:

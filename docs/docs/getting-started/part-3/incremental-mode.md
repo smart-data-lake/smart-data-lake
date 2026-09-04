@@ -32,8 +32,12 @@ See [Execution Modes](/docs/reference/executionModes) for detailed documentation
 :::
 
 :::caution
-Due to load limits of the departures web service, the time interval in `ext-departures` should not be larger than a week. As mentioned, we will implement a simple incremental query logic that always queries from the last execution time until the current execution.
-If the time difference between the last execution and the current execution time is larger than a week, we will query the next four days since the last execution time. Otherwise, we query the data from the last execution until now.
+Due to the load limits of the departures web service, the queried time interval must stay short and recent, see
+[Custom Webservice](custom-webservice.md). We will implement a simple incremental query logic that always
+queries from the last execution time until the current execution. `checkQueryParameters` then clamps that
+window: *begin* is moved forward to at most 3 days ago, and the interval is capped at `maxIntervalSeconds`
+(6 hours). So if the last run is longer ago than that, a run does not fetch everything at once - it catches up
+by one interval per run.
 :::
 
 ## Define state variables
@@ -71,7 +75,7 @@ We can see that by implementing these two functions, we start using the variable
 
 To compile the following additional import statements are necessary at the top of the file:
 ```scala
-import io.smartdatalake.workflow.dataobject.CanCreateIncrementalOutput
+import io.smartdatalake.workflow.dataobject.generic.CanCreateIncrementalOutput
 import org.json4s.jackson.{JsonMethods, Serialization}
 ```
 
@@ -83,8 +87,11 @@ To have access to the state file, we specify the path to be in an already mounte
 
 ```
 ./buildJob.sh
-./startJob.sh -c /mnt/config,/mnt/envConfig/dev.conf --feed-sel ids:download-deduplicate-departures --state-path /mnt/data/state -n getting-started
+./startJob.sh -c /mnt/config,/mnt/envConfig/dev.conf --feed-sel ids:download-deduplicate-departures --state-path /mnt/state -n getting-started
 ```
+
+`startJob.sh` mounts the project folder `viz/state` as `/mnt/state` in the container, so the state files end up
+in `viz/state` - which is also where the SDLB UI of the next chapter reads them from.
 
 Use this slightly modified command to run `download-deduplicate-departures` Action. 
 Nothing should have changed so far, since we only read and write an empty state.   
@@ -104,7 +111,7 @@ Now we want to achieve the following query logic:
 
 The starting point are the query parameters provided in the configuration file and no previous state. 
 During the first execution, we query the departures for the two airports in the given time window.
-If no begin and end time are provided, we take the interval of [2 weeks and 2 days ago] -> [2 weeks ago] as a starting point.
+If no begin and end time are provided, we take the interval of [6 hours ago] -> [now] as a starting point.
 Afterward, the `end`-parameter of the current query will be stored as `begin`-parameter for the next query.
 Now the true incremental phase starts as we can get the state of the last successful run. 
 We query the flight-data API to get data from the last successful run up until now.
@@ -124,7 +131,7 @@ Then the logic for the next state must be placed below the comment `// put simpl
 
 Compile and execute the code of this project again and execute it multiple times.
 The scenario will be that the first run fetches the data defined in the configuration file, then the proceeding run retrieves the data from the endpoint of the last run until now. 
-If this time difference is larger than a week, the program only queries the next four days since the last execution.
+If this time difference is larger than the allowed interval, the program only queries the next 6 hours since the last execution, catching up one interval per run.
 If there is no data available in a time window, because only a few seconds have passed since the last execution, the execution will fail with Error **404**.
 
 :::info

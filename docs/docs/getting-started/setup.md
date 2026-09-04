@@ -7,7 +7,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 :::info Trouble Shooting
-In case you encounter an issue during this tutorial, feel free to consult the [trouble shooting section](troubleshooting/common-problems.md) of the Getting Started guide or the [one](../reference/troubleshooting.md) of the Smart Data Lake Reference. Another good source is the issue tracker on Github, either of the [Getting Started guide](https://github.com/smart-data-lake/getting-started/issues) or on the [main repository](https://github.com/smart-data-lake/getting-started/issues).
+In case you encounter an issue during this tutorial, feel free to consult the [trouble shooting section](troubleshooting/common-problems.md) of the Getting Started guide or the [one](../reference/troubleshooting.md) of the Smart Data Lake Reference. Another good source is the issue tracker on Github, either of the [Getting Started guide](https://github.com/smart-data-lake/getting-started/issues) or on the [main repository](https://github.com/smart-data-lake/smart-data-lake/issues).
 :::
 
 ## Requirements
@@ -49,21 +49,50 @@ This might take some time, but it's only needed at the beginning or if Scala cod
 :::
 
 :::caution
-In case you get an error stating that the dev.conf file is not existing please do the following: 
-- Navigate into the folder envConfig
-- Copy the file dev.conf.part-2-solution as dev.conf (`cp dev.conf.part-2-solution dev.conf`)
-- Rerun `./buildJob.sh`
+The build reads the configuration files to generate the Scala interface, so it needs a configuration to be
+in place. If you get an error stating that `dev.conf` or one of the `*.conf` files does not exist, seed the
+working tree first with `./prepare.sh` as described in the next section, then rerun `./buildJob.sh`.
 :::
+
+## Prepare the configuration files
+
+The repository does not contain the configuration files SDLB actually reads.
+`config/` holds only `global.conf` and an empty `config.template`; the state of the configuration
+after each step of this guide is tracked as a *variant* instead, e.g. `config/airports.conf.part-1-solution`.
+A fresh clone can therefore not run anything before one of these variants is activated.
+
+The `prepare.sh` script does that for you:
+
+```
+./prepare.sh --list                 # show the part -> file mapping
+./prepare.sh 1                      # empty configs, the starting point of part 1
+./prepare.sh 3 --clean              # starting point of part 3, and delete output of previous runs
+./prepare.sh final                  # the completed pipeline of the whole guide
+```
+
+:::caution prepare.sh seeds the *start* of a part
+`./prepare.sh 3` lays down the solution of part **2**, plus the files part 3 starts from - not the
+part-3 solution. Use `./prepare.sh final` for the finished pipeline. `--list` is authoritative.
+:::
+
+Two options are useful as you work through the guide:
+- `--clean` additionally deletes the tables and files written by previous runs. Files tracked by git are never touched.
+- `--fix-timestamps` rewrites the time window of the flight data webservice in `config/departures.conf`, see [Get Departures](part-1/get-departures.md).
+
+Each part of this guide starts by telling you which `prepare.sh` command to run, so you can also jump
+straight into part 2 or part 3.
 
 ## Run SDLB with Spark docker image
 
 Now let's see Smart Data Lake in action!
 
 ```
-pushd config && cp departures.conf.part-1-solution departures.conf && cp airports.conf.part-1-solution airports.conf && cp btl.conf.part-1-solution btl.conf && popd
+./prepare.sh 2
 ./startJob.sh --config /mnt/config,/mnt/envConfig/dev.conf --feed-sel download
 ```
 
+`./prepare.sh 2` activates the solution of part 1 - the pipeline you are going to build yourself in the
+next chapters.
 This executes a simple data pipeline that downloads two files from two different websites into the *data* folder.
 
 When the execution is complete, you should see the two new directories in the *data* folder.
@@ -86,10 +115,10 @@ Windows Users need to follow the steps below to have a working Hadoop Installati
 ### Run SDLB in IntelliJ
 We will focus on the community version of IntelliJ. Please [download](https://www.jetbrains.com/idea/) the version that suits your operating system.
 This needs an Intellij and Java SDK installation. Please make sure you have:
-- Java Java 17 SDK or Java 11 JDK
-- Scala Version 2.12.
+- Java 17 SDK (SDLB 3.x builds on Spark 4.x, which needs Java 17 or higher)
+- Scala Version 2.13.
     - Install the Scala-Plugin (`File` -> `Settings` -> `Plugins`)
-    - Install Scala version 2.12 and DO NOT UPGRADE to Scala 3. For the complete list of versions at play in SDLB, [you can consult the Reference](../reference/build).
+    - Install Scala version 2.13 and DO NOT UPGRADE to Scala 3. SDLB 3.x publishes `_2.13` artifacts only. For the complete list of versions at play in SDLB, [you can consult the Reference](../reference/build).
         - Existing Project: `File` -> `Project Structure` -> `Global Libraries` -> `Add` (Select correct version)
         - New Project: Select `Scala` under New Project and choose the correct version
 
@@ -97,9 +126,9 @@ Then do the following to load the project successfully:
 1. Load the project as a maven project: Right-click on pom.xml file -> add as Maven Project
 2. Ensure all correct dependencies are loaded: Right-click on pom.xml file, Maven -> Sync Project
 3. Configure and run the following run configuration in IntelliJ IDEA (optional, as the .idea folder already contains this setup):
-    - Main class: `io.smartdatalake.app.LocalSmartDataLakeBuilder`
-    - Program arguments: `--feed-sel <regex-feedname-selector> --config $ProjectFileDir$/config`
-    - Working directory: `/path/to/sdl-examples/target` or just `target`
+    - Main class: `io.smartdatalake.app.DefaultSmartDataLakeBuilder`
+    - Program arguments: `-c $ProjectFileDir$/config --feed-sel <regex-feedname-selector> --state-path state -n getting-started`
+    - Working directory: `$ProjectFileDir$/data`, so that relative paths of DataObjects resolve into the *data* folder just like in the container
     - VM Options: `--add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED --add-opens=java.base/sun.nio.cs=ALL-UNNAMED --add-opens=java.base/sun.security.action=ALL-UNNAMED --add-opens=java.base/sun.util.calendar=ALL-UNNAMED`
 
 **Congratulations!** You're now all setup! Head over to the next step to analyse these files...

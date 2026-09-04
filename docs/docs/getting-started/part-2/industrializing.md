@@ -16,7 +16,8 @@ In Part 2 we will cover the following points:
 Additionally, we will use spark-shell to interact with our data.
 
 Part 2 is based on departures/airports/btl.conf of Part 1, see files ending with `part-1-solution` in [this directory](https://github.com/smart-data-lake/getting-started/tree/master/config).
-Use the following cmd to reset your configuration files to the final solution of Part 1:
+Use the following cmd to reset your configuration files to the final solution of Part 1, which is the state part 2 starts from:
 ```
-pushd config && cp departures.conf.part-1-solution departures.conf && cp airports.conf.part-1-solution airports.conf && cp btl.conf.part-1-solution btl.conf && popd
+./prepare.sh 2
 ```
+Remember that `prepare.sh <part>` seeds the *starting point* of that part, see [Technical Setup](../setup.md#prepare-the-configuration-files).

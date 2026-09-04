@@ -114,6 +114,7 @@ Finally, adapt the action definition for `join-departures-airports` in btl.conf:
 :::
 
 To run our data pipeline, first delete `data/int-*` and `data/btl-*` - otherwise DeltaLakeTableDataObject will fail because of existing files in different format.
+`./prepare.sh 2 --clean` does that for you: it re-seeds the configuration files of part 2 and removes the output of previous runs, including `data/metastore_db`.
 Then you can execute the usual *./startJob.sh* command for `compute` feed:
 
 ```
@@ -193,6 +194,7 @@ should look similar to
 ```
 
 You can also use SDLB's scala interface to access DataObjects and Actions in the spark-shell. The interface is generated through `./buildJob.sh` and it is important to re-execute buildJob.sh after changes on configurations files before starting the spark-shell.
+`./sparkShell.sh` initializes it for you on startup by loading `InitSDLBInterface.scala`, which creates the `sdlb` handle used below.
 
 Now you can show or drop DataObjects as follows. Note that DataObjectId is converted from hyphen separated to camelCase style for Java/Scala compatibility.
 
@@ -204,17 +206,39 @@ sdlb.dataObjects.intDepartures.dataObject.dropTable
 
 You can find a detailed description of SDLB's scala interface [here](../../reference/notebookCatalog)
 
-To automatically initialize SDLB's scala interface on spark-shell startup, uncomment the corresponding code in `shell.scala`.
-
 :::tip Delta Lake tuning
 You might have seen that our data pipeline with DeltaTableDataObject runs a Spark stage with 50 tasks several times.
 This is delta lake reading its transaction log with Spark. For our data volume, 50 tasks are way too much.
-You can reduce the number of snapshot partitions to speed up the execution by setting the following Spark property in your `global.conf` under `global.spark-options`:
+You can reduce the number of snapshot partitions to speed up the execution by setting the corresponding Spark property:
 
 ```
     "spark.databricks.delta.snapshotPartitions" = 2
 ```
 
+Since SDLB 3.0.0 Spark properties are no longer set in `global.spark-options`, but on the *engine connection*
+that provides the Spark session. `config/global.conf` of this project defines it as follows, and already
+contains this property:
+
+```
+connections {
+  default-engine {
+    type = SparkClassicConnection
+    master = "local[*]"
+    enableHive = true
+    sparkOptions {
+      "spark.sql.shuffle.partitions" = 2
+      "spark.databricks.delta.snapshotPartitions" = 2
+    }
+  }
+}
+```
+
+An Action uses the connection given by its `engineConnectionId`, which defaults to `default-engine`.
+`enableHive = true` gives the run a persistent metastore in `./metastore_db`, so that tables registered by
+one run can be resolved by name in the next process - the spark-shell below and the metadata exporters of
+part 3 depend on it.
+See [Execution Engines](/docs/reference/executionEngines) for the full picture, including how to run against
+a Spark session provided by a cluster.
 :::
 
 :::tip Hocon file splitting - global.conf
