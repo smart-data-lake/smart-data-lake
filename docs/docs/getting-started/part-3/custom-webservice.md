@@ -29,11 +29,13 @@ That should greatly improve your development experience compared to manipulating
 
 ## Starting point
 Again we start with departures/airports/btl.conf that resulted from finishing the last part.
-Use the following cmd to reset your configuration files to the final solution of Part 2:
+Use the following cmd to reset your configuration files to the final solution of Part 2, and to lay down the
+initial version of the Scala class we are going to work on:
 ```
-pushd config && cp departures.conf.part-2-solution departures.conf && cp airports.conf.part-2-solution airports.conf && cp btl.conf.part-2-solution btl.conf && popd
-pushd envConfig && cp dev.conf.part-2-solution dev.conf && popd  
+./prepare.sh 3
 ```
+Besides the three configuration files this also activates `envConfig/dev.conf` and
+`src/main/scala/com/sample/CustomWebserviceDataObject.scala`.
 
 ## Define Data Objects
 We start by rewriting the existing `ext-departures` DataObject. 
@@ -62,27 +64,28 @@ The connection timeout corresponds to the time we wait until the connection is e
 If the request cannot be answered in the times configured, we try to automatically resend the request. 
 How many times a failed request will be resent, is controlled by the `nRetry` parameter.
 
-Note that we changed the type to `com.sampleCustomWebserviceDataObject`.
+Note that we changed the type to `com.sample.CustomWebserviceDataObject`.
 This is a custom DataObject type, not included in standard Smart Data Lake Builder. 
-To make it work, please go to the project's root directory and copy the Scala class with 
-```
-cp src/main/scala/com/sample/CustomWebserviceDataObject.scala.part-3a-initial src/main/scala/com/sample/CustomWebserviceDataObject.scala
-```
-
-This created an initial version of the file `src/main/scala/org/sample/CustomWebserviceDataObject.scala`.
+`./prepare.sh 3` above already created the initial version of the file
+`src/main/scala/com/sample/CustomWebserviceDataObject.scala` from the tracked variant
+`CustomWebserviceDataObject.scala.part-3a-initial`. If you want to restore it later, run `./prepare.sh 3` again -
+be aware that this also resets the configuration files to the solution of part 2.
 
 :::info
-The *begin* and *end* are now automatically set to two weeks ago minus 2 days and two weeks ago, respectively.
+The *begin* and *end* are now automatically set to the last 6 hours, i.e. *begin* is 6 hours ago and *end* is now.
 They can still be overridden if you want to try out fixed timestamps. For example, you could also write
 ```
     {
       airport = "LSZB"
-      begin = 1696854853   # 29.08.2021
-      end = 1697027653     # 30.08.2021
+      begin = 1234567890   # unix timestamp of a recent point in time
+      end = 1234589490     # at most ~12 hours later
     }
 ```
 
-However, as noted previously, when you request older data it may be that the webservice does not respond, so we recommend not to specify begin and end anymore.
+Keep in mind that the webservice refuses a window that starts more than a few days ago or that spans more than
+about 12 hours, so overriding these values mostly makes the request fail - we recommend not to specify begin
+and end anymore. `CustomWebserviceDataObject` protects you from this: its method `checkQueryParameters` moves
+*begin* forward to at most 3 days ago and caps the interval at `maxIntervalSeconds` (6 hours).
 Can you spot which line of code in `CustomWebserviceDataObject` is responsible for setting the defaults?
 :::
   
