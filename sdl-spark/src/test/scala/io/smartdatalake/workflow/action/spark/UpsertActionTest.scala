@@ -19,49 +19,56 @@
 package io.smartdatalake.workflow.action.spark
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
-import io.smartdatalake.testutils.DeduplicateActionBehaviour
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
+import io.smartdatalake.testutils.UpsertActionBehaviour
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.dataset.Equality
+import io.smartdatalake.workflow.action.UpsertAction
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
+import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 
-class DeduplicateWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogger with DeduplicateActionBehaviour {
+class UpsertActionTest extends AnyFunSuite with BeforeAndAfter with SparkTestTool with Equality with SmartDataLakeLogger
+    with UpsertActionBehaviour {
 
   override def defaultEngineConnection: Connection with EngineConnection = SparkTestUtil.defaultSparkConnection
 
-  test("deduplicate load mergeModeEnable") {
-    testDeduplicateWithMergeMode(
+  test("upsert 1st 2nd load") {
+    testUpsertTwoRuns(
       (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
     )
   }
 
-  test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
-    testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
-      (id, registry) => MockSparkDataObject(id)(registry),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
-    )
+  test("early validation that output primary key exists") {
+    implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
+    // setup DataObjects
+    val srcDO = MockSparkDataObject("src1").register
+    val tgtDO = MockSparkDataObject("tgt1").register
+
+    // prepare & start 1st load
+    intercept[IllegalArgumentException] {
+      UpsertAction("dda", srcDO.id, tgtDO.id)
+    }
   }
 
-  test("deduplicate load mergeModeEnable sourceTimestampColumn") {
-    testDeduplicateWithMergeModeSourceTimestampColumn(
+  test("upsert with filter clause") {
+    testUpsertWithFilter(
       (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
     )
   }
 
-  test("deduplicate load mergeModeEnable sourceTimestampColumn updateCapturedColumnOnlyWhenChanged") {
-    testDeduplicateWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(
+  test("upsert 1st 2nd load with transformer changing schema") {
+    testUpsertWithTransformerChangingSchema(
       (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
     )
   }
 
-  test("deduplicate 1st 2nd load with transformer changing schema") {
-    testDeduplicateWithTransformerChangingSchema(
-      (id, registry) => MockSparkDataObject(id)(registry),
-      (id, pks, registry) => MockSparkDataObject(id, primaryKey = pks)(registry)
-    )
+  test("upsert with schema evolution") {
+    testUpsertWithSchemaEvolution(SparkSubFeed.subFeedType)
   }
 }

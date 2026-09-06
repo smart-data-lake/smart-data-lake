@@ -34,7 +34,7 @@ import scala.reflect.runtime.universe.Type
  * Note: not portable to ScalaSubFeed today: this test combines src1/src2 via a [[SQLDfsTransformer]], which uses
  * `DataFrameFunctions.sql`, not implemented for ScalaSubFeed. `DebugTransformer` itself is fully generic.
  *
- * Note also, like [[DeduplicateActionBehaviour]], the input placeholder subfeeds are built with [[ScalaSubFeed]]
+ * Note also, like [[UpsertActionBehaviour]], the input placeholder subfeeds are built with [[ScalaSubFeed]]
  * regardless of the engine under test: they carry no DataFrame, only the DataObject id, and the Action re-reads
  * the actual DataFrame from the DataObject itself.
  */

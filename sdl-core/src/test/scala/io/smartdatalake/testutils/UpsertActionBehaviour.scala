@@ -23,7 +23,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil.getCommonSubFeed
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.action.DeduplicateAction
+import io.smartdatalake.workflow.action.UpsertAction
 import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
@@ -36,7 +36,7 @@ import java.sql.Timestamp
 import java.time.{LocalDateTime, Month}
 import scala.reflect.runtime.universe.Type
 
-trait DeduplicateActionBehaviour extends GenericTestTool {
+trait UpsertActionBehaviour extends GenericTestTool {
   this: SmartDataLakeLogger =>
 
   implicit private val implicitLogger: Logger = logger
@@ -49,7 +49,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
 
   private def ts(str: String) = Timestamp.valueOf(LocalDateTime.parse(str.replace(" ", "T")))
 
-  def testDeduplicateTwoRuns(
+  def testUpsertTwoRuns(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
       createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
@@ -67,7 +67,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
     val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
-    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id)
+    val action1 = UpsertAction("dda", srcDO.id, tgtDO.id)
     val l1 = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeDataFrame(l1, Seq())(context1)
     val srcSubFeed = ScalaSubFeed(None, "src1", Seq())
@@ -85,7 +85,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -106,12 +106,12 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
   }
 
-  def testDeduplicateWithFilter(
+  def testUpsertWithFilter(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
       createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
@@ -131,7 +131,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // prepare & start 1st load
     // note: pass the actual subFeedType as subFeedTypeForValidation, as the default (SparkSubFeed) might not be on the classpath
     val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = LocalDateTime.now, phase = ExecutionPhase.Exec)
-    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, transformers = Seq(FilterTransformer(filterClause = "lastname='jonson'", subFeedTypeForValidation = subFeedType.typeSymbol.fullName)))
+    val action1 = UpsertAction("dda", srcDO.id, tgtDO.id, transformers = Seq(FilterTransformer(filterClause = "lastname='jonson'", subFeedTypeForValidation = subFeedType.typeSymbol.fullName)))
     val l1 = Seq(("jonson", "rob", 5), ("doe", "bob", 3)).toDF("lastname", "firstname", "rating")
 
     srcDO.writeDataFrame(l1, Seq())(context1)
@@ -147,7 +147,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     assert(r1.size == 1)
   }
 
-  def testDeduplicateWithTransformerChangingSchema(
+  def testUpsertWithTransformerChangingSchema(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
       createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
@@ -165,7 +165,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
     val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
-    val action1 = DeduplicateAction(
+    val action1 = UpsertAction(
       "dda",
       srcDO.id,
       tgtDO.id,
@@ -187,7 +187,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "Rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -208,12 +208,12 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "Rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
   }
 
-  def testDeduplicateWithSchemaEvolution(subFeedType: Type): Unit = {
+  def testUpsertWithSchemaEvolution(subFeedType: Type): Unit = {
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val contextInit: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
@@ -236,15 +236,15 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
       .toDF(colId, colValueOld, colValueNew)
 
     val dateTime1 = Timestamp.valueOf(LocalDateTime.of(2020, Month.AUGUST, 15, 10, 0, 0))
-    val dfResult1 = DeduplicateAction
+    val dfResult1 = UpsertAction
       .deduplicateDataFrame(Option(df1), Seq(colId), dateTime1, ignoreOldDeletedColumns = false, ignoreOldDeletedNestedColumns = true)(df2)
 
-    // deduplicate again, using the new column
+    // upsert again, using the new column
     val df3 = Seq((1, "B", 200))
       .toDF(colId, colValueOld, colValueNew)
 
     val dateTime2 = Timestamp.valueOf(LocalDateTime.of(2020, Month.AUGUST, 16, 10, 0, 0))
-    val dfResult2 = DeduplicateAction
+    val dfResult2 = UpsertAction
       .deduplicateDataFrame(Option(dfResult1), Seq(colId), dateTime2, ignoreOldDeletedColumns = false,
         ignoreOldDeletedNestedColumns = true)(df3)
 
@@ -255,7 +255,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     assert(dfExpected.isEqual(dfResult2))
   }
 
-  def testDeduplicateWithMergeMode(
+  def testUpsertWithMergeMode(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
       createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
@@ -273,7 +273,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
     val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
-    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id)
+    val action1 = UpsertAction("dda", srcDO.id, tgtDO.id)
     val l1 = Seq(
       ("doe",  "john",   5),
       ("pan",  "peter",  5),
@@ -293,7 +293,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -318,7 +318,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context2)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -341,12 +341,12 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context3)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert load", Seq())(actual)(expected)
       assert(resultat)
     }
   }
 
-  def testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
+  def testUpsertWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
       createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
@@ -364,7 +364,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
     val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
-    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, updateCapturedColumnOnlyWhenChanged = true)
+    val action1 = UpsertAction("dda", srcDO.id, tgtDO.id, updateCapturedColumnOnlyWhenChanged = true)
     val l1 = Seq(
       ("doe",  "john",   Some(5)),
       ("pan",  "peter",  Some(5)),
@@ -388,7 +388,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -418,7 +418,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context2)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -441,12 +441,12 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context3)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert load", Seq())(actual)(expected)
       assert(resultat)
     }
   }
 
-  def testDeduplicateWithMergeModeSourceTimestampColumn(
+  def testUpsertWithMergeModeSourceTimestampColumn(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
       createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
@@ -468,7 +468,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
     val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
-    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, sourceTimestampColumn = Some(sourceTsCol))
+    val action1 = UpsertAction("dda", srcDO.id, tgtDO.id, sourceTimestampColumn = Some(sourceTsCol))
     val l1 = Seq(
       ("doe", "john",   Some(5), Some(srcTs1)),
       ("pan", "peter",  Some(5), Some(srcTs1)),
@@ -488,7 +488,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "rating", Environment.capturedColumnName)
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate 1st load with sourceTimestampColumn", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert 1st load with sourceTimestampColumn", Seq())(actual)(expected)
       assert(resultat)
       // the source timestamp column itself is not written to the output
       assert(!actual.columns.map(_.toLowerCase).contains(sourceTsCol))
@@ -516,12 +516,12 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "rating", Environment.capturedColumnName)
       val actual = tgtDO.getDataFrame()(context2)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate 2nd load with sourceTimestampColumn", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert 2nd load with sourceTimestampColumn", Seq())(actual)(expected)
       assert(resultat)
     }
   }
 
-  def testDeduplicateWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(
+  def testUpsertWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
       createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
@@ -542,7 +542,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
     val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
-    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, sourceTimestampColumn = Some(sourceTsCol),
+    val action1 = UpsertAction("dda", srcDO.id, tgtDO.id, sourceTimestampColumn = Some(sourceTsCol),
       updateCapturedColumnOnlyWhenChanged = true)
     val l1 = Seq(
       ("doe", "john",  5, srcTs1),
@@ -572,12 +572,12 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "rating", Environment.capturedColumnName)
       val actual = tgtDO.getDataFrame()(context2)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate 2nd load with sourceTimestampColumn", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert 2nd load with sourceTimestampColumn", Seq())(actual)(expected)
       assert(resultat)
     }
   }
 
-  def testDeduplicateWithMergeModeSchemaEvolution(
+  def testUpsertWithMergeModeSchemaEvolution(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
       createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame
   ): Unit = {
@@ -595,7 +595,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
     // prepare & start 1st load
     val refTimestamp1 = LocalDateTime.now()
     val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = refTimestamp1, phase = ExecutionPhase.Exec)
-    val action1 = DeduplicateAction(
+    val action1 = UpsertAction(
       "dda",
       srcDO.id,
       tgtDO.id,
@@ -621,7 +621,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "rating2", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context1)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
 
@@ -646,7 +646,7 @@ trait DeduplicateActionBehaviour extends GenericTestTool {
         .toDF("lastname", "firstname", "rating2", "dl_ts_captured")
       val actual = tgtDO.getDataFrame()(context2)
       val resultat = expected.isEqual(actual)
-      if (!resultat) printFailedTestResultGdf("deduplicate 1st 2nd load", Seq())(actual)(expected)
+      if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
     }
   }

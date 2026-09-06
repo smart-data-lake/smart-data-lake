@@ -29,6 +29,7 @@ private[smartdatalake] case class GenericTypeDef(
                                                   tpe: Type,
                                                   description: Option[String],
                                                   isFinal: Boolean,
+                                                  isDeprecated: Boolean,
                                                   superTypes: Set[Type],
                                                   attributes: Seq[GenericAttributeDef]
                          )

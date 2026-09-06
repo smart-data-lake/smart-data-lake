@@ -156,7 +156,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val statePath = tempPath + "stateTest/"
     val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
-    val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id, metricsFailCondition = Some(s"dataObjectId = '${tgt1DO.id.id}' and key = 'records_written' and value = 0"))
+    val action1 = UpsertAction("a", srcDO.id, tgt1DO.id, metricsFailCondition = Some(s"dataObjectId = '${tgt1DO.id.id}' and key = 'records_written' and value = 0"))
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
     val actions: Seq[DataFrameOneToOneActionImpl] = Seq(action1, action2)
     val stateStore = HadoopFileActionDAGRunStateStore(statePath, contextInit.application, defaultHadoopConf)
@@ -207,7 +207,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     // prepare DAG
     val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
-    val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id)
+    val action1 = UpsertAction("a", srcDO.id, tgt1DO.id)
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id)
     val actions: Seq[DataFrameOneToOneActionImpl] = Seq(action1, action2)
     val dag: ActionDAGRun = ActionDAGRun(actions)
@@ -299,7 +299,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     tgtADO.initSparkDataFrame(dfTgtA, Seq())
     tgtADO.writeSparkDataFrame(dfTgtA, Seq()) // populate tgtA with "doe", so there should be only 1 partition to process (dau)
     tgtDDO.writeSparkDataFrame(dataA, Seq()) // populate tgtD so there should be no partitions left to process
-    instanceRegistry.register(DeduplicateAction("a", srcADO.id, tgtADO.id, executionMode = Some(PartitionDiffMode()), metadata = Some(ActionMetadata(feed = Some(feed)))))
+    instanceRegistry.register(UpsertAction("a", srcADO.id, tgtADO.id, executionMode = Some(PartitionDiffMode()), metadata = Some(ActionMetadata(feed = Some(feed)))))
     // srcB should be filtered with partition values received from tgtA. Transformer selects records from srcB, so "doe, bob, 6" should be inserted in tgtB, but "doe, john, 3" should remain.
     instanceRegistry.register(CustomDataFrameAction("b", Seq(tgtADO.id, srcBDO.id), Seq(tgtBDO.id), executionMode = Some(FailIfNoPartitionValuesMode()), metadata = Some(ActionMetadata(feed = Some(feed))),
       transformers = Seq(SQLDfsTransformer(code = Map(tgtBDO.id.id -> "select * from src_B"))), mainInputId = Some(tgtADO.id)
@@ -490,7 +490,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     val l1 = Seq(("doe", "john", 5)).toDF("lastname", "firstname", "rating")
     srcDO.writeSparkDataFrame(l1, Seq())
     val actions = Seq(
-      DeduplicateAction("A", srcDO.id, tgtADO.id),
+      UpsertAction("A", srcDO.id, tgtADO.id),
       CopyAction("B", tgtADO.id, tgtBDO.id),
       CopyAction("C", tgtADO.id, tgtCDO.id),
       CustomDataFrameAction("D", List(tgtBDO.id, tgtCDO.id), List(tgtDDO.id), transformers = Seq(customTransformer))
@@ -598,7 +598,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
     // prepare DAG
     val actions = Seq(
-      DeduplicateAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode())), // PartitionDiffMode is ignored because partition values are given below as parameter
+      UpsertAction("a", srcDO.id, tgt1DO.id, executionMode = Some(PartitionDiffMode())), // PartitionDiffMode is ignored because partition values are given below as parameter
       CopyAction("b", tgt1DO.id, tgt2DO.id)
     )
     val dag = ActionDAGRun(actions, partitionValues = Seq(PartitionValues(Map("dt" -> "20180101"))))
@@ -728,7 +728,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
       failCondition = Some("size(selectedOutputPartitionValues) = 0 and size(outputPartitionValues) = 0")
     )
     val actions = Seq(
-      DeduplicateAction("a", srcDO.id, tgt1DO.id, executionMode = Some(partitionDiffMode)),
+      UpsertAction("a", srcDO.id, tgt1DO.id, executionMode = Some(partitionDiffMode)),
       CopyAction("b", tgt1DO.id, tgt2DO.id)
     )
     val dag = ActionDAGRun(actions)

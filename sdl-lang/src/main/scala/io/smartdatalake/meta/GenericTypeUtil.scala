@@ -167,7 +167,9 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     val scaladoc = extractScalaDoc(tpe.typeSymbol.annotations)
     val description = scaladoc.map(formatScaladocWithTags(_, tag => !(tag.isInstanceOf[Tag.Param] || tag.isInstanceOf[Tag.OtherTag])))
     val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.textParams.view.mapValues(formatScaladocString).toMap).getOrElse(Map())) else Seq()
-    GenericTypeDef(name, baseType, tpe, description, tpe.typeSymbol.asClass.isCaseClass, parentTypes.toSet, attributes)
+    // only java annotations are kept for runtime. SDLB needs to use Java @Deprecated annotation to be able to retrieve this with reflection.
+    val isDeprecated = tpe.typeSymbol.annotations.exists(_.tree.tpe =:= typeOf[Deprecated])
+    GenericTypeDef(name, baseType, tpe, description, tpe.typeSymbol.asClass.isCaseClass, isDeprecated, parentTypes.toSet, attributes)
   }
 
   /**

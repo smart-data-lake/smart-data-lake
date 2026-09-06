@@ -126,7 +126,7 @@ SDLB Actions require these capabilities, so what you mix in decides which Action
 | `CanWriteDataFrame` | can be written from a DataFrame - required to be an output of a DataFrame Action |
 | `CanHandlePartitions` | has partition columns, enables partition-wise processing |
 | `TableDataObject` / `TransactionalTableDataObject` | is a table, resp. a table with atomic writes |
-| `CanMergeDataFrame` | supports SQL merge - required by DeduplicateAction and HistorizeAction |
+| `CanMergeDataFrame` | supports SQL merge - required by UpsertAction and HistorizeAction |
 | `CanEvolveSchema` | supports schema evolution, see [Schema](schema.md) |
 | `CanCreateIncrementalOutput` | can remember a state and deliver increments - required by `DataObjectStateIncrementalMode` |
 | `ExpectationValidation` / `CanHandleConstraints` | supports [Data Quality](dataQuality) checks |

@@ -91,7 +91,7 @@ case class ActionPipelineContext (
   /**
    * Timestamp used as reference in certain actions, e.g. the value written to the captured column by
    * [[io.smartdatalake.workflow.action.HistorizeAction]] and
-   * [[io.smartdatalake.workflow.action.DeduplicateAction]].
+   * [[io.smartdatalake.workflow.action.UpsertAction]].
    *
    * This defaults to `runStartTime`, so it stays stable over all attempts of the same run. It can be
    * overridden by the SDLB parameter `referenceTimestamp`, see [[Environment.referenceTimestamp]].

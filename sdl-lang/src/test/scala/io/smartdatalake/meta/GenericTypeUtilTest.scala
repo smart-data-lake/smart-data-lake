@@ -39,6 +39,13 @@ class GenericTypeUtilTest extends AnyFunSuite {
     assert(testObjectTypeDef.attributes.map(a => (a.name,a.isRequired,a.isDeprecated,a.isOverride)) == attrsExpected)
   }
 
+  test ("handle deprecated class") {
+    // scala annotations are *not* kept for runtime, only the java @Deprecated annotation is reflected in the type def
+    assert(!GenericTypeUtil.typeDefForClass(typeOf[TestObject]).isDeprecated)
+    assert(!GenericTypeUtil.typeDefForClass(typeOf[TestScalaDeprecatedObject]).isDeprecated)
+    assert(GenericTypeUtil.typeDefForClass(typeOf[TestDeprecatedObject]).isDeprecated)
+  }
+
   test("scala doc from case class attribute and from overridden method as fallback") {
     val testObjectTypeDef = GenericTypeUtil.typeDefForClass(typeOf[TestObject])
     assert(testObjectTypeDef.name == "TestObject")
@@ -117,6 +124,13 @@ case class TestObject (
                        override val overrideTestFirstMethod: String,
                        override val overrideTestSecondMethod: String
                      ) extends OverrideTest
+
+@Deprecated
+@deprecated("use TestObject instead", "3.0.0")
+case class TestDeprecatedObject (id: String)
+
+@deprecated("use TestObject instead", "3.0.0")
+case class TestScalaDeprecatedObject (id: String)
 
 trait OverrideTest {
   /**

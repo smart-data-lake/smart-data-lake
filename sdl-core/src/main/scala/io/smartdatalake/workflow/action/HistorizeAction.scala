@@ -245,7 +245,7 @@ case class HistorizeAction(
     _saveModeOptions = Some(mode.saveModeOptions(schema))
   }
 
-  // Output is used as recursive input in DeduplicateAction to get existing data.
+  // Output is used as recursive input in UpsertAction to get existing data.
   // This override is needed to force tick-tock write operation.
   override val recursiveInputs: Seq[TransactionalTableDataObject] = Seq(output)
 

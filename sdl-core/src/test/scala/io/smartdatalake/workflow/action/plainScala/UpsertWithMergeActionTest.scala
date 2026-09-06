@@ -19,47 +19,47 @@
 package io.smartdatalake.workflow.action.plainScala
 
 import io.smartdatalake.testutils.plainScala.{MockScalaDataObject, ScalaTestUtil}
-import io.smartdatalake.testutils.DeduplicateActionBehaviour
+import io.smartdatalake.testutils.UpsertActionBehaviour
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.scalatest.funsuite.AnyFunSuite
 
-class DeduplicateWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogger with DeduplicateActionBehaviour {
+class UpsertWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogger with UpsertActionBehaviour {
 
   override def defaultEngineConnection: Connection with EngineConnection = ScalaTestUtil.defaultScalaConnection
 
-  test("deduplicate load mergeModeEnable") {
-    testDeduplicateWithMergeMode(
+  test("upsert load mergeModeEnable") {
+    testUpsertWithMergeMode(
       (id, _) => MockScalaDataObject(id),
       (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
     )
   }
 
-  test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
-    testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
+  test("upsert load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
+    testUpsertWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
       (id, _) => MockScalaDataObject(id),
       (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
     )
 
   }
 
-  test("deduplicate load mergeModeEnable sourceTimestampColumn") {
-    testDeduplicateWithMergeModeSourceTimestampColumn(
+  test("upsert load mergeModeEnable sourceTimestampColumn") {
+    testUpsertWithMergeModeSourceTimestampColumn(
       (id, _) => MockScalaDataObject(id),
       (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
     )
   }
 
-  test("deduplicate load mergeModeEnable sourceTimestampColumn updateCapturedColumnOnlyWhenChanged") {
-    testDeduplicateWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(
+  test("upsert load mergeModeEnable sourceTimestampColumn updateCapturedColumnOnlyWhenChanged") {
+    testUpsertWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(
       (id, _) => MockScalaDataObject(id),
       (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
     )
   }
 
   // SQLDfTransformer does not yet work with ScalaSubFeed
-  ignore("deduplicate 1st 2nd load with transformer changing schema") {
-    testDeduplicateWithTransformerChangingSchema(
+  ignore("upsert 1st 2nd load with transformer changing schema") {
+    testUpsertWithTransformerChangingSchema(
       (id, _) => MockScalaDataObject(id),
       (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
     )

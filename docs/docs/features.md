@@ -20,9 +20,10 @@ More details on the roadmap will follow shortly.
 
 ## Multi-Engine
 * Spark (DataFrames)
+* Spark Connect (DataFrames)
 * Snowflake (DataFrames)
 * File (Input&OutputStream)
-* Future: SQL, Kafka Streams, Flink, …
+* Future: SQL
 
 ## Connectivity
 * Spark: diverse connectors (HadoopFS, Hive, DeltaLake, JDBC, Kafka, Splunk, Webservice, JMS) and formats (CSV, JSON, XML, Avro, Parquet, Excel, Access …)
@@ -33,7 +34,7 @@ More details on the roadmap will follow shortly.
 * Support for integration of [Airbyte sources](https://docs.airbyte.com/category/sources)
 
 ## Generic Transformations
-* Spark based: Copy, Historization, Deduplication (incl. incremental update/merge mode for streaming)
+* DataFrame based: Copy, Historization (SCD2, using merge statement), Upsert (SCD1, using merge statement)
 * File based: FileTransfer
 * Easy to extend by implementing predefined scala traits
 * Future: applying MLFlow machine learning models

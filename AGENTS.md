@@ -255,7 +255,7 @@ and instantiate it once per engine — instead of duplicating near-identical Spa
 /### Where behaviour traits live
 
 Behaviour traits live in `sdl-core/src/test/scala/io/smartdatalake/testutils/*Behaviour.scala`, e.g.
-`DeduplicateActionBehaviour`, `SmartDataLakeBuilderBehaviour`, `ColumnsTransformerBehaviour`, `SQLDfsTransformerBehaviour`.
+`UpsertActionBehaviour`, `SmartDataLakeBuilderBehaviour`, `ColumnsTransformerBehaviour`, `SQLDfsTransformerBehaviour`.
 
 This location is not arbitrary: sdl-core publishes a `test-jar` artifact so other modules (sdl-spark, sdl-snowflake, ...)
 can reuse test utilities, but the jar only packages a few include patterns configured in `sdl-core/pom.xml`

@@ -33,7 +33,7 @@ import scala.reflect.runtime.universe.Type
  * [[io.smartdatalake.workflow.dataframe.GenericDataFrame]] implementation (Spark, plain-Scala, ...).
  *
  * Note: not portable to ScalaSubFeed today: `DataFrameFunctions.sql` is not implemented for ScalaSubFeed
- * (same known gap as documented for `DeduplicateActionBehaviour`'s SQLDfTransformer-based test).
+ * (same known gap as documented for `UpsertActionBehaviour`'s SQLDfTransformer-based test).
  */
 trait SQLDfsTransformerBehaviour {
 
