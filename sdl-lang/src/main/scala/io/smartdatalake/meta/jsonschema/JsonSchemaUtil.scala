@@ -113,7 +113,8 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
       // Otherwise, there might happen a stack overflow with ProxyAction.
       val properties = new LazyListMapWrapper(() => ListMap(typeProperty ++ attributes.map(a => (a.name, convertToJsonType(a))):_*))
       val required = typeProperty.map(_._1) ++ attributes.filter(_.isRequired).map(_.name)
-      jsonschema.JsonObjectDef(properties, required = required, title = typeDef.name, description = typeDef.description)
+      jsonschema.JsonObjectDef(properties, required = required, title = typeDef.name, description = typeDef.description,
+        deprecated = if (typeDef.isDeprecated) Some(true) else None)
     }
 
     private def getTypeAttributesForJsonSchema(typeDef: GenericTypeDef): Seq[GenericAttributeDef] = {

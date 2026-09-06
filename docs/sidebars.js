@@ -64,7 +64,7 @@ const sidebars = {
           label: 'Actions',
           link: {type: 'doc', id: 'reference/actions'},
           items: [
-            'reference/actions/deduplicateAction',
+            'reference/actions/upsertAction',
             'reference/actions/historizeAction',
             'reference/actions/customDataFrameAction',
           ],

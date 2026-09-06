@@ -133,7 +133,7 @@ As Delta Lake supports merge statement, we can add `mergeModeEnable = true` to o
 ```
 
 :::info Merge Mode
-`mergeModeEnable = true` tells Deduplicate/HistorizeAction to merge changed data into the output DataObject, instead of overwriting the whole DataObject.
+`mergeModeEnable = true` tells Upsert/HistorizeAction to merge changed data into the output DataObject, instead of overwriting the whole DataObject.
 The output DataObject must implement CanMergeDataFrame interface (also called trait in Scala) for this. 
 DeltaLakeTableDataObject will then create a complex SQL-Upsert statement to merge new and changed data into existing output data.
 :::
@@ -232,14 +232,14 @@ Add a primary key to the table definition of `int-departures`:
   }
 ```
 
-Change the type of action `prepare-departures` from `CopyAction`, this time to `DeduplicateAction` and rename it to `deduplicate-departures`, again to reflect its new type.
+Change the type of action `prepare-departures` from `CopyAction`, this time to `UpsertAction` and rename it to `deduplicate-departures`, again to reflect what it does.
 It also needs an additional transformers to calculate the new primary key column `dt` derived from the column `firstseen`, and to make sure input data is unique across the primary key of the output DataObject.
 Finally, we need to set `mergeModeEnable = true` and `updateCapturedColumnOnlyWhenChanged = true`.
 
 The `deduplicate-departures` Action definition should then look as follows: 
 ```
   deduplicate-departures {
-    type = DeduplicateAction
+    type = UpsertAction
     inputId = stg-departures
     outputId = int-departures
     mergeModeEnable = true
@@ -255,7 +255,7 @@ The `deduplicate-departures` Action definition should then look as follows:
 ```
 
 :::tip Effect of updateCapturedColumnOnlyWhenChanged
-By default DeduplicateAction updates column dl_captured in the output for every record it receives. To reduce the number of updated records, `updateCapturedColumnOnlyWhenChanged = true` can be set. 
+By default UpsertAction updates column dl_captured in the output for every record it receives. To reduce the number of updated records, `updateCapturedColumnOnlyWhenChanged = true` can be set. 
 In this case column dl_captured is only updated in the output, when some attribute of the record changed.
 :::
 
@@ -293,7 +293,7 @@ prints:
   |-- dl_ts_captured: timestamp (nullable = true)
 ```
 
-We can check the work of DeduplicateAction by the following query in spark-shell: 
+We can check the work of UpsertAction by the following query in spark-shell: 
 ```
 sdlb.dataObjects.intDepartures.get
 .groupBy($"icao24", $"estdepartureairport", $"dt")
@@ -319,8 +319,8 @@ sdlb.dataObjects.intDepartures.get
     ...
 ```
 
-Note that DeduplicateAction assumes that input data is already unique across the given primary key. With `mergeModeEnable = true` we even get errors otherwise.
-DeduplicateAction doesn't deduplicate your input data by default, because deduplication is costly and data often is already unique.
+Note that UpsertAction assumes that input data is already unique across the given primary key. With `mergeModeEnable = true` we even get errors otherwise.
+UpsertAction doesn't deduplicate your input data, because deduplication is costly and data often is already unique.
 In our example we have duplicates in the input data set, and added the DeduplicateTransformer to our input data.
 Instead of using DeduplicateTransformer, we could also implement our own deduplicate logic using the Scala Spark API with ScalaCodeSparkDfTransformer as follows:
 
@@ -346,7 +346,7 @@ Then for the more complex example of computing distances, we used a ScalaClassSp
 Here, we simply include Scala code in our configuration file directly.
 :::
 
-For sure DeduplicateAction did not have much work to do, as this was the first data load. 
+For sure UpsertAction did not have much work to do, as this was the first data load. 
 In order to get different data you would need to adjust the unix timestamp parameters in the URL of DataObject `ext-departures`. 
 Feel free to play around.
 

@@ -16,7 +16,7 @@ All parameters of every Action are listed in the [Configuration Schema Viewer](.
 | ------ | -------------- | ------------- |-------------------------------------------------------------------------------------------------------------------------------------------------|
 | CopyAction | 1:1 | SparkSubFeed, SparkConnectSubFeed, SnowparkSubFeed | Read the input into a DataFrame, optionally transform it, and write it to the output. The standard 1:1 Action.                                  |
 | [CustomDataFrameAction](actions/customDataFrameAction.md) | n:m | SparkSubFeed, SparkConnectSubFeed, SnowparkSubFeed | Transform many inputs into many outputs with DataFrames. Use it for joins and unions (n:1), but also fan-outs (1:n).                            |
-| [DeduplicateAction](actions/deduplicateAction.md) | 1:1 | SparkSubFeed, SparkConnectSubFeed | Keep the latest version of every record, also after it was deleted in the source. Adds column `dl_ts_captured`.                                 |
+| [UpsertAction](actions/upsertAction.md) | 1:1 | SparkSubFeed, SparkConnectSubFeed | Keep the latest version of every record (Slowly Changing Dimension Type 1), also after it was deleted in the source. Adds column `dl_ts_captured`.                                 |
 | [HistorizeAction](actions/historizeAction.md) | 1:1 | SparkSubFeed, SparkConnectSubFeed | Build a technical history (Slowly Changing Dimension Type 2) with validity columns `dl_ts_captured` and `dl_ts_delimited`.                      |
 | FileTransferAction | 1:1 | FileSubFeed | Transfer files between SFtp, Hadoop, local filesystem and webservices as is, without interpreting their content.                                |
 | CustomFileAction | 1:1 | FileSubFeed | Transform files as byte/line streams with a custom transformer, distributed on Spark executors, e.g. to unzip, decrypt or repair a file format. |
@@ -30,10 +30,10 @@ If the data does not need to be interpreted at all, FileTransferAction avoids re
 
 ### Choosing the SubFeed type
 
-Actions of the "Generic DataFrame API" category (CopyAction, CustomDataFrameAction, DeduplicateAction, HistorizeAction) are implemented independently of a concrete DataFrame library.
+Actions of the "Generic DataFrame API" category (CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction) are implemented independently of a concrete DataFrame library.
 SDLB determines the SubFeed type to use in Init-phase from the types supported by all inputs, outputs and transformers, restricted to the engine of the Actions [engine connection](executionEngines#engine-connections), see [Execution Engines](executionEngines#determining-execution-engine-to-use-in-generic-dataframe-api-actions).
 
-DeduplicateAction and HistorizeAction additionally need an output DataObject which is a transactional table supporting SQL merge, currently DeltaLakeTableDataObject, IcebergTableDataObject, JdbcTableDataObject and SparkConnectTableDataObject.
+UpsertAction and HistorizeAction additionally need an output DataObject which is a transactional table supporting SQL merge, currently DeltaLakeTableDataObject, IcebergTableDataObject, JdbcTableDataObject and SparkConnectTableDataObject.
 This limits them to the Spark and Spark Connect engines in practice, even though their implementation is engine-agnostic.
 
 If none of the Actions above fits, an own Action can be implemented, see [Extending SDLB](extending). Prefer a [transformation](transformations) on an existing Action whenever possible: it keeps the lineage SDLB derives from your configuration accurate.

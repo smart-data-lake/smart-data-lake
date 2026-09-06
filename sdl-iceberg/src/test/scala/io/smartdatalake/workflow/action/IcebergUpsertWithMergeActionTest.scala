@@ -19,7 +19,7 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
-import io.smartdatalake.testutils.DeduplicateActionBehaviour
+import io.smartdatalake.testutils.UpsertActionBehaviour
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataobject.generic.Table
@@ -30,8 +30,8 @@ import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 
-class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
-    with SmartDataLakeLogger with DeduplicateActionBehaviour {
+class IcebergUpsertWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
+    with SmartDataLakeLogger with UpsertActionBehaviour {
 
   // set additional spark options for iceberg
   protected implicit val session: SparkSession = IcebergTestUtils.session
@@ -41,8 +41,8 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
 
-  test("deduplicate load mergeModeEnable") {
-    testDeduplicateWithMergeMode(
+  test("upsert load mergeModeEnable") {
+    testUpsertWithMergeMode(
       (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => {
         val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
@@ -51,8 +51,8 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
     )
   }
 
-  test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
-    testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
+  test("upsert load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
+    testUpsertWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
       (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => {
         val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
@@ -61,8 +61,8 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
     )
   }
 
-  test("deduplicate load mergeModeEnable sourceTimestampColumn") {
-    testDeduplicateWithMergeModeSourceTimestampColumn(
+  test("upsert load mergeModeEnable sourceTimestampColumn") {
+    testUpsertWithMergeModeSourceTimestampColumn(
       (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => {
         val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
@@ -71,8 +71,8 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
     )
   }
 
-  test("deduplicate load mergeModeEnable sourceTimestampColumn updateCapturedColumnOnlyWhenChanged") {
-    testDeduplicateWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(
+  test("upsert load mergeModeEnable sourceTimestampColumn updateCapturedColumnOnlyWhenChanged") {
+    testUpsertWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(
       (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => {
         val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
@@ -81,8 +81,8 @@ class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAf
     )
   }
 
-  test("deduplicate 1st 2nd load with transformer changing schema") {
-    testDeduplicateWithTransformerChangingSchema(
+  test("upsert 1st 2nd load with transformer changing schema") {
+    testUpsertWithTransformerChangingSchema(
       (id, registry) => MockSparkDataObject(id)(registry),
       (id, pks, registry) => {
         val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)

@@ -222,6 +222,55 @@ private[smartdatalake] class ActionImplTests extends AnyFlatSpec with Matchers {
     )
   }
 
+  "UpsertAction" should "be parsable" in {
+
+    val config = ConfigFactory.parseString(
+      """
+        |connections = {
+        | default-engine = { type = SparkClassicConnection, master = "local[*]" }
+        |}
+        |actions = {
+        | 123 = {
+        |   type = UpsertAction
+        |   inputId = tdo1
+        |   outputId = tdo2
+        | }
+        |}
+        |""".stripMargin).withFallback(dataObjectConfig).resolve
+
+    implicit val registry: InstanceRegistry = ConfigParser.parse(config)
+    registry.getActions.head shouldBe action.UpsertAction(
+      id = "123",
+      inputId = "tdo1",
+      outputId = "tdo2"
+    )
+  }
+
+  // UpsertAction was called DeduplicateAction until version 3.0.0. Existing configurations must keep working.
+  it should "still be parsable under its deprecated name DeduplicateAction" in {
+
+    val config = ConfigFactory.parseString(
+      """
+        |connections = {
+        | default-engine = { type = SparkClassicConnection, master = "local[*]" }
+        |}
+        |actions = {
+        | 123 = {
+        |   type = DeduplicateAction
+        |   inputId = tdo1
+        |   outputId = tdo2
+        | }
+        |}
+        |""".stripMargin).withFallback(dataObjectConfig).resolve
+
+    implicit val registry: InstanceRegistry = ConfigParser.parse(config)
+    registry.getActions.head shouldBe (action.DeduplicateAction(
+      id = "123",
+      inputId = "tdo1",
+      outputId = "tdo2"
+    ): @scala.annotation.nowarn("cat=deprecation"))
+  }
+
   "Action" should "throw nice error when wrong DataObject type" in {
 
     val config = ConfigFactory.parseString(

@@ -17,7 +17,7 @@ Adding the executionMode `DataObjectStateIncrementalMode` will enable DataObject
 The DataObject saves its state in the state file that is written after each run of the SDLB. You haven't worked with this state file before, more on that later.
 ```
   download-deduplicate-departures {
-    type = DeduplicateAction
+    type = UpsertAction
     inputId = ext-departures
     outputId = int-departures
     executionMode = { type = DataObjectStateIncrementalMode }

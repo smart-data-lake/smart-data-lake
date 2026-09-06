@@ -334,7 +334,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter with Smar
       .toDF("dt", "type", "lastname", "firstname", "rating")
 
     // start first dag run
-    val action1 = DeduplicateAction("a", srcDO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
+    val action1 = UpsertAction("a", srcDO.id, tgt1DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action1)
     val action2 = CopyAction("b", tgt1DO.id, tgt2DO.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
     instanceRegistry.register(action2)

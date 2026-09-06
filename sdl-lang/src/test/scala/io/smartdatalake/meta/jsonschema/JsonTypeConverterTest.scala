@@ -177,7 +177,7 @@ class JsonTypeConverterTest extends AnyFunSuite {
 
   private def getGenericTypeDef(tpe: Type, baseType: Option[Type] = None): GenericTypeDef = {
     val attributes = attributesForCaseClass(tpe, Map())
-    GenericTypeDef("testTypeDef", baseType, tpe, None, true, Set(), attributes)
+    GenericTypeDef("testTypeDef", baseType, tpe, None, isFinal = true, isDeprecated = false, Set(), attributes)
   }
 
   case class TestClassWithEnum(testEnum: TestEnum)

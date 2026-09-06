@@ -4,10 +4,10 @@ title: HistorizeAction
 ---
 
 HistorizeAction copies data from one input to one output DataObject and keeps **all versions of every record**, identified by the primary key of the output table.
-It creates a technical history by adding validity columns to each record, a pattern also known as *Slowly Changing Dimension Type 2*.
+It creates a technical history by adding validity columns to each record - the pattern known as *Slowly Changing Dimension Type 2* (SCD2).
 Every time a record changes in the source, the current version is closed and a new version is inserted. Records which are no longer delivered by the source are closed as well.
 
-If you only need the latest state of every record, use the cheaper [DeduplicateAction](deduplicateAction.md).
+If you only need the latest state of every record, use the cheaper [UpsertAction](upsertAction.md), which implements *Slowly Changing Dimension Type 1* (SCD1).
 
 ## Requirements
 
@@ -316,7 +316,7 @@ The complete list of parameters is available in the [Configuration Schema Viewer
 ## See also
 
 * [Actions overview](../actions.md)
-* [DeduplicateAction](deduplicateAction.md) to keep only the latest version of a record
+* [UpsertAction](upsertAction.md) to keep only the latest version of a record (SCD1)
 * [Getting Started: Historical data](../../getting-started/part-2/historical-data.md) for a hands-on walkthrough
 * [Change Data Capture (CDC) with SDLB](/blog/sdl-debezium) for the CDC end-to-end story
 * [Schema Evolution](../schema.md)

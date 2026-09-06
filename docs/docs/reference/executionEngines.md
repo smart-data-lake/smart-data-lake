@@ -13,8 +13,8 @@ Currently SDLB supports the following execution engines:
 |Category|Execution Engine|SubFeed Name|Engine Connection|Description|Supported Actions|Supported DataObjects|
 | ------ | -------------- | ---------- | --------------- | --------- | --------------- | ------------------- |
 |Java-Byte-Stream|File Engine|FileSubFeed|-|Transfer Byte-Streams without further knowledge about their content|FileTransferAction, CustomFileAction|all HadoopFileDataObjects, WebserviceFileDataObject, SFtpFileDataObject|
-|Generic DataFrame API|Spark Engine|SparkSubFeed|SparkClassicConnection|Transform data with Spark DataFrame API in a Spark session running inside the SDLB process|CopyAction, CustomDataFrameAction, DeduplicateAction, HistorizeAction|all Hadoop/SparkFileDataObject, AccessTableDataObject, AirbyteDataObject, CustomDfDataObject, DeltaLakeTableDataObject, HiveTableDataObject, IcebergTableDataObject, JdbcTableDataObject, JmsDataObject, KafkaTopicDataObject, SnowflakeTableDataObject, SplunkDataObject, TickTockHiveTableDataObject|
-|Generic DataFrame API|Spark Connect Engine|SparkConnectSubFeed|SparkConnectConnection|Transform data with the Spark DataFrame API on a **remote** Spark Connect server, without a Spark session inside the SDLB process|CopyAction, CustomDataFrameAction, DeduplicateAction, HistorizeAction|SparkConnectTableDataObject, DeltaLakeTableDataObject, IcebergTableDataObject|
+|Generic DataFrame API|Spark Engine|SparkSubFeed|SparkClassicConnection|Transform data with Spark DataFrame API in a Spark session running inside the SDLB process|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction|all Hadoop/SparkFileDataObject, AccessTableDataObject, AirbyteDataObject, CustomDfDataObject, DeltaLakeTableDataObject, HiveTableDataObject, IcebergTableDataObject, JdbcTableDataObject, JmsDataObject, KafkaTopicDataObject, SnowflakeTableDataObject, SplunkDataObject, TickTockHiveTableDataObject|
+|Generic DataFrame API|Spark Connect Engine|SparkConnectSubFeed|SparkConnectConnection|Transform data with the Spark DataFrame API on a **remote** Spark Connect server, without a Spark session inside the SDLB process|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction|SparkConnectTableDataObject, DeltaLakeTableDataObject, IcebergTableDataObject|
 |Generic DataFrame API|Snowflake-Snowpark Engine|SnowparkSubFeed|-|Transform data within Snowflake with Snowpark DataFrame API|CopyAction, CustomDataFrameAction|SnowflakeTableDataObject|
 |Script|Script Engine|ScriptSubFeed|-|Coordinate script task execution and notify DataObjects about script results|CustomScriptAction|all DataObjects|
 
@@ -91,7 +91,7 @@ dataObjects {
 }
 ```
 
-It is a transactional table DataObject supporting partitions, schema evolution and `SDLSaveMode.Merge`, so all four DataFrame Actions can be used with it, including [DeduplicateAction](actions/deduplicateAction) and [HistorizeAction](actions/historizeAction).
+It is a transactional table DataObject supporting partitions, schema evolution and `SDLSaveMode.Merge`, so all four DataFrame Actions can be used with it, including [UpsertAction](actions/upsertAction) and [HistorizeAction](actions/historizeAction).
 Note that merge and schema evolution need a table format supporting them on the server side, e.g. delta or iceberg. Use `format` to choose the format when the table is created.
 
 `DeltaLakeTableDataObject` and `IcebergTableDataObject` also work with the Spark Connect engine. They live in sdl-core and delegate to engine-specific implementations discovered on the classpath, so the same DataObject configuration runs on classic Spark or Spark Connect depending on the engine connection.

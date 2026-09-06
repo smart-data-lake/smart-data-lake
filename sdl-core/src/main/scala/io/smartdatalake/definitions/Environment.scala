@@ -495,7 +495,7 @@ object Environment extends SmartDataLakeLogger {
 
   /**
    * Override the reference timestamp of a run, e.g. the value written to `capturedColumnName` by
-   * HistorizeAction and DeduplicateAction. Useful for initial loads, where the data should be dated
+   * HistorizeAction and UpsertAction. Useful for initial loads, where the data should be dated
    * to the publishing time of the source instead of the processing time in SDLB.
    * The value is parsed like `historizationUpperHorizonTimestamp`, e.g. `yyyy-mm-dd hh:mm:ss[.f...]`.
    * Default is empty, in which case the start time of the run is used, see
@@ -515,7 +515,7 @@ object Environment extends SmartDataLakeLogger {
 
   /**
    * Name of column that marks the creation date of a record.
-   * Used in HistorizeAction and DeduplicateAction.
+   * Used in HistorizeAction and UpsertAction.
    * Default is `dl_ts_captured`.
    */
   def capturedColumnName: String = {

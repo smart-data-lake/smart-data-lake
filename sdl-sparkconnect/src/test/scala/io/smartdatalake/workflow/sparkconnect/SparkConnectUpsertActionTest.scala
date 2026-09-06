@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.sparkconnect
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.DeduplicateActionBehaviour
+import io.smartdatalake.testutils.UpsertActionBehaviour
 import io.smartdatalake.testutils.sparkconnect.SparkConnectTestUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection, SparkConnectConnection}
@@ -31,12 +31,12 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.{Canceled, Outcome}
 
 /**
- * Tests DeduplicateAction with SparkConnectTableDataObjects, using the shared DeduplicateActionBehaviour.
+ * Tests UpsertAction with SparkConnectTableDataObjects, using the shared UpsertActionBehaviour.
  * Needs a Spark Connect server with delta lake support, see [[SparkConnectTestUtil]] and start-spark-connect.sh.
  * Tests are cancelled (not failed) if no such server is available.
  */
-class SparkConnectDeduplicateActionTest extends AnyFunSuite
-  with SmartDataLakeLogger with DeduplicateActionBehaviour {
+class SparkConnectUpsertActionTest extends AnyFunSuite
+  with SmartDataLakeLogger with UpsertActionBehaviour {
 
   override val defaultEngineConnection: Connection with EngineConnection =
     SparkConnectConnection(ConnectionId(Environment.defaultEngineConnectionId), SparkConnectTestUtil.url)
@@ -55,31 +55,31 @@ class SparkConnectDeduplicateActionTest extends AnyFunSuite
     SparkConnectTableDataObject(id, Table(Some("default"), s"sdlb_dedup_$id", primaryKey = primaryKey),
       format = Some("delta"), allowSchemaEvolution = true, connectionId = defaultEngineConnection.id)(registry)
 
-  test("deduplicate 1st and 2nd load") {
-    testDeduplicateTwoRuns(createSrcDataObject, createTgtDataObject)
+  test("upsert 1st and 2nd load") {
+    testUpsertTwoRuns(createSrcDataObject, createTgtDataObject)
   }
 
-  test("deduplicate load with filter") {
-    testDeduplicateWithFilter(createSrcDataObject, createTgtDataObject)
+  test("upsert load with filter") {
+    testUpsertWithFilter(createSrcDataObject, createTgtDataObject)
   }
 
-  test("deduplicate load mergeModeEnable") {
-    testDeduplicateWithMergeMode(createSrcDataObject, createTgtDataObject)
+  test("upsert load mergeModeEnable") {
+    testUpsertWithMergeMode(createSrcDataObject, createTgtDataObject)
   }
 
-  test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
-    testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(createSrcDataObject, createTgtDataObject)
+  test("upsert load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
+    testUpsertWithMergeModeUpdateCapturedColumnOnlyWhenChanged(createSrcDataObject, createTgtDataObject)
   }
 
-  test("deduplicate load mergeModeEnable sourceTimestampColumn") {
-    testDeduplicateWithMergeModeSourceTimestampColumn(createSrcDataObject, createTgtDataObject)
+  test("upsert load mergeModeEnable sourceTimestampColumn") {
+    testUpsertWithMergeModeSourceTimestampColumn(createSrcDataObject, createTgtDataObject)
   }
 
-  test("deduplicate load mergeModeEnable sourceTimestampColumn updateCapturedColumnOnlyWhenChanged") {
-    testDeduplicateWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(createSrcDataObject, createTgtDataObject)
+  test("upsert load mergeModeEnable sourceTimestampColumn updateCapturedColumnOnlyWhenChanged") {
+    testUpsertWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(createSrcDataObject, createTgtDataObject)
   }
 
-  test("deduplicate 1st 2nd load with transformer changing schema") {
-    testDeduplicateWithTransformerChangingSchema(createSrcDataObject, createTgtDataObject)
+  test("upsert 1st 2nd load with transformer changing schema") {
+    testUpsertWithTransformerChangingSchema(createSrcDataObject, createTgtDataObject)
   }
 }

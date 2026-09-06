@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
-import io.smartdatalake.testutils.DeduplicateActionBehaviour
+import io.smartdatalake.testutils.UpsertActionBehaviour
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataobject.DeltaLakeTableDataObject
@@ -30,8 +30,8 @@ import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.Files
 
-class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite
-    with SmartDataLakeLogger with DeduplicateActionBehaviour {
+class DeltaLakeUpsertWithMergeActionTest extends AnyFunSuite
+    with SmartDataLakeLogger with UpsertActionBehaviour {
 
   private implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
 
@@ -40,8 +40,8 @@ class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
 
-  test("deduplicate load mergeModeEnable") {
-    testDeduplicateWithMergeMode(
+  test("upsert load mergeModeEnable") {
+    testUpsertWithMergeMode(
       (id, _) => MockSparkDataObject(id),
       (id, pks, registry) => {
         val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)
@@ -50,8 +50,8 @@ class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite
     )
   }
 
-  test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
-    testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
+  test("upsert load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
+    testUpsertWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
       (id, _) => MockSparkDataObject(id),
       (id, pks, registry) => {
         val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)
@@ -60,8 +60,8 @@ class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite
     )
   }
 
-  test("deduplicate load mergeModeEnable sourceTimestampColumn") {
-    testDeduplicateWithMergeModeSourceTimestampColumn(
+  test("upsert load mergeModeEnable sourceTimestampColumn") {
+    testUpsertWithMergeModeSourceTimestampColumn(
       (id, _) => MockSparkDataObject(id),
       (id, pks, registry) => {
         val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)
@@ -70,8 +70,8 @@ class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite
     )
   }
 
-  test("deduplicate load mergeModeEnable sourceTimestampColumn updateCapturedColumnOnlyWhenChanged") {
-    testDeduplicateWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(
+  test("upsert load mergeModeEnable sourceTimestampColumn updateCapturedColumnOnlyWhenChanged") {
+    testUpsertWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(
       (id, _) => MockSparkDataObject(id),
       (id, pks, registry) => {
         val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)
@@ -80,8 +80,8 @@ class DeltaLakeDeduplicateWithMergeActionTest extends AnyFunSuite
     )
   }
 
-  test("deduplicate 1st 2nd load with transformer changing schema") {
-    testDeduplicateWithTransformerChangingSchema(
+  test("upsert 1st 2nd load with transformer changing schema") {
+    testUpsertWithTransformerChangingSchema(
       (id, _) => MockSparkDataObject(id),
       (id, pks, registry) => {
         val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)

@@ -181,9 +181,9 @@ So a plain `mvn test` starts the Spark Connect server automatically. Note that t
 a Spark distribution (~400MB) into the module directory. Server availability is always checked with a fast tcp
 probe first, because the gRPC client blocks with a long retry policy on an unreachable server.
 
-The `DeduplicateActionBehaviour` and `HistorizeActionBehaviour` test suites of sdl-core are executed with
-`SparkConnectTableDataObject`s in `SparkConnectDeduplicateActionTest` and `SparkConnectHistorizeActionTest`,
-covering DeduplicateAction and HistorizeAction with merge mode, CDC and schema evolution over Spark Connect.
+The `UpsertActionBehaviour` and `HistorizeActionBehaviour` test suites of sdl-core are executed with
+`SparkConnectTableDataObject`s in `SparkConnectUpsertActionTest` and `SparkConnectHistorizeActionTest`,
+covering UpsertAction and HistorizeAction with merge mode, CDC and schema evolution over Spark Connect.
 
 The CI snapshot build caches the Spark distribution and runs `start-spark-connect.sh` before the Maven build,
 so these tests execute in CI (the tests then detect the already running server).
