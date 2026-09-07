@@ -4141,7 +4141,7 @@
                 "$ref" : "#/definitions/GenericDfTransformer/WhitelistTransformer"
               } ]
             },
-            "description" : "optional list of transformations to apply before deduplication. See`sparktransformer` for a\nlist of included Transformers. The transformations are applied according to the lists ordering."
+            "description" : "optional list of transformations to apply before the upsert. See `sparktransformer` for a\nlist of included Transformers. The transformations are applied according to the lists ordering."
           },
           "ignoreOldDeletedColumns" : {
             "type" : "boolean",
@@ -4153,11 +4153,11 @@
           },
           "updateCapturedColumnOnlyWhenChanged" : {
             "type" : "boolean",
-            "description" : "Set to true to enable update Column`Environment.capturedColumnName` only if Record has\nchanged in the source, instead of updating it with every execution (default=false). This\nresults in much less records updated with saveMode.Merge.  \nNote that this is normally not needed if sourceTimestampColumn is set, see there."
+            "description" : "Set to true to enable update Column `Environment.capturedColumnName` only if Record has\nchanged in the source, instead of updating it with every execution (default=false). This\nresults in much less records updated with saveMode.Merge.  \nNote that this is normally not needed if sourceTimestampColumn is set, see there."
           },
           "sourceTimestampColumn" : {
             "type" : "string",
-            "description" : "Optional column holding the timestamp of the last change of the record in the source system. If set, it is used\nas value for Column[[Environment.capturedColumnName]]instead of the runs reference timestamp. The column must\nexist in the data to deduplicate and be of type timestamp. Records where it is null fall back to the runs\nreference timestamp.  \nNote that the column itself is not written to the output DataObject, as its value is kept in[[Environment.capturedColumnName]]. Copy it to a column with another name in a transformer if you want to keep it.  \nRecords arriving late, e.g. having a source timestamp older than the record already stored, are not applied, so\nthat[[Environment.capturedColumnName]]always holds the latest version according to the source system.  \nSetting updateCapturedColumnOnlyWhenChanged = true is normally not needed together with sourceTimestampColumn:`Environment.capturedColumnName` is moved forward only if the source system changed the record anyway, no\nmatter how it is set. What it changes is that existing records are updated only if the source timestamp\nincreased, instead of comparing all columns. This avoids rewriting records which the source system delivers\nagain with an unchanged timestamp, but a change which the source system did not timestamp is not applied."
+            "description" : "Optional column holding the timestamp of the last change of the record in the source system. If set, it is used\nas value for Column `Environment.capturedColumnName` instead of the runs reference timestamp. The column must\nexist in the data to upsert and be of type timestamp. Records where it is null fall back to the runs\nreference timestamp.  \nNote that the column itself is not written to the output DataObject, as its value is kept in `Environment.capturedColumnName`. Copy it to a column with another name in a transformer if you want to keep it.  \nRecords arriving late, e.g. having a source timestamp older than the record already stored, are not applied, so\nthat `Environment.capturedColumnName` always holds the latest version according to the source system.  \nSetting updateCapturedColumnOnlyWhenChanged = true is normally not needed together with sourceTimestampColumn: `Environment.capturedColumnName` is moved forward only if the source system changed the record anyway, no\nmatter how it is set. What it changes is that existing records are updated only if the source timestamp\nincreased, instead of comparing all columns. This avoids rewriting records which the source system delivers\nagain with an unchanged timestamp, but a change which the source system did not timestamp is not applied."
           },
           "mergeModeAdditionalJoinPredicate" : {
             "type" : "string",
@@ -4226,7 +4226,8 @@
         "title" : "DeduplicateAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "This `Action` copies and deduplicates data between an input and output DataObject using\nDataFrames. Deduplication keeps the last record for every key, also after it has been deleted in\nthe source. The DataFrame might be transformed using SQL or DataFrame transformations. These\ntransformations are applied before the deduplication.\n\nDeduplicateAction adds an additional Column `Environment.capturedColumnName`. It contains the\ntimestamp of the last occurrence of the record in the source. This creates lots of updates.  \nEspecially when using saveMode.Merge it is better to set `Environment.capturedColumnName` to\nthe last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to\nenable this optimization.\n\nIf the input contains the timestamp of the last change of the record in the source system, it can be used as `Environment.capturedColumnName` by setting sourceTimestampColumn, so that the output reflects the time axis of\nthe source system instead of the schedule of the pipeline. updateCapturedColumnOnlyWhenChanged is normally not\nneeded then, as the source timestamp is only moved forward if the source system changed the record anyway.\n\nDeduplicateAction needs a transactional table (e.g. `TransactionalTableDataObject` ) as output\nwith defined primary keys. If output implements `CanMergeDataFrame`, saveMode.\n\nDeduplicateAction's input data must be unique across the primary key, otherwise the merge\nstatement creates errors like `DeltaUnsupportedOperationException: [DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE] Cannot perform Merge as multiple source rows matched and attempted to modify the same` .  \nThis can be achieved through adding a DeduplicateTransformer to transformers. Note that this is\nnot included by default in DeduplicateAction, as it is a performance intensive operation. Example:\n```\nactions = {\n  dedup-airports {\n    type = DeduplicateAction\n    inputId = stg-airports\n    outputId = int-airports\n    updateCapturedColumnOnlyWhenChanged = true\n    mergeModeAdditionalJoinPredicate = \"existing.dl_ts_captured > current_date - interval 7 days\"\n  }\n}\n```\n"
+        "description" : "Former name of `UpsertAction`, kept for backward compatibility of existing configurations.  \nIt behaves exactly like `UpsertAction`, see there for a description and the available parameters.\n\nThe name was misleading: this Action does not deduplicate its input data, it keeps the latest version of every\nrecord identified by the primary key of the output table (Slowly Changing Dimension Type 1). Use a\nDeduplicateTransformer if you need to make the input data unique.\n\nDEPRECATED: Renamed to `UpsertAction` in version 3.0.0. Change `type = DeduplicateAction` to `type = UpsertAction` in your configuration, all parameters stay the same.",
+        "deprecated" : true
       },
       "FileTransferAction" : {
         "type" : "object",
@@ -4497,6 +4498,154 @@
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
         "description" : "This `Action` historizes data between an input and output DataObject using DataFrames.  \nHistorization creates a technical history of data by creating valid-from/to columns. The\nDataFrame might be transformed using SQL or DataFrame transformations. These transformations are\napplied before the deduplication.\n\nBy default, a history with closed intervals is created, e.g. valid-from and valid-to is\ninclusive. The time axis unit can be set by configuration attribute `timeAxisUnit` . It is used as\nthe offset between valid-to of the previous record and valid-from of the current record. A\nhistory with half-open intervals can be created by setting timeAxisUnit=0. In a half-open\ninterval valid-from is inclusive and valid-to is exclusive.\n\nHistorizeAction needs a transactional table (e.g. implementation of `TransactionalTableDataObject` ) as output with defined primary keys.\n\nSince SDLB version 3.0 incremental historization is used per default, and full historization is removed.  \nIncremental historization does not rewrite all data in output table.  \nIt still needs to join new data with all existing data, but uses hash values to minimize data\ntransfer. If you have change-data-capture (CDC) information available to identify deleted\nrecords, you can set mergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join\nbetween new and existing data. This is optimal from a performance perspective.\n\nIf the input delivers change events using SDLBs standard CDC columns `_change_type` , `_commit_timestamp` and `_change_ordinal` (as DebeziumCdcDataObject does), CDC historization is used without any further configuration,\nsee mergeModeCDCAutoDetect.\n\nIf you still have a legacy full historization table, migration to incremental historization should happen\nautomatically. The missing hash column is detected and added to existing data.\n\nBy default the validity of a new version starts at the reference timestamp of the run. If the input contains the\ntimestamp of the last change in the source system, it can be used instead by setting sourceTimestampColumn, so\nthat the history reflects the time axis of the source system. Example:\n```\nactions = {\n  historize-airports {\n    type = HistorizeAction\n    inputId = stg-airports\n    outputId = int-airports\n    timeAxisUnit = 1d\n    historizeBlacklist = [last_updated]\n  }\n}\n```\n"
+      },
+      "UpsertAction" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "UpsertAction"
+          },
+          "inputId" : {
+            "type" : "string",
+            "description" : "inputs DataObject"
+          },
+          "outputId" : {
+            "type" : "string",
+            "description" : "output DataObject"
+          },
+          "transformers" : {
+            "type" : "array",
+            "items" : {
+              "oneOf" : [ {
+                "$ref" : "#/definitions/GenericDfTransformer/BlacklistTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ColumnsTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ConvertNullValuesTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/DataValidationTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/DebugTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/DecryptColumnsTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/DeduplicateTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/EncryptColumnsTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/FilterTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/PythonCodeDfTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/SQLDfTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ScalaClassGenericDfTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ScalaClassSnowparkDfTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ScalaClassSparkDfTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ScalaCodeSparkDfTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/ScalaNotebookSparkDfTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/SparkFlattenDfTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/SparkRepartitionTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/StandardizeColNamesTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/StandardizeSparkDatatypesTransformer"
+              }, {
+                "$ref" : "#/definitions/GenericDfTransformer/WhitelistTransformer"
+              } ]
+            },
+            "description" : "optional list of transformations to apply before the upsert. See `sparktransformer` for a\nlist of included Transformers. The transformations are applied according to the lists ordering."
+          },
+          "ignoreOldDeletedColumns" : {
+            "type" : "boolean",
+            "description" : "if true, remove no longer existing columns in Schema Evolution"
+          },
+          "ignoreOldDeletedNestedColumns" : {
+            "type" : "boolean",
+            "description" : "if true, remove no longer existing columns from nested data types in Schema Evolution. Keeping\ndeleted columns in complex data types has performance impact as all new data in the future has\nto be converted by a complex function."
+          },
+          "updateCapturedColumnOnlyWhenChanged" : {
+            "type" : "boolean",
+            "description" : "Set to true to enable update Column `Environment.capturedColumnName` only if Record has\nchanged in the source, instead of updating it with every execution (default=false). This\nresults in much less records updated with saveMode.Merge.  \nNote that this is normally not needed if sourceTimestampColumn is set, see there."
+          },
+          "sourceTimestampColumn" : {
+            "type" : "string",
+            "description" : "Optional column holding the timestamp of the last change of the record in the source system. If set, it is used\nas value for Column `Environment.capturedColumnName` instead of the runs reference timestamp. The column must\nexist in the data to upsert and be of type timestamp. Records where it is null fall back to the runs\nreference timestamp.  \nNote that the column itself is not written to the output DataObject, as its value is kept in `Environment.capturedColumnName`. Copy it to a column with another name in a transformer if you want to keep it.  \nRecords arriving late, e.g. having a source timestamp older than the record already stored, are not applied, so\nthat `Environment.capturedColumnName` always holds the latest version according to the source system.  \nSetting updateCapturedColumnOnlyWhenChanged = true is normally not needed together with sourceTimestampColumn: `Environment.capturedColumnName` is moved forward only if the source system changed the record anyway, no\nmatter how it is set. What it changes is that existing records are updated only if the source timestamp\nincreased, instead of comparing all columns. This avoids rewriting records which the source system delivers\nagain with an unchanged timestamp, but a change which the source system did not timestamp is not applied."
+          },
+          "mergeModeAdditionalJoinPredicate" : {
+            "type" : "string",
+            "description" : "To optimize performance it might be interesting to limit the records read from the existing\ntable data, e.g. it might be sufficient to use only the last 7 days. Specify a condition to\nselect existing data to be used in transformation as Spark SQL expression. Use table alias\n'existing' to reference columns of the existing table data."
+          },
+          "cacheOutput" : {
+            "type" : "boolean",
+            "description" : "Cache the output DataFrame of this Action, so that subsequent Actions can reuse it instead of reading the output\nDataObject again. This saves reading the data again, at the cost of materializing it in the engine.\n\nBy default the DataFrame is not propagated to subsequent Actions, they get a fresh DataFrame from the output\nDataObject according to the SubFeed's partition values.\n\nNote that on Snowflake this materializes a temporary table which is only released when the session is closed."
+          },
+          "cacheInput" : {
+            "type" : "boolean",
+            "description" : "Force materializing input DataFrame's.  \nThis improves performance if the input DataFrame is used multiple times in the transformation of this Action\nand can serve as a recovery point in case a task gets lost."
+          },
+          "executionMode" : {
+            "oneOf" : [ {
+              "$ref" : "#/definitions/ExecutionMode/CustomPartitionMode"
+            }, {
+              "$ref" : "#/definitions/ExecutionMode/DataFrameIncrementalMode"
+            }, {
+              "$ref" : "#/definitions/ExecutionMode/DataObjectStateIncrementalMode"
+            }, {
+              "$ref" : "#/definitions/ExecutionMode/FailIfNoPartitionValuesMode"
+            }, {
+              "$ref" : "#/definitions/ExecutionMode/FileIncrementalMoveMode"
+            }, {
+              "$ref" : "#/definitions/ExecutionMode/KafkaStateIncrementalMode"
+            }, {
+              "$ref" : "#/definitions/ExecutionMode/PartitionDiffMode"
+            }, {
+              "$ref" : "#/definitions/ExecutionMode/ProcessAllMode"
+            }, {
+              "$ref" : "#/definitions/ExecutionMode/SparkStreamingMode"
+            } ],
+            "description" : "Optional execution mode for this action."
+          },
+          "executionCondition" : {
+            "type" : "object",
+            "properties" : {
+              "expression" : {
+                "type" : "string",
+                "description" : "Condition formulated as Spark SQL. The attributes available are dependent on the context."
+              },
+              "description" : {
+                "type" : "string",
+                "description" : "A textual description of the condition to be shown in error messages."
+              }
+            },
+            "title" : "Condition",
+            "required" : [ "expression" ],
+            "additionalProperties" : false,
+            "description" : "Optional execution condition for this action.  \nBy default, an Action is executed if all inputs are available, e.g. no input from a previous Action is skipped.  \nOverride the default behaviour by specifying an executionCondition in Spark SQL expression syntax.  \nIt is evaluated against the properties available in `SubFeedsExpressionData`.  \nIf true, the Action is executed, otherwise it is skipped. Example:\n```\nexecutionCondition = {\n  description = \"execute if input stg-src1 is not skipped\"\n  expression = \"!inputSubFeeds.stg-src1.isSkipped\"\n}\n```\n\n\nBesides the input SubFeeds, the runtime information of all Actions this Action transitively depends on is\navailable through `SubFeedsExpressionData.predecessorActions`, see `ActionExpressionData`. Example:\n```\nexecutionCondition = {\n  description = \"execute if the previous action loaded data\"\n  expression = \"predecessorActions['loadAction'].metrics['stg-src1']['records_written'] > 0\"\n}\n```\n"
+          },
+          "metricsFailCondition" : {
+            "type" : "string",
+            "description" : "Optional Spark SQL condition evaluated as where-clause against dataframe of SubFeed metrics. Available columns are dataObjectId, key, value.  \nIf there are any rows passing the where clause, a MetricCheckFailed exception is thrown.\n\nTo check for skipped SubFeeds, an additional row with key='skipped' and value=true|false is created per output DataObject. Example - fail an action writing to output int-tgt in case there are no records written:\n```\ndataObjectId = 'int-tgt' and key = 'no_data' and value = true\"\n```\n"
+          },
+          "metadata" : {
+            "$ref" : "#/definitions/Others/ActionMetadata",
+            "description" : "Additional metadata for the Action"
+          },
+          "engineConnectionId" : {
+            "type" : "string",
+            "description" : "Actions needing an engine to execute, e.g. Spark, can override this method to provide the connection to the engine."
+          }
+        },
+        "title" : "UpsertAction",
+        "required" : [ "type", "inputId", "outputId" ],
+        "additionalProperties" : false,
+        "description" : "This `Action` keeps the **latest version of every record** in the output DataObject, identified by the primary\nkey of the output table. This is known as *Slowly Changing Dimension Type 1* (SCD1): when a record changes in the\nsource, the stored version is overwritten and no history is kept. Use `HistorizeAction` if you need the full\nhistory of every change (SCD2).\n\nRecords which are no longer delivered by the source are kept, so the output always contains the complete set of\nrecords ever seen, each one in its most recent state. The DataFrame might be transformed using SQL or DataFrame\ntransformations. These transformations are applied before the upsert.\n\nUpsertAction adds an additional Column `Environment.capturedColumnName`. It contains the\ntimestamp of the last occurrence of the record in the source. This creates lots of updates.  \nEspecially when using saveMode.Merge it is better to set `Environment.capturedColumnName` to\nthe last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to\nenable this optimization.\n\nIf the input contains the timestamp of the last change of the record in the source system, it can be used as `Environment.capturedColumnName` by setting sourceTimestampColumn, so that the output reflects the time axis of\nthe source system instead of the schedule of the pipeline. updateCapturedColumnOnlyWhenChanged is normally not\nneeded then, as the source timestamp is only moved forward if the source system changed the record anyway.\n\nUpsertAction needs a transactional table (e.g. `TransactionalTableDataObject` ) as output\nwith defined primary keys. If output implements `CanMergeDataFrame`, saveMode.\n\nUpsertAction's input data must be unique across the primary key, otherwise the merge\nstatement creates errors like `DeltaUnsupportedOperationException: [DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE] Cannot perform Merge as multiple source rows matched and attempted to modify the same` .  \nThis can be achieved through adding a DeduplicateTransformer to transformers. Note that this is\nnot included by default in UpsertAction, as it is a performance intensive operation. Example:\n```\nactions = {\n  upsert-airports {\n    type = UpsertAction\n    inputId = stg-airports\n    outputId = int-airports\n    updateCapturedColumnOnlyWhenChanged = true\n    mergeModeAdditionalJoinPredicate = \"existing.dl_ts_captured > current_date - interval 7 days\"\n  }\n}\n```\n\n\nNOTE: UpsertAction was called DeduplicateAction until version 3.0.0. The old name is deprecated but still works,\nsee `DeduplicateAction`. It was misleading, as this Action does not deduplicate its input data."
       }
     },
     "HttpAuthMode" : {
@@ -7361,6 +7510,8 @@
           "$ref" : "#/definitions/Action/FileTransferAction"
         }, {
           "$ref" : "#/definitions/Action/HistorizeAction"
+        }, {
+          "$ref" : "#/definitions/Action/UpsertAction"
         } ],
         "description" : "Map of Action name and definition"
       }
