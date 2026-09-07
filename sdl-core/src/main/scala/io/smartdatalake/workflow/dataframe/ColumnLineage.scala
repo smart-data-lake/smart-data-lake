@@ -27,8 +27,9 @@ import org.json4s.JsonAST.{JArray, JBool, JField, JObject, JString, JValue}
  *
  * A column which is not created from any input column, e.g. a constant, is listed in `fields` without input
  * fields. A column whose lineage could not be traced completely is listed in `unresolvedColumns` instead, see
- * [[io.smartdatalake.util.spark.SparkColumnLineageUtil]] for the cases where this happens. Keeping the two
- * apart tells a consumer of the export whether a column has no source or whether SDLB could not find it.
+ * `SparkColumnLineageUtil` resp. [[io.smartdatalake.workflow.dataframe.plainScala.ScalaColumnLineageUtil]] for
+ * the cases where this happens. Keeping the two apart tells a consumer of the export whether a column has no
+ * source or whether SDLB could not find it.
  *
  * The Json representation is the `columnLineage` dataset facet of the OpenLineage standard, see
  * https://openlineage.io/docs/spec/facets/dataset-facets/column_lineage_facet. Using an established format

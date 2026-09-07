@@ -122,7 +122,7 @@ trait GenericDataFrame extends GenericTypedObject {
   /**
    * Get the column level lineage of this DataFrame with respect to the DataFrames it was created from, see
    * [[ColumnLineage]].
-   * The default implementation returns None, as this is only implemented for the Spark engine.
+   * The default implementation returns None, as this is implemented for the Spark and the plain-Scala engine only.
    *
    * @param inputs the DataFrames read from the input DataObjects, with the id of the DataObject they belong to.
    * @return None if the engine can not analyze column level lineage.

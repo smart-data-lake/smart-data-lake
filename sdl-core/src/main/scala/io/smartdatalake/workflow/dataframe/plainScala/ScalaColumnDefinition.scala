@@ -26,12 +26,16 @@ import scala.reflect.runtime.universe._
 /**
  * Definition of a column in a ScalaDataFrame
  * The data type is deduced from the generic type A if not explicitly provided through dataType
+ *
+ * @param provenance which columns the values of this column are calculated from, see [[ScalaColumnProvenance]].
+ *                   It is the identity of the column and not part of its definition, see `equals`.
  */
 case class ScalaColumnDefinition[A: ClassTag](name: String,
                                               dataFrameAlias: Option[String] = None,
                                               nullable: Boolean = true,
                                               comment: Option[String] = None,
-                                              dataTypeOverride: Option[ScalaDataType[A]] = None
+                                              dataTypeOverride: Option[ScalaDataType[A]] = None,
+                                              provenance: ScalaColumnProvenance = ScalaColumnProvenance.root()
                                              ) extends GenericField {
 
   // datatype is deduced from generic type A if not explicitly provided
@@ -50,6 +54,25 @@ case class ScalaColumnDefinition[A: ClassTag](name: String,
   def withDataFrameAlias(alias: Option[String]): ScalaColumnDefinition[A] = copy(dataFrameAlias = alias)
 
   def getFullName() = dataFrameAlias.map(a => s"$a.$name").getOrElse(name)
+
+  def withProvenance(provenance: ScalaColumnProvenance): ScalaColumnDefinition[A] = copy(provenance = provenance)
+
+  /**
+   * The provenance is excluded from equality and from the string representation, as it is the identity of a
+   * column and not part of its definition: two columns with the same name, data type and metadata are the same
+   * field of a schema, no matter how their values were calculated. Schemas are compared as sets of fields, see
+   * [[ScalaSchema.diffSchema]], so `hashCode` has to leave out the provenance as well.
+   */
+  override def equals(other: Any): Boolean = other match {
+    case that: ScalaColumnDefinition[_] =>
+      name == that.name && dataFrameAlias == that.dataFrameAlias && nullable == that.nullable &&
+        comment == that.comment && dataTypeOverride == that.dataTypeOverride
+    case _ => false
+  }
+
+  override def hashCode(): Int = (name, dataFrameAlias, nullable, comment, dataTypeOverride).hashCode()
+
+  override def toString: String = s"ScalaColumnDefinition($name,$dataFrameAlias,$nullable,$comment,$dataTypeOverride)"
 
   override def subFeedType: Type = typeOf[ScalaSubFeed]
 }

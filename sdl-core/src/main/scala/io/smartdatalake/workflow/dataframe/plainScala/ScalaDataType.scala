@@ -83,7 +83,10 @@ abstract class ScalaDataType[A: ClassTag] extends GenericDataType with GenericSi
   }
 
   def castColumnDefinition(fromColumnDefinition: ScalaColumnDefinition[_]): ScalaColumnDefinition[A] = {
-    ScalaColumnDefinition[A](fromColumnDefinition.name, None, fromColumnDefinition.nullable, fromColumnDefinition.comment)
+    // the cast column takes its values from the column it casts, see ScalaColumnProvenance
+    val provenance = ScalaColumnProvenance.calculated(Seq(fromColumnDefinition.provenance), isIdentity = false,
+      Some(s"cast(${fromColumnDefinition.getFullName()} as $typeName)"))
+    ScalaColumnDefinition[A](fromColumnDefinition.name, None, fromColumnDefinition.nullable, fromColumnDefinition.comment, provenance = provenance)
   }
 
   def castColumn(fromColumn: ScalaColumn[_]): ScalaColumn[A] = {

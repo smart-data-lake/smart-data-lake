@@ -38,6 +38,8 @@ case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], var da
 
   override def toScalaColumn(df: ScalaDataFrame): ScalaColumn[_] = this
 
+  override def describe: String = definition.getFullName()
+
   override def apply(extraction: Any): ScalaColumn[A] = throw new NotImplementedError("The 'apply' method is not applicable for a ScalaColumn instance")
 
   // Support methods for DataFrame operations

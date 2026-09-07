@@ -31,6 +31,8 @@ case class ScalaExplodeExpr(in: ScalaAbstractColumn, fixedDataType: Option[Scala
 
   override def data: Seq[Option[_]] = throw new IllegalStateException("Cannot get data for explode() expression, because it changes DataFrame granularity. Make sure explode is used as top-level expression in a withColumn statement.")
 
+  override def describe: String = s"explode(${in.describe})"
+
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
     aggregator(visitorFunc(this), in.visit(visitorFunc, aggregator))
   }
@@ -49,7 +51,10 @@ case class ScalaExplodeExpr(in: ScalaAbstractColumn, fixedDataType: Option[Scala
     val explodedRows = df.rows.zip(inData).flatMap {
       case (row, seqOpt) => seqOpt.map(_.map(x => (row.values :+ Option(x))))
     }.flatten
-    ScalaDataFrame.fromData(explodedRows, Some(ScalaSchema(df.cols.map(_.definition) :+ dataType.createColumnDefinition(colName))))
+    // the exploded column takes its values from the array column it explodes, see ScalaColumnProvenance
+    val explodedColumn = dataType.createColumnDefinition(colName)
+      .withProvenance(ScalaColumnProvenance.calculated(Seq(inResolved.definition.provenance), isIdentity = false, Some(describe)))
+    ScalaDataFrame.fromData(explodedRows, Some(ScalaSchema(df.cols.map(_.definition) :+ explodedColumn)))
   }
 
 }

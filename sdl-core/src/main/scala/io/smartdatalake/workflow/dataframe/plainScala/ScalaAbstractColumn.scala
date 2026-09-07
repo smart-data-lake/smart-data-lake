@@ -104,7 +104,7 @@ abstract class ScalaAbstractColumn extends GenericColumn {
       case (Some(alias), name) => dataType.createColumnDefinition(name).withDataFrameAlias(Some(alias))
       case (None, name) => dataType.createColumnDefinition(name)
     }
-    columnDefinition.createColumn(data)
+    columnDefinition.withProvenance(provenance).createColumn(data)
   }
 
   private def compareOptions(a: Option[Any], b: Option[Any]): Option[Boolean] = (a, b) match {
@@ -261,6 +261,46 @@ abstract class ScalaAbstractColumn extends GenericColumn {
    * It is optional, as Name is given only by ScalaNamedExpr or ScalaColumnReference.
    */
   override def getName: Option[String] = None
+
+  /**
+   * Description of this expression, used as description of the transformation in the column lineage export.
+   * This is the plain-Scala engines equivalent of Sparks `Expression.sql`.
+   */
+  def describe: String = getClass.getSimpleName
+
+  /**
+   * Provenance of the column created by this expression, see [[ScalaColumnProvenance]].
+   *
+   * The columns read by the expression are collected from the expression tree: a column reference contributes
+   * the column it was resolved to, and a column holding data contributes itself. An expression reading no
+   * column at all, e.g. a literal, gets a provenance without references, which marks a column that has no
+   * source rather than one whose source is unknown.
+   *
+   * The description is built eagerly although the lineage is exported in a dry-run only, as computing it
+   * lazily would keep the expression tree alive - and with it the data of the columns it references.
+   */
+  private[plainScala] def provenance: ScalaColumnProvenance = {
+    val references = visit[Seq[ScalaColumnProvenance]]({
+      // a star reference is resolved to an arbitrary column of the DataFrame, see ScalaColumnReference.setInputData.
+      // it is expanded by select, and reads no specific column where it is not, e.g. in count(*).
+      case reference: ScalaColumnReference if reference.name == "*" || reference.name.endsWith(".*") => Seq()
+      case reference: ScalaColumnReference => reference.resolvedProvenance.toSeq
+      case column: ScalaColumn[_] => Seq(column.definition.provenance)
+      case _ => Seq()
+    }, _ ++ _).distinct
+    ScalaColumnProvenance.calculated(references, isIdentity, Some(describe))
+  }
+
+  /**
+   * True if this expression takes over the value of a column unchanged, which is the case for a reference to a
+   * column and for renaming one.
+   */
+  private def isIdentity: Boolean = this match {
+    case _: ScalaColumnReference => true
+    case _: ScalaColumn[_] => true
+    case named: ScalaNamedExpr => named.in.isIdentity
+    case _ => false
+  }
 }
 
 /**
@@ -288,6 +328,8 @@ case class ScalaManyExpr(cols: Seq[ScalaAbstractColumn], opName: String,
     val opFun = funcCreator(dataType.asInstanceOf[ScalaDataType[Any]])
     colsDataCasted.transpose.map(opFun)
   }
+
+  override def describe: String = s"$opName(${cols.map(_.describe).mkString(", ")})"
 
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
     (cols.map(_.visit(visitorFunc, aggregator)) :+ visitorFunc(this))
@@ -323,6 +365,8 @@ case class ScalaBinaryExpr(left: ScalaAbstractColumn, right: ScalaAbstractColumn
     (left.data zip right.data).map(pair => func(pair._1.map(castLeft), pair._2.map(castRight)))
   }
 
+  override def describe: String = s"$opName(${left.describe}, ${right.describe})"
+
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
     Seq(
       left.visit(visitorFunc, aggregator),
@@ -344,6 +388,8 @@ case class ScalaUnaryExpr(in: ScalaAbstractColumn, opName: String, func: Option[
   override def dataType: ScalaDataType[_] = fixedDataType.getOrElse(in.dataType)
 
   override def data: Seq[Option[_]] = in.data.map(func)
+
+  override def describe: String = s"$opName(${in.describe})"
 
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
     aggregator(in.visit(visitorFunc, aggregator), visitorFunc(this))
@@ -381,6 +427,8 @@ case class ScalaMapExpr(cols: Seq[ScalaAbstractColumn]) extends ScalaAbstractCol
     }
   }
 
+  override def describe: String = s"map(${cols.map(_.describe).mkString(", ")})"
+
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
     (cols.map(_.visit(visitorFunc, aggregator)) :+ visitorFunc(this))
       .reduce(aggregator)
@@ -405,6 +453,8 @@ case class ScalaMapValueExpr(in: ScalaAbstractColumn, key: Any) extends ScalaAbs
     case value => throw new IllegalArgumentException(s"Cannot extract key '$key' from value '$value' of data type ${in.dataType.typeName}, expected a map")
   })
 
+  override def describe: String = s"${in.describe}[$key]"
+
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
     aggregator(in.visit(visitorFunc, aggregator), visitorFunc(this))
   }
@@ -428,6 +478,8 @@ case class ScalaLiteral[A: ClassTag](value: Option[A]) extends ScalaAbstractColu
   override def data: Seq[Option[_]] = {
     Seq.fill(colSize.getOrElse(throw new IllegalStateException("Literal is not initialized")))(value)
   }
+
+  override def describe: String = value.map(_.toString).getOrElse("null")
 }
 
 /**
@@ -459,6 +511,14 @@ case class ScalaColumnReference(name: String) extends ScalaAbstractColumn {
   }
 
   override def getName: Option[String] = Some(name)
+
+  override def describe: String = name
+
+  /**
+   * Provenance of the column this reference was resolved to, see [[ScalaColumnProvenance]].
+   * It is empty as long as the reference is not bound to a DataFrame.
+   */
+  private[plainScala] def resolvedProvenance: Option[ScalaColumnProvenance] = resolvedColumn.map(_.definition.provenance)
 }
 
 /**
@@ -474,6 +534,8 @@ case class ScalaNamedExpr(in: ScalaAbstractColumn, name: String) extends ScalaAb
   override def data: Seq[Option[_]] = in.data
 
   override def getName: Option[String] = Some(name)
+
+  override def describe: String = in.describe
 
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
     aggregator(in.visit(visitorFunc, aggregator), visitorFunc(this))
@@ -499,6 +561,8 @@ case class ScalaAggregateExpr(in: ScalaAbstractColumn, opName: String,
     val result = aggFunc(in.data)
     Seq(result)
   }
+
+  override def describe: String = s"$opName(${in.describe})"
 
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
     aggregator(in.visit(visitorFunc, aggregator), visitorFunc(this))
@@ -537,6 +601,8 @@ case class ScalaWhenExpr(condition: ScalaAbstractColumn, in: ScalaAbstractColumn
     }
     outData
   }
+
+  override def describe: String = prev.map(p => s"${p.describe}.").getOrElse("") + s"when(${condition.describe}, ${in.describe})"
 
   override def setInputData(inputData: Map[String, ScalaColumn[_]], size: Int): Unit = {
     super.setInputData(inputData, size)
