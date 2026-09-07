@@ -112,26 +112,34 @@ wrote it. There is no need to turn caching off to export lineage.
 
 `cacheInput` has no effect on the lineage at all, as it only materializes DataFrames in the exec-phase.
 
-One case does degrade. If an Action reads both the cached output of a previous Action and a DataObject that
-previous Action passed through unchanged, both inputs share the same Spark columns. Spark's analyzer then
-replaces the column ids of one side of the join, so the columns of that side cannot be traced back and are
-reported in `unresolvedFields`. Columns of the other side are reported for both input DataObjects, as they
-belong to both.
+If an Action reads both the cached output of a previous Action and a DataObject that previous Action passed
+through unchanged, both inputs share the very same columns. Such a column is reported for both input
+DataObjects, as there is no way to tell which one it was read from - and both are true. With the Spark engine
+this case degrades further if the two inputs are joined: Spark's analyzer replaces the column ids of one side
+of the join, so the columns of that side cannot be traced back and are reported in `unresolvedFields`.
 
 ## Limitations
 
-Column lineage is analyzed for the Spark engine only, and it is best-effort: a column which can not be traced
-back to an input DataObject is reported as unresolved rather than with a wrong source. This is the case for
+Column lineage is analyzed for the Spark engine and for the plain-Scala engine. The two use the same format
+and follow the same rules, but they read the lineage from different places: for Spark it is read from the
+expression ids of the analyzed logical plan, while the plain-Scala engine evaluates expressions immediately
+and therefore records with every column it creates which columns its values come from.
 
-- columns read from the same DataObject twice, e.g. in a self-join, where only one of the two occurrences is
-  traced back, as Spark replaces the duplicated expression ids. The same happens for the cached pass-through
-  described above.
-- transformations which break the DataFrame lineage, e.g. a custom transformer which reads data itself
+The analysis is best-effort: a column which can not be traced back to an input DataObject is reported as
+unresolved rather than with a wrong source. This is the case for
+
+- transformations which break the DataFrame lineage, e.g. a custom transformer which reads data itself, or a
+  DataFrame created from data inside a transformation
+- columns read from the same DataObject twice with the Spark engine, e.g. in a self-join, where only one of
+  the two occurrences is traced back, as Spark replaces the duplicated expression ids. The same happens for
+  the cached pass-through described above.
 
 Columns which are used in a join, filter, group by, sort or window condition influence the output without
 being part of its value. They are not reported yet - OpenLineage calls this `INDIRECT` lineage and collects it
 in the `dataset` list of the facet. An aggregation over all rows such as `count(*)` belongs there too, and is
 reported without input columns until then.
 
-For a typed Dataset transformation, e.g. a `map` over a case class, the Scala function is opaque. Every output
-column of such a transformation is therefore reported to depend on every column it reads.
+For a typed Dataset transformation of the Spark engine, e.g. a `map` over a case class, the Scala function is
+opaque. Every output column of such a transformation is therefore reported to depend on every column it reads.
+User defined functions need no special handling, as a UDF reads the columns of its arguments like any other
+expression.

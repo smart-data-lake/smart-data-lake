@@ -84,6 +84,11 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
 
   override def schema: ScalaSchema = ScalaSchema(cols.map(_.definition))
 
+  override def getColumnLineage(inputs: Seq[(SdlConfigObject.DataObjectId, GenericDataFrame)]): Option[ColumnLineage] = {
+    val scalaInputs = inputs.collect { case (dataObjectId, df: ScalaDataFrame) => (dataObjectId, df) }
+    Some(ScalaColumnLineageUtil.extractColumnLineage(this, scalaInputs))
+  }
+
   override def join(other: GenericDataFrame, joinCols: Seq[String], joinType: String = "inner"): ScalaDataFrame = other match {
     case otherScala: ScalaDataFrame =>
       checkColumnsExist(this, joinCols)
@@ -289,8 +294,11 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
         val thisCol = thisCols.getOrElse(colName, otherCols(colName).definition.createColumn(IndexedSeq.fill(this.nrRows)(None)))
         val otherCol = otherCols.getOrElse(colName, thisCols(colName).definition.createColumn(IndexedSeq.fill(otherScala.nrRows)(None)))
         assert(thisCol.definition.dataType == otherCol.definition.dataType || thisCol.definition.dataType == ScalaNullDataType || otherCol.definition.dataType == ScalaNullDataType, s"Data types for column $colName do not match between the two dataframes (${thisCol.definition.dataType.getClass.getSimpleName} != ${otherCol.definition.dataType.getClass.getSimpleName}")
-        if (thisCol.definition.dataType == ScalaNullDataType) otherCol.definition.createColumn(data = thisCol.data ++ otherCol.data)
-        else thisCol.definition.createColumn(data = thisCol.data ++ otherCol.data)
+        // the united column takes its values from the columns of both DataFrames, see ScalaColumnProvenance.
+        // a column missing on one side is filled with null values and contributes no provenance.
+        val provenance = ScalaColumnProvenance.union((thisCols.get(colName) ++ otherCols.get(colName)).map(_.definition.provenance).toSeq)
+        val definition = if (thisCol.definition.dataType == ScalaNullDataType) otherCol.definition else thisCol.definition
+        definition.withProvenance(provenance).createColumn(data = thisCol.data ++ otherCol.data)
       }
       ScalaDataFrame(unionData)
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
@@ -304,7 +312,9 @@ case class ScalaDataFrame(cols: Seq[ScalaColumn[_]], alias: Option[String] = Non
       val newFields = schema.fields.zip(otherScala.schema.fields).map{
         case (f1, f2) =>
           assert(f1.dataType == f2.dataType || f1.dataType == ScalaNullDataType || f2.dataType == ScalaNullDataType, s"Data types for column ${f1.name} do not match between the two dataframes (${f1.dataType} != ${f2.dataType})")
-          if (f1.dataType == ScalaNullDataType) f2 else f1
+          // the united column takes its values from the columns of both DataFrames, see ScalaColumnProvenance
+          val field = if (f1.dataType == ScalaNullDataType) f2 else f1
+          field.withProvenance(ScalaColumnProvenance.union(Seq(f1.provenance, f2.provenance)))
       }
       ScalaDataFrame.fromData(this.rows.map(_.values) ++ otherScala.rows.map(_.values), Some(ScalaSchema(newFields)))
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
