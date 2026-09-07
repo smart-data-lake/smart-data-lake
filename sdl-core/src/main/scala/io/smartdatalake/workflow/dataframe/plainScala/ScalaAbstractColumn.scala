@@ -62,6 +62,12 @@ abstract class ScalaAbstractColumn extends GenericColumn {
 
   def dataType: ScalaDataType[_]
 
+  /**
+   * The values of this expression, computed on every access as the data of the input columns can change
+   * between two accesses, see [[setInputData]]. An implementation must therefore read the data of each of its
+   * input expressions exactly once: reading it twice makes evaluating a chain of n expressions cost O(2^n),
+   * which does not terminate for the chains built by e.g. `concat` over many arguments.
+   */
   def data: Seq[Option[_]]
 
   def inputColumns: Set[String] = Set()
@@ -320,10 +326,12 @@ case class ScalaManyExpr(cols: Seq[ScalaAbstractColumn], opName: String,
   )
   lazy val func: Seq[Option[Any]] => Any = funcCreator(dataType.asInstanceOf[ScalaDataType[Any]])
   override def data: Seq[Option[_]] = {
-    assert(cols.map(_.data.size).distinct.size == 1, s"Size of all columns must be equal, but got sizes: ${cols.map(c => s"'${c.getName.getOrElse("col")}': ${c.data.size}").mkString(", ")}")
-    val colsDataCasted = cols.map { c =>
+    // read the data of every input expression exactly once, see the note on ScalaAbstractColumn.data
+    val colsData = cols.map(_.data)
+    assert(colsData.map(_.size).distinct.size == 1, s"Size of all columns must be equal, but got sizes: ${cols.zip(colsData).map { case (c, data) => s"'${c.getName.getOrElse("col")}': ${data.size}" }.mkString(", ")}")
+    val colsDataCasted = cols.zip(colsData).map { case (c, data) =>
       val castFun = if (dataType != c.dataType && fixedDataType.isEmpty) dataType.getCastFunction(c.dataType) else (x: Any) => x
-      c.data.map(_.map(castFun))
+      data.map(_.map(castFun))
     }
     val opFun = funcCreator(dataType.asInstanceOf[ScalaDataType[Any]])
     colsDataCasted.transpose.map(opFun)
@@ -356,13 +364,16 @@ case class ScalaBinaryExpr(left: ScalaAbstractColumn, right: ScalaAbstractColumn
   )
 
   override def data: Seq[Option[_]] = {
-    assert(left.data.size == right.data.size, s"Size of left data (${left.data.size}) must be equal to size of right data (${right.data.size})")
+    // read the data of both operands exactly once, see the note on ScalaAbstractColumn.data
+    val leftData = left.data
+    val rightData = right.data
+    assert(leftData.size == rightData.size, s"Size of left data (${leftData.size}) must be equal to size of right data (${rightData.size})")
     val funcDataType = left.dataType.getGreaterType(right.dataType)
     val func: (Option[Any], Option[Any]) => Option[Any] = funcCreator(funcDataType.asInstanceOf[ScalaDataType[Any]])
     // both operands are cast to the common data type of the operation, which is not the same as the result data type, e.g. for comparisons
     val castLeft = if (funcDataType != left.dataType) funcDataType.getCastFunction(left.dataType) else (x: Any) => x
     val castRight = if (funcDataType != right.dataType) funcDataType.getCastFunction(right.dataType) else (x: Any) => x
-    (left.data zip right.data).map(pair => func(pair._1.map(castLeft), pair._2.map(castRight)))
+    (leftData zip rightData).map(pair => func(pair._1.map(castLeft), pair._2.map(castRight)))
   }
 
   override def describe: String = s"$opName(${left.describe}, ${right.describe})"
@@ -419,9 +430,11 @@ case class ScalaMapExpr(cols: Seq[ScalaAbstractColumn]) extends ScalaAbstractCol
   }
 
   override def data: Seq[Option[_]] = {
-    assert(cols.map(_.data.size).distinct.size == 1, s"Size of all columns must be equal, but got sizes: ${cols.map(c => s"'${c.getName.getOrElse("col")}': ${c.data.size}").mkString(", ")}")
-    val keyData = keyCols.map(_.data).transpose
-    val valueData = valueCols.map(_.data).transpose
+    // read the data of every key and value expression exactly once, see the note on ScalaAbstractColumn.data
+    val colsData = cols.map(_.data)
+    assert(colsData.map(_.size).distinct.size == 1, s"Size of all columns must be equal, but got sizes: ${cols.zip(colsData).map { case (c, data) => s"'${c.getName.getOrElse("col")}': ${data.size}" }.mkString(", ")}")
+    val keyData = colsData.zipWithIndex.collect { case (data, idx) if idx % 2 == 0 => data }.transpose
+    val valueData = colsData.zipWithIndex.collect { case (data, idx) if idx % 2 == 1 => data }.transpose
     (keyData zip valueData).map { case (keys, values) =>
       Some((keys zip values).collect { case (Some(key), value) => (key, value.getOrElse(null)) }.toMap)
     }
