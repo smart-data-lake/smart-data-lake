@@ -119,6 +119,16 @@ trait GenericDataFrame extends GenericTypedObject {
    */
   def enrichColumnCommentsFromUdfs: GenericDataFrame = this
 
+  /**
+   * Get the column level lineage of this DataFrame with respect to the DataFrames it was created from, see
+   * [[ColumnLineage]].
+   * The default implementation returns None, as this is only implemented for the Spark engine.
+   *
+   * @param inputs the DataFrames read from the input DataObjects, with the id of the DataObject they belong to.
+   * @return None if the engine can not analyze column level lineage.
+   */
+  def getColumnLineage(inputs: Seq[(DataObjectId, GenericDataFrame)]): Option[ColumnLineage] = None
+
   // instantiate subfeed helper
   private lazy val functions = DataFrameSubFeed.getFunctions(subFeedType)
 

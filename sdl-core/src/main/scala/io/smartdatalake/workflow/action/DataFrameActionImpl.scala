@@ -34,6 +34,7 @@ import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, Expe
 import io.smartdatalake.workflow.dataobject.generic._
 
 import scala.reflect.runtime.universe.{Type, typeOf}
+import scala.util.{Failure, Success, Try}
 
 /**
  * Implementation of logic needed for Spark Actions.
@@ -321,6 +322,10 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
       if (context.appConfig.isSchemaExport) {
         context.schemaExportRegistry.register(output.id, commentedSubFeed.dataFrame.get.schema)
       }
+      // collect the column level lineage to be exported at the end of a dry-run with lineage export
+      if (context.appConfig.isColumnLineageExport) {
+        registerColumnLineage(output.id, commentedSubFeed.dataFrame.get, inputSubFeeds)
+      }
     }
     // apply expectation validation
     output match {
@@ -352,6 +357,27 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         if (observations.nonEmpty) postSubFeed = postSubFeed.withObservation(Some(CombinedObservation.create(inputObservationsToCombine ++ outputObservations)))
         postSubFeed
       case _ => outputSubFeed
+    }
+  }
+
+  /**
+   * Analyze from which columns of the input DataObjects the columns of an output DataFrame are created, and
+   * register the result to be exported at the end of a dry-run, see [[io.smartdatalake.app.TestMode.DryRunWithLineageExport]].
+   *
+   * The analysis reads engine internals which are not part of the stable API, e.g. the logical plan of a Spark
+   * DataFrame. It is therefore not allowed to fail the run, as the lineage is additional information only.
+   */
+  private def registerColumnLineage(dataObjectId: DataObjectId, dataFrame: GenericDataFrame, inputSubFeeds: Seq[DataFrameSubFeed])
+                                   (implicit context: ActionPipelineContext): Unit = {
+    val inputs = inputSubFeeds.flatMap(subFeed => subFeed.dataFrame.map(df => (subFeed.dataObjectId, df)))
+    Try(dataFrame.getColumnLineage(inputs)) match {
+      case Success(Some(columnLineage)) =>
+        if (columnLineage.nonEmpty) context.columnLineageExportRegistry.register(id, dataObjectId, columnLineage)
+        else logger.warn(s"($id) No column lineage could be analyzed for $dataObjectId")
+      case Success(None) =>
+        logger.warn(s"($id) Analyzing column lineage is not supported for ${dataFrame.subFeedType.typeSymbol.name}")
+      case Failure(ex) =>
+        logger.warn(s"($id) Could not analyze the column lineage of $dataObjectId: ${ex.getClass.getSimpleName} - ${ex.getMessage}")
     }
   }
 

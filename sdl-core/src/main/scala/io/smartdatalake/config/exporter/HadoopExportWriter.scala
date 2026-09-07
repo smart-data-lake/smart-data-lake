@@ -45,6 +45,10 @@ case class HadoopExportWriter(path: HadoopPath, hadoopConfig: Configuration = ne
     writeFile(document, s"${dataObjectId}.stats.json")
   }
 
+  override def writeLineage(document: String, dataObjectId: DataObjectId, version: Long): Unit = {
+    writeFile(document, s"${dataObjectId}.lineage.json")
+  }
+
   override def readLatestSchema(dataObjectId: DataObjectId): Option[String] = {
     readFile(s"${dataObjectId}.schema.json")
   }

@@ -78,6 +78,7 @@ const sidebars = {
       'reference/dag',
       'reference/schema',
       'reference/schema-viewer-navigation',
+      'reference/columnLineage',
       'reference/dataQuality',
       'reference/executionPhases',
       'reference/executionEngines',
