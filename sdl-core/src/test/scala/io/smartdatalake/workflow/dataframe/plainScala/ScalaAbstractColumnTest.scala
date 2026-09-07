@@ -101,4 +101,46 @@ class ScalaAbstractColumnTest extends AnyFunSuite {
     assert(colN.data == expected)
   }
 
+  test("a binary expression reads the data of each operand only once") {
+    val left = new CountingColumn("a")
+    val right = new CountingColumn("b")
+    assert(concat(left, right).data == Seq(Some("ab")))
+    assert((left.reads, right.reads) == (1, 1))
+  }
+
+  test("a many argument expression reads the data of each argument only once") {
+    val columns = Seq(new CountingColumn("a"), new CountingColumn("b"))
+    assert(array(columns: _*).data == Seq(Some(Seq("a", "b"))))
+    assert(columns.map(_.reads) == Seq(1, 1))
+  }
+
+  test("a map expression reads the data of each key and value only once") {
+    val columns = Seq(new CountingColumn("k"), new CountingColumn("v"))
+    assert(map(columns: _*).data == Seq(Some(Map("k" -> "v"))))
+    assert(columns.map(_.reads) == Seq(1, 1))
+  }
+
+  test("a deeply nested expression is evaluated in linear time") {
+    val df = Seq(Seq("a")).toDF("str")
+    // functions like concat, least and greatest build a chain of binary expressions. As every operand is read
+    // exactly once, evaluating a chain of n operations costs O(n) - reading an operand twice would cost
+    // O(2^n), and this test would not terminate.
+    val deepConcat = concat(ScalaColumnReference("str") +: (1 to 60).map(i => lit(i.toString)): _*)
+    assert(deepConcat.toScalaColumn(df).data == Seq(Some("a" + (1 to 60).mkString)))
+  }
+
+  /**
+   * A column counting how often its data was read, to check that an expression evaluates its inputs only once.
+   */
+  private class CountingColumn(value: String) extends ScalaAbstractColumn {
+    var reads = 0
+
+    override def dataType: ScalaDataType[_] = ScalaStringDataType
+
+    override def data: Seq[Option[_]] = {
+      reads += 1
+      Seq(Some(value))
+    }
+  }
+
 }
