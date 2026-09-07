@@ -88,6 +88,16 @@ object TestMode extends Enumeration {
    * to apply table metadata to the catalog of a target environment at deployment time.
    */
   val DryRunWithSchemaExport: app.TestMode.Value = Value("dry-run-with-schema-export")
+
+  /**
+   * Like [[DryRun]], but additionally exports the column level lineage of all output DataObjects to
+   * `global.dataObjectsSchemaSource`. The lineage is taken from the init phase DataFrames and describes from
+   * which columns of which input DataObjects a column of an output DataObject is created, and how.
+   *
+   * Use this to analyze dependencies on column level, e.g. which transformations have been applied to create a
+   * specific column of a reporting table, see issue #867.
+   */
+  val DryRunWithLineageExport: app.TestMode.Value = Value("dry-run-with-lineage-export")
 }
 
 /**
@@ -185,10 +195,11 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         .text(s"Hadoop path to save run state files. Must be set to enable recovery in case of failures."),
       opt[String]("test")
         .action((arg, config) => config.withTest(Some(TestMode.withName(arg))))
-        .valueName("<config|dry-run|dry-run-with-schema-export>")
+        .valueName("<config|dry-run|dry-run-with-schema-export|dry-run-with-lineage-export>")
         .text(
           "Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage, " +
-            "dry-run-with-schema-export -> like dry-run, and export the schemas of the output DataObjects to global.dataObjectsSchemaSource"
+            "dry-run-with-schema-export -> like dry-run, and export the schemas of the output DataObjects to global.dataObjectsSchemaSource, " +
+            "dry-run-with-lineage-export -> like dry-run, and export the column level lineage of the output DataObjects to global.dataObjectsSchemaSource"
         ),
       help("help").text("Display the help text."),
       version("version").text("Display version information.")
@@ -568,6 +579,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         actionDAGRun.init(context)
         if (appConfig.isDryRun) { // stop here if only dry-run
           if (appConfig.isSchemaExport) exportDataObjectSchemas(context)
+          if (appConfig.isColumnLineageExport) exportColumnLineage(context)
           logger.info(s"${appConfig.test.get}-Test successful")
           return (Seq(), RunStatistics.empty)
         }
@@ -615,6 +627,36 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         writer.writeSchema(ExportWriter.formatSchema(Some(schema), None), dataObjectId, version)
       }
       logger.info(s"Exported ${schemas.size} DataObject schemas to '$target'")
+    }
+  }
+
+  /**
+   * Export the column level lineage collected during the init phase to `global.dataObjectsSchemaSource`,
+   * see [[TestMode.DryRunWithLineageExport]].
+   *
+   * One document per output DataObject is written, in the format of the OpenLineage `columnLineage` facet.
+   */
+  private[smartdatalake] def exportColumnLineage(context: ActionPipelineContext): Unit = {
+    val globalConfig = context.globalConfig
+    val target = globalConfig.dataObjectsSchemaSource.getOrElse(
+      throw ConfigurationException(
+        s"global.dataObjectsSchemaSource must be defined to use --test ${TestMode.DryRunWithLineageExport}"
+      )
+    )
+    val columnLineages = context.columnLineageExportRegistry.getColumnLineages
+    if (columnLineages.isEmpty) {
+      logger.warn(s"No column lineage collected, nothing to export to '$target'")
+    } else {
+      val writer = ExportWriter.apply(
+        target,
+        backendClient = globalConfig.uiBackend.map(_.client),
+        hadoopConfig = Some(context.hadoopConf)
+      )
+      val version = System.currentTimeMillis() / 1000
+      columnLineages.foreach { case (dataObjectId, entry) =>
+        writer.writeLineage(ExportWriter.formatColumnLineage(entry.actionId, dataObjectId, entry.lineage), dataObjectId, version)
+      }
+      logger.info(s"Exported the column lineage of ${columnLineages.size} DataObjects to '$target'")
     }
   }
 

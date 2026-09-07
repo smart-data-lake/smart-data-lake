@@ -46,6 +46,10 @@ case class FileExportWriter(path: Path) extends ExportWriter with SmartDataLakeL
     writeWithIndex(document, dataObjectId, "stats", version)
   }
 
+  override def writeLineage(document: String, dataObjectId: DataObjectId, version: Long): Unit = {
+    writeWithIndex(document, dataObjectId, "lineage", version)
+  }
+
   def writeWithIndex(document: String, dataObjectId: DataObjectId, tpe: String, version: Long): Unit = {
     if (path.getParent != null) Files.createDirectories(path)
     val indexFile = getIndexPath(dataObjectId, tpe)

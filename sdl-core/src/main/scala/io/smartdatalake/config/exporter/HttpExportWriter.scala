@@ -37,6 +37,10 @@ case class HttpExportWriter(baseUrl: String) extends ExportWriter with SmartData
     upload(document.getBytes("UTF-8"), s"dataobject/stats/${dataObjectId.id}", Map("tstamp" -> tstamp.toString))
   }
 
+  override def writeLineage(document: String, dataObjectId: DataObjectId, tstamp: Long): Unit = {
+    upload(document.getBytes("UTF-8"), s"dataobject/lineage/${dataObjectId.id}", Map("tstamp" -> tstamp.toString))
+  }
+
   override def writeFile(content: Array[Byte], filename: String, version: Option[String]): Unit = {
     upload(content, "descriptions", Seq(Some("filename" -> filename), version.map("version" -> _)).flatten.toMap)
   }

@@ -47,6 +47,10 @@ case class BackendClient(uploader: UploadService) extends ExportWriter with Smar
     upload(document, s"dataobject/stats/${dataObjectId.id}", additionalParams = Map("tstamp" -> tstamp.toString))
   }
 
+  override def writeLineage(document: String, dataObjectId: DataObjectId, tstamp: Long): Unit = {
+    upload(document, s"dataobject/lineage/${dataObjectId.id}", additionalParams = Map("tstamp" -> tstamp.toString))
+  }
+
   override def writeFile(content: Array[Byte], filename: String, version: Option[String]): Unit = {
     val additionalParams = Seq(version.map("version" -> _)).flatten.toMap
     logger.info(s"Uploading descriptions/$filename " + additionalParams.map { case (k, v) => s"$k=$v" }.mkString(" "))

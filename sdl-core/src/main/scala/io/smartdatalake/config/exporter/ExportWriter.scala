@@ -19,16 +19,16 @@
 package io.smartdatalake.config.exporter
 
 import io.smartdatalake.app.BackendClient
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.workflow.DataFrameSubFeed
-import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.{ColumnLineage, GenericSchema}
 import org.apache.commons.lang3.NotImplementedException
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path => HadoopPath}
 import org.json4s.JsonAST.JString
 import org.json4s.jackson.JsonMethods
 import org.json4s.jackson.JsonMethods.pretty
-import org.json4s.{JArray, JObject}
+import org.json4s.{JArray, JField, JObject, JValue}
 
 import java.nio.file.Paths
 import java.sql.Timestamp
@@ -39,6 +39,11 @@ trait ExportWriter {
   def writeSchema(document: String, dataObjectId: DataObjectId, version: Long): Unit
 
   def writeStats(document: String, dataObjectId: DataObjectId, version: Long): Unit
+
+  /**
+   * Write the column level lineage of a DataObject, see [[io.smartdatalake.app.TestMode.DryRunWithLineageExport]].
+   */
+  def writeLineage(document: String, dataObjectId: DataObjectId, version: Long): Unit
 
   def writeFile(content: Array[Byte], filename: String, version: Option[String]): Unit = throw new NotImplementedException()
 
@@ -73,6 +78,28 @@ object ExportWriter {
       schema.toSeq.map("schema" -> _.toJson),
       schema.toSeq.map(s => "subFeedType" -> JString(s.subFeedType.typeSymbol.name.toString))
     ).flatten.toIndexedSeq: _*)
+    pretty(contentJson)
+  }
+
+  /**
+   * Format the column level lineage of an output DataObject as Json document.
+   *
+   * The lineage itself is the `columnLineage` dataset facet of the OpenLineage standard, see [[ColumnLineage]].
+   * It is wrapped with the ids of the DataObject and of the Action which created it, as these are the SDLB
+   * objects the lineage belongs to, and with the columns whose lineage could not be traced completely. The
+   * latter are needed to tell a column without a source apart from a column SDLB could not analyze.
+   */
+  def formatColumnLineage(actionId: ActionId, dataObjectId: DataObjectId, columnLineage: ColumnLineage): String = {
+    val contentJson = JObject(
+      Seq[Option[JField]](
+        Some("actionId" -> JString(actionId.id)),
+        Some("dataObjectId" -> JString(dataObjectId.id)),
+        Some("columnLineage" -> columnLineage.toJson),
+        Option.when(columnLineage.unresolvedColumns.nonEmpty)(
+          "unresolvedFields" -> (JArray(columnLineage.unresolvedColumns.map(JString(_)).toList): JValue)
+        )
+      ).flatten.toList
+    )
     pretty(contentJson)
   }
 

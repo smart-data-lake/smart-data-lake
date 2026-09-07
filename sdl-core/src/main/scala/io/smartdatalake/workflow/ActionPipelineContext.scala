@@ -72,6 +72,7 @@ case class ActionPipelineContext (
                                    phase: ExecutionPhase = ExecutionPhase.Prepare,
                                    cacheRegistry: DataFrameCacheRegistry = new DataFrameCacheRegistry(),
                                    schemaExportRegistry: SchemaExportRegistry = new SchemaExportRegistry(),
+                                   columnLineageExportRegistry: ColumnLineageExportRegistry = new ColumnLineageExportRegistry(),
                                    runtimeRegistry: ActionsRuntimeRegistry = new ActionsRuntimeRegistry(),
                                    actionsSelected: Seq[ActionId] = Seq(),
                                    actionsSkipped: Map[ActionId, RuntimeInfo] = Map(),
