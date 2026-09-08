@@ -252,6 +252,6 @@ object LabCatalogGenerator extends SmartDataLakeLogger {
    * SparkSubFeed and SparkConnectSubFeed can create Spark DataFrames.
    */
   def canCreateSparkDataFrame(subFeedType: Type): Boolean = {
-    subFeedType == typeOf[SparkSubFeed] || subFeedType == typeOf[SparkConnectSubFeed]
+    subFeedType.typeSymbol.name.toString.startsWith("Spark")
   }
 }
