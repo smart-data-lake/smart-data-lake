@@ -20,6 +20,7 @@ package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.spark.GetSession.loggEnv
+import org.apache.spark.sql.functions.{coalesce, lit}
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -61,6 +62,29 @@ class DsCommentTest extends AnyFlatSpec with Matchers
     val expected = Set("desc_id", "desc_x", "desc_y")
     actual shouldBe expected
     dfCommented.columns shouldBe df.columns
+  }
+
+  it should "keep the given expression if the column name is new to the input DataFrame" in {
+    val df = List((1, "a")).toDF("id", "src")
+    val dfCommented = df.select(withComment(coalesce(lit(null).cast("string"), $"src").as("derived"), "desc_derived"))
+    dfCommented.columns shouldBe Array("derived")
+    dfCommented.as[String].collect().toSeq shouldBe Seq("a")
+    dfCommented.schema.head.getComment() shouldBe Some("desc_derived")
+  }
+
+  it should "keep the given expression if the column name collides with an input column" in {
+    val df = List((1, "old")).toDF("id", "country_code")
+    val dfCommented = df.select(withComment(coalesce(lit(null).cast("string"), lit("new")).as("country_code"), "desc_country_code"))
+    dfCommented.as[String].collect().toSeq shouldBe Seq("new")
+    dfCommented.schema.head.getComment() shouldBe Some("desc_country_code")
+  }
+
+  it should "comment a plain qualified column reference" in {
+    val df = List((1, "a")).toDF("id", "src")
+    val dfCommented = df.as("t").select(withComment($"t.src", "desc_src"))
+    dfCommented.columns shouldBe Array("src")
+    dfCommented.as[String].collect().toSeq shouldBe Seq("a")
+    dfCommented.schema.head.getComment() shouldBe Some("desc_src")
   }
 
 }
