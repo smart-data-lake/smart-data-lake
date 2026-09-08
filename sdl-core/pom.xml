@@ -44,7 +44,7 @@
         <dependency>
             <groupId>com.databricks</groupId>
             <artifactId>databricks-dbutils-scala_${scala.minor.version}</artifactId>
-            <version>0.1.4</version>
+            <version>0.1.5</version>
         </dependency>
         <!-- this is a transitive dependency of databricks-dbutils-scala, but as this pom is defect in Scala 2.13, it must be added manually -->
         <dependency>
