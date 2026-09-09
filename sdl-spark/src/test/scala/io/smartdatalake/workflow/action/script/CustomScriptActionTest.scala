@@ -24,7 +24,7 @@ import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.CustomScriptAction
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.script.CanReceiveScriptNotification
+import io.smartdatalake.workflow.dataobject.generic.CanReceiveParameterNotification
 import io.smartdatalake.workflow.dataobject.{CsvFileDataObject, DataObject, DataObjectMetadata}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, FileSubFeed}
 import org.apache.commons.lang3.NotImplementedException
@@ -80,10 +80,10 @@ class CustomScriptActionTest extends AnyFunSuite with BeforeAndAfter {
 
 }
 
-case class TestScriptNotificationDataObject(override val id: DataObjectId, notifyFunc: String => Unit) extends DataObject with CanReceiveScriptNotification with ExcludeFromSchemaExport {
+case class TestScriptNotificationDataObject(override val id: DataObjectId, notifyFunc: String => Unit) extends DataObject with CanReceiveParameterNotification with ExcludeFromSchemaExport {
   override def metadata: Option[DataObjectMetadata] = None
 
-  override def scriptNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+  override def parameterNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     notifyFunc(parameters("test"))
   }
 }

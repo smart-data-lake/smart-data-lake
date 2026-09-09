@@ -25,8 +25,12 @@ import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 
 /**
- * A ScriptSubFeed is used to notify DataObjects and subsequent actions about the completion of a script.
- * It allows to pass on arbitrary informations as key/values.
+ * A ParameterSubFeed transports arbitrary key/values between Actions and DataObjects, but no data.
+ *
+ * It is used by Actions which coordinate work happening outside of SDLB and want to pass on information about it,
+ * e.g. [[io.smartdatalake.workflow.action.CustomScriptAction]] passing on the output of a script, or an ML training
+ * Action passing on the information about the training run. Output DataObjects receive the parameters through
+ * [[io.smartdatalake.workflow.dataobject.generic.CanReceiveParameterNotification]].
  *
  * @param dataObjectId id of the DataObject this SubFeed corresponds to
  * @param partitionValues Values of Partitions transported by this SubFeed
@@ -34,29 +38,29 @@ import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
  * @param isSkipped true if this subfeed is the result of a skipped action
  * @param parameters arbitrary informations as key/value to pass on
  */
-case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
-                         override val dataObjectId: DataObjectId,
-                         override val partitionValues: Seq[PartitionValues],
-                         override val isDAGStart: Boolean = false,
-                         override val isSkipped: Boolean = false,
-                         override val metrics: Option[MetricsMap] = None,
-                         override val expectationsResult: Option[Map[String, String]] = None,
-                         override val executionModeResultOptions: Map[String, String] = Map()
-                        )
+case class ParameterSubFeed(parameters: Option[Map[String,String]] = None,
+                            override val dataObjectId: DataObjectId,
+                            override val partitionValues: Seq[PartitionValues],
+                            override val isDAGStart: Boolean = false,
+                            override val isSkipped: Boolean = false,
+                            override val metrics: Option[MetricsMap] = None,
+                            override val expectationsResult: Option[Map[String, String]] = None,
+                            override val executionModeResultOptions: Map[String, String] = Map()
+                           )
   extends SubFeed {
-  override def breakLineage(implicit context: ActionPipelineContext): ScriptSubFeed = this
-  override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): ScriptSubFeed = {
+  override def breakLineage(implicit context: ActionPipelineContext): ParameterSubFeed = this
+  override def clearPartitionValues(breakLineageOnChange: Boolean = true)(implicit context: ActionPipelineContext): ParameterSubFeed = {
     this.copy(partitionValues = Seq())
   }
-  override def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit context: ActionPipelineContext): ScriptSubFeed = {
+  override def updatePartitionValues(partitions: Seq[String], breakLineageOnChange: Boolean = true, newPartitionValues: Option[Seq[PartitionValues]] = None)(implicit context: ActionPipelineContext): ParameterSubFeed = {
     val updatedPartitionValues = SubFeed.filterPartitionValues(newPartitionValues.getOrElse(partitionValues), partitions)
     this.copy(partitionValues = updatedPartitionValues)
   }
-  override def toOutput(dataObjectId: DataObjectId): ScriptSubFeed = {
+  override def toOutput(dataObjectId: DataObjectId): ParameterSubFeed = {
     this.copy(dataObjectId = dataObjectId, parameters = None, isDAGStart = false, isSkipped = false, metrics = None, expectationsResult = None, executionModeResultOptions = Map())
   }
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
-    case subFeed: ScriptSubFeed =>
+    case subFeed: ParameterSubFeed =>
       this.copy(
         parameters = optionalizeMap(this.parameters.getOrElse(Map()) ++ subFeed.parameters.getOrElse(Map())),
         partitionValues = unionPartitionValues(subFeed.partitionValues), isDAGStart = this.isDAGStart || subFeed.isDAGStart,
@@ -65,22 +69,22 @@ case class ScriptSubFeed(parameters: Option[Map[String,String]] = None,
     case x => this.copy(parameters = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart,
       executionModeResultOptions = unionExecutionModeResultOptions(x))
   }
-  override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): ScriptSubFeed = {
+  override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): ParameterSubFeed = {
     this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, executionModeResultOptions = result.options)
   }
-  override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): ScriptSubFeed = {
+  override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): ParameterSubFeed = {
     this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false, parameters = None, executionModeResultOptions = result.options)
   }
 }
-object ScriptSubFeed extends SubFeedConverter[ScriptSubFeed] {
+object ParameterSubFeed extends SubFeedConverter[ParameterSubFeed] {
   /**
-   * This method is used to pass an output SubFeed as input FileSubFeed to the next Action. SubFeed type might need conversion.
+   * This method is used to pass an output SubFeed as input ParameterSubFeed to the next Action. SubFeed type might need conversion.
    */
-  override def fromSubFeed( subFeed: SubFeed )(implicit context: ActionPipelineContext): ScriptSubFeed = {
+  override def fromSubFeed( subFeed: SubFeed )(implicit context: ActionPipelineContext): ParameterSubFeed = {
     subFeed match {
       // executionModeResultOptions are not passed on to the next Action
-      case subFeed: ScriptSubFeed => subFeed.copy(executionModeResultOptions = Map())
-      case _ => ScriptSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
+      case subFeed: ParameterSubFeed => subFeed.copy(executionModeResultOptions = Map())
+      case _ => ParameterSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }
 }

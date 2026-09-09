@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.DefaultExpressionData
-import io.smartdatalake.util.spark.{PythonSparkEntryPoint, PythonUtil}
+import io.smartdatalake.util.spark.{PythonSparkEntryPoint, PythonTransformationException, PythonUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionHelper
 import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
@@ -108,7 +108,7 @@ case class PythonCodeDfTransformer(override val name: String = "pythonSparkTrans
           |    entryPoint.setOutputDf(df._jdf)
           """.stripMargin
       PythonUtil.execPythonSparkCode(entryPoint, additionalInitCode + sys.props("line.separator")
-        + PythonCodeDfTransformer.dedent(pythonCode) + sys.props("line.separator")
+        + PythonUtil.dedent(pythonCode) + sys.props("line.separator")
         + PythonDynamicTransform.dfPostludeCode)
       entryPoint.outputDf.getOrElse(throw new IllegalStateException(s"($actionId.transformers.$name) Python transformation must set output DataFrame (call setOutputDf(df))"))
     } catch {
@@ -121,15 +121,6 @@ object PythonCodeDfTransformer extends FromConfigFactory[GenericDfTransformer] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): PythonCodeDfTransformer = {
     extract[PythonCodeDfTransformer](config)
   }
-
-  /** Dedent multiline strings by removing common leading spaces */
-  def dedent(code: String): String = {
-    val lines = code.stripMargin.linesIterator.toList
-    val nonEmptyLines = lines.filter(line => line.trim.nonEmpty)
-    val minIndentLength = if (nonEmptyLines.isEmpty) 0 else nonEmptyLines.map(_.segmentLength(c => c == ' ' || c == '\t')).min
-    val dedentedLines = lines.map(_.drop(minIndentLength))
-    dedentedLines.mkString(System.lineSeparator())
-  }
 }
 
 private[smartdatalake] class DfTransformerPythonSparkEntryPoint(override val session: SparkSession, options: Map[String,String], inputDf: DataFrame, dataObjectId: String, var outputDf: Option[DataFrame] = None) extends PythonSparkEntryPoint(session, options) {
@@ -140,8 +131,3 @@ private[smartdatalake] class DfTransformerPythonSparkEntryPoint(override val ses
     outputDf = Some(df)
   }
 }
-
-/**
- * Exception is thrown if the Python transformation can not be executed correctly
- */
-private[smartdatalake] class PythonTransformationException(msg: String, throwable: Throwable) extends RuntimeException(msg, throwable)

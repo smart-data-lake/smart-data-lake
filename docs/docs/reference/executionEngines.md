@@ -16,7 +16,7 @@ Currently SDLB supports the following execution engines:
 |Generic DataFrame API|Spark Engine|SparkSubFeed|SparkClassicConnection|Transform data with Spark DataFrame API in a Spark session running inside the SDLB process|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction|all Hadoop/SparkFileDataObject, AccessTableDataObject, AirbyteDataObject, CustomDfDataObject, DeltaLakeTableDataObject, HiveTableDataObject, IcebergTableDataObject, JdbcTableDataObject, JmsDataObject, KafkaTopicDataObject, SnowflakeTableDataObject, SplunkDataObject, TickTockHiveTableDataObject|
 |Generic DataFrame API|Spark Connect Engine|SparkConnectSubFeed|SparkConnectConnection|Transform data with the Spark DataFrame API on a **remote** Spark Connect server, without a Spark session inside the SDLB process|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction|SparkConnectTableDataObject, DeltaLakeTableDataObject, IcebergTableDataObject|
 |Generic DataFrame API|Snowflake-Snowpark Engine|SnowparkSubFeed|-|Transform data within Snowflake with Snowpark DataFrame API|CopyAction, CustomDataFrameAction|SnowflakeTableDataObject|
-|Script|Script Engine|ScriptSubFeed|-|Coordinate script task execution and notify DataObjects about script results|CustomScriptAction|all DataObjects|
+|Parameter|Parameter Engine|ParameterSubFeed|-|Coordinate work happening outside of SDLB and pass on key/values about it, e.g. script results or the information about an ML training run|CustomScriptAction, MLflowTrainAction|all DataObjects|
 
 ### Engine connections
 
@@ -118,7 +118,7 @@ Build a job for one of the two engines: `sdl-spark` for classic Spark, `sdl-spar
 In order to build a data pipeline using different execution engines, you need a DataObject that supports both execution engines as interface, so that one execution engine can write the data in the DataObject and the other one can read from it.
 - from FileSubFeed to SparkSubFeed (and vice-versa): any Hadoop/SparkFileDataObject like ParquetFileDataObject
 - from SparkSubFeed to SnowparkSubFeed (and vice-versa): SnowflakeTableDataObject
-- from ScriptSubFeed to any (and vice-versa): every DataObject is suitable
+- from ParameterSubFeed to any (and vice-versa): every DataObject is suitable
 
 SparkSubFeed and SparkConnectSubFeed are the exception: they cannot be combined in the same job at all, as their sessions cannot coexist in one JVM, see [above](#spark-connect-engine). Hand data over through a table read by a separate job instead.
 

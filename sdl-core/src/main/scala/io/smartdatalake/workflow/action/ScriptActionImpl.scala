@@ -21,37 +21,37 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.dataobject.DataObject
-import io.smartdatalake.workflow.dataobject.script.CanReceiveScriptNotification
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ScriptSubFeed, SubFeedConverter}
+import io.smartdatalake.workflow.dataobject.generic.CanReceiveParameterNotification
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, ParameterSubFeed, SubFeedConverter}
 
 /**
  * Implementation of logic needed for Script Actions
  */
-abstract class ScriptActionImpl extends ActionSubFeedsImpl[ScriptSubFeed] {
+abstract class ScriptActionImpl extends ActionSubFeedsImpl[ParameterSubFeed] {
 
   override def inputs: Seq[DataObject]
-  override def outputs: Seq[DataObject with CanReceiveScriptNotification]
+  override def outputs: Seq[DataObject with CanReceiveParameterNotification]
 
   override val executionMode: Option[ExecutionMode] = None // no use for execution mode with scripts so far
   override def metricsFailCondition: Option[String] = None // no metrics for script execution so far
 
-  override def subFeedConverter: SubFeedConverter[ScriptSubFeed] = ScriptSubFeed
+  override def subFeedConverter: SubFeedConverter[ParameterSubFeed] = ParameterSubFeed
 
   /**
    * To be implemented by sub-classes
    */
-  protected def execScript(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit context: ActionPipelineContext): Seq[ScriptSubFeed]
+  protected def execScript(inputSubFeeds: Seq[ParameterSubFeed], outputSubFeeds: Seq[ParameterSubFeed])(implicit context: ActionPipelineContext): Seq[ParameterSubFeed]
 
-  override protected def transform(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit context: ActionPipelineContext): Seq[ScriptSubFeed] = {
+  override protected def transform(inputSubFeeds: Seq[ParameterSubFeed], outputSubFeeds: Seq[ParameterSubFeed])(implicit context: ActionPipelineContext): Seq[ParameterSubFeed] = {
     // execute scripts in exec phase
     if (context.isExecPhase) {
       execScript(inputSubFeeds, outputSubFeeds)
     } else outputSubFeeds
   }
 
-  override def writeSubFeed(subFeed: ScriptSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): ScriptSubFeed = {
+  override def writeSubFeed(subFeed: ParameterSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): ParameterSubFeed = {
     val output = outputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
-    output.scriptNotification(subFeed.parameters.getOrElse(Map()))
+    output.parameterNotification(subFeed.parameters.getOrElse(Map()))
     subFeed
   }
 }

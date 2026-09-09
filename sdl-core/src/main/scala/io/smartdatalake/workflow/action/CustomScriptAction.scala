@@ -24,8 +24,8 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.dataobject.DataObject
-import io.smartdatalake.workflow.dataobject.script.CanReceiveScriptNotification
-import io.smartdatalake.workflow.{ActionPipelineContext, ScriptSubFeed}
+import io.smartdatalake.workflow.dataobject.generic.CanReceiveParameterNotification
+import io.smartdatalake.workflow.{ActionPipelineContext, ParameterSubFeed}
 
 /**
  * [[Action]] execute script after multiple input DataObjects are ready, notifying multiple output DataObjects when script succeeded.
@@ -52,7 +52,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ScriptSubFeed}
  * }
  * }}}
  *
- * @note Output DataObjects must implement [[io.smartdatalake.workflow.dataobject.script.CanReceiveScriptNotification]]
+ * @note Output DataObjects must implement [[io.smartdatalake.workflow.dataobject.generic.CanReceiveParameterNotification]]
  *       to be able to receive the notification. No DataObject shipped with SDLB implements it yet, so `outputIds`
  *       normally references a custom DataObject implementation. Otherwise the Action fails with a
  *       ConfigurationException when the configuration is parsed.
@@ -69,11 +69,11 @@ case class CustomScriptAction(override val id: ActionId,
                        )(implicit val instanceRegistry: InstanceRegistry) extends ScriptActionImpl {
 
   override val inputs: Seq[DataObject] = inputIds.map(getInputDataObject[DataObject])
-  override val outputs: Seq[DataObject with CanReceiveScriptNotification] = outputIds.map(getOutputDataObject[DataObject with CanReceiveScriptNotification])
+  override val outputs: Seq[DataObject with CanReceiveParameterNotification] = outputIds.map(getOutputDataObject[DataObject with CanReceiveParameterNotification])
 
   validateConfig()
 
-  override protected def execScript(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit context: ActionPipelineContext): Seq[ScriptSubFeed] = {
+  override protected def execScript(inputSubFeeds: Seq[ParameterSubFeed], outputSubFeeds: Seq[ParameterSubFeed])(implicit context: ActionPipelineContext): Seq[ParameterSubFeed] = {
     val inputParameters = inputSubFeeds.flatMap(_.parameters).reduceLeftOption(_ ++ _).getOrElse(Map())
     val mainPartitionValues = getMainPartitionValues(inputSubFeeds)
     val outputParameters = scripts.foldLeft(inputParameters) {

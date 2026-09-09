@@ -74,6 +74,15 @@ private[smartdatalake] object PythonUtil {
       |sc._javaAccumulator = None
       |""".stripMargin
 
+  /** Dedent multiline strings by removing common leading spaces */
+  def dedent(code: String): String = {
+    val lines = code.stripMargin.linesIterator.toList
+    val nonEmptyLines = lines.filter(line => line.trim.nonEmpty)
+    val minIndentLength = if (nonEmptyLines.isEmpty) 0 else nonEmptyLines.map(_.segmentLength(c => c == ' ' || c == '\t')).min
+    val dedentedLines = lines.map(_.drop(minIndentLength))
+    dedentedLines.mkString(System.lineSeparator())
+  }
+
 }
 
 class PythonSparkEntryPoint(override val session: SparkSession, options: Map[String,String] = Map()) extends SparkEntryPoint {
@@ -81,3 +90,7 @@ class PythonSparkEntryPoint(override val session: SparkSession, options: Map[Str
   def getOptions: java.util.HashMap[String,String] = new java.util.HashMap(options.asJava)
 }
 
+/**
+ * Exception is thrown if the Python transformation can not be executed correctly
+ */
+private[smartdatalake] class PythonTransformationException(msg: String, throwable: Throwable) extends RuntimeException(msg, throwable)

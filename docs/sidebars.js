@@ -67,6 +67,7 @@ const sidebars = {
             'reference/actions/upsertAction',
             'reference/actions/historizeAction',
             'reference/actions/customDataFrameAction',
+            'reference/actions/mlflow',
           ],
         },
       ]},
