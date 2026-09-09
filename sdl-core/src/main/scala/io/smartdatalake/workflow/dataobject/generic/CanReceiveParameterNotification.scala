@@ -16,13 +16,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.workflow.dataobject.script
+package io.smartdatalake.workflow.dataobject.generic
 
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
 
-trait CanReceiveScriptNotification {
+trait CanReceiveParameterNotification {
 
-  def scriptNotification(parameters: Map[String,String], partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): Unit
+  /**
+   * Receive key/values from an Action which has this DataObject as output, see [[io.smartdatalake.workflow.ParameterSubFeed]].
+   */
+  def parameterNotification(parameters: Map[String,String], partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): Unit
 
 }

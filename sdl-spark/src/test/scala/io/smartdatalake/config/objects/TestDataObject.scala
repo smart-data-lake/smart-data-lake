@@ -28,7 +28,7 @@ import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.generic.{CanMergeDataFrame, Table, TransactionalTableDataObject}
-import io.smartdatalake.workflow.dataobject.script.CanReceiveScriptNotification
+import io.smartdatalake.workflow.dataobject.generic.CanReceiveParameterNotification
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import org.apache.spark.sql.DataFrame
 
@@ -48,7 +48,7 @@ case class TestDataObject( id: DataObjectId,
                            override val metadata: Option[DataObjectMetadata] = None)
                          ( implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
-    with CanReceiveScriptNotification with CanMergeDataFrame {
+    with CanReceiveParameterNotification with CanMergeDataFrame {
 
   override val options: Map[String, String] = Map()
 
@@ -67,7 +67,7 @@ case class TestDataObject( id: DataObjectId,
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = throw new NotImplementedError()
 
-  override def scriptNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
+  override def parameterNotification(parameters: Map[String, String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   def prepareAndExecSql(sqlOpt: Option[String], configName: Option[String], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {}
 }

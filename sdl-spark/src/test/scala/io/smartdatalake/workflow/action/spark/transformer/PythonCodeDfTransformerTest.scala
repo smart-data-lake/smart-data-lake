@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.action.spark.transformer
 
-import io.smartdatalake.workflow.action.spark.transformer.PythonCodeDfTransformer.dedent
+import io.smartdatalake.util.spark.PythonUtil.dedent
 import org.scalatest.funsuite.AnyFunSuite
 
 class PythonCodeDfTransformerTest extends AnyFunSuite {

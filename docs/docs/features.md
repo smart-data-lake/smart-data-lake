@@ -37,7 +37,7 @@ More details on the roadmap will follow shortly.
 * DataFrame based: Copy, Historization (SCD2, using merge statement), Upsert (SCD1, using merge statement)
 * File based: FileTransfer
 * Easy to extend by implementing predefined scala traits
-* Future: applying MLFlow machine learning models
+* Machine learning: train and apply models tracked by [MLflow](reference/actions/mlflow)
 
 ## Customizable [Transformations](reference/transformations)
 * Spark Transformations:

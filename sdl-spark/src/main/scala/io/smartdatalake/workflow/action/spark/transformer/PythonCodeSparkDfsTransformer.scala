@@ -23,10 +23,10 @@ import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.DefaultExpressionData
-import io.smartdatalake.util.spark.{PythonSparkEntryPoint, PythonUtil}
+import io.smartdatalake.util.spark.{PythonSparkEntryPoint, PythonTransformationException, PythonUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformer
-import io.smartdatalake.workflow.action.spark.transformer.PythonCodeDfTransformer.dedent
+import io.smartdatalake.util.spark.PythonUtil.dedent
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.{DataFrame, SparkSession}

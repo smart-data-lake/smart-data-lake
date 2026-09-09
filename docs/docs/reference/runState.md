@@ -76,3 +76,9 @@ State files carry a `runStateFormatVersion`. SDLB migrates older state files to 
 so an upgrade does not invalidate a pending recovery. Reading a state file written by a *newer* SDLB version fails
 with an explicit error. Existing state files can also be migrated in place with the `StateMigrator` tool
 (`io.smartdatalake.meta.state.StateMigrator -s <state-path>`).
+
+:::caution SDLB 3.0.0
+`ScriptSubFeed` was renamed to `ParameterSubFeed` in version 3.0.0, and the SubFeed type name is part of the state
+file. A run of `CustomScriptAction` which failed on an older SDLB version can therefore **not** be recovered on
+3.0.0 - start it again instead. State files of runs without such an Action are unaffected.
+:::

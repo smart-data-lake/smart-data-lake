@@ -61,7 +61,7 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
    * This does *not* break the lineage of Actions and DataObjects known to SDLB: a [[DataFrameSubFeed]] keeps its schema
    * (see [[DataFrameSubFeed.keptSchema]]), so that subsequent Actions can still be validated in init phase.
    * Which data is discarded is implementation specific: [[DataFrameSubFeed]] drops its DataFrame, [[FileSubFeed]] drops
-   * its FileRefs, while [[ScriptSubFeed]] and [[InitSubFeed]] transport no data and are left unchanged.
+   * its FileRefs, while [[ParameterSubFeed]] and [[InitSubFeed]] transport no data and are left unchanged.
    */
   def breakLineage(implicit context: ActionPipelineContext): SubFeed
 

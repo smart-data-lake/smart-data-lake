@@ -199,7 +199,7 @@ If you do need one, extend the base class matching your cardinality and engine i
 | `DataFrameOneToOneActionImpl` | 1:1 DataFrame Action - implement `input`, `output` and `transform(inputSubFeed, outputSubFeed)` |
 | `DataFrameActionImpl` | n:m DataFrame Action - implement `inputs`, `outputs` and `transform(inputSubFeeds, outputSubFeeds)` |
 | `FileOneToOneActionImpl` | 1:1 byte-stream Action - implement `transform` and `writeSubFeed` |
-| `ScriptActionImpl` | Action executing scripts - implement `execScript` |
+| `ScriptActionImpl` | Action executing scripts - implement `execScript`. Its outputs receive key/values through `CanReceiveParameterNotification`, see `ParameterSubFeed`. |
 
 These base classes already handle the [execution phases](executionPhases), execution modes, filters, metrics, expectations and schema propagation. What is left to implement is the transformation itself:
 
