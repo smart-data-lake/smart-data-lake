@@ -402,6 +402,8 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <license.header.file>src/license/gplv3-header.txt</license.header.file>
+        <!-- only used for the copyright year of the license header, see license-maven-plugin -->
+        <maven.build.timestamp.format>yyyy</maven.build.timestamp.format>
         <maven.compiler.release>17</maven.compiler.release>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -716,6 +718,10 @@
                         <properties>
                             <copyright.name>${project.organization.name}</copyright.name>
                             <copyright.contact>${project.organization.url}</copyright.contact>
+                            <!-- Copyright range as inception year until the current year.
+                                 Do not derive this from the git history (license-maven-plugin-git): that reads the
+                                 history of every single source file, which makes the check take minutes per module. -->
+                            <copyright.years>${project.inceptionYear}-${maven.build.timestamp}</copyright.years>
                         </properties>
                         <mapping>
                             <scala>SLASHSTAR_STYLE</scala>
@@ -723,13 +729,6 @@
                         </mapping>
                         <failIfMissing>false</failIfMissing>
                     </configuration>
-                    <dependencies>
-                        <dependency>
-                            <groupId>com.mycila</groupId>
-                            <artifactId>license-maven-plugin-git</artifactId>
-                            <version>4.2</version>
-                        </dependency>
-                    </dependencies>
                     <executions>
                         <execution>
                             <goals>
