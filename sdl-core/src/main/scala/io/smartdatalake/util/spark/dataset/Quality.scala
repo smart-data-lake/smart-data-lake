@@ -47,7 +47,7 @@ trait Quality extends Transform {
         s" as it is not a NamedExpression." +
         s" use withComment(colName: String, column: Column, commentText: String) instead.")
     }
-    withComment(colName, commentText)
+    withComment(colName, column, commentText)
   }
 
   implicit class DsColComment(column: Column) {
