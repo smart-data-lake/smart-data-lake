@@ -180,8 +180,6 @@ case class HistorizeAction(
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: TransactionalTableDataObject = getOutputDataObject[TransactionalTableDataObject](outputId)
-  override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
-  override val outputs: Seq[TransactionalTableDataObject] = Seq(output)
 
   /**
    * Determine the historization strategy to use.

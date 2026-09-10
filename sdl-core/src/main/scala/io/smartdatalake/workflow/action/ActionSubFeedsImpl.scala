@@ -45,6 +45,36 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   def inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
 
   /**
+   * The input DataObjects whose SubFeeds are handled as SubFeed type S of this Action.
+   * Default is all inputs. Subclasses supporting inputs of another SubFeed type override this,
+   * see [[DataFrameActionImpl.additionalInputs]].
+   */
+  protected def subFeedInputs: Seq[DataObject] = inputs
+
+  /**
+   * The output DataObjects whose SubFeeds are handled as SubFeed type S of this Action.
+   * Default is all outputs. Subclasses supporting outputs of another SubFeed type override this,
+   * see [[DataFrameActionImpl.additionalOutputs]].
+   */
+  protected def subFeedOutputs: Seq[DataObject] = outputs
+
+  /**
+   * Create the SubFeeds for the outputs which are not handled as SubFeed type S, in Init phase.
+   * This must not have any side effects, as it is also executed for a dry run.
+   * Can be implemented by subclass.
+   */
+  protected def initAdditionalOutputSubFeeds(implicit context: ActionPipelineContext): Seq[SubFeed] = Seq()
+
+  /**
+   * Create the SubFeeds for the outputs which are not handled as SubFeed type S, in Exec phase.
+   * This is where their work happens and where they are written. It is called after the SubFeeds of type S
+   * have been written, but it gets the *transformed* output SubFeeds, which still carry their content.
+   * Can be implemented by subclass.
+   */
+  protected def execAdditionalOutputSubFeeds(inputSubFeeds: Seq[S], outputSubFeeds: Seq[S])
+                                            (implicit context: ActionPipelineContext): Seq[SubFeed] = Seq()
+
+  /**
    * put configuration validation checks here
    */
   override def validateConfig(): Unit = {
@@ -71,7 +101,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
 
   // helper data structures
   lazy val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
-  private lazy val outputMap = outputs.map(i => i.id -> i).toMap
+  private lazy val outputMap = subFeedOutputs.map(i => i.id -> i).toMap
 
   def subFeedConverter: SubFeedConverter[S]
 
@@ -79,8 +109,11 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     logger.debug(s"($id) prepareInputSubFeeds: subFeeds: ${subFeeds.mkString(", ")}")
     val mainInput = getMainInput
     val mainSubFeed = subFeeds.find(_.dataObjectId == mainInput.id).get
-    // convert subfeeds to these Actions SubFeed type or initialize if not yet existing
-    var inputSubFeeds: Seq[S] = subFeeds.map { subFeed =>
+    // convert subfeeds to these Actions SubFeed type or initialize if not yet existing.
+    // Only the inputs handled as SubFeed type S are converted, see subFeedInputs. The SubFeeds of additional
+    // inputs are filtered out, as converting them would drop their content.
+    val subFeedInputIds = (subFeedInputs ++ recursiveInputs).map(_.id)
+    var inputSubFeeds: Seq[S] = subFeeds.filter(subFeed => subFeedInputIds.contains(subFeed.dataObjectId)).map { subFeed =>
       val partitionValues = if (mainSubFeed.partitionValues.nonEmpty) Some(mainSubFeed.partitionValues) else None
       scala.util.Try {
         updateInputPartitionValues(inputMap(subFeed.dataObjectId), subFeedConverter.fromSubFeed(subFeed), partitionValues)
@@ -93,7 +126,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     }
     val mainInputSubFeed = inputSubFeeds.find(_.dataObjectId == mainInput.id).get
     // create output subfeeds with transformed partition values from main input
-    var outputSubFeeds: Seq[S] = outputs.map(output =>
+    var outputSubFeeds: Seq[S] = subFeedOutputs.map(output =>
       // the ExecutionModeResult is not yet available here, so no executionModeResultOptions can be passed
       updateOutputPartitionValues(output, subFeedConverter.get(mainInputSubFeed.toOutput(output.id)), Some(transformPartitionValues(_, Map())))
     )
@@ -133,12 +166,12 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
 
   def postprocessOutputSubFeeds(subFeeds: Seq[S], inputSubFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
     // assert all outputs have a subFeed
-    outputs.foreach { output =>
+    subFeedOutputs.foreach { output =>
       subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
     }
     // validate & update subfeeds
     subFeeds.map { subFeed =>
-      outputMap.getOrElse(subFeed.dataObjectId, throw ConfigurationException(s"($id) No output found for result ${subFeed.dataObjectId}. Configured outputs are ${outputs.map(_.id.id).mkString(", ")}."))
+      outputMap.getOrElse(subFeed.dataObjectId, throw ConfigurationException(s"($id) No output found for result ${subFeed.dataObjectId}. Configured outputs are ${subFeedOutputs.map(_.id.id).mkString(", ")}."))
       postprocessOutputSubFeedCustomized(subFeed, inputSubFeeds)
     }
   }
@@ -148,7 +181,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
   def writeOutputSubFeeds(subFeeds: Seq[S])(implicit context: ActionPipelineContext): Seq[S] = {
     // write and collect all SubFeeds until there is a TaskFailedException, then collect SubFeed without writing.
     // This way metrics from successfully written SubFeeds can be preserved and enriched in TaskFailedException.
-    val (outputSubFeeds, taskFailedException, noDataWarning) = outputs.foldLeft((Seq[S](), Option.empty[TaskFailedException], Option.empty[NoDataToProcessWarning])) {
+    val (outputSubFeeds, taskFailedException, noDataWarning) = subFeedOutputs.foldLeft((Seq[S](), Option.empty[TaskFailedException], Option.empty[NoDataToProcessWarning])) {
       case ((outputSubFeeds, taskFailedException, noDataWarning), output) =>
         // find SubFeed for output and write it
         val subFeed = subFeeds.find(_.dataObjectId == output.id).getOrElse(throw new IllegalStateException(s"($id) subFeed for output ${output.id} not found"))
@@ -212,8 +245,8 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     // update partition values to output's partition columns and update dataObjectId
     outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds, inputSubFeeds)
       .map(convertToOutputSubFeed(_)) // replay transformations that will be done in exec phase writeOutputSubFeeds
-    // return
-    outputSubFeeds
+    // return, adding the SubFeeds of outputs which are not of SubFeed type S
+    outputSubFeeds ++ initAdditionalOutputSubFeeds
   } catch {
     // throw exception with skipped output subfeeds if "no data"
     case ex: NoDataToProcessWarning if ex.results.isEmpty =>
@@ -233,10 +266,12 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
       outputSubFeeds = transform(inputSubFeeds, outputSubFeeds)
       // check and adapt output SubFeeds
       outputSubFeeds = postprocessOutputSubFeeds(outputSubFeeds, inputSubFeeds)
+      // remember the transformed SubFeeds, as writeOutputSubFeeds drops the DataFrames of uncached outputs
+      val transformedOutputSubFeeds = outputSubFeeds
       // write output
       outputSubFeeds = writeOutputSubFeeds(outputSubFeeds)
-      // return
-      outputSubFeeds
+      // return, adding the SubFeeds of outputs which are not of SubFeed type S
+      outputSubFeeds ++ execAdditionalOutputSubFeeds(inputSubFeeds, transformedOutputSubFeeds)
     } catch {
       case ex: NoDataToProcessWarning => throw ex // pass on to outer exception handler
       case ex: TaskFailedException => throw ex // pass on to outer exception handler
@@ -281,7 +316,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     logger.info(s"($id) got NoDataToProcessWarning when writing to ${subFeed.dataObjectId.id}. ${if (isMainSubFeed) "As this is the main output, Action will be set to skipped." else "As this is not the main output, Action will not be set to skipped."}")
   }
 
-  private def getMainDataObjectCandidates(mainId: Option[DataObjectId], dataObjects: Seq[DataObject], inputOutput: String): Seq[DataObject] = {
+  protected def getMainDataObjectCandidates(mainId: Option[DataObjectId], dataObjects: Seq[DataObject], inputOutput: String): Seq[DataObject] = {
     if (mainId.isDefined) {
       // if mainInput is defined -> return only that DataObject
       Seq(dataObjects.find(_.id == mainId.get).getOrElse(throw ConfigurationException(s"($id) main${inputOutput}Id ${mainId.get} not found in ${inputOutput}s")))

@@ -22,6 +22,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.mlflow.MLflowRunInfo
+import io.smartdatalake.workflow.action.generic.transformer.{SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.dataobject.MLflowDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed}
 import org.apache.spark.sql.SparkSession
@@ -92,11 +93,15 @@ class MLflowEndToEndTest extends AnyFunSuite {
     val mlflow = MLflowDataObject(DataObjectId("mlflow-test"), experimentName = experimentName,
       trackingUri = trackingUri, artifactLocation = artifactLocation)
     val input = MockSparkDataObject(DataObjectId("src"))
+    val trainOutput = MockSparkDataObject(DataObjectId("train-data"))
     val output = MockSparkDataObject(DataObjectId("tgt"))
-    Seq(mlflow, input, output).foreach(instanceRegistry.register)
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
+    Seq(mlflow, input, trainOutput, output).foreach(instanceRegistry.register)
     input.writeSparkDataFrame(Seq((1.0, 3.0), (2.0, 5.0), (3.0, 7.0), (4.0, 9.0)).toDF("x", "y"))
 
     val trainAction = MLflowTrainAction(ActionId("train"), input.id, mlflow.id, modelName,
+      // the optional DataFrame output writes the training data on, next to training the model
+      outputId = Some(trainOutput.id),
       registerModel = true, modelAlias = Some("champion"),
       pythonModelCode = Some(
         """
@@ -111,7 +116,9 @@ class MLflowEndToEndTest extends AnyFunSuite {
     assert(MLflowRunInfo.fields.forall(runInfo.contains))
     assert(runInfo(MLflowRunInfo.ExperimentName) == experimentName)
     assert(runInfo(MLflowRunInfo.ModelUri).nonEmpty)
-    assert(trainResult.size == 1)
+    // one SubFeed for the DataFrame output and one for the MLflow DataObject
+    assert(trainResult.map(_.dataObjectId.id) == Seq("train-data", "mlflow-test"))
+    assert(trainOutput.getSparkDataFrame()(execContext).count() == 4)
 
     val predictAction = MLflowPredictAction(ActionId("predict"), input.id, mlflow.id, output.id,
       modelName = Some(modelName), modelAlias = Some("champion"), featureColumns = Some(Seq("x")))

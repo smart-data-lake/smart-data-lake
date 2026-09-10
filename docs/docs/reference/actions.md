@@ -21,8 +21,8 @@ All parameters of every Action are listed in the [Configuration Schema Viewer](.
 | FileTransferAction | 1:1 | FileSubFeed | Transfer files between SFtp, Hadoop, local filesystem and webservices as is, without interpreting their content.                                |
 | CustomFileAction | 1:1 | FileSubFeed | Transform files as byte/line streams with a custom transformer, distributed on Spark executors, e.g. to unzip, decrypt or repair a file format. |
 | CustomScriptAction | n:m | ParameterSubFeed | Execute scripts once all inputs are ready and notify the outputs afterwards. No data is read or written by SDLB.                                |
-| [MLflowTrainAction](actions/mlflow.md) | 1:1 | ParameterSubFeed | Train a machine learning model with python code and track it with MLflow. Passes on the run information as key/values. |
-| [MLflowPredictAction](actions/mlflow.md) | 2:1 | SparkSubFeed | Apply a machine learning model tracked by MLflow, adding the prediction as an additional column. |
+| [MLflowTrainAction](actions/mlflow.md) | 1:0-1 | SparkSubFeed | Train a machine learning model with python code and track it with MLflow. Reports the run information to the MLflowDataObject as key/values, and optionally writes the training data on. |
+| [MLflowPredictAction](actions/mlflow.md) | 1:1 | SparkSubFeed | Apply a machine learning model tracked by MLflow, adding the prediction as an additional column. |
 
 :::info
 Choose the most specific Action for the job: it keeps the configuration short and the lineage accurate.

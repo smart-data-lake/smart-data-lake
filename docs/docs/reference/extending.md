@@ -197,9 +197,26 @@ If you do need one, extend the base class matching your cardinality and engine i
 | Base class | Use for |
 | ---------- | ------- |
 | `DataFrameOneToOneActionImpl` | 1:1 DataFrame Action - implement `input`, `output` and `transform(inputSubFeed, outputSubFeed)` |
-| `DataFrameActionImpl` | n:m DataFrame Action - implement `inputs`, `outputs` and `transform(inputSubFeeds, outputSubFeeds)` |
+| `DataFrameActionImpl` | n:m DataFrame Action - implement `dataFrameInputs`, `dataFrameOutputs` and `transform(inputSubFeeds, outputSubFeeds)` |
 | `FileOneToOneActionImpl` | 1:1 byte-stream Action - implement `transform` and `writeSubFeed` |
 | `ScriptActionImpl` | Action executing scripts - implement `execScript`. Its outputs receive key/values through `CanReceiveParameterNotification`, see `ParameterSubFeed`. |
+
+:::caution SDLB 3.0.0
+The abstract members `inputs` and `outputs` of `DataFrameActionImpl` were renamed to `dataFrameInputs` and
+`dataFrameOutputs` in version 3.0.0; `inputs` / `outputs` are now derived from them and the additional ones below.
+A custom **n:m** DataFrame Action has to rename its two overrides. A custom **1:1** DataFrame Action can simply
+**delete** them - `DataFrameOneToOneActionImpl` now derives both from `input` and `output`. The compiler reports
+every place that needs the change.
+:::
+
+A DataFrame Action can also have inputs or outputs which are **no DataFrame DataObjects**, by overriding
+`additionalInputs` respectively `additionalOutputs`. They are connected through a `ParameterSubFeed` instead of a
+DataFrame: an additional input creates the dependency in the DAG but delivers no data, and an additional output
+receives key/values through `CanReceiveParameterNotification`. Produce those key/values by overriding
+`execAdditionalOutputSubFeeds` (Exec phase, this is also where they are written with `writeAdditionalOutputSubFeed`)
+and `initAdditionalOutputSubFeeds` (Init phase, which must have no side effects).
+`Action.inputs` / `Action.outputs` are then the DataFrame ones plus the additional ones.
+See `MLflowTrainAction` and `MLflowPredictAction` for a complete example.
 
 These base classes already handle the [execution phases](executionPhases), execution modes, filters, metrics, expectations and schema propagation. What is left to implement is the transformation itself:
 
@@ -232,8 +249,6 @@ case class DeleteFlaggedAction(override val id: ActionId,
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: DataObject with CanWriteDataFrame = getOutputDataObject[DataObject with CanWriteDataFrame](outputId)
-  override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
-  override val outputs: Seq[DataObject with CanWriteDataFrame] = Seq(output)
 
   validateConfig()
 

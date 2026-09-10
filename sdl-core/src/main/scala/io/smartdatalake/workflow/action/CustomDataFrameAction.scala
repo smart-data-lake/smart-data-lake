@@ -92,8 +92,8 @@ case class CustomDataFrameAction(override val id: ActionId,
                              )(implicit val instanceRegistry: InstanceRegistry) extends DataFrameActionImpl {
 
   override val recursiveInputs: Seq[DataObject with CanCreateDataFrame] = recursiveInputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
-  override val inputs: Seq[DataObject with CanCreateDataFrame] = inputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
-  override val outputs: Seq[DataObject with CanWriteDataFrame] = outputIds.map(getOutputDataObject[DataObject with CanWriteDataFrame])
+  override val dataFrameInputs: Seq[DataObject with CanCreateDataFrame] = inputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
+  override val dataFrameOutputs: Seq[DataObject with CanWriteDataFrame] = outputIds.map(getOutputDataObject[DataObject with CanWriteDataFrame])
 
   if (executionMode.exists(_.isStreamingMode) && transformers.exists(_.isInstanceOf[SQLDfsTransformer]))
     logger.warn("Defining custom stateful streaming operations with sqlCode is not well supported by Spark and can create strange errors or effects. Use scalaCode to be safe.")

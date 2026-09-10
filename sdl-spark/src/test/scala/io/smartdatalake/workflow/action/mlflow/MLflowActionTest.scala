@@ -24,7 +24,10 @@ import io.smartdatalake.config.{ConfigParser, ConfigurationException, InstanceRe
 import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.mlflow.MLflowRunInfo
 import io.smartdatalake.workflow.action.Action
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.workflow.action.executionMode.ProcessAllMode
+import io.smartdatalake.workflow.action.expectation.TransferRateExpectation
+import io.smartdatalake.workflow.action.generic.transformer.{SQLDfTransformer, SQLDfsTransformer}
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.MLflowDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSubFeed, ParameterSubFeed}
 import io.smartdatalake.testutils.spark.MockSparkDataObject
@@ -48,6 +51,8 @@ class MLflowActionTest extends AnyFunSuite with BeforeAndAfter {
 
   before {
     instanceRegistry.clear()
+    // the MLflow Actions are DataFrame Actions, so they need the engine connection
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
   private def registerMlflow(id: String = "mlflow-test", experimentName: String = "test-experiment"): MLflowDataObject = {
@@ -99,7 +104,7 @@ class MLflowActionTest extends AnyFunSuite with BeforeAndAfter {
         |id = train
         |type = MLflowTrainAction
         |inputId = src
-        |mlflowId = mlflow-test
+        |outputMlflowId = mlflow-test
         |modelName = "price-regressor"
         |registerModel = true
         |modelAlias = champion
@@ -155,7 +160,7 @@ class MLflowActionTest extends AnyFunSuite with BeforeAndAfter {
         |id = predict
         |type = MLflowPredictAction
         |inputId = src
-        |mlflowId = mlflow-test
+        |inputMlflowId = mlflow-test
         |outputId = tgt
         |modelName = "price-regressor"
         |modelAlias = champion
@@ -208,7 +213,8 @@ class MLflowActionTest extends AnyFunSuite with BeforeAndAfter {
     assert(result.size == 1)
     val subFeed = result.head.asInstanceOf[SparkSubFeed]
     assert(subFeed.dataObjectId == output.id)
-    val schema = subFeed.dataFrame.get.inner.schema
+    // the DataFrame itself is only propagated with cacheOutput, but the schema always is
+    val schema = subFeed.schemaOpt.get.asInstanceOf[SparkSchema].inner
     assert(schema.fieldNames.toSeq == Seq("nights", "reviews_per_month", "price_pred"))
     assert(schema("price_pred").dataType.typeName == "double")
   }
@@ -223,5 +229,86 @@ class MLflowActionTest extends AnyFunSuite with BeforeAndAfter {
     val initContext = context.copy(phase = ExecutionPhase.Init)
     val ex = intercept[AssertionError](action.init(Seq(InitSubFeed(input.id, Seq()), InitSubFeed(mlflow.id, Seq())))(initContext))
     assert(ex.getMessage.contains("does_not_exist"))
+  }
+
+  test("MLflowTrainAction writes the training data to an optional DataFrame output") {
+    val mlflow = registerMlflow()
+    val input = registerInput()
+    val output = MockSparkDataObject(DataObjectId("tgt"))
+    instanceRegistry.register(output)
+    val action = MLflowTrainAction(ActionId("train"), input.id, mlflow.id, "m", outputId = Some(output.id),
+      pythonModelCode = Some("pass"))
+    assert(action.inputs.map(_.id.id) == Seq("src"))
+    // the DataFrame output comes first, the MLflow DataObject is the additional output
+    assert(action.outputs.map(_.id.id) == Seq("tgt", "mlflow-test"))
+    assert(action.mainOutput.id == output.id)
+    val initContext = context.copy(phase = ExecutionPhase.Init)
+    val result = action.init(Seq(InitSubFeed(input.id, Seq())))(initContext)
+    // one SubFeed per output: the DataFrame output and the MLflow DataObject
+    assert(result.map(_.dataObjectId.id) == Seq("tgt", "mlflow-test"))
+    assert(result.head.isInstanceOf[SparkSubFeed])
+    assert(result.last.asInstanceOf[ParameterSubFeed].parameters.isEmpty)
+    assert(mlflow.getLastRunInfo.isEmpty)
+  }
+
+  test("MLflowTrainAction without a DataFrame output has the MLflow DataObject as main output") {
+    val mlflow = registerMlflow()
+    val input = registerInput()
+    val action = MLflowTrainAction(ActionId("train"), input.id, mlflow.id, "m", pythonModelCode = Some("pass"))
+    assert(action.dataFrameOutputs.isEmpty)
+    assert(action.mainOutput.id == mlflow.id)
+  }
+
+  test("MLflowTrainAction rejects transformers without a DataFrame output") {
+    val mlflow = registerMlflow()
+    registerInput()
+    val ex = intercept[ConfigurationException](
+      MLflowTrainAction(ActionId("train"), DataObjectId("src"), mlflow.id, "m", pythonModelCode = Some("pass"),
+        transformers = Seq(SQLDfsTransformer(code = Map("tgt" -> "select * from src")))))
+    assert(ex.getMessage.contains("transformers need outputId"))
+  }
+
+  test("MLflowPredictAction supports an execution mode and expectations") {
+    val mlflow = registerMlflow()
+    val input = registerInput()
+    val output = MockSparkDataObject(DataObjectId("tgt"))
+    instanceRegistry.register(output)
+    val action = MLflowPredictAction(ActionId("predict"), input.id, mlflow.id, output.id,
+      modelName = Some("m"), modelAlias = Some("champion"),
+      executionMode = Some(ProcessAllMode()),
+      expectations = Seq(TransferRateExpectation(expectation = Some("= 1"))))
+    assert(action.executionMode.contains(ProcessAllMode()))
+    assert(action.expectations.map(_.name) == Seq("pctTransfer"))
+    // the MLflow DataObject is an additional input, so it is not a DataFrame input
+    assert(action.dataFrameInputs.map(_.id.id) == Seq("src"))
+    assert(action.additionalInputs.map(_.id.id) == Seq("mlflow-test"))
+    assert(action.getMainInput.id == input.id)
+  }
+
+  test("MLflowPredictAction applies transformers before the model") {
+    val mlflow = registerMlflow()
+    val input = registerInput()
+    val output = MockSparkDataObject(DataObjectId("tgt"))
+    instanceRegistry.register(output)
+    val action = MLflowPredictAction(ActionId("predict"), input.id, mlflow.id, output.id,
+      modelName = Some("m"), modelAlias = Some("champion"), predictionColumn = "price_pred",
+      transformers = Seq(SQLDfTransformer(code = Some("select nights from %{inputViewName}"))))
+    val initContext = context.copy(phase = ExecutionPhase.Init)
+    val result = action.init(Seq(InitSubFeed(input.id, Seq()), InitSubFeed(mlflow.id, Seq())))(initContext)
+    val schema = result.head.asInstanceOf[SparkSubFeed].schemaOpt.get.asInstanceOf[SparkSchema].inner
+    // the transformer dropped reviews_per_month, then the prediction column was added
+    assert(schema.fieldNames.toSeq == Seq("nights", "price_pred"))
+  }
+
+  test("a DataObject can not be a DataFrame input and an additional input at the same time") {
+    val mlflow = registerMlflow()
+    val input = registerInput()
+    val output = MockSparkDataObject(DataObjectId("tgt"))
+    instanceRegistry.register(output)
+    // the MLflow DataObject can not create a DataFrame, so using it as inputId must be reported
+    // Note: the generic type of getInputDataObject is erased, so this is only caught by validateConfig
+    val ex = intercept[AssertionError](
+      MLflowPredictAction(ActionId("predict"), mlflow.id, mlflow.id, output.id, modelName = Some("m"), modelAlias = Some("champion")))
+    assert(ex.getMessage.contains("must not be listed as DataFrame input and additional input"))
   }
 }

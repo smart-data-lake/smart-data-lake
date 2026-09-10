@@ -113,8 +113,6 @@ abstract class UpsertActionImpl extends DataFrameOneToOneActionImpl {
     implicit val registry: InstanceRegistry = instanceRegistry
     getOutputDataObject[TransactionalTableDataObject](outputId)
   }
-  override lazy val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
-  override lazy val outputs: Seq[TransactionalTableDataObject] = Seq(output)
 
   override def saveModeOptions: Option[SaveModeOptions] = { // force SDLSaveMode.Merge
     assert(
