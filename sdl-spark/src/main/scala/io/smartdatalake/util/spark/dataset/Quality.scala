@@ -21,6 +21,8 @@ package io.smartdatalake.util.spark.dataset
 import io.smartdatalake.util.LogUtils.{debLogFun, debugLog}
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.NamedExpression
+import org.apache.spark.sql.catalyst.expressions.objects.AssertNotNull
+import org.apache.spark.sql.classic.SdlColumnExpression
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
@@ -50,6 +52,29 @@ trait Quality extends Transform {
     // the comment must be attached to the given column: re-resolving colName against the input DataFrame drops the
     // expression, failing with UNRESOLVED_COLUMN or - if that name already exists in the input - returning its value
     withComment(colName.split('.').last, column, commentText)
+  }
+
+  implicit class DsColComment(column: Column) {
+
+    /**
+     * Fluent alternative to withComment(column, commentText): col("abc").withComment("my description")
+     */
+    def withComment(commentText: String): Column = Quality.this.withComment(column, commentText)
+
+    /**
+     * Marks this column as not-nullable. The check is enforced at runtime: an actual null value in the
+     * underlying data throws a NullPointerException.
+     */
+    def makeNotNullable: Column = {
+      import org.apache.spark.sql.classic.ColumnConversions._
+      // Spark 4 has no public way to build a Column from a catalyst Expression, see SdlColumnExpression
+      val expr = column.expr
+      val asserted = SdlColumnExpression.toColumn(AssertNotNull(expr))
+      expr match {
+        case named: NamedExpression => asserted.as(named.name)
+        case _                      => asserted
+      }
+    }
   }
 
   /**
