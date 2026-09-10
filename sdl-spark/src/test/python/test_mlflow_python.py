@@ -156,8 +156,8 @@ def build_mlflow(existing_experiment=None):
     def get_experiment_by_name(name):
         return FakeExperiment(existing_experiment) if existing_experiment else None
 
-    def create_experiment(name):
-        mlflow.created.append(name)
+    def create_experiment(name, artifact_location=None):
+        mlflow.created.append((name, artifact_location))
         return "42"
 
     def register_model(model_uri, name):
@@ -188,11 +188,17 @@ OPTIONS = {"trackingUri": "http://localhost:5000", "experimentName": "test-exper
 # --- experiment is created when it does not exist, reused otherwise
 env, mlflow, _ = run_prelude(OPTIONS)
 check("experiment created when missing", env["_sdlb_get_or_create_experiment"]("test-experiment") == "42")
-check("create_experiment called", mlflow.created == ["test-experiment"])
+check("create_experiment called", mlflow.created == [("test-experiment", None)])
 
 env, mlflow, _ = run_prelude(OPTIONS, existing_experiment="13")
 check("existing experiment reused", env["_sdlb_get_or_create_experiment"]("test-experiment") == "13")
 check("create_experiment not called", mlflow.created == [])
+
+# --- artifactLocation is passed on when the experiment is created
+env, mlflow, _ = run_prelude(dict(OPTIONS, artifactLocation="file:///tmp/artifacts"))
+env["_sdlb_get_or_create_experiment"]("test-experiment")
+check("artifactLocation passed to create_experiment",
+      mlflow.created == [("test-experiment", "file:///tmp/artifacts")])
 
 # --- run info collected from the MLflow 2 log-model history tag
 env, _, _ = run_prelude(OPTIONS)
