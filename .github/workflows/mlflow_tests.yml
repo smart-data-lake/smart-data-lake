@@ -1,0 +1,47 @@
+name: MLflow Tests
+
+# The MLflow Actions and the Python transformers need a Python environment, which the Snapshot Build does not have,
+# so their tests cancel themselves there. This workflow creates the environment with uv and runs them.
+# It is separate from the Snapshot Build, so it neither makes that build longer nor gates the snapshot deploy.
+# It has to be started manually on demand.
+on:
+  # allow running it manually
+  workflow_dispatch:
+
+jobs:
+  mlflow-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 17
+      - name: Extract Spark version from pom.xml
+        id: get_spark_version
+        run: |
+          SPARK_VERSION=$(grep -oPm1 '(?<=<spark.version>)[^<]+' pom.xml)
+          echo "spark_version=$SPARK_VERSION" >> $GITHUB_OUTPUT
+      - name: Cache Maven
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+          cache-dependency-glob: sdl-spark/uv.lock
+      - name: Create the Python environment of sdl-spark
+        # --frozen fails instead of re-resolving, so a new mlflow release cannot break the build without a commit
+        run: |
+          uv sync --frozen --project sdl-spark
+          echo "PYSPARK_PYTHON=$PWD/sdl-spark/.venv/bin/python" >> $GITHUB_ENV
+      - name: Run the MLflow and Python transformation tests
+        # license headers are already checked by the Snapshot Build
+        run: |
+          mvn -B -ntp -Daether.dependencyCollector.impl=bf install -pl sdl-core,sdl-spark -am -DskipTests -Dlicense.skip=true
+          mvn -B -ntp test -pl sdl-spark -Dlicense.skip=true -Dsuites='io.smartdatalake.workflow.action.mlflow.MLflowEndToEndTest,io.smartdatalake.workflow.action.mlflow.MLflowActionTest,io.smartdatalake.util.mlflow.MLflowPythonCodeTest,io.smartdatalake.workflow.action.spark.transformer.PythonDynamicTransformTest'

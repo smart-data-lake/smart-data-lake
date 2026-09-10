@@ -331,8 +331,7 @@ transformers = [{
 }]
 ```
 
-PySpark is initialized automatically and the PySpark session is available under the variables
-`sc` and `session`.
+PySpark is initialized automatically and the PySpark session is available under the variable `session`.
 Some additional variables are also available:
 * `inputDf`: Input DataFrame
 * `dataObjectId`: Id of input DataObject as string
@@ -356,8 +355,7 @@ In this case, `inputDfs` is a dictionary (dict) and `setOutputDf` expects a dict
 ##### Requirements
 Running Python transformations needs some additional setup. 
 In general, Python >= 3.10 is required and PySpark package needs to be installed with a version matching your SDL spark version. 
-Further environment variable PYTHONPATH needs to be set to your python environment `.../Lib/site-packages` directory, 
-and pyspark command needs to be accessible from the PATH environment variable.
+Further environment variable PYSPARK_PYTHON needs to be set to the python executable of the corresponding python environment to be used.
 
 
 ### Options / RuntimeOptions
@@ -366,8 +364,7 @@ Code written can probably only be used for one specific action.
 
 For custom transformers, you can therefore provide additional options:
 * `options`: static options provided in your HOCON configuration
-* `runtimeOptions`: extracted at runtime from the context. 
-
+* `runtimeOptions`: extracted at runtime from the context.
 
 
 ##### In SQL

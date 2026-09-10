@@ -4,7 +4,6 @@ lib
 target
 venv
 .venv
-uv.lock
 __pycache__/
 # local MLflow tracking server state, see docs/docs/reference/actions/mlflow.md
 mlruns/
