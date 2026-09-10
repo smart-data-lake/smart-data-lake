@@ -28,7 +28,7 @@ package io.smartdatalake.util.mlflow
  * The only exception is the user's model code, which [[MLflowPythonUtil.train]] appends to [[trainPreludeCode]].
  *
  * The code assumes the variables provided by [[io.smartdatalake.util.spark.PythonUtil]]'s init code, namely `gateway`,
- * `entryPoint`, `session`, `sqlContext`, `options` and `DataFrame`.
+ * `entryPoint`, `session`, `options` and `DataFrame`.
  */
 private[smartdatalake] object MLflowPythonCode {
 
@@ -134,7 +134,7 @@ private[smartdatalake] object MLflowPythonCode {
       |    print('MLflow: could not disable spark autolog ({}), continuing'.format(e))
       |mlflow.autolog()
       |# the training DataFrame provided by SDLB
-      |df = DataFrame(entryPoint.getInputDf(), sqlContext)
+      |df = DataFrame(entryPoint.getInputDf(), session)
       |mlflow.start_run()
       |run = mlflow.active_run()
       |print('MLflow: run started (run_id={})'.format(run.info.run_id))
@@ -169,7 +169,7 @@ private[smartdatalake] object MLflowPythonCode {
       |print('MLflow: loading model {}'.format(model_uri))
       |predict_udf = mlflow.pyfunc.spark_udf(session, model_uri=model_uri, result_type=options['resultType'],
       |                                      env_manager=options['envManager'])
-      |df = DataFrame(entryPoint.getInputDf(), sqlContext)
+      |df = DataFrame(entryPoint.getInputDf(), session)
       |df_predict = df.withColumn(options['predictionColumn'], predict_udf(struct(*[col(c) for c in feature_columns])))
       |# The model is downloaded into a temporary directory which python removes in an atexit hook. The DataFrame is
       |# only evaluated later in the JVM, so that directory has to survive this python process.

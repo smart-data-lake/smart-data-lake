@@ -332,7 +332,7 @@ transformers = [{
 ```
 
 PySpark is initialized automatically and the PySpark session is available under the variables
-`sc`, `session` or `sqlContext`. 
+`sc` and `session`.
 Some additional variables are also available:
 * `inputDf`: Input DataFrame
 * `dataObjectId`: Id of input DataObject as string

@@ -34,7 +34,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 /**
  * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Python/PySpark code.
  * Note that this transformer needs a Python and PySpark environment installed.
- * PySpark session is initialize and available under variables `sc`, `session`, `sqlContext`.
+ * PySpark session is initialized and available under the variables `sc` and `session`.
  * Other variables available are
  * - `inputDf`: Input DataFrame
  * - `options`: Transformation options as Map[String,String]
@@ -101,7 +101,7 @@ case class PythonCodeDfTransformer(override val name: String = "pythonSparkTrans
       val additionalInitCode =
         """
           |# prepare input parameters
-          |inputDf = DataFrame(entryPoint.getInputDf(), sqlContext) # convert input dataframe to pyspark
+          |inputDf = DataFrame(entryPoint.getInputDf(), session) # convert input dataframe to pyspark
           |dataObjectId = entryPoint.getDataObjectId()
           |# helper function to return output dataframe
           |def setOutputDf( df ):
