@@ -58,7 +58,8 @@ private[smartdatalake] object MLflowPythonCode {
       |    experiment = mlflow.get_experiment_by_name(name)
       |    if experiment is not None:
       |        return experiment.experiment_id
-      |    return mlflow.create_experiment(name)
+      |    # without an explicit location MLflow puts artifacts in ./mlruns relative to the working directory
+      |    return mlflow.create_experiment(name, artifact_location=options.get('artifactLocation') or None)
       |
       |def _sdlb_model_info(run):
       |    '''Return (artifact_path, model_uri) of the model logged by the given run.'''

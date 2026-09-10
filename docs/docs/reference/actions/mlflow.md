@@ -28,7 +28,17 @@ Action in the DAG.
   activate the environment before running SDLB.
 * MLflow **2.9 or newer** - the Actions address models by alias, and MLflow *stages* are deprecated since 2.9 and
   removed in MLflow 3
-* a reachable MLflow tracking server, e.g. started with `mlflow server --host 127.0.0.1 --port 5000`
+* somewhere for MLflow to keep its data. Either a tracking server, e.g. `mlflow server --host 127.0.0.1 --port 5000`,
+  or - with no server at all - a local database, which is what `MLflowEndToEndTest` uses:
+
+  ```
+  trackingUri = "sqlite:///path/to/mlflow.db"
+  artifactLocation = "file:///path/to/artifacts"
+  ```
+
+  Set `artifactLocation` with a database backend, otherwise MLflow puts the artifacts in `./mlruns` relative to the
+  working directory. MLflow's file backend (`./mlruns` as `trackingUri`) is **not** an option: since MLflow 3 it
+  raises unless `MLFLOW_ALLOW_FILE_STORE=true` is set, and MLflow recommends a database backend instead.
 
 These Actions run on the classic Spark engine only. `mlflow.pyfunc.spark_udf` needs a Spark session inside the SDLB
 process, so they cannot be used with Spark Connect or Snowpark.

@@ -27,39 +27,50 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, InitSub
 import org.apache.spark.sql.SparkSession
 import org.scalatest.funsuite.AnyFunSuite
 
-import java.net.{HttpURLConnection, URI}
+import java.nio.file.{Files, Paths}
 import scala.sys.process._
 import scala.util.Try
 
 /**
- * Trains a model and applies it, against a real MLflow instance.
+ * Trains a model and applies it, against a real MLflow.
  *
- * This test is skipped unless all of the following are available, as none of them is needed to build SDLB:
- * - a python interpreter with `mlflow` and `scikit-learn` installed
- * - a reachable MLflow tracking server
+ * No MLflow server is needed: the test points MLflow at a SQLite database and an artifact directory below `target`.
+ * MLflow's SQLAlchemy backend keeps the experiment, the runs and the model registry there, and `spark_udf` reads the
+ * artifacts from the local filesystem. Everything is real except the server - the MLflow client, `mlflow.autolog()`,
+ * the registered model with its alias, and `mlflow.pyfunc.spark_udf` loading the model back.
  *
- * To run it locally:
- * Console 1: start MLflow server
+ * Note that MLflow's file backend (`./mlruns`) is not usable here: since MLflow 3 it raises unless
+ * `MLFLOW_ALLOW_FILE_STORE=true` is set, and MLflow recommends a database backend instead.
+ *
+ * The test is skipped unless a python interpreter with `mlflow` and `scikit-learn` is available, as no part of the
+ * build needs python. To run it locally:
  * {{{
- *   cd sdl-spark && uv sync
- *   source .venv/bin/activate
- *   mlflow server --host 127.0.0.1 --port 5000
- * }}}
- * Console 2: start SDLB tests
- * {{{
+ *   cd sdl-spark && uv sync && cd ..
  *   export PYSPARK_PYTHON=$PWD/sdl-spark/.venv/bin/python
- *   cd ..
- *   mvn -B install -pl sdl-spark -am
- *   mvn -B test -pl sdl-spark -Dsuites=io.smartdatalake.workflow.action.mlflow.MLflowEndToEndTest
+ *   mvn -B install -pl sdl-spark -am -DskipTests -Dlicense.skip=true
+ *   mvn -B test -pl sdl-spark -Dlicense.skip=true -Dsuites=io.smartdatalake.workflow.action.mlflow.MLflowEndToEndTest
  * }}}
- * Set the environment variable MLFLOW_TRACKING_URI to use a different server.
+ * Set the environment variable MLFLOW_TRACKING_URI to run against a tracking server instead, e.g. to inspect the
+ * result in the MLflow UI: `mlflow server --host 127.0.0.1 --port 5000`.
  */
 class MLflowEndToEndTest extends AnyFunSuite {
 
   protected implicit val session: SparkSession = SparkTestUtil.session
   import session.implicits._
 
-  private val trackingUri = sys.env.getOrElse("MLFLOW_TRACKING_URI", "http://localhost:5000")
+  /** a fresh directory below target, holding the SQLite tracking database and the artifacts of this run */
+  private lazy val mlflowDir = Files.createTempDirectory(Paths.get("target"), "mlflow-").toAbsolutePath
+
+  /**
+   * A tracking server if one is configured, otherwise a local SQLite database needing no server at all. The
+   * SQLAlchemy backend implements the model registry including aliases, which the file backend of MLflow 2 did.
+   */
+  private lazy val trackingUri: String =
+    sys.env.getOrElse("MLFLOW_TRACKING_URI", s"sqlite:///${mlflowDir.resolve("mlflow.db")}")
+
+  /** artifacts default to ./mlruns relative to the working directory, keep them with the database instead */
+  private lazy val artifactLocation: Option[String] =
+    if (sys.env.contains("MLFLOW_TRACKING_URI")) None else Some(mlflowDir.resolve("artifacts").toUri.toString)
 
   private def pythonCmd: Option[String] = sys.env.get("PYSPARK_PYTHON")
     .orElse(sys.env.get("PYSPARK_DRIVER_PYTHON"))
@@ -68,25 +79,18 @@ class MLflowEndToEndTest extends AnyFunSuite {
   private def hasPythonModules(cmd: String, modules: String*): Boolean =
     Try(Seq(cmd, "-c", modules.map("import " + _).mkString("; ")).! == 0).getOrElse(false)
 
-  private def isTrackingServerReachable: Boolean = Try {
-    val connection = URI.create(s"$trackingUri/health").toURL.openConnection().asInstanceOf[HttpURLConnection]
-    connection.setConnectTimeout(2000)
-    connection.setReadTimeout(2000)
-    try connection.getResponseCode == 200 finally connection.disconnect()
-  }.getOrElse(false)
-
   test("train a model and apply it") {
     val python = pythonCmd
     assume(python.isDefined, "no Python interpreter found")
     assume(hasPythonModules(python.get, "mlflow", "sklearn"), "python modules mlflow and scikit-learn are needed")
-    assume(isTrackingServerReachable, s"no MLflow tracking server reachable at $trackingUri")
 
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     implicit val context: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
 
     val experimentName = s"sdlb-test-${System.currentTimeMillis()}"
     val modelName = s"sdlb-test-model-${System.currentTimeMillis()}"
-    val mlflow = MLflowDataObject(DataObjectId("mlflow-test"), experimentName = experimentName, trackingUri = trackingUri)
+    val mlflow = MLflowDataObject(DataObjectId("mlflow-test"), experimentName = experimentName,
+      trackingUri = trackingUri, artifactLocation = artifactLocation)
     val input = MockSparkDataObject(DataObjectId("src"))
     val output = MockSparkDataObject(DataObjectId("tgt"))
     Seq(mlflow, input, output).foreach(instanceRegistry.register)

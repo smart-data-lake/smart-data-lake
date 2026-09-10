@@ -56,6 +56,9 @@ import io.smartdatalake.workflow.dataobject.generic.CanReceiveParameterNotificat
  * @param trackingUri     Uri of the MLflow tracking server. Default is http://localhost:5000.
  * @param registryUri     Optional Uri of the MLflow model registry, if it is not the tracking server.
  * @param experimentName  Name of the experiment in MLflow. It is created if it does not exist yet.
+ * @param artifactLocation Optional location where MLflow stores the artifacts of the experiment, e.g. the trained
+ *                        models. Only used when the experiment is created. Without it MLflow uses its own default,
+ *                        which for a database backend is `./mlruns` relative to the working directory.
  * @param envManager      How MLflow restores the model's environment when applying it, one of `local`, `virtualenv`
  *                        or `conda`. With `local` the environment running SDLB must already satisfy the model's
  *                        requirements, with the other two MLflow builds an environment on every executor.
@@ -65,6 +68,7 @@ case class MLflowDataObject(override val id: DataObjectId,
                             experimentName: String,
                             trackingUri: String = "http://localhost:5000",
                             registryUri: Option[String] = None,
+                            artifactLocation: Option[String] = None,
                             envManager: String = "local",
                             override val metadata: Option[DataObjectMetadata] = None
                            )(@transient implicit val instanceRegistry: InstanceRegistry)
@@ -105,7 +109,7 @@ case class MLflowDataObject(override val id: DataObjectId,
     "trackingUri" -> trackingUri,
     "experimentName" -> experimentName,
     "envManager" -> envManager
-  ) ++ registryUri.map("registryUri" -> _)
+  ) ++ registryUri.map("registryUri" -> _) ++ artifactLocation.map("artifactLocation" -> _)
 
   private[smartdatalake] def getPythonUtil(implicit context: ActionPipelineContext): MLflowPythonUtil =
     MLflowPythonUtil(id, SparkSubFeed.getSparkSession, pythonOptions)
