@@ -46,7 +46,6 @@ private[smartdatalake] object PythonUtil {
       |from pyspark.context import SparkContext
       |from pyspark.conf import SparkConf
       |from pyspark.sql.session import SparkSession
-      |from pyspark.sql import SQLContext
       |from pyspark.sql import DataFrame
       |
       |# Initialize python spark session from java spark context.
@@ -57,9 +56,8 @@ private[smartdatalake] object PythonUtil {
       |sparkConf = SparkConf(_jvm=gateway.jvm, _jconf=javaSparkContext.getConf())
       |sc = SparkContext(conf=sparkConf, gateway=gateway, jsc=javaSparkContext)
       |session = SparkSession(sc, entryPoint.session())
-      |sqlContext = SQLContext(sc, session, entryPoint.getSQLContext())
       |options = entryPoint.getOptions()
-      |print("python spark session initialized (sc, session, sqlContext)")
+      |print("python spark session initialized (sc, session)")
       |# Unregister python accumulator to avoid "java.net.ConnectException: Connection refused: connect" by PythonAccumulatorV2
       |# This happens as we call python from java and not java from python as it would be normal with pyspark.
       |# Our python server accumulator update server is already closed when the accumulator wants to send its updates to python.

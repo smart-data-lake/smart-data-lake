@@ -36,7 +36,7 @@ import scala.jdk.CollectionConverters._
 /**
  * Configuration of a custom Spark-DataFrame transformation between many inputs and many outputs (n:m) as Python/PySpark code.
  * Note that this transformer needs a Python and PySpark environment installed.
- * PySpark session is initialize and available under variables `sc`, `session`, `sqlContext`.
+ * PySpark session is initialized and available under the variables `sc` and `session`.
  * Other variables available are
  * - `inputDfs`: Input DataFrames
  * - `options`: Transformation options as Map[String,String]
@@ -116,7 +116,7 @@ case class PythonCodeDfsTransformer(
           |# prepare input parameters
           |inputDfs = {}
           |for k,v in entryPoint.getInputDfs().items():
-          |    inputDfs[k] = DataFrame(v, sqlContext) # convert input dataframe to pyspark
+          |    inputDfs[k] = DataFrame(v, session) # convert input dataframe to pyspark
           |# helper function to return output dataframe
           |outputDfs = gateway.jvm.java.util.HashMap()
           |def setOutputDfs(dict):
