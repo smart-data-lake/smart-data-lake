@@ -14,8 +14,18 @@ Action in the DAG.
 
 ## Prerequisites
 
-* a python environment reachable from the SDLB process, with `mlflow` installed (`pip install mlflow`), plus whatever
-  your model code needs, e.g. `scikit-learn`
+* a python environment reachable from the SDLB process, with `mlflow` installed, plus whatever your model code
+  needs, e.g. `scikit-learn`. SDLB ships one as `sdl-spark/pyproject.toml`, to be created with
+  [uv](https://docs.astral.sh/uv):
+
+  ```bash
+  cd sdl-spark && uv sync
+  export PYSPARK_PYTHON=$PWD/.venv/bin/python
+  ```
+
+  SDLB starts the interpreter itself, through Spark's `PythonRunner`, which takes it from `PYSPARK_DRIVER_PYTHON`
+  or `PYSPARK_PYTHON` and otherwise falls back to `python3` on the `PATH`. So either export that variable or
+  activate the environment before running SDLB.
 * MLflow **2.9 or newer** - the Actions address models by alias, and MLflow *stages* are deprecated since 2.9 and
   removed in MLflow 3
 * a reachable MLflow tracking server, e.g. started with `mlflow server --host 127.0.0.1 --port 5000`
@@ -123,8 +133,48 @@ The model is not loaded in Init phase, so a dry-run neither contacts MLflow nor 
 `envManager` on the MLflowDataObject decides how MLflow restores the environment the model was trained in:
 
 * `local` (default) - the environment running SDLB must already satisfy the model's requirements. Fast, and the right
-  choice when SDLB runs in a container built for the model.
-* `virtualenv` / `conda` - MLflow builds an environment on every executor. Safer across environments, but slow.
+  choice when the model was trained by an MLflowTrainAction in the same pipeline, or when SDLB runs in a container
+  built for the model.
+* `virtualenv` / `conda` - MLflow builds an environment on every executor. Use it when the model was trained
+  somewhere else, e.g. in a data scientist's notebook, and you cannot guarantee that the environment running SDLB
+  matches. It is considerably slower.
+
+`local` is also MLflow's own default for `spark_udf`, and it makes MLflow log this warning on every prediction:
+
+```
+WARNING mlflow.pyfunc: Calling `spark_udf()` with `env_manager="local"` does not recreate the same environment
+that was used during training, which may lead to errors or inaccurate predictions. ...
+```
+
+It is unconditional and says nothing about your model. What *does* say something is that MLflow compares the model's
+pip requirements against the current environment just before it, and logs a second, specific warning per mismatched
+package. If you see only the generic warning above and no mismatch warnings, the environment satisfies the model and
+`local` is doing its job. Switch to `virtualenv` if mismatches are reported.
+
+### Serialization of the model
+
+`mlflow.autolog()` stores scikit-learn models with `cloudpickle`, which makes MLflow log:
+
+```
+WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution
+because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during
+deserialization. The recommended safe alternative is the 'skops' format. ...
+```
+
+This is autolog's default, not a choice of SDLB. Note what it implies for MLflowPredictAction: loading a pickled
+model **executes code from the model artifact**, on the driver and on every Spark executor. The MLflow tracking
+server and model registry are therefore part of your trust boundary - only apply models from a registry you control.
+
+To store a model in the safer `skops` format instead, override autolog or log the model explicitly in your
+`pythonModelCode`, which runs after SDLB has called `mlflow.autolog()`:
+
+```python
+import mlflow.sklearn
+mlflow.sklearn.autolog(serialization_format="skops")
+```
+
+Note that `skops` cannot serialize custom functions or classes that are not defined at the top level; MLflow raises
+an explicit error in that case, and cloudpickle remains the fallback.
 
 ## Limitations
 
