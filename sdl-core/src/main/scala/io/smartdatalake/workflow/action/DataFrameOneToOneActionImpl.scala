@@ -40,6 +40,11 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
    */
   def output: DataObject with CanWriteDataFrame
 
+  // A 1:1 Action has exactly one DataFrame input and output, so they need not be declared by subclasses.
+  // Note: these must be lazy, as input & output are lazy in some subclasses.
+  override lazy val dataFrameInputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
+  override lazy val dataFrameOutputs: Seq[DataObject with CanWriteDataFrame] = Seq(output)
+
   /**
    * SubFeed types of DataFrame transformers to apply with this action
    * Override by subclasses if there are transformers.
@@ -77,11 +82,14 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
   }
 
   override final def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
-    assert(inputSubFeeds.size == 1, s"($id) Only one inputSubFeed allowed")
-    assert(outputSubFeeds.size == 1, s"($id) Only one outputSubFeed allowed")
+    // Note: the SubFeeds of additional inputs & outputs are filtered out, only the DataFrame ones are 1:1.
+    val dataFrameInputSubFeeds = inputSubFeeds.filter(subFeed => dataFrameInputs.exists(_.id == subFeed.dataObjectId))
+    val dataFrameOutputSubFeeds = outputSubFeeds.filter(subFeed => dataFrameOutputs.exists(_.id == subFeed.dataObjectId))
+    assert(dataFrameInputSubFeeds.size == 1, s"($id) Only one inputSubFeed allowed")
+    assert(dataFrameOutputSubFeeds.size == 1, s"($id) Only one outputSubFeed allowed")
     if (isAsynchronousProcessStarted) return
     super.postExec(inputSubFeeds, outputSubFeeds)
-    postExecSubFeed(inputSubFeeds.head, outputSubFeeds.head)
+    postExecSubFeed(dataFrameInputSubFeeds.head, dataFrameOutputSubFeeds.head)
   }
 
   /**

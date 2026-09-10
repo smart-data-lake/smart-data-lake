@@ -8,9 +8,15 @@ MLflowTrainAction and MLflowPredictAction train a machine learning model and app
 Both talk to MLflow through python, so no model artifact is ever stored by SDLB itself.
 
 The two Actions share an **MLflowDataObject**, which holds the connection information and names the MLflow experiment.
-The training Action writes the information about its run into that DataObject and passes it on as a
-[ParameterSubFeed](../executionEngines), which also makes the prediction Action depend on the training
-Action in the DAG.
+The training Action names it as `outputMlflowId` and writes the information about its run into it, the prediction
+Action names it as `inputMlflowId` and reads the model from it. That shared DataObject is what makes the prediction
+Action depend on the training Action in the DAG.
+
+Both are regular [DataFrame Actions](../executionEngines): their data side is a SparkSubFeed like any other Action,
+and the MLflowDataObject is connected as an *additional* input respectively output which carries no DataFrame but
+the key/values about the run as a [ParameterSubFeed](../executionEngines). They therefore support
+[execution modes](../executionModes), [expectations](../dataQuality), save mode options, DataFrame caching and
+transformers just like a CopyAction.
 
 ## Prerequisites
 
@@ -62,7 +68,7 @@ actions {
   train-price-model {
     type = MLflowTrainAction
     inputId = int-listings
-    mlflowId = mlflow-price-model
+    outputMlflowId = mlflow-price-model
     modelName = "price-regressor"
     registerModel = true
     modelAlias = "champion"
@@ -76,7 +82,7 @@ actions {
   predict-price {
     type = MLflowPredictAction
     inputId = int-listings
-    mlflowId = mlflow-price-model
+    inputMlflowId = mlflow-price-model
     outputId = int-listings-predicted
     modelName = "price-regressor"
     modelAlias = "champion"
@@ -95,7 +101,12 @@ Use `pythonModelFile` instead of `pythonModelCode` to keep the model code in its
 With `registerModel = true` the logged model is registered in the MLflow model registry under `modelName`, and
 `modelAlias` sets an alias such as `champion` on the newly created version.
 
-Nothing is executed in Init phase, so a [dry-run](../commandLine) creates no MLflow runs.
+No model is trained in Init phase, so a [dry-run](../commandLine) creates no MLflow runs.
+
+`outputId` is optional. Configure it to write the training data on to a DataObject, which makes the Action behave
+like a CopyAction that also trains a model - useful to keep the exact data a model was trained on, and needed if you
+want to apply `transformers` to prepare the features. Without it the Action only trains, and the MLflowDataObject is
+its only output.
 
 :::caution
 `mlflow.spark.autolog` is disabled, because a model logged through it cannot call back into py4j from a Spark session
@@ -127,6 +138,8 @@ result is written to `outputId`.
 
 By default all columns of the input are passed to the model. Set `featureColumns` to select and order them explicitly,
 which is normally what you want once the input carries more than the model's features.
+
+`transformers` are applied to the input before the model, so the features can be prepared in the same Action.
 
 The model to apply is resolved in this order:
 
@@ -188,11 +201,14 @@ an explicit error in that case, and cloudpickle remains the fallback.
 
 ## Limitations
 
-Both Actions connect a Spark DataFrame to an MLflow experiment, so their input and output SubFeeds have different
-types. They are therefore not DataFrame Actions and support neither
-[execution modes](../executionModes), [expectations](../dataQuality), save mode options, DataFrame caching nor
-[simulation runs](../testing). Write the predictions to a DataObject and continue with a CopyAction if you need any of
-those.
+Neither Action supports [simulation runs](../testing): a simulation must not train a model or execute python.
+
+MLflowTrainAction without an `outputId` has no DataFrame output, so the MLflowDataObject becomes its main output.
+Execution modes which compare the main input against the main output - `PartitionDiffMode`, `DataFrameIncrementalMode` -
+then have nothing to compare against and need `alternativeOutputId` to point at a real DataObject. Configuring
+`outputId` avoids this.
+
+Streaming execution modes are not supported, as the python model code and `spark_udf` need a batch DataFrame.
 
 A model applied with `spark_udf` is downloaded into a temporary directory which has to survive the python process, as
 the DataFrame is only evaluated later in the JVM. These directories are not cleaned up automatically; remove them

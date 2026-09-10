@@ -18,39 +18,45 @@
  */
 package io.smartdatalake.workflow.action.mlflow
 
-import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.mlflow.MLflowPythonUtil
-import io.smartdatalake.workflow.SubFeed
-import io.smartdatalake.workflow.action.{Action, ActionHelper, NoDataToProcessWarning}
-import io.smartdatalake.workflow.action.executionMode.ExecutionMode
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{DataObject, MLflowDataObject}
-import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.action.DataFrameActionImpl
+import io.smartdatalake.workflow.action.executionMode.DataFrameStreamingExecutionMode
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.MLflowDataObject
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.DataFrame
+
+import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
  * Common implementation of the MLflow Actions.
  *
- * These Actions implement [[Action]] directly instead of extending [[io.smartdatalake.workflow.action.ActionSubFeedsImpl]],
- * because they mix SubFeed types: their data input and output are SparkSubFeeds, while the
- * [[MLflowDataObject]] is connected through a [[io.smartdatalake.workflow.ParameterSubFeed]].
- * [[io.smartdatalake.workflow.action.ActionSubFeedsImpl]] is parameterized on a single SubFeed type and converts
- * every input to it, which would drop the DataFrame.
+ * The [[MLflowDataObject]] is connected as an additional input or output of a DataFrame Action, see
+ * [[DataFrameActionImpl.additionalInputs]] and [[DataFrameActionImpl.additionalOutputs]]: it transports no
+ * DataFrame, but the key/values about the MLflow run as a [[io.smartdatalake.workflow.ParameterSubFeed]].
+ * Everything else - execution modes, expectations, save mode options, DataFrame caching, transformers - is
+ * inherited from the DataFrame Action implementation.
  *
- * Consequently these Actions support neither execution modes, expectations, save mode options, DataFrame caching
- * nor simulation runs. Write the result to a DataObject and continue with a CopyAction if you need those.
+ * These Actions run on the classic Spark engine only: MLflow is driven through python, which needs a Spark session
+ * inside the SDLB process, so neither Spark Connect nor Snowpark can be used.
  */
-private[smartdatalake] abstract class MLflowActionImpl extends Action {
+private[smartdatalake] trait MLflowActionImpl extends DataFrameActionImpl {
 
   /**
    * The MLflow DataObject holding the connection information.
    */
   def mlflow: MLflowDataObject
 
-  override val executionMode: Option[ExecutionMode] = None // execution modes are not supported
-  override val metricsFailCondition: Option[String] = None // no metrics to check so far
+  // `mlflow.pyfunc.spark_udf` and the python model code need a Spark session inside the SDLB process,
+  // so the classic Spark engine is the only option, regardless of the configured transformers.
+  override lazy val transformerSubFeedType: Option[Type] = Some(typeOf[SparkSubFeed])
+
+  override def validateConfig(): Unit = {
+    super.validateConfig()
+    // the python model code and spark_udf work on a batch DataFrame
+    assert(!executionMode.exists(_.isInstanceOf[DataFrameStreamingExecutionMode]),
+      s"($id) streaming execution modes are not supported, as MLflow needs a batch DataFrame")
+  }
 
   /**
    * Options passed to the generated python code, see [[io.smartdatalake.util.mlflow.MLflowPythonCode]].
@@ -62,45 +68,11 @@ private[smartdatalake] abstract class MLflowActionImpl extends Action {
     MLflowPythonUtil(id, SparkSubFeed.getSparkSession, pythonOptions)
 
   /**
-   * Check that the SubFeeds handed over by the DAG match the input DataObjects of this Action.
+   * Get the Spark DataFrame of a SubFeed.
    */
-  protected def validateInputSubFeeds(subFeeds: Seq[SubFeed]): Unit = {
-    val inputIds = inputs.map(_.id)
-    val superfluous = subFeeds.map(_.dataObjectId).diff(inputIds)
-    val missing = inputIds.diff(subFeeds.map(_.dataObjectId))
-    assert(superfluous.isEmpty && missing.isEmpty, s"($id) input SubFeeds must match input DataObjects: " +
-      s"${if (superfluous.nonEmpty) "superfluous=" + superfluous.mkString(",") + " " else ""}" +
-      s"${if (missing.nonEmpty) "missing=" + missing.mkString(",") else ""}")
-  }
-
-  /**
-   * Make sure a "no data to process" warning carries a skipped SubFeed per output, as the DAG expects a result for
-   * every output DataObject. This is what ActionSubFeedsImpl does for the other Actions.
-   */
-  protected def withSkippedOutputsOnNoData(results: => Seq[SubFeed]): Seq[SubFeed] = {
-    try results
-    catch {
-      case ex: NoDataToProcessWarning if ex.results.isEmpty =>
-        throw ex.copy(results = Some(ActionHelper.createSkippedSubFeeds(outputs)))
-    }
-  }
-
-  protected def getPartitionValues(subFeeds: Seq[SubFeed], dataObjectId: DataObjectId): Seq[PartitionValues] =
-    subFeeds.find(_.dataObjectId == dataObjectId).map(_.partitionValues).getOrElse(Seq())
-
-  /**
-   * Get the DataFrame of an input DataObject.
-   *
-   * It is taken from the incoming SubFeed if that transports one, and read from the DataObject otherwise. Note that
-   * reading it from the DataObject is the normal case: a DataFrame is only passed on between Actions if the
-   * preceding Action has `cacheOutput` enabled.
-   */
-  protected def getInputDataFrame(subFeeds: Seq[SubFeed], input: DataObject with CanCreateSparkDataFrame)
-                                 (implicit context: ActionPipelineContext): DataFrame = {
-    val partitionValues = getPartitionValues(subFeeds, input.id)
-    subFeeds.find(_.dataObjectId == input.id)
-      .map(SparkSubFeed.fromSubFeed)
-      .flatMap(_.dataFrame.map(_.inner))
-      .getOrElse(input.getSparkDataFrame(partitionValues))
+  protected def getSparkDataFrame(subFeed: DataFrameSubFeed): DataFrame = subFeed.dataFrame match {
+    case Some(dataFrame: SparkDataFrame) => dataFrame.inner
+    case Some(dataFrame) => throw new IllegalStateException(s"($id) needs a Spark DataFrame, but ${subFeed.dataObjectId} delivered a ${dataFrame.subFeedType.typeSymbol.name}")
+    case None => throw new IllegalStateException(s"($id) SubFeed of ${subFeed.dataObjectId} has no DataFrame")
   }
 }

@@ -21,13 +21,17 @@ package io.smartdatalake.workflow.action.mlflow
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.Condition
+import io.smartdatalake.definitions.{Condition, SaveModeOptions}
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.mlflow.MLflowRunInfo
-import io.smartdatalake.workflow.action.{Action, ActionMetadata}
+import io.smartdatalake.workflow.action.executionMode.ExecutionMode
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfTransformerDef}
+import io.smartdatalake.workflow.action.{Action, ActionMetadata, DataFrameOneToOneActionImpl}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.expectation.ActionExpectation
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import io.smartdatalake.workflow.dataobject.{DataObject, MLflowDataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.lit
 
@@ -35,7 +39,12 @@ import org.apache.spark.sql.functions.lit
  * [[Action]] to apply a machine learning model tracked by MLflow to a DataFrame.
  *
  * The model is loaded with `mlflow.pyfunc.spark_udf` and applied to the DataFrame of `inputId`, adding the
- * prediction as an additional column. The result is written to `outputId`.
+ * prediction as an additional column. The result is written to `outputId`. Configured `transformers` are applied to
+ * the input before the model.
+ *
+ * The [[MLflowDataObject]] of `inputMlflowId` is an additional input of this DataFrame Action, see
+ * [[io.smartdatalake.workflow.action.DataFrameActionImpl.additionalInputs]]: it delivers no DataFrame, but it holds
+ * the connection to MLflow and creates the dependency on a preceding [[MLflowTrainAction]] in the DAG.
  *
  * The model is addressed by an alias or a version of the registered model `modelName`, or by an explicit `modelUri`.
  * If none of these is given, the model of the latest run of the experiment is used, which is the model just trained
@@ -51,7 +60,7 @@ import org.apache.spark.sql.functions.lit
  *   predict-price {
  *     type = MLflowPredictAction
  *     inputId = int-listings
- *     mlflowId = mlflow-price-model
+ *     inputMlflowId = mlflow-price-model
  *     outputId = int-listings-predicted
  *     modelName = "price-regressor"
  *     modelAlias = "champion"
@@ -61,7 +70,8 @@ import org.apache.spark.sql.functions.lit
  * }}}
  *
  * @param inputId          id of the DataObject with the data to predict on. It must be able to create a Spark DataFrame.
- * @param mlflowId         id of the [[MLflowDataObject]] holding the connection and the experiment
+ * @param inputMlflowId    id of the [[MLflowDataObject]] holding the connection and the experiment. The model of
+ *                         its latest run is applied if no model is configured explicitly.
  * @param outputId         id of the DataObject the predictions are written to
  * @param modelName        name of the registered model in the MLflow model registry
  * @param modelAlias       optional alias of the model version to apply, resolved as "models:/{modelName}@{modelAlias}".
@@ -73,10 +83,11 @@ import org.apache.spark.sql.functions.lit
  * @param resultType       Spark data type of the prediction column. Default is `double`.
  * @param featureColumns   optional columns of the input passed to the model. Default is all columns of the input.
  * @param options          additional options passed to the python code as `options` dict
+ * @param transformers     optional list of transformations to apply to the input before applying the model
  */
 case class MLflowPredictAction(override val id: ActionId,
                                inputId: DataObjectId,
-                               mlflowId: DataObjectId,
+                               inputMlflowId: DataObjectId,
                                outputId: DataObjectId,
                                modelName: Option[String] = None,
                                modelAlias: Option[String] = None,
@@ -86,17 +97,24 @@ case class MLflowPredictAction(override val id: ActionId,
                                resultType: String = "double",
                                featureColumns: Option[Seq[String]] = None,
                                options: Map[String, String] = Map(),
+                               transformers: Seq[GenericDfTransformer] = Seq(),
+                               override val cacheInput: Boolean = false,
+                               override val cacheOutput: Boolean = false,
+                               override val executionMode: Option[ExecutionMode] = None,
                                override val executionCondition: Option[Condition] = None,
+                               override val metricsFailCondition: Option[String] = None,
+                               override val expectations: Seq[ActionExpectation] = Seq(),
+                               override val saveModeOptions: Option[SaveModeOptions] = None,
                                override val metadata: Option[ActionMetadata] = None
-                              )(implicit val instanceRegistry: InstanceRegistry) extends MLflowActionImpl {
+                              )(implicit val instanceRegistry: InstanceRegistry) extends DataFrameOneToOneActionImpl with MLflowActionImpl {
 
-  private val input = getInputDataObject[DataObject with CanCreateSparkDataFrame](inputId)
-  override val mlflow: MLflowDataObject = getInputDataObject[MLflowDataObject](mlflowId)
-  private val output = getOutputDataObject[DataObject with CanWriteSparkDataFrame](outputId)
+  override val input: DataObject with CanCreateSparkDataFrame = getInputDataObject[DataObject with CanCreateSparkDataFrame](inputId)
+  override val output: DataObject with CanWriteSparkDataFrame = getOutputDataObject[DataObject with CanWriteSparkDataFrame](outputId)
+  override val mlflow: MLflowDataObject = getInputDataObject[MLflowDataObject](inputMlflowId)
 
-  // the MLflow DataObject has to be an input, as the DAG derives its edges from the inputs of an Action
-  override val inputs: Seq[DataObject] = Seq(input, mlflow)
-  override val outputs: Seq[DataObject] = Seq(output)
+  // The MLflow DataObject is an additional input: it delivers no DataFrame, but it creates the dependency on the
+  // MLflowTrainAction in the DAG, as the DAG derives its edges from the inputs of an Action.
+  override val additionalInputs: Seq[DataObject] = Seq(mlflow)
 
   if (modelAlias.isDefined && modelVersion.isDefined) {
     throw ConfigurationException(s"($id) only one of modelAlias and modelVersion may be defined")
@@ -106,6 +124,13 @@ case class MLflowPredictAction(override val id: ActionId,
   }
 
   validateConfig()
+
+  override def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef] = transformers
+
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
+    super.prepare
+    getTransformers.foreach(_.prepare(id))
+  }
 
   override protected def pythonOptions: Map[String, String] =
     super.pythonOptions ++ options ++ modelName.map("modelName" -> _)
@@ -131,44 +156,31 @@ case class MLflowPredictAction(override val id: ActionId,
   }
 
   /**
-   * In Init phase the model is not loaded. The output schema is the input schema plus the prediction column, which
-   * is enough for subsequent Actions and lets the output DataObject prepare itself.
-   */
-  override def init(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = withSkippedOutputsOnNoData {
-    validateInputSubFeeds(subFeeds)
-    val partitionValues = getPartitionValues(subFeeds, inputId)
-    val inputDf = getEmptyInputDataFrame(subFeeds)
-    getFeatureColumns(inputDf) // fail early on a wrong column name
-    val outputDf = inputDf.withColumn(predictionColumn, lit(null).cast(resultType))
-    output.initSparkDataFrame(outputDf, partitionValues)
-    Seq(SparkSubFeed(Some(SparkDataFrame(outputDf)), outputId, partitionValues))
-  }
-
-  override def exec(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Seq[SubFeed] = withSkippedOutputsOnNoData {
-    validateInputSubFeeds(subFeeds)
-    assert(!context.simulation, s"($id) MLflowPredictAction does not support simulation runs")
-    val partitionValues = getPartitionValues(subFeeds, inputId)
-    val inputDf = getInputDataFrame(subFeeds, input)
-    val uri = getModelUri
-    logger.info(s"($id) applying model $uri to ${input.id}")
-    val predictedDf = getPythonUtil.predict(inputDf, uri, getFeatureColumns(inputDf), predictionColumn, resultType)
-    val metrics = output.writeSparkDataFrame(predictedDf, partitionValues)
-    Seq(SparkSubFeed(None, outputId, partitionValues, metrics = Some(metrics)))
-  }
-
-  /**
-   * An empty DataFrame with the schema of the input, without reading any data.
+   * Apply the configured transformers and then the model.
    *
-   * The schema is taken from the incoming SubFeed if the preceding Action propagated one, and from the DataObject
-   * otherwise. This mirrors what DataFrameActionImpl does for DataFrame Actions in Init phase.
+   * The model is only loaded in Exec phase. In Init phase the prediction column is added as a null column of
+   * `resultType`, which gives subsequent Actions and the output DataObject the correct schema, so a dry run
+   * neither contacts MLflow nor downloads a model artifact.
    */
-  private def getEmptyInputDataFrame(subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): DataFrame = {
-    val inputSubFeed = subFeeds.find(_.dataObjectId == inputId).map(SparkSubFeed.fromSubFeed)
-    val schema = inputSubFeed.flatMap(_.schemaOpt)
-      .orElse(SparkSubFeed.getDeclaredDataObjectSchema(input))
-    schema.map(s => SparkSubFeed.getEmptyDataFrame(s, inputId).asInstanceOf[SparkDataFrame].inner)
-      .getOrElse(input.getSparkDataFrame(Seq()).filter(lit(false)))
+  override def transform(inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)
+                        (implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    val transformedSubFeed = applyTransformers(getTransformers, inputSubFeed, outputSubFeed)
+    val df = getSparkDataFrame(transformedSubFeed)
+    val columns = getFeatureColumns(df) // fail early on a wrong column name, in both phases
+    val predictedDf = if (context.isExecPhase) {
+      assert(!context.simulation, s"($id) does not support simulation runs")
+      val uri = getModelUri
+      logger.info(s"($id) applying model $uri to ${input.id}")
+      getPythonUtil.predict(df, uri, columns, predictionColumn, resultType)
+    } else {
+      df.withColumn(predictionColumn, lit(null).cast(resultType))
+    }
+    transformedSubFeed.withDataFrame(Some(SparkDataFrame(predictedDf)))
   }
+
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String, String])
+                                       (implicit context: ActionPipelineContext): Map[PartitionValues, PartitionValues] =
+    applyTransformers(getTransformers, partitionValues, executionModeResultOptions)
 }
 
 object MLflowPredictAction extends FromConfigFactory[Action] {

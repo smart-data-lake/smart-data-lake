@@ -32,10 +32,14 @@ import io.smartdatalake.workflow.dataobject.generic.CanReceiveParameterNotificat
  * [[DataObject]] representing an experiment of an MLflow instance.
  *
  * It holds the information needed to connect to MLflow and is used
- * - as output of [[io.smartdatalake.workflow.action.mlflow.MLflowTrainAction]], where it receives the information
- *   about the training run as [[io.smartdatalake.workflow.ParameterSubFeed]] parameters, see [[MLflowRunInfo]],
- * - as input of [[io.smartdatalake.workflow.action.mlflow.MLflowPredictAction]], where it provides the connection
- *   and the model of the latest training run.
+ * - as additional output (`outputMlflowId`) of [[io.smartdatalake.workflow.action.mlflow.MLflowTrainAction]], where
+ *   it receives the information about the training run as [[io.smartdatalake.workflow.ParameterSubFeed]] parameters,
+ *   see [[MLflowRunInfo]],
+ * - as additional input (`inputMlflowId`) of [[io.smartdatalake.workflow.action.mlflow.MLflowPredictAction]], where
+ *   it provides the connection and the model of the latest training run.
+ *
+ * "additional" means it is connected to a DataFrame Action without carrying a DataFrame, see
+ * [[io.smartdatalake.workflow.action.DataFrameActionImpl.additionalInputs]].
  *
  * No data is read or written by this DataObject, and it does not create a DataFrame. The model itself is stored by
  * MLflow, not by SDLB.

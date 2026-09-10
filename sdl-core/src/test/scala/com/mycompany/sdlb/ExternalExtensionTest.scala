@@ -128,8 +128,6 @@ case class ExternalAction(override val id: ActionId,
 
   override val input: DataObject with CanCreateDataFrame = getInputDataObject[DataObject with CanCreateDataFrame](inputId)
   override val output: DataObject with CanWriteDataFrame = getOutputDataObject[DataObject with CanWriteDataFrame](outputId)
-  override val inputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
-  override val outputs: Seq[DataObject with CanWriteDataFrame] = Seq(output)
 
   validateConfig()
 

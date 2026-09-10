@@ -42,11 +42,74 @@ import scala.util.{Failure, Success, Try}
  */
 abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] {
 
-  override def inputs: Seq[DataObject with CanCreateDataFrame]
+  /**
+   * Input [[DataObject]]s which can create a DataFrame.
+   * To be implemented by subclasses.
+   */
+  def dataFrameInputs: Seq[DataObject with CanCreateDataFrame]
 
-  override def outputs: Seq[DataObject with CanWriteDataFrame]
+  /**
+   * Output [[DataObject]]s which can write a DataFrame.
+   * To be implemented by subclasses. It may be empty if this Action only has additional outputs.
+   */
+  def dataFrameOutputs: Seq[DataObject with CanWriteDataFrame]
+
+  /**
+   * Additional input [[DataObject]]s which are no DataFrame DataObjects.
+   *
+   * They are connected through a [[ParameterSubFeed]], which creates the dependency in the DAG, but they deliver
+   * no data. Use it to let a DataFrame Action depend on something which is not a DataFrame, e.g. the MLflow
+   * experiment an [[io.smartdatalake.workflow.action.mlflow.MLflowPredictAction]] takes its model from.
+   */
+  def additionalInputs: Seq[DataObject] = Seq()
+
+  /**
+   * Additional output [[DataObject]]s which are no DataFrame DataObjects.
+   *
+   * They receive key/values through [[CanReceiveParameterNotification]] instead of a DataFrame, see
+   * [[ParameterSubFeed]]. Use it to report information about the work of this Action, e.g. the MLflow run created
+   * by an [[io.smartdatalake.workflow.action.mlflow.MLflowTrainAction]].
+   */
+  def additionalOutputs: Seq[DataObject with CanReceiveParameterNotification] = Seq()
+
+  // Note: the DataFrame inputs/outputs come first, as Action.checkExecutionCondition uses inputs.head as default main input.
+  final override lazy val inputs: Seq[DataObject] = dataFrameInputs ++ additionalInputs
+
+  final override lazy val outputs: Seq[DataObject] = dataFrameOutputs ++ additionalOutputs
+
+  override protected lazy val subFeedInputs: Seq[DataObject] = dataFrameInputs
+
+  override protected lazy val subFeedOutputs: Seq[DataObject] = dataFrameOutputs
 
   override def recursiveInputs: Seq[DataObject with CanCreateDataFrame] = Seq()
+
+  // main input & output must never be an additional DataObject, as they are used to create and write DataFrames.
+  override protected lazy val prioritizedMainInputCandidates: Seq[DataObject] =
+    getMainDataObjectCandidates(mainInputId, dataFrameInputs, "input")
+  override lazy val mainOutput: DataObject =
+    if (dataFrameOutputs.nonEmpty) getMainDataObjectCandidates(mainOutputId, dataFrameOutputs, "output").head
+    else additionalOutputs.head
+
+  override def validateConfig(): Unit = {
+    super.validateConfig()
+    assert(dataFrameInputs.nonEmpty, s"($id) at least one input DataObject creating a DataFrame is needed")
+    val duplicateInputs = dataFrameInputs.map(_.id).intersect(additionalInputs.map(_.id))
+    assert(duplicateInputs.isEmpty, s"($id) ${duplicateInputs.mkString(", ")} must not be listed as DataFrame input and additional input at the same time")
+    val duplicateOutputs = dataFrameOutputs.map(_.id).intersect(additionalOutputs.map(_.id))
+    assert(duplicateOutputs.isEmpty, s"($id) ${duplicateOutputs.mkString(", ")} must not be listed as DataFrame output and additional output at the same time")
+    mainInputId.foreach(mainId => assert(!additionalInputs.exists(_.id == mainId), s"($id) mainInputId $mainId must not be an additional input, as no DataFrame can be created from it"))
+    mainOutputId.foreach(mainId => assert(!additionalOutputs.exists(_.id == mainId), s"($id) mainOutputId $mainId must not be an additional output, as no DataFrame can be written to it"))
+    // Note: an Action expectation referencing an additional input is reported by calculateInputAggMetricsWithScopeAll.
+  }
+
+  /**
+   * Write the parameters of a SubFeed to an additional output, see [[additionalOutputs]].
+   */
+  protected def writeAdditionalOutputSubFeed(subFeed: ParameterSubFeed)(implicit context: ActionPipelineContext): Unit = {
+    val output = additionalOutputs.find(_.id == subFeed.dataObjectId)
+      .getOrElse(throw new IllegalStateException(s"($id) additional output for subFeed ${subFeed.dataObjectId} not found"))
+    output.parameterNotification(subFeed.parameters.getOrElse(Map()), subFeed.partitionValues)
+  }
 
   /**
    * Cache the output DataFrame of this Action, so that subsequent Actions can reuse it instead of reading the output
@@ -101,9 +164,11 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
       subFeedTypes.flatMap(tpe => if (tpe =:= typeOf[DataFrameSubFeed]) DataFrameSubFeed.getKnownSubFeedTypes else Seq(tpe))
     }
 
-    val allInputTypes = inputs.map(_.getSubFeedSupportedTypes).map(explodeGenericType)
+    val allInputTypes = dataFrameInputs.map(_.getSubFeedSupportedTypes).map(explodeGenericType)
     val commonInputTypes = allInputTypes.toSet.reduce(_ intersect _)
-    val commonOutputTypes = outputs.map(_.writeSubFeedSupportedTypes).map(explodeGenericType).toSet.reduce(_ intersect _)
+    // an Action without DataFrame output is not restricted by its outputs, see dataFrameOutputs
+    val commonOutputTypes = if (dataFrameOutputs.isEmpty) commonInputTypes
+      else dataFrameOutputs.map(_.writeSubFeedSupportedTypes).map(explodeGenericType).toSet.reduce(_ intersect _)
     // search common types in input & output
     val commonInputOutputTypes = commonInputTypes.intersect(commonOutputTypes)
     if (commonInputOutputTypes.isEmpty) throw ConfigurationException(s"($id) No common subfeed type found between inputs & outputs")
@@ -194,7 +259,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
                   .withExecutionModeResultOptions(subFeed.executionModeResultOptions).asInstanceOf[DataFrameSubFeed])
               } catch {
                 // if there is no data, but it's an action with multiple inputs, we need to avoid that the action gets skipped because of the thrown NoDataToProcessWarning
-                case _: NoDataToProcessWarning if inputs.size > 1 => subFeed.withDataFrame(Some(createEmptyDataFrame(input)))
+                case _: NoDataToProcessWarning if dataFrameInputs.size > 1 => subFeed.withDataFrame(Some(createEmptyDataFrame(input)))
               }
             } else {
               // if skipped create empty DataFrame
@@ -258,7 +323,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
                                                           isRecursive: Boolean)
                                                          (implicit context: ActionPipelineContext): DataFrameSubFeed = {
     logger.debug(s"($id) preprocessInputSubFeedCustomized: subFeed = $subFeed, ignoreFilters = $ignoreFilters, , isRecursive = $isRecursive")
-    val inputMap = (inputs ++ recursiveInputs).map(i => i.id -> i).toMap
+    val inputMap = (dataFrameInputs ++ recursiveInputs).map(i => i.id -> i).toMap
     val input = inputMap(subFeed.dataObjectId)
     var preparedSubFeed = subFeed
     // drop the DataFrame and pass on only the read schema, if it is different from the write schema on this DataObject
@@ -310,7 +375,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
 
   override def postprocessOutputSubFeedCustomized(subFeed: DataFrameSubFeed, inputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     assert(subFeed.dataFrame.isDefined)
-    val output = outputs.find(_.id == subFeed.dataObjectId).get
+    val output = dataFrameOutputs.find(_.id == subFeed.dataObjectId).get
     // Document columns created by user defined functions returning a case class with the ScalaDoc of that case class.
     val commentedSubFeed = subFeed.withDataFrame(subFeed.dataFrame.map(_.enrichColumnCommentsFromUdfs))
     // propagate the filters of the main input SubFeed to this output, restricted to the columns it has
@@ -394,7 +459,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
   override protected def writeSubFeed(subFeed: DataFrameSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     // write subfeed to output
     context.engineConnection.foreach(_.activate(Some(s"writing to ${subFeed.dataObjectId}")))
-    val output = outputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
+    val output = dataFrameOutputs.find(_.id == subFeed.dataObjectId).getOrElse(throw new IllegalStateException(s"($id) output for subFeed ${subFeed.dataObjectId} not found"))
     var outputSubFeed = writeSubFeed(subFeed, output, isRecursive)
     context.engineConnection.foreach(_.activate(None))
     // the DataFrame is only propagated to subsequent Actions if it has been cached, otherwise they read it
@@ -416,7 +481,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         var (metrics, expectationsResult, exceptions) = evDataObject
           .validateExpectations(subFeedType, subFeed.dataFrame, evDataObject.getDataFrame(Seq(), subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics ++ actionExpectationsInputMetrics, if (isMainOutput) expectations else Seq(), enrichmentFunc, loggerContext = "output")
         // evaluate and validate expectations of input DataObjects to be validated on read
-        val inputExpectationsToEvaluateOnRead = inputs
+        val inputExpectationsToEvaluateOnRead = dataFrameInputs
           .filter(i => context.instanceRegistry.shouldValidateDataObjectOnRead(i.id))
           .collect { case x: DataObject with ExpectationValidation => x }
         inputExpectationsToEvaluateOnRead.foreach { dataObject =>
@@ -533,7 +598,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
       .orElse(inputSubFeeds.headOption).map(_.executionModeResultOptions).getOrElse(Map())
     val (outputDfsMap, _) = transformers.foldLeft((inputDfsMap, inputPartitionValues)) {
       case ((inputDfsMap, inputPartitionValues), transformer) =>
-        val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap, executionModeResultOptions, outputs.map(_.id))
+        val (outputDfsMap, outputPartitionValues) = transformer.applyTransformation(id, inputPartitionValues, inputDfsMap, executionModeResultOptions, dataFrameOutputs.map(_.id))
         (inputDfsMap ++ outputDfsMap, outputPartitionValues)
     }
     outputDfsMap

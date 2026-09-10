@@ -125,7 +125,7 @@ class InstanceRegistry {
       // only DataObjects that can Create/Write DataFrames with ExpectationValidation are relevant
       val expectationValidationDataObjects = getDataObjects.collect{case x: CanCreateDataFrame with CanWriteDataFrame with ExpectationValidation => x}
       // get DataObjects that are written by an Action using DataFrames
-      val dataFrameActions = getActions.collect{case x: DataFrameActionImpl => x}.flatMap(_.outputs)
+      val dataFrameActions = getActions.collect{case x: DataFrameActionImpl => x}.flatMap(_.dataFrameOutputs)
       // all DataObjects which are not used as an output should be validated on read
       _dataObjectIdsToValidateOnRead = Some(expectationValidationDataObjects.map(_.id).diff(dataFrameActions.map(_.id)))
     }

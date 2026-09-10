@@ -16,7 +16,7 @@ Currently SDLB supports the following execution engines:
 |Generic DataFrame API|Spark Engine|SparkSubFeed|SparkClassicConnection|Transform data with Spark DataFrame API in a Spark session running inside the SDLB process|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction|all Hadoop/SparkFileDataObject, AccessTableDataObject, AirbyteDataObject, CustomDfDataObject, DeltaLakeTableDataObject, HiveTableDataObject, IcebergTableDataObject, JdbcTableDataObject, JmsDataObject, KafkaTopicDataObject, SnowflakeTableDataObject, SplunkDataObject, TickTockHiveTableDataObject|
 |Generic DataFrame API|Spark Connect Engine|SparkConnectSubFeed|SparkConnectConnection|Transform data with the Spark DataFrame API on a **remote** Spark Connect server, without a Spark session inside the SDLB process|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction|SparkConnectTableDataObject, DeltaLakeTableDataObject, IcebergTableDataObject|
 |Generic DataFrame API|Snowflake-Snowpark Engine|SnowparkSubFeed|-|Transform data within Snowflake with Snowpark DataFrame API|CopyAction, CustomDataFrameAction|SnowflakeTableDataObject|
-|Parameter|Parameter Engine|ParameterSubFeed|-|Coordinate work happening outside of SDLB and pass on key/values about it, e.g. script results or the information about an ML training run|CustomScriptAction, MLflowTrainAction|all DataObjects|
+|Parameter|Parameter Engine|ParameterSubFeed|-|Coordinate work happening outside of SDLB and pass on key/values about it, e.g. script results or the information about an ML training run|CustomScriptAction, and the additional inputs/outputs of a DataFrame Action such as MLflowTrainAction|all DataObjects|
 
 ### Engine connections
 
