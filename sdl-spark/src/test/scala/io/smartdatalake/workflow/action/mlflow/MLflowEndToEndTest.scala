@@ -39,9 +39,17 @@ import scala.util.Try
  * - a reachable MLflow tracking server
  *
  * To run it locally:
+ * Console 1: start MLflow server
  * {{{
- *   pip install mlflow scikit-learn
+ *   cd sdl-spark && uv sync
+ *   source .venv/bin/activate
  *   mlflow server --host 127.0.0.1 --port 5000
+ * }}}
+ * Console 2: start SDLB tests
+ * {{{
+ *   export PYSPARK_PYTHON=$PWD/sdl-spark/.venv/bin/python
+ *   cd ..
+ *   mvn -B install -pl sdl-spark -am
  *   mvn -B test -pl sdl-spark -Dsuites=io.smartdatalake.workflow.action.mlflow.MLflowEndToEndTest
  * }}}
  * Set the environment variable MLFLOW_TRACKING_URI to use a different server.
@@ -53,7 +61,9 @@ class MLflowEndToEndTest extends AnyFunSuite {
 
   private val trackingUri = sys.env.getOrElse("MLFLOW_TRACKING_URI", "http://localhost:5000")
 
-  private def pythonCmd: Option[String] = Seq("python3", "python").find(cmd => Try(Seq(cmd, "--version").! == 0).getOrElse(false))
+  private def pythonCmd: Option[String] = sys.env.get("PYSPARK_PYTHON")
+    .orElse(sys.env.get("PYSPARK_DRIVER_PYTHON"))
+    .orElse(Seq("python3", "python").find(cmd => Try(Seq(cmd, "--version").! == 0).getOrElse(false)))
 
   private def hasPythonModules(cmd: String, modules: String*): Boolean =
     Try(Seq(cmd, "-c", modules.map("import " + _).mkString("; ")).! == 0).getOrElse(false)
