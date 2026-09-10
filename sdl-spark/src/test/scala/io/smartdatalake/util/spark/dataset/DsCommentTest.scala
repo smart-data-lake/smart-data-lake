@@ -20,7 +20,7 @@ package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.spark.GetSession.loggEnv
-import org.apache.spark.sql.functions.{coalesce, lit}
+import org.apache.spark.sql.functions.{coalesce, col, lit}
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -85,6 +85,35 @@ class DsCommentTest extends AnyFlatSpec with Matchers
     dfCommented.columns shouldBe Array("src")
     dfCommented.as[String].collect().toSeq shouldBe Seq("a")
     dfCommented.schema.head.getComment() shouldBe Some("desc_src")
+  }
+
+  "DsColComment.withComment" should "add a comment fluently on a Column" in {
+    val df = List(TestCaseClass(1, 1f, TestInnerClass(1, 1))).toDF()
+    val dfCommented = df.select(col("id").withComment("desc_id"))
+    dfCommented.getColumnComments.select("comment").as[String].collect().toSet shouldBe Set("desc_id")
+  }
+
+  it should "keep the given expression if the column name collides with an input column" in {
+    val df = List((1, "old")).toDF("id", "country_code")
+    val dfCommented = df.select(coalesce(lit(null).cast("string"), lit("new")).as("country_code").withComment("desc_cc"))
+    dfCommented.as[String].collect().toSeq shouldBe Seq("new")
+    dfCommented.schema.head.getComment() shouldBe Some("desc_cc")
+  }
+
+  "DsColComment.makeNotNullable" should "mark a nullable column as not-nullable in the schema" in {
+    val df = List(Some(1), None).toDF("id")
+    df.schema("id").nullable shouldBe true
+    df.select(col("id").makeNotNullable).schema("id").nullable shouldBe false
+  }
+
+  it should "keep the column name" in {
+    val df = List((1, "a")).toDF("id", "src")
+    df.select(col("id").makeNotNullable).columns shouldBe Array("id")
+  }
+
+  it should "throw at runtime if the column actually contains a null value" in {
+    val df = List(Some(1), None).toDF("id")
+    a[Exception] should be thrownBy df.select(col("id").makeNotNullable).collect()
   }
 
 }
