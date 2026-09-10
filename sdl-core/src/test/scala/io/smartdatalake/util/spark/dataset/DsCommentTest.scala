@@ -21,7 +21,7 @@ package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.TestUtil
 import io.smartdatalake.util.spark.GetSession.loggEnv
-import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.functions.{coalesce, col, lit}
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -65,10 +65,40 @@ class DsCommentTest extends AnyFlatSpec with Matchers
     dfCommented.columns shouldBe df.columns
   }
 
+  it should "keep the given expression if the column name is new to the input DataFrame" in {
+    val df = List((1, "a")).toDF("id", "src")
+    val dfCommented = df.select(withComment(coalesce(lit(null).cast("string"), $"src").as("derived"), "desc_derived"))
+    dfCommented.columns shouldBe Array("derived")
+    dfCommented.as[String].collect().toSeq shouldBe Seq("a")
+    dfCommented.schema.head.getComment() shouldBe Some("desc_derived")
+  }
+
+  it should "keep the given expression if the column name collides with an input column" in {
+    val df = List((1, "old")).toDF("id", "country_code")
+    val dfCommented = df.select(withComment(coalesce(lit(null).cast("string"), lit("new")).as("country_code"), "desc_country_code"))
+    dfCommented.as[String].collect().toSeq shouldBe Seq("new")
+    dfCommented.schema.head.getComment() shouldBe Some("desc_country_code")
+  }
+
+  it should "comment a plain qualified column reference" in {
+    val df = List((1, "a")).toDF("id", "src")
+    val dfCommented = df.as("t").select(withComment($"t.src", "desc_src"))
+    dfCommented.columns shouldBe Array("src")
+    dfCommented.as[String].collect().toSeq shouldBe Seq("a")
+    dfCommented.schema.head.getComment() shouldBe Some("desc_src")
+  }
+
   "DsColComment.withComment" should "add a comment fluently on a Column" in {
     val df = List(TestCaseClass(1, 1f, TestInnerClass(1, 1))).toDF()
     val dfCommented = df.select(col("id").withComment("desc_id"))
     dfCommented.getColumnComments.select("comment").as[String].collect().toSet shouldBe Set("desc_id")
+  }
+
+  it should "keep the given expression if the column name collides with an input column" in {
+    val df = List((1, "old")).toDF("id", "country_code")
+    val dfCommented = df.select(coalesce(lit(null).cast("string"), lit("new")).as("country_code").withComment("desc_country_code"))
+    dfCommented.as[String].collect().toSeq shouldBe Seq("new")
+    dfCommented.schema.head.getComment() shouldBe Some("desc_country_code")
   }
 
   "DsColComment.makeNotNullable" should "mark the column as not-nullable in the schema" in {
