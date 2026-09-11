@@ -24,13 +24,14 @@ import io.smartdatalake.app.ModulePlugin
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{CustomCodeUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.util.spark.SDLSparkExtension
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.spark.customlogic.{PythonUDFCreatorConfig, SparkUDFCreatorConfig}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import org.apache.spark.SparkException
+import org.apache.spark.api.java.JavaSparkContext.fromSparkContext
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.slf4j.MDC
@@ -206,6 +207,10 @@ object SparkClassicConnection extends FromConfigFactory[Connection] with SmartDa
       sparkOptionsOpt: Map[String, StringOrSecret] = Map(),
       enableHive: Boolean = false
   ): SparkSession = {
+    // check spark classic version
+    assert(CustomCodeUtil.getClassByNameIfExists("org.apache.spark.sql.connect.SparkSession").isEmpty, "Spark Connect classes are on the classpath but sdl-spark is built for Spark Classic. Use sdl-sparkconnect and SparkConnectConnection instead, or change to Spark Classic environment / cluster.")
+    assert(CustomCodeUtil.getClassByNameIfExists("org.apache.spark.sql.classic.SparkSession").nonEmpty, "Spark Classic classes are missing on the classpath but sdl-spark is built for Spark Classic. Make sure to use a Spark Classic environment / cluster.")
+
     if (masterOpt.isDefined) logger.info(
       s"Get or create spark session with parameters: name=$name master=$masterOpt deployMode=$deployModeOpt enableHive=$enableHive kryoClassNamesOpt=$kryoClassNamesOpt sparkOptionsOpt=$sparkOptionsOpt"
     )

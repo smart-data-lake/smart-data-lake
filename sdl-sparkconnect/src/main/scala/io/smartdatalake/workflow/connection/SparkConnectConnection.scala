@@ -22,7 +22,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.app.AppUtil.createMaskedSecretsKVLog
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{CustomCodeUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.sparkconnect.SparkConnectSubFeed
@@ -56,6 +56,9 @@ case class SparkConnectConnection(
   @transient private var _sparkSession: Option[SparkSession] = None
   def sparkSession(implicit context: ActionPipelineContext): SparkSession = {
     if (_sparkSession.isEmpty) {
+      assert(CustomCodeUtil.getClassByNameIfExists("org.apache.spark.sql.classic.SparkSession").isEmpty, "Spark Classic classes are on the classpath but sdl-sparkconnect is built for Spark Connect. Use sdl-spark and SparkConnection instead, or change to Spark Connect environment / cluster.")
+      assert(CustomCodeUtil.getClassByNameIfExists("org.apache.spark.sql.connect.SparkSession").nonEmpty, "Spark Connect classes are missing on the classpath but sdl-sparkconnect is built for Spark Connect. Make sure to use a Spark Connect environment / cluster.")
+
       logger.info(s"($id) creating Spark Connect session for remote url $url")
       if (sparkOptions.nonEmpty) logger.info(s"($id) additional sparkOptions: " + sparkOptions.map { case (k, v) => createMaskedSecretsKVLog(k, v.toString) }.mkString(", "))
       val builder = SparkSession.builder().remote(url)
