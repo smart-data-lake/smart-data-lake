@@ -56,8 +56,9 @@ case class SparkConnectConnection(
   @transient private var _sparkSession: Option[SparkSession] = None
   def sparkSession(implicit context: ActionPipelineContext): SparkSession = {
     if (_sparkSession.isEmpty) {
-      assert(CustomCodeUtil.getClassByNameIfExists("org.apache.spark.sql.classic.SparkSession").isEmpty, "Spark Classic classes are on the classpath but sdl-sparkconnect is built for Spark Connect. Use sdl-spark and SparkConnection instead, or change to Spark Connect environment / cluster.")
       assert(CustomCodeUtil.getClassByNameIfExists("org.apache.spark.sql.connect.SparkSession").nonEmpty, "Spark Connect classes are missing on the classpath but sdl-sparkconnect is built for Spark Connect. Make sure to use a Spark Connect environment / cluster.")
+      if (CustomCodeUtil.getClassByNameIfExists("org.apache.spark.sql.classic.SparkSession").nonEmpty)
+        logger.warn("Spark Classic classes are on the classpath but sdl-sparkconnect is built for Spark Connect. Use sdl-spark and SparkConnection instead, or remove Spark Classic libraries.")
 
       logger.info(s"($id) creating Spark Connect session for remote url $url")
       if (sparkOptions.nonEmpty) logger.info(s"($id) additional sparkOptions: " + sparkOptions.map { case (k, v) => createMaskedSecretsKVLog(k, v.toString) }.mkString(", "))

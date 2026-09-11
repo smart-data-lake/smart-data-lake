@@ -208,8 +208,9 @@ object SparkClassicConnection extends FromConfigFactory[Connection] with SmartDa
       enableHive: Boolean = false
   ): SparkSession = {
     // check spark classic version
-    assert(CustomCodeUtil.getClassByNameIfExists("org.apache.spark.sql.connect.SparkSession").isEmpty, "Spark Connect classes are on the classpath but sdl-spark is built for Spark Classic. Use sdl-sparkconnect and SparkConnectConnection instead, or change to Spark Classic environment / cluster.")
     assert(CustomCodeUtil.getClassByNameIfExists("org.apache.spark.sql.classic.SparkSession").nonEmpty, "Spark Classic classes are missing on the classpath but sdl-spark is built for Spark Classic. Make sure to use a Spark Classic environment / cluster.")
+    if (CustomCodeUtil.getClassByNameIfExists("org.apache.spark.sql.connect.SparkSession").nonEmpty)
+      logger.warn("Spark Connect classes are also on the classpath but sdl-spark is built for Spark Classic. Use sdl-sparkconnect and SparkConnectConnection instead, or remove Spark Connect libraries.")
 
     if (masterOpt.isDefined) logger.info(
       s"Get or create spark session with parameters: name=$name master=$masterOpt deployMode=$deployModeOpt enableHive=$enableHive kryoClassNamesOpt=$kryoClassNamesOpt sparkOptionsOpt=$sparkOptionsOpt"
