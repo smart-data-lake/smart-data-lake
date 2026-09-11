@@ -31,12 +31,13 @@ jobs:
           key: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
           cache-dependency-glob: sdl-spark/uv.lock
       - name: Create the Python environment of sdl-spark
-        # --frozen fails instead of re-resolving, so a new mlflow release cannot break the build without a commit
+        # uv's --no-build cannot be used: pyspark publishes no wheel, so it always has to be built from its sdist.
+        # uv.lock pins that sdist by sha256, so the security risk is limited.
         run: |
           uv sync --frozen --project sdl-spark
           echo "PYSPARK_PYTHON=$PWD/sdl-spark/.venv/bin/python" >> $GITHUB_ENV
