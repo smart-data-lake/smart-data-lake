@@ -18,8 +18,8 @@
  */
 package io.smartdatalake.workflow.dataobject
 
-import com.healthmarketscience.jackcess.DatabaseBuilder
 import com.typesafe.config.Config
+import io.github.spannm.jackcess.DatabaseBuilder
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues

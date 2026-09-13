@@ -94,7 +94,7 @@
         </dependency>
 
         <dependency>
-            <groupId>com.healthmarketscience.jackcess</groupId>
+            <groupId>io.github.spannm</groupId>
             <artifactId>jackcess</artifactId>
             <version>${jackcess.version}</version>
         </dependency>
@@ -311,8 +311,8 @@
                         <ignoredUnusedDeclaredDependency>io.smartdatalake:spark-extensions_${scala.minor.version}</ignoredUnusedDeclaredDependency>
                         <!-- spark-excel: DataSource registered via string format name -->
                         <ignoredUnusedDeclaredDependency>dev.mauch:spark-excel_${scala.minor.version}</ignoredUnusedDeclaredDependency>
-                        <!-- jackcess: loaded via reflection for Access file format -->
-                        <ignoredUnusedDeclaredDependency>com.healthmarketscience.jackcess:jackcess</ignoredUnusedDeclaredDependency>
+                        <!-- jackcess: used directly in AccessTableDataObject, bytecode analyzer misses Scala usage -->
+                        <ignoredUnusedDeclaredDependency>io.github.spannm:jackcess</ignoredUnusedDeclaredDependency>
                         <!-- spark-tags: scope override for fat-jar exclusion -->
                         <ignoredUnusedDeclaredDependency>org.apache.spark:spark-tags_${scala.minor.version}</ignoredUnusedDeclaredDependency>
                         <!-- Hadoop classes accessed through SparkContext; bytecode analyzer misses Scala usages -->
