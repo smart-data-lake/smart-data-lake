@@ -368,7 +368,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
 
   // Note that table metadata (table comment, column comments, primary key) is not applied here anymore,
-  // it is applied at deployment time by DataObjectSchemaExporter, see CanHandleCatalogMetadata.
+  // it is applied at deployment time by CatalogSchemaUpdater, see CanHandleCatalogMetadata.
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
   }

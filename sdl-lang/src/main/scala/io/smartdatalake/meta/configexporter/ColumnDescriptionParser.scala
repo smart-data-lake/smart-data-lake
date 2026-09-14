@@ -35,7 +35,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
  * `address.street`, and may contain array markers, e.g. `addresses.[].street`.
  *
  * The descriptions are used by [[ConfigJsonExporter]] to document the columns in the SDLB UI, and by
- * [[DataObjectSchemaExporter]] to apply them as column comments to the catalog.
+ * [[CatalogSchemaUpdater]] to apply them as column comments to the catalog.
  */
 object ColumnDescriptionParser extends SmartDataLakeLogger {
 

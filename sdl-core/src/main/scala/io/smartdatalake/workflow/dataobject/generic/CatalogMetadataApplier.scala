@@ -293,7 +293,7 @@ class CatalogMetadataApplier(schemaReader: DataObjectId => Option[GenericSchema]
 
   /**
    * Apply all changes of a DataObject to the catalog.
-   * Note that DataObjectSchemaExporter applies the two phases separately for all DataObjects,
+   * Note that CatalogSchemaUpdater applies the two phases separately for all DataObjects,
    * see [[applyTableChanges]] and [[applyForeignKeys]].
    */
   def apply(dataObject: DataObject, changes: CatalogMetadataChanges)(implicit context: ActionPipelineContext): Unit = {

@@ -660,7 +660,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   /**
    * Read the column comments from the JDBC metadata (REMARKS).
    * Note that not all JDBC drivers return the comments of the columns. If they are not returned, the comments
-   * are written on every "apply" of DataObjectSchemaExporter, as it can not detect that they are up to date.
+   * are written on every "apply" of CatalogSchemaUpdater, as it can not detect that they are up to date.
    */
   override def getColumnComments(implicit context: ActionPipelineContext): Map[Seq[String], String] = {
     jdbcColumnMetadata.toSeq.flatten.flatMap(col => col.comment.map(comment => Seq(col.name) -> comment)).toMap

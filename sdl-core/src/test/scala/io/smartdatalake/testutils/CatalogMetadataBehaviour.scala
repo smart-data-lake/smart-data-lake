@@ -57,7 +57,7 @@ case class CatalogMetadataTestParams(
  * Engine-agnostic tests for managing tables in the catalog at deployment time, see issue #1129:
  * creating missing tables, evolving their schema, and creating primary and foreign keys.
  *
- * Note that none of this is applied during a normal SDLB run. It is applied by DataObjectSchemaExporter,
+ * Note that none of this is applied during a normal SDLB run. It is applied by CatalogSchemaUpdater,
  * which uses [[CatalogMetadataApplier]] with the schemas exported by a dry-run. The behaviours therefore
  * work on the applier and not on Actions, and each of them checks that a second "apply" changes nothing.
  *
@@ -83,7 +83,7 @@ trait CatalogMetadataBehaviour extends GenericTestTool {
   private def setupRegistryAndContext(): (InstanceRegistry, ActionPipelineContext) = {
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     instanceRegistry.register(defaultEngineConnection)
-    // the catalog is changed in exec phase, like DataObjectSchemaExporter does it
+    // the catalog is changed in exec phase, like CatalogSchemaUpdater does it
     (instanceRegistry, ScalaTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec))
   }
 

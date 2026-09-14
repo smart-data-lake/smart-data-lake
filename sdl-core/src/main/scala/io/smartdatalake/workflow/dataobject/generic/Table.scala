@@ -33,7 +33,7 @@ package io.smartdatalake.workflow.dataobject.generic
  *                                   according to the SDLB configuration (=TRUE), or if they are configured just
  *                                   for information purposes (=FALSE). It defaults to false. For the creation / replacement to work,
  *                                   at least one primary Key column must be defined.
- *                                   Primary keys are created at deployment time by DataObjectSchemaExporter,
+ *                                   Primary keys are created at deployment time by CatalogSchemaUpdater,
  *                                   see [[io.smartdatalake.workflow.dataobject.generic.CanHandleConstraints]]
  *                                   for the DataObjects supporting it. Using it in other DataObjects will have no effect.
  *                                   It also makes the primary key columns not null when creating or evolving
@@ -47,7 +47,7 @@ package io.smartdatalake.workflow.dataobject.generic
  * @param createAndReplaceForeignKeys Parameter to define if the foreign keys should be created and updated
  *                                    according to the SDLB configuration (=TRUE), or if they are configured just
  *                                    for information purposes (=FALSE). It defaults to false.
- *                                    Foreign keys are created at deployment time by DataObjectSchemaExporter,
+ *                                    Foreign keys are created at deployment time by CatalogSchemaUpdater,
  *                                    see [[io.smartdatalake.workflow.dataobject.generic.CanHandleForeignKeys]].
  *                                    Note that the referenced table must exist and have a primary key on the
  *                                    referenced columns.

@@ -81,7 +81,7 @@ class DeltaLakeUdfColumnCommentTest extends AnyFunSuite with BeforeAndAfterAll {
     action.init(Seq(SparkSubFeed(None, srcDO.id, Seq())))(contextInitExport)
     action.exec(Seq(SparkSubFeed(None, srcDO.id, Seq())))(contextExec)
 
-    // the init phase schema is what a dry-run exports for the UI and for DataObjectSchemaExporter
+    // the init phase schema is what a dry-run exports for the UI and for CatalogSchemaUpdater
     val exportedSchema = contextInitExport.schemaExportRegistry.getSchemas.get(tgtDO.id)
     assert(exportedSchema.isDefined, "no schema was collected for export")
     val exportedComments = GenericSchemaUtil.columnComments(exportedSchema.get)

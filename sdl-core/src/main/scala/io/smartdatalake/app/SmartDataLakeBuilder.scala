@@ -84,7 +84,7 @@ object TestMode extends Enumeration {
    * the column comments assembled by SDLB, e.g. from schemaMin or from the ScalaDoc of case classes
    * returned by user defined functions.
    *
-   * Use this on a development environment to create the schema files needed by DataObjectSchemaExporter
+   * Use this on a development environment to create the schema files needed by CatalogSchemaUpdater
    * to apply table metadata to the catalog of a target environment at deployment time.
    */
   val DryRunWithSchemaExport: app.TestMode.Value = Value("dry-run-with-schema-export")
@@ -604,7 +604,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * see [[TestMode.DryRunWithSchemaExport]].
    *
    * The exported files are read back by [[GlobalConfig.getSchemaFromSource]] for dry-runs on a local
-   * environment, and by DataObjectSchemaExporter to apply table metadata to a catalog at deployment time.
+   * environment, and by CatalogSchemaUpdater to apply table metadata to a catalog at deployment time.
    */
   private[smartdatalake] def exportDataObjectSchemas(context: ActionPipelineContext): Unit = {
     val globalConfig = context.globalConfig

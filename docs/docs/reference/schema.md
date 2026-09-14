@@ -160,17 +160,17 @@ global {
 }
 ```
 
-**2. Apply the changes on the target environment.** `DataObjectSchemaExporter` reads the desired state from
+**2. Apply the changes on the target environment.** `CatalogSchemaUpdater` reads the desired state from
 the configuration and from the exported schema files, compares it with the catalog and writes only what
 differs:
 
 ```bash
-# report what would change, without changing anything
-java -cp sdlb.jar io.smartdatalake.meta.configexporter.DataObjectSchemaExporter \
+# report what would change, without changing anything - this is the default mode
+java -cp sdlb.jar io.smartdatalake.meta.configexporter.CatalogSchemaUpdater \
   --config config/ --mode plan --descriptionPath ./description
 
 # apply the changes
-java -cp sdlb.jar io.smartdatalake.meta.configexporter.DataObjectSchemaExporter \
+java -cp sdlb.jar io.smartdatalake.meta.configexporter.CatalogSchemaUpdater \
   --config config/ --mode apply --descriptionPath ./description
 ```
 

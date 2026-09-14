@@ -24,7 +24,7 @@ import scala.annotation.tailrec
  * Engine independent helpers to work with [[GenericSchema]].
  *
  * This mirrors the Spark specific SparkSchemaUtil for the cases where no Spark session is available,
- * e.g. when applying column comments to a catalog from DataObjectSchemaExporter.
+ * e.g. when applying column comments to a catalog from CatalogSchemaUpdater.
  */
 object GenericSchemaUtil {
 
