@@ -34,7 +34,7 @@ case class PrimaryKeyDefinition(pkColumns: Seq[String], pkName: Option[String] =
  * TransactionalTableDataObject. Foreign keys are handled by [[CanHandleForeignKeys]].
  *
  * Note that constraints are not applied during a normal SDLB run. They are applied at deployment time by
- * DataObjectSchemaExporter, see [[CanHandleCatalogMetadata]], and only if [[Table.createAndReplacePrimaryKey]]
+ * CatalogSchemaUpdater, see [[CanHandleCatalogMetadata]], and only if [[Table.createAndReplacePrimaryKey]]
  * is set to true.
  */
 trait CanHandleConstraints { self: TransactionalTableDataObject =>

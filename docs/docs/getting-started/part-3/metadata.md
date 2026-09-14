@@ -75,7 +75,7 @@ Let's edit therefore file `viz/description/dataObjects/btl-distances.md`.
 
 The existing file already contains some examples to create titles, tables and include images.
 And there is an example of a special syntax to create column descriptions using `@column` keyword.
-These column descriptions are applied as column comments by `DataObjectSchemaExporter`, see
+These column descriptions are applied as column comments by `CatalogSchemaUpdater`, see
 [Managing tables in the catalog at deploy time](/docs/reference/schema#managing-tables-in-the-catalog-at-deploy-time),
 and are therefore shown as column comments in the schema. They override a comment coming from the schema itself.
 
@@ -120,17 +120,18 @@ For this you can easily add _ConfigJsonExporter_ and _DataObjectSchemaExporter_ 
 ## Write the metadata into the data catalog
 
 The descriptions above document your pipeline in the SDLB UI. To make them visible in the data catalog
-itself - as table and column comments on the tables SDLB writes - run _DataObjectSchemaExporter_ in `apply`
-mode as part of your deployment. It also creates missing tables and applies schema changes, primary and
-foreign keys. This is a deployment step and not part of a normal SDLB run, so that running a pipeline does
-not repeatedly write to the catalog:
+itself - as table and column comments on the tables SDLB writes - run a second Java command line tool called
+_CatalogSchemaUpdater_ in `apply` mode as part of your deployment. It also creates missing tables and applies
+schema changes, primary and foreign keys. This is a deployment step and not part of a normal SDLB run, so
+that running a pipeline does not repeatedly write to the catalog:
 
 ```
-java -cp sdlb.jar io.smartdatalake.meta.configexporter.DataObjectSchemaExporter \
+java -cp sdlb.jar io.smartdatalake.meta.configexporter.CatalogSchemaUpdater \
   --config ./config,./envConfig/dev.conf --mode plan
 ```
 
-`--mode plan` reports what would change without changing anything; `--mode apply` writes the changes.
+`--mode plan` reports what would change without changing anything and is the default; `--mode apply` writes
+the changes.
 See [Managing tables in the catalog at deploy time](/docs/reference/schema#managing-tables-in-the-catalog-at-deploy-time)
 for the full flow, including how to export the schemas of tables that do not exist yet.
 

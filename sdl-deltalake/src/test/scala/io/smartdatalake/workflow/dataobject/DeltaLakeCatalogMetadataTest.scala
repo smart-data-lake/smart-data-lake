@@ -41,7 +41,7 @@ import java.nio.file.Files
  * Test applying table metadata to the catalog at deployment time, see issues #1121, #1127 and #1129.
  *
  * Note that no catalog metadata is written during a normal SDLB run anymore. It is applied by
- * DataObjectSchemaExporter, which uses [[CatalogMetadataApplier]].
+ * CatalogSchemaUpdater, which uses [[CatalogMetadataApplier]].
  */
 class DeltaLakeCatalogMetadataTest extends AnyFunSuite with BeforeAndAfterAll with SmartDataLakeLogger
   with CatalogMetadataBehaviour {

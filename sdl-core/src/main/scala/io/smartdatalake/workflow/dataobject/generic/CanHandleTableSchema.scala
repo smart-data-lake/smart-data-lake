@@ -66,7 +66,7 @@ case class ChangeColumnNullable(columnPath: Seq[String], nullable: Boolean) exte
  * This trait defines how the schema of a TableDataObject is created and evolved in the catalog.
  *
  * Like the table and column comments of [[CanHandleCatalogMetadata]], this is *not* applied during a normal
- * SDLB run, but at deployment time by DataObjectSchemaExporter. The desired schema is the one exported by a
+ * SDLB run, but at deployment time by CatalogSchemaUpdater. The desired schema is the one exported by a
  * dry-run, see [[io.smartdatalake.app.TestMode.DryRunWithSchemaExport]]. This allows to create and migrate the
  * tables of an environment before the data pipeline runs there, and to review the changes with mode "plan".
  *

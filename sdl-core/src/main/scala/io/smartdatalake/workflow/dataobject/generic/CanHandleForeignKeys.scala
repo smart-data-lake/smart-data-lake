@@ -53,7 +53,7 @@ case class ForeignKeyDefinition(columns: Map[String, String], referencedTable: S
  * to the catalog.
  *
  * Note that foreign keys are not applied during a normal SDLB run. They are applied at deployment time by
- * DataObjectSchemaExporter, see [[CanHandleCatalogMetadata]], and only if [[Table.createAndReplaceForeignKeys]]
+ * CatalogSchemaUpdater, see [[CanHandleCatalogMetadata]], and only if [[Table.createAndReplaceForeignKeys]]
  * is set to true. This needs two phases: all tables must be created including their primary keys, before the
  * foreign keys referencing them can be applied.
  */

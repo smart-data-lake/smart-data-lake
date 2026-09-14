@@ -26,7 +26,7 @@ import io.smartdatalake.workflow.dataframe.GenericSchemaUtil
  * TableDataObject.
  *
  * Note that comments are *not* applied during a normal SDLB run: table metadata can only change when the
- * configuration or the code changes, so it is applied at deployment time by DataObjectSchemaExporter,
+ * configuration or the code changes, so it is applied at deployment time by CatalogSchemaUpdater,
  * which reads the desired state from the configuration and from the exported schema files.
  * See [[io.smartdatalake.app.TestMode.DryRunWithSchemaExport]] for how these schema files are created.
  *

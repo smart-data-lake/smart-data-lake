@@ -108,7 +108,7 @@ import scala.util.Try
  *                         See HousekeepingMode for available implementations. Default is None.
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.HiveTableConnection]]
  * @param metadata metadata of the table. metadata.description is applied as table comment in the catalog
- *                 by the DataObjectSchemaExporter, see also [[io.smartdatalake.workflow.dataobject.generic.CanHandleCatalogMetadata]].
+ *                 by the CatalogSchemaUpdater, see also [[io.smartdatalake.workflow.dataobject.generic.CanHandleCatalogMetadata]].
  *
  * @note DeltaLake needs the spark properties spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension and
  *       spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog. They are added automatically
@@ -227,7 +227,7 @@ case class DeltaLakeTableDataObject(override val id: DataObjectId,
 
   // Note that table metadata (table comment, column comments, primary key) is not applied here anymore.
   // It can only change when the configuration or the code changes, so it is applied at deployment time by
-  // DataObjectSchemaExporter, see CanHandleCatalogMetadata.
+  // CatalogSchemaUpdater, see CanHandleCatalogMetadata.
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
   }
