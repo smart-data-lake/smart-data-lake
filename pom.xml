@@ -847,13 +847,6 @@
                                 <version>17</version>
                             </requireJavaVersion>
                             <dependencyConvergence/>
-                            <!--<requireProperty>
-                            TODO: We do not have profiles for Scala 2.11 and 21.12 anymore. Can this be removed?
-                                <property>scala.minor.version</property>
-                                <message>You must setscala.minor.version property by activating profile scala-2.11 or
-                                    scala-2.12!
-                                </message>
-                            </requireProperty>-->
                         </rules>
                     </configuration>
                 </plugin>

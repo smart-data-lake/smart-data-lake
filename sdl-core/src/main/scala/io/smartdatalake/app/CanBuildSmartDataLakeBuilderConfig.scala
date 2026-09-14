@@ -84,13 +84,13 @@ trait CanBuildSmartDataLakeBuilderConfig[R] {
 
   val appName: String = applicationName.getOrElse(feedSel)
 
-  def isDryRun: Boolean = test.exists(Seq(TestMode.DryRun, TestMode.DryRunWithSchemaExport, TestMode.DryRunWithLineageExport).contains)
+  def isDryRun: Boolean = test.nonEmpty
 
   /**
    * true if the schemas of the output DataObjects should be exported at the end of this (dry) run,
    * see [[TestMode.DryRunWithSchemaExport]].
    */
-  def isSchemaExport: Boolean = test.contains(TestMode.DryRunWithSchemaExport)
+  def isSchemaExport: Boolean = test.contains(TestMode.DryRunWithSchemaExport) || test.contains(TestMode.DryRunWithLineageExport)
 
   /**
    * true if the column level lineage of the output DataObjects should be exported at the end of this (dry) run,

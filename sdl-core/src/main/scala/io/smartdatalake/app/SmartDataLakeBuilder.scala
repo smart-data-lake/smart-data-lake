@@ -90,7 +90,7 @@ object TestMode extends Enumeration {
   val DryRunWithSchemaExport: app.TestMode.Value = Value("dry-run-with-schema-export")
 
   /**
-   * Like [[DryRun]], but additionally exports the column level lineage of all output DataObjects to
+   * Like [[DryRunWithSchemaExport]], but additionally exports the column level lineage of all output DataObjects to
    * `global.dataObjectsSchemaSource`. The lineage is taken from the init phase DataFrames and describes from
    * which columns of which input DataObjects a column of an output DataObject is created, and how.
    *
