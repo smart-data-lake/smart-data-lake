@@ -19,10 +19,12 @@
 package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.dataframe.{ColumnLineage, ColumnLineageField, ColumnLineageInputField, ColumnTransformation}
+import io.smartdatalake.workflow.dataframe.{ColumnLineage, ColumnLineageDebug, ColumnLineageDebugColumn, ColumnLineageDebugDeadEnd, ColumnLineageDebugInput, ColumnLineageField, ColumnLineageInputField, ColumnTransformation}
 
 import scala.collection.mutable
+import scala.util.{Failure, Success, Try}
 
 /**
  * Extract the column level lineage of a [[ScalaDataFrame]], see issue #867.
@@ -40,7 +42,8 @@ import scala.collection.mutable
  *
  * A column which is not created from an input column at all, e.g. a constant, is reported without input
  * columns. A column which could not be traced back completely is reported as unresolved instead, so that a
- * consumer of the lineage can tell the two apart.
+ * consumer of the lineage can tell the two apart. Why a column stayed unresolved is collected as
+ * [[ColumnLineageDebug]] if `Environment.columnLineageDebug` is enabled.
  *
  * Limitations, next to the ones of the engine itself (see [[ScalaSubFeed]]):
  * - Only DIRECT lineage is detected, as in the Spark implementation. Columns used in join, filter, group by
@@ -67,7 +70,11 @@ private[smartdatalake] object ScalaColumnLineageUtil extends SmartDataLakeLogger
    */
   def extractColumnLineage(df: ScalaDataFrame, inputs: Seq[(DataObjectId, ScalaDataFrame)]): ColumnLineage = {
     val sources = collectSources(inputs)
-    if (sources.isEmpty) return ColumnLineage.empty
+    // there is nothing to trace back to, but the debug output still tells why the inputs are unknown
+    if (sources.isEmpty) {
+      return if (Environment.columnLineageDebug) ColumnLineage(Seq(), Seq(), collectDebugInfo(df, inputs, Seq()))
+      else ColumnLineage.empty
+    }
     val resolutions = df.cols
       .groupBy(_.definition.name)
       .toSeq
@@ -80,11 +87,11 @@ private[smartdatalake] object ScalaColumnLineageUtil extends SmartDataLakeLogger
       case (name, resolution) if resolution.isComplete =>
         ColumnLineageField(name, resolution.inputFields, if (resolution.inputFields.isEmpty) resolution.expression else None)
     }
-    val unresolvedColumns = resolutions.collect { case (name, resolution) if !resolution.isComplete => name }
-    if (unresolvedColumns.nonEmpty) {
-      logger.debug(s"Could not trace back all columns of the DataFrame, lineage is incomplete for ${unresolvedColumns.mkString(", ")}")
+    val unresolved = resolutions.filterNot { case (_, resolution) => resolution.isComplete }
+    if (unresolved.nonEmpty) {
+      logger.debug(s"Could not trace back all columns of the DataFrame, lineage is incomplete for ${unresolved.map(_._1).mkString(", ")}")
     }
-    ColumnLineage(fields, unresolvedColumns)
+    ColumnLineage(fields, unresolved.map(_._1), collectDebugInfo(df, inputs, unresolved))
   }
 
   /**
@@ -115,10 +122,12 @@ private[smartdatalake] object ScalaColumnLineageUtil extends SmartDataLakeLogger
       sources: Map[ScalaColumnProvenance, Seq[(DataObjectId, String)]]
   ): Resolution = {
     val inputFields = mutable.LinkedHashMap[(DataObjectId, String), ColumnTransformation]()
+    val deadEnds = mutable.Buffer[Seq[ScalaColumnProvenance]]()
     var expression: Option[String] = None
-    var isComplete = true
-    def go(provenance: ScalaColumnProvenance, isIdentity: Boolean, description: Option[String], visited: Set[ScalaColumnProvenance]): Unit = {
-      if (visited.contains(provenance)) return
+    // the path is the columns followed to get to this one, which doubles as the guard against cycles
+    def go(provenance: ScalaColumnProvenance, isIdentity: Boolean, description: Option[String], path: List[ScalaColumnProvenance]): Unit = {
+      if (path.contains(provenance)) return
+      val currentPath = provenance :: path
       val source = sources.get(provenance)
       source.foreach(_.foreach {
         case (dataObjectId, column) =>
@@ -133,22 +142,23 @@ private[smartdatalake] object ScalaColumnLineageUtil extends SmartDataLakeLogger
       if (source.isEmpty) {
         if (provenance.references.nonEmpty) {
           provenance.references.foreach { reference =>
-            go(reference, isIdentity && provenance.isIdentity, description.orElse(provenance.description), visited + provenance)
+            go(reference, isIdentity && provenance.isIdentity, description.orElse(provenance.description), currentPath)
           }
         // a column of a DataFrame which is neither an input DataObject nor calculated, so its source is unknown
         } else if (provenance.isRoot) {
-          isComplete = false
+          deadEnds += currentPath.reverse
         // the column is calculated without reading any column, e.g. from a literal
         } else if (expression.isEmpty) {
           expression = description.orElse(provenance.description).map(truncate)
         }
       }
     }
-    go(provenance, isIdentity = true, None, Set())
+    go(provenance, isIdentity = true, None, Nil)
     val sortedInputFields = inputFields.toSeq
       .map { case ((dataObjectId, column), transformation) => ColumnLineageInputField(dataObjectId, column, transformation) }
       .sortBy(f => (f.dataObjectId.id, f.column))
-    Resolution(sortedInputFields, expression, isComplete)
+    // the same column can be reached over several paths, of which the first one found is reported
+    Resolution(sortedInputFields, expression, deadEnds.toSeq.distinctBy(_.last))
   }
 
   private def truncate(description: String): String = {
@@ -156,19 +166,92 @@ private[smartdatalake] object ScalaColumnLineageUtil extends SmartDataLakeLogger
   }
 
   /**
+   * Collect why the lineage of the given columns could not be traced back completely, if the debug switch
+   * `Environment.columnLineageDebug` is enabled.
+   *
+   * A column which dead-ends has no provenance to describe where it comes from, as it belongs to a DataFrame
+   * created from data inside a transformation. The path leading to it therefore tells which transformation to
+   * look at. If the columns of an input DataObject are not used by the output DataFrame at all, the
+   * transformation has re-created them instead of deriving them, which also breaks the lineage.
+   *
+   * Collecting the debug output must not fail the analysis, so exceptions are caught here as well.
+   */
+  private def collectDebugInfo(
+      df: ScalaDataFrame,
+      inputs: Seq[(DataObjectId, ScalaDataFrame)],
+      unresolved: Seq[(String, Resolution)]
+  ): Option[ColumnLineageDebug] = {
+    if (!Environment.columnLineageDebug) return None
+    val debugInfo = Try {
+      val used = collectUsedProvenances(df)
+      val debugInputs = inputs.map {
+        case (dataObjectId, input) =>
+          ColumnLineageDebugInput(
+            dataObjectId,
+            input.cols.map(c => describeColumn(c.definition.name, c.definition.provenance)),
+            input.cols.filterNot(c => used.contains(c.definition.provenance)).map(_.definition.name)
+          )
+      }
+      val debugColumns = unresolved.map {
+        case (name, resolution) =>
+          val deadEnds = resolution.deadEnds.map { path =>
+            ColumnLineageDebugDeadEnd(describeProvenance(path.last), path.map(describeProvenance))
+          }
+          ColumnLineageDebugColumn(name, deadEnds)
+      }
+      if (debugColumns.nonEmpty) {
+        logger.warn(s"Could not trace back ${debugColumns.size} columns, dead-ending at a column created from data")
+      }
+      ColumnLineageDebug("plainScala", debugInputs, debugColumns)
+    }
+    debugInfo match {
+      case Success(debug) => Some(debug)
+      case Failure(ex) =>
+        logger.warn(s"Could not collect the column lineage debug info: ${ex.getClass.getSimpleName} - ${ex.getMessage}")
+        None
+    }
+  }
+
+  /**
+   * The provenance of every column the columns of `df` are calculated from, directly or indirectly.
+   */
+  private def collectUsedProvenances(df: ScalaDataFrame): Set[ScalaColumnProvenance] = {
+    val used = mutable.Set[ScalaColumnProvenance]()
+    def go(provenance: ScalaColumnProvenance): Unit = {
+      if (used.add(provenance)) provenance.references.foreach(go)
+    }
+    df.cols.foreach(c => go(c.definition.provenance))
+    used.toSet
+  }
+
+  private def describeColumn(name: String, provenance: ScalaColumnProvenance): String = {
+    s"$name@${Integer.toHexString(System.identityHashCode(provenance))}"
+  }
+
+  /**
+   * Describe a column by the identity of its provenance, as the provenance does not know the columns name.
+   */
+  private def describeProvenance(provenance: ScalaColumnProvenance): String = {
+    val description = provenance.description.map(d => s", ${truncate(d)}").getOrElse("")
+    s"column@${Integer.toHexString(System.identityHashCode(provenance))}(isIdentity=${provenance.isIdentity}, isRoot=${provenance.isRoot}$description)"
+  }
+
+  /**
    * The result of tracing one column back to the columns of the input DataObjects.
    *
    * @param inputFields the input columns found, empty if the column is not created from an input column.
    * @param expression  the expression defining the column, if it is not created from an input column.
-   * @param isComplete  false if a column was reached which could neither be traced back further nor attributed
-   *                    to an input DataObject. The lineage of such a column is unknown, not empty.
+   * @param deadEnds    the paths which ended at a column that could neither be traced back further nor
+   *                    attributed to an input DataObject. The lineage of such a column is unknown, not empty.
    */
-  private case class Resolution(inputFields: Seq[ColumnLineageInputField], expression: Option[String], isComplete: Boolean) {
+  private case class Resolution(inputFields: Seq[ColumnLineageInputField], expression: Option[String], deadEnds: Seq[Seq[ScalaColumnProvenance]]) {
+    def isComplete: Boolean = deadEnds.isEmpty
+
     // several columns of a DataFrame can have the same name, in which case their lineage is combined
     def combineWith(other: Resolution): Resolution = Resolution(
       (inputFields ++ other.inputFields).distinctBy(f => (f.dataObjectId, f.column)),
       expression.orElse(other.expression),
-      isComplete && other.isComplete
+      (deadEnds ++ other.deadEnds).distinctBy(_.last)
     )
   }
 }

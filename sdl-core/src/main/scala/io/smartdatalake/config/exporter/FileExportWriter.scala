@@ -50,6 +50,17 @@ case class FileExportWriter(path: Path) extends ExportWriter with SmartDataLakeL
     writeWithIndex(document, dataObjectId, "lineage", version)
   }
 
+  /**
+   * The debug output is written unversioned and is not added to an index, as it is read by a developer
+   * extending the lineage extraction and not by the local UI.
+   */
+  override def writeLineageDebug(document: String, dataObjectId: DataObjectId): Unit = {
+    if (path.getParent != null) Files.createDirectories(path)
+    val file = path.resolve(s"${dataObjectId.id}.lineage-debug.txt")
+    logger.info(s"Writing column lineage debug output for $dataObjectId to file $file")
+    Files.write(file, document.getBytes("UTF-8"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+  }
+
   def writeWithIndex(document: String, dataObjectId: DataObjectId, tpe: String, version: Long): Unit = {
     if (path.getParent != null) Files.createDirectories(path)
     val indexFile = getIndexPath(dataObjectId, tpe)

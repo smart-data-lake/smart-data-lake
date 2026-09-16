@@ -21,6 +21,7 @@ package io.smartdatalake.testutils
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, TestMode}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.testutils.ColumnLineageBehaviour.withColumnLineageDebug
 import io.smartdatalake.workflow.action.generic.customlogic.{CustomGenericDfTransformer, CustomGenericDfsTransformer}
 import io.smartdatalake.workflow.action.generic.transformer.{ScalaClassGenericDfTransformer, ScalaClassGenericDfsTransformer}
 import io.smartdatalake.workflow.action.{CopyAction, CustomDataFrameAction}
@@ -202,6 +203,56 @@ trait ColumnLineageExportBehaviour {
       assert(inputsOf(lineages(tgtDO.id).lineage, "label")
         == Seq(("inter1", "city", Transformation), ("inter1", "country", Transformation)))
       assert(lineages(tgtDO.id).lineage.unresolvedColumns.isEmpty)
+  }
+
+  def testTheColumnLineageDebugOutputIsExportedIfTheDebugSwitchIsEnabled(): Unit = withLineageExport {
+    (instanceRegistry, contextExec, contextInitExport, tempDir) =>
+      implicit val registry: InstanceRegistry = instanceRegistry
+      // the DataFrames of the mock DataObjects are created in the exec phase, see withLineageExport
+      implicit val dataFrameContext: ActionPipelineContext = contextExec
+      val srcDO = createDataObject("src1")
+      srcDO.writeDataFrame(Seq(("Bern", "CH")).toDF("name", "country"), Seq(), isRecursiveInput = false, None)(contextExec)
+      val tgtDO = createDataObject("tgt1")
+      val action = CopyAction("copyCities", srcDO.id, tgtDO.id,
+        transformers = Seq(ScalaClassGenericDfTransformer(className = classOf[ColumnLineageTestTransformer].getName))
+      )
+      instanceRegistry.register(action)
+
+      withColumnLineageDebug {
+        action.init(Seq(inputSubFeed(srcDO.id)))(contextInitExport)
+        DefaultSmartDataLakeBuilder.exportColumnLineage(contextInitExport)
+      }
+
+      // the exported files are named like the DataObject, see HadoopExportWriter
+      val debugFile = tempDir.resolve(s"${tgtDO.id}.lineage-debug.txt")
+      assert(Files.exists(debugFile), s"no column lineage debug file was written to $tempDir")
+      val content = Files.readString(debugFile)
+      assert(content.contains("Action copyCities -> DataObject tgt1"))
+      // the columns of the input DataObjects are reported, as they are what the lineage is traced back to
+      assert(content.contains("src1: "))
+      assert(content.contains("Unresolved columns:"))
+      // the lineage export itself is written as usual
+      assert(Files.exists(tempDir.resolve(s"${tgtDO.id}.lineage.json")))
+  }
+
+  def testNoColumnLineageDebugOutputIsExportedWithoutTheDebugSwitch(): Unit = withLineageExport {
+    (instanceRegistry, contextExec, contextInitExport, tempDir) =>
+      implicit val registry: InstanceRegistry = instanceRegistry
+      // the DataFrames of the mock DataObjects are created in the exec phase, see withLineageExport
+      implicit val dataFrameContext: ActionPipelineContext = contextExec
+      val srcDO = createDataObject("src1")
+      srcDO.writeDataFrame(Seq(("Bern", "CH")).toDF("name", "country"), Seq(), isRecursiveInput = false, None)(contextExec)
+      val tgtDO = createDataObject("tgt1")
+      val action = CopyAction("copyCities", srcDO.id, tgtDO.id,
+        transformers = Seq(ScalaClassGenericDfTransformer(className = classOf[ColumnLineageTestTransformer].getName))
+      )
+      instanceRegistry.register(action)
+
+      action.init(Seq(inputSubFeed(srcDO.id)))(contextInitExport)
+      DefaultSmartDataLakeBuilder.exportColumnLineage(contextInitExport)
+
+      assert(Files.exists(tempDir.resolve(s"${tgtDO.id}.lineage.json")))
+      assert(!Files.exists(tempDir.resolve(s"${tgtDO.id}.lineage-debug.txt")))
   }
 
   def testNoColumnLineageIsCollectedWithoutTheLineageExportTestMode(): Unit = withLineageExport {

@@ -20,8 +20,9 @@ package io.smartdatalake.config.exporter
 
 import io.smartdatalake.app.BackendClient
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.DataFrameSubFeed
-import io.smartdatalake.workflow.dataframe.{ColumnLineage, GenericSchema}
+import io.smartdatalake.workflow.dataframe.{ColumnLineage, ColumnLineageDebug, GenericSchema}
 import org.apache.commons.lang3.NotImplementedException
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path => HadoopPath}
@@ -33,7 +34,7 @@ import org.json4s.{JArray, JField, JObject, JValue}
 import java.nio.file.Paths
 import java.sql.Timestamp
 
-trait ExportWriter {
+trait ExportWriter extends SmartDataLakeLogger {
   def writeConfig(document: String, version: Option[String]): Unit
 
   def writeSchema(document: String, dataObjectId: DataObjectId, version: Long): Unit
@@ -44,6 +45,15 @@ trait ExportWriter {
    * Write the column level lineage of a DataObject, see [[io.smartdatalake.app.TestMode.DryRunWithLineageExport]].
    */
   def writeLineage(document: String, dataObjectId: DataObjectId, version: Long): Unit
+
+  /**
+   * Write why the column lineage of a DataObject could not be traced back completely, see
+   * `Environment.columnLineageDebug`. This is diagnostic output for developing the lineage extraction, so
+   * writers publishing to a service ignore it instead of uploading it there.
+   */
+  def writeLineageDebug(document: String, dataObjectId: DataObjectId): Unit = {
+    logger.warn(s"${getClass.getSimpleName} does not write column lineage debug output, skipping $dataObjectId")
+  }
 
   def writeFile(content: Array[Byte], filename: String, version: Option[String]): Unit = throw new NotImplementedException()
 
@@ -101,6 +111,37 @@ object ExportWriter {
       ).flatten.toList
     )
     pretty(contentJson)
+  }
+
+  /**
+   * Format why the column lineage of an output DataObject could not be traced back completely.
+   *
+   * This is a text report and not Json: it is read by a developer extending the lineage extraction, and its
+   * main part is the plan of the engine, which is a text tree.
+   */
+  def formatColumnLineageDebug(actionId: ActionId, dataObjectId: DataObjectId, debug: ColumnLineageDebug): String = {
+    val header = Seq(s"Action ${actionId.id} -> DataObject ${dataObjectId.id} (engine ${debug.engine})")
+    val inputs = Seq("", "Inputs:") ++ {
+      if (debug.inputs.isEmpty) Seq("  none - there are no input columns the lineage could be traced back to")
+      else debug.inputs.flatMap { input =>
+        Seq(s"  ${input.dataObjectId.id}: ${input.columns.mkString(", ")}") ++
+          Option.when(input.columnsNotInPlan.nonEmpty)(
+            s"    not used by the output DataFrame: ${input.columnsNotInPlan.mkString(", ")}"
+          )
+      }
+    }
+    val unresolvedColumns = Seq("", "Unresolved columns:") ++ {
+      if (debug.unresolvedColumns.isEmpty) Seq("  none")
+      else debug.unresolvedColumns.flatMap { column =>
+        Seq(s"  ${column.column}") ++ column.deadEnds.flatMap { deadEnd =>
+          Seq(s"    ${deadEnd.path.mkString(" <- ")}") ++
+            deadEnd.producedBy.map(nodeType => s"    produced by $nodeType").toSeq ++
+            deadEnd.producedByNode.map(node => s"      $node").toSeq
+        }
+      }
+    }
+    val plan = if (debug.plan.isEmpty) Seq() else Seq("", "Analyzed plan:") ++ debug.plan
+    (header ++ inputs ++ unresolvedColumns ++ plan).mkString(System.lineSeparator) + System.lineSeparator
   }
 
   def parseSchema(content: String): (GenericSchema, Option[String]) = {

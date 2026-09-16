@@ -102,6 +102,56 @@ The lineage of one run covers one Action each. End-to-end lineage over a whole p
 following the columns from Action to Action: the input fields of a DataObject written by one Action are the
 output columns of the DataObject read by the next one.
 
+## Debugging unresolved columns
+
+If many columns end up in `unresolvedFields`, enable the debug output to see *why* they could not be traced
+back. It is switched on with the environment parameter `columnLineageDebug`, e.g. as a Java system property:
+
+```bash
+sdlb --config config/ --feed-sel '.*' --test dry-run-with-lineage-export -Dsdl.columnLineageDebug=true
+```
+
+It can also be set as environment variable `SDL_COLUMN_LINEAGE_DEBUG=true` or in the configuration under
+`global.environment.columnLineageDebug`. SDLB then writes an additional text file
+`<dataObjectId>.lineage-debug.txt` next to the exported lineage, holding the columns of the input DataObjects,
+every column which could not be traced back, and the plan the lineage was read from:
+
+```
+Action selectCities -> DataObject tgt1 (engine Spark)
+
+Inputs:
+  src1: name#21, country#22
+
+Unresolved columns:
+  country
+    country#26 <- _2#24
+    produced by LocalRelation
+      LocalRelation [_1#23, _2#24]
+
+Analyzed plan:
+Project [name#21, country#26]
++- Join Inner, (country#22 = country#26)
+   :- SubqueryAlias a
+   :  +- Project [_1#14 AS name#21, _2#15 AS country#22]
+   :     +- LocalRelation [_1#14, _2#15]
+   +- SubqueryAlias b
+      +- Project [_1#23 AS name#25, _2#24 AS country#26]
+         +- LocalRelation [_1#23, _2#24]
+```
+
+How to read it:
+
+- the line below an unresolved column is the path SDLB followed, from the output column down to the column it
+  could not trace back any further, e.g. `country#26 <- _2#24`.
+- `produced by` names the type of the plan node which created that column. If that node type is one SDLB does
+  not handle yet, this is the missing piece of the analysis - please report it with the file.
+- `not used by the output DataFrame` after an input DataObject means that none of the columns of the output
+  DataFrame is derived from these input columns. Either the transformation really does not use them, or it
+  re-created them, e.g. by reading the data itself, which breaks the lineage.
+
+The debug output describes engine internals, its format is not stable, and it is meant to be read by a
+developer. Leave it switched off for regular exports.
+
 ## Caching
 
 An Action can hand its output DataFrame to the next Action instead of letting it read the DataObject again

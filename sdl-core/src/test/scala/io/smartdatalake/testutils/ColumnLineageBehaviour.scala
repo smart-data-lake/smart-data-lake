@@ -19,6 +19,8 @@
 package io.smartdatalake.testutils
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.definitions.Environment
+import io.smartdatalake.testutils.ColumnLineageBehaviour.withColumnLineageDebug
 import io.smartdatalake.workflow.dataframe.ColumnTransformation.{Direct, Identity, Transformation}
 import io.smartdatalake.workflow.dataframe.{ColumnLineage, GenericDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
@@ -111,6 +113,27 @@ trait ColumnLineageBehaviour {
     assert(lineage.unresolvedColumns == Seq("cnt", "other"))
     assert(lineage.get("other").isEmpty)
     assert(inputsOf(lineage, "name") == Seq(("src1", "name", Identity)))
+    // analyzing why a column could not be traced back costs time and is therefore opt-in
+    assert(lineage.debugInfo.isEmpty)
+  }
+
+  def testTheDebugSwitchRecordsWhyAColumnCouldNotBeTracedBack(): Unit = withColumnLineageDebug {
+    val src = cities
+    val other = Seq(("x", 1)).toDF("other", "cnt")
+    val df = src.join(other, lit(true), "inner")
+    val lineage = extract(df, "src1" -> src)
+
+    assert(lineage.unresolvedColumns == Seq("cnt", "other"))
+    val debug = lineage.debugInfo.getOrElse(throw new IllegalStateException("no column lineage debug info was collected"))
+    // every unresolved column is reported with the path leading to the column which could not be traced back
+    assert(debug.unresolvedColumns.map(_.column) == Seq("cnt", "other"))
+    assert(debug.unresolvedColumns.flatMap(_.deadEnds).nonEmpty)
+    assert(debug.unresolvedColumns.flatMap(_.deadEnds).forall(_.path.nonEmpty))
+    assert(debug.unresolvedColumns.flatMap(_.deadEnds).forall(deadEnd => deadEnd.path.last == deadEnd.attribute))
+    // the columns of the input DataObjects are listed, so that columns missing there can be spotted as well
+    assert(debug.inputs.map(_.dataObjectId.id) == Seq("src1"))
+    assert(debug.inputs.head.columns.exists(_.startsWith("name")))
+    assert(debug.inputs.head.columnsNotInPlan.isEmpty)
   }
 
   def testAJoinKeepsTheLineageOfTheColumnsOfBothInputs(): Unit = {
@@ -194,5 +217,21 @@ trait ColumnLineageBehaviour {
     // its value, which is INDIRECT lineage in OpenLineage and not detected yet
     assert(lineage.fields.flatMap(_.inputFields).forall(_.transformation.tpe == Direct))
     assert(lineage.fields.flatMap(_.inputFields).forall(!_.transformation.masking))
+  }
+}
+
+object ColumnLineageBehaviour {
+
+  /**
+   * Run a test with the column lineage debug output enabled, see `Environment.columnLineageDebug`.
+   */
+  def withColumnLineageDebug[T](test: => T): T = {
+    val previousColumnLineageDebug = Environment._columnLineageDebug
+    Environment._columnLineageDebug = Some(true)
+    try {
+      test
+    } finally {
+      Environment._columnLineageDebug = previousColumnLineageDebug
+    }
   }
 }

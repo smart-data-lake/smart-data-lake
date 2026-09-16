@@ -21,6 +21,7 @@ package io.smartdatalake.util.spark
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.testutils.ColumnLineageBehaviour
+import io.smartdatalake.testutils.ColumnLineageBehaviour.withColumnLineageDebug
 import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.ColumnLineage
@@ -79,6 +80,10 @@ class SparkColumnLineageUtilTest extends AnyFunSuite with ColumnLineageBehaviour
 
   test("a column of a DataFrame which is not an input is reported as unresolved") {
     testAColumnOfADataFrameWhichIsNotAnInputIsReportedAsUnresolved()
+  }
+
+  test("the debug switch records why a column could not be traced back") {
+    testTheDebugSwitchRecordsWhyAColumnCouldNotBeTracedBack()
   }
 
   test("a join keeps the lineage of the columns of both inputs") {
@@ -203,6 +208,35 @@ class SparkColumnLineageUtilTest extends AnyFunSuite with ColumnLineageBehaviour
     assert(inputsOf(lineage, "name") == Seq(("src1", "name", Identity)))
     assert(inputsOf(lineage, "maxPopulation") == Seq(("src2", "population", Transformation)))
     assert(lineage.unresolvedColumns.isEmpty)
+  }
+
+  test("the debug output names the plan node which created a column that could not be traced back") {
+    withColumnLineageDebug {
+      val src = sparkCities
+      val other = Seq(("x", 1)).toDF("other", "cnt")
+      val df = src.join(other, lit(true), "inner")
+      val lineage = extract(df, "src1" -> src)
+      val debug = lineage.debugInfo.get
+      val deadEnds = debug.unresolvedColumns.flatMap(_.deadEnds)
+      assert(deadEnds.nonEmpty)
+      // the type of the plan node creating a column tells which extract logic is missing to trace it back
+      assert(deadEnds.forall(_.producedBy.contains("LocalRelation")))
+      assert(deadEnds.forall(_.producedByNode.exists(_.contains("LocalRelation"))))
+      // the plan is part of the debug output, as it is where the lineage is read from
+      assert(debug.plan.exists(_.contains("Join")))
+    }
+  }
+
+  test("the debug output lists input columns which do not occur in the plan of the output DataFrame") {
+    withColumnLineageDebug {
+      // a DataFrame created a second time has other expression ids, so its columns can not be traced back
+      val df = sparkCities.withColumn("upperName", upper($"name"))
+      val lineage = extract(df, "src1" -> sparkCities)
+      assert(lineage.unresolvedColumns == Seq("country", "name", "upperName"))
+      val debug = lineage.debugInfo.get
+      assert(debug.inputs.map(_.dataObjectId.id) == Seq("src1"))
+      assert(debug.inputs.head.columnsNotInPlan == Seq("name", "country"))
+    }
   }
 
   test("a column created by a correlated scalar subquery is traced back into the subquery") {

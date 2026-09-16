@@ -635,6 +635,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    * see [[TestMode.DryRunWithLineageExport]].
    *
    * One document per output DataObject is written, in the format of the OpenLineage `columnLineage` facet.
+   * If `Environment.columnLineageDebug` is enabled, an additional text file per DataObject describes why the
+   * lineage of a column could not be traced back completely.
    */
   private[smartdatalake] def exportColumnLineage(context: ActionPipelineContext): Unit = {
     val globalConfig = context.globalConfig
@@ -655,8 +657,13 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       val version = System.currentTimeMillis() / 1000
       columnLineages.foreach { case (dataObjectId, entry) =>
         writer.writeLineage(ExportWriter.formatColumnLineage(entry.actionId, dataObjectId, entry.lineage), dataObjectId, version)
+        entry.lineage.debugInfo.foreach { debugInfo =>
+          writer.writeLineageDebug(ExportWriter.formatColumnLineageDebug(entry.actionId, dataObjectId, debugInfo), dataObjectId)
+        }
       }
       logger.info(s"Exported the column lineage of ${columnLineages.size} DataObjects to '$target'")
+      val debugCount = columnLineages.count(_._2.lineage.debugInfo.isDefined)
+      if (debugCount > 0) logger.info(s"Exported the column lineage debug output of $debugCount DataObjects to '$target'")
     }
   }
 

@@ -385,6 +385,23 @@ object Environment extends SmartDataLakeLogger {
   var _parseSchemaFilesLazy: Option[Boolean] = None
 
   /**
+   * Collect why the lineage of a column could not be traced back to a column of an input DataObject, and
+   * write it to an additional `<dataObjectId>.lineage-debug.txt` file next to the exported column lineage,
+   * see [[io.smartdatalake.app.TestMode.DryRunWithLineageExport]].
+   * This is diagnostic output for developing the lineage extraction and is disabled by default.
+   */
+  def columnLineageDebug: Boolean = {
+    if (_columnLineageDebug.isEmpty) {
+      _columnLineageDebug = Some(
+        EnvironmentUtil.getSdlParameter("columnLineageDebug")
+          .exists(_.toBoolean)
+      )
+    }
+    _columnLineageDebug.get
+  }
+  var _columnLineageDebug: Option[Boolean] = None
+
+  /**
    * Compile scala code of transformations only when used, e.g. lazy.
    * This improves startup speed for large configurations, and can fix problems with code files not being available for some locations.
    */

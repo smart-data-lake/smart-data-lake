@@ -19,14 +19,15 @@
 package io.smartdatalake.util.spark
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.dataframe.{ColumnLineage, ColumnLineageField, ColumnLineageInputField, ColumnTransformation}
+import io.smartdatalake.workflow.dataframe.{ColumnLineage, ColumnLineageDebug, ColumnLineageDebugColumn, ColumnLineageDebugDeadEnd, ColumnLineageDebugInput, ColumnLineageField, ColumnLineageInputField, ColumnTransformation}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, ExprId, Expression, ScalarSubquery, SubqueryExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeReference, ExprId, Expression, ScalarSubquery, SubqueryExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{Expand, Generate, LogicalPlan, ObjectProducer, SerializeFromObject, Union}
 
 import scala.collection.mutable
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
  * Extract the column level lineage of a Spark DataFrame, see issue #867.
@@ -42,7 +43,8 @@ import scala.util.Try
  *
  * A column which is not created from an input column at all, e.g. a constant, is reported without input
  * columns. A column which could not be traced back completely is reported as unresolved instead, so that a
- * consumer of the lineage can tell the two apart.
+ * consumer of the lineage can tell the two apart. Why a column stayed unresolved is collected as
+ * [[ColumnLineageDebug]] if `Environment.columnLineageDebug` is enabled.
  *
  * Limitations, to be addressed in a later step:
  * - Only DIRECT lineage is detected. Columns used in join, filter, group by, sort and window conditions
@@ -65,6 +67,11 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
   private val maxDescriptionLength = 200
 
   /**
+   * Maximum number of fields Spark prints per plan node when describing it for the debug output.
+   */
+  private val maxNodeFields = 25
+
+  /**
    * Extract the column level lineage of `df` with respect to the given input DataObjects.
    *
    * @param df     the DataFrame to analyze, e.g. the DataFrame written to an output DataObject.
@@ -73,7 +80,11 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
    */
   def extractColumnLineage(df: DataFrame, inputs: Seq[(DataObjectId, DataFrame)]): ColumnLineage = {
     val sources = collectSources(inputs)
-    if (sources.isEmpty) return ColumnLineage.empty
+    // there is nothing to trace back to, but the debug output still tells why the inputs are unknown
+    if (sources.isEmpty) {
+      return if (Environment.columnLineageDebug) ColumnLineage(Seq(), Seq(), collectDebugInfo(df, inputs, Seq()))
+      else ColumnLineage.empty
+    }
     val plan = df.queryExecution.analyzed
     val definitions = collectDefinitions(plan)
     val resolutions = plan.output
@@ -88,11 +99,11 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
       case (name, resolution) if resolution.isComplete =>
         ColumnLineageField(name, resolution.inputFields, if (resolution.inputFields.isEmpty) resolution.expression else None)
     }
-    val unresolvedColumns = resolutions.collect { case (name, resolution) if !resolution.isComplete => name }
-    if (unresolvedColumns.nonEmpty) {
-      logger.debug(s"Could not trace back all columns of the DataFrame, lineage is incomplete for ${unresolvedColumns.mkString(", ")}")
+    val unresolved = resolutions.filterNot { case (_, resolution) => resolution.isComplete }
+    if (unresolved.nonEmpty) {
+      logger.debug(s"Could not trace back all columns of the DataFrame, lineage is incomplete for ${unresolved.map(_._1).mkString(", ")}")
     }
-    ColumnLineage(fields, unresolvedColumns)
+    ColumnLineage(fields, unresolved.map(_._1), collectDebugInfo(df, inputs, unresolved))
   }
 
   /**
@@ -202,8 +213,11 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
    * Describe an expression by its SQL representation, cut off if it is too long.
    */
   private def describe(expression: Expression): Option[String] = {
-    Try(expression.sql).toOption
-      .map(sql => if (sql.length > maxDescriptionLength) sql.take(maxDescriptionLength - 3) + "..." else sql)
+    Try(expression.sql).toOption.map(truncate)
+  }
+
+  private def truncate(description: String): String = {
+    if (description.length > maxDescriptionLength) description.take(maxDescriptionLength - 3) + "..." else description
   }
 
   /**
@@ -218,10 +232,12 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
       definitions: Definitions
   ): Resolution = {
     val inputFields = mutable.LinkedHashMap[(DataObjectId, String), ColumnTransformation]()
+    val deadEnds = mutable.Buffer[Seq[ExprId]]()
     var expression: Option[String] = None
-    var isComplete = true
-    def go(exprId: ExprId, isIdentity: Boolean, description: Option[String], visited: Set[ExprId]): Unit = {
-      if (visited.contains(exprId)) return
+    // the path is the columns followed to get to this one, which doubles as the guard against cycles
+    def go(exprId: ExprId, isIdentity: Boolean, description: Option[String], path: List[ExprId]): Unit = {
+      if (path.contains(exprId)) return
+      val currentPath = exprId :: path
       val source = sources.get(exprId)
       source.foreach(_.foreach {
         case (dataObjectId, column) =>
@@ -234,7 +250,7 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
       // a column of a Union can be a column of an input DataObject and take the columns of the other children
       // of the Union at the same time, see the Union case in collectDefinitions
       definitions.unionDependencies.getOrElse(exprId, Seq()).foreach { dependency =>
-        go(dependency, isIdentity, description, visited + exprId)
+        go(dependency, isIdentity, description, currentPath)
       }
       // A column of an input DataObject is a leaf of the lineage of this Action. Its own definition describes
       // how the input DataObject created it and belongs to the Action which wrote it.
@@ -242,21 +258,124 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
         definitions.byExprId.get(exprId) match {
           case Some(definition) if definition.dependencies.nonEmpty =>
             definition.dependencies.foreach { dependency =>
-              go(dependency, isIdentity && definition.isIdentity, description.orElse(definition.description), visited + exprId)
+              go(dependency, isIdentity && definition.isIdentity, description.orElse(definition.description), currentPath)
             }
           // the column is defined without reading any column, e.g. from a literal or by count(*)
           case Some(definition) =>
             if (expression.isEmpty) expression = description.orElse(definition.description)
           // the column is neither a column of an input DataObject nor defined inside the plan
-          case None => isComplete = false
+          case None => deadEnds += currentPath.reverse
         }
       }
     }
-    go(exprId, isIdentity = true, None, Set())
+    go(exprId, isIdentity = true, None, Nil)
     val sortedInputFields = inputFields.toSeq
       .map { case ((dataObjectId, column), transformation) => ColumnLineageInputField(dataObjectId, column, transformation) }
       .sortBy(f => (f.dataObjectId.id, f.column))
-    Resolution(sortedInputFields, expression, isComplete)
+    // the same column can be reached over several paths, of which the first one found is reported
+    Resolution(sortedInputFields, expression, deadEnds.toSeq.distinctBy(_.last))
+  }
+
+  /**
+   * Collect why the lineage of the given columns could not be traced back completely, if the debug switch
+   * `Environment.columnLineageDebug` is enabled.
+   *
+   * The interesting part is the plan node which created the column a lineage dead-ended at: if that node type
+   * is not handled by [[collectDefinitions]], the extraction has to be extended for it. If on the other hand
+   * the columns of an input DataObject do not occur in the plan at all, their expression ids were replaced on
+   * the way to the output DataFrame, e.g. by Sparks analyzer deduplicating the columns of a self-join.
+   *
+   * Reading the plan for the debug output must not fail the analysis, so exceptions are caught here as well.
+   */
+  private def collectDebugInfo(
+      df: DataFrame,
+      inputs: Seq[(DataObjectId, DataFrame)],
+      unresolved: Seq[(String, Resolution)]
+  ): Option[ColumnLineageDebug] = {
+    if (!Environment.columnLineageDebug) return None
+    val debugInfo = Try {
+      val plan = df.queryExecution.analyzed
+      val names = collectAttributeNames(plan)
+      val origins = collectOrigins(plan)
+      val debugInputs = inputs.map {
+        case (dataObjectId, input) =>
+          val attributes = input.queryExecution.analyzed.output
+          ColumnLineageDebugInput(
+            dataObjectId,
+            attributes.map(describeAttribute),
+            attributes.filterNot(a => names.contains(a.exprId)).map(_.name)
+          )
+      }
+      val debugColumns = unresolved.map {
+        case (name, resolution) =>
+          val deadEnds = resolution.deadEnds.map { path =>
+            val node = origins.get(path.last)
+            ColumnLineageDebugDeadEnd(
+              describeExprId(path.last, names),
+              path.map(describeExprId(_, names)),
+              node.map(_.nodeName),
+              node.map(describeNode)
+            )
+          }
+          ColumnLineageDebugColumn(name, deadEnds)
+      }
+      if (debugColumns.nonEmpty) {
+        val nodeTypes = debugColumns.flatMap(_.deadEnds.flatMap(_.producedBy)).distinct
+        logger.warn(s"Could not trace back ${debugColumns.size} columns, dead-ending at ${nodeTypes.mkString(", ")}")
+      }
+      ColumnLineageDebug("Spark", debugInputs, debugColumns, plan.treeString.linesIterator.toSeq)
+    }
+    debugInfo match {
+      case Success(debug) => Some(debug)
+      case Failure(ex) =>
+        logger.warn(s"Could not collect the column lineage debug info: ${ex.getClass.getSimpleName} - ${ex.getMessage}")
+        None
+    }
+  }
+
+  /**
+   * The name of every column occurring in the plan, by its expression id, to make the ids readable.
+   * Its key set is at the same time the expression ids the plan knows.
+   */
+  private def collectAttributeNames(plan: LogicalPlan): Map[ExprId, String] = {
+    val names = mutable.Map[ExprId, String]()
+    plan.foreachWithSubqueries { node =>
+      node.output.foreach(attribute => names.put(attribute.exprId, attribute.name))
+      node.expressions.foreach(_.foreach {
+        case attribute: Attribute => names.put(attribute.exprId, attribute.name)
+        case alias: Alias => names.put(alias.exprId, alias.name)
+        case _ => ()
+      })
+    }
+    names.toMap
+  }
+
+  /**
+   * The plan node creating a column, by the expression id of that column.
+   *
+   * A node creates the columns of its output which none of its children has, e.g. the columns of a relation
+   * or the columns an aggregation calculates. The traversal visits a node before its children, so putting the
+   * nodes unconditionally leaves the node furthest down in the plan, which is the one creating the column.
+   */
+  private def collectOrigins(plan: LogicalPlan): Map[ExprId, LogicalPlan] = {
+    val origins = mutable.Map[ExprId, LogicalPlan]()
+    plan.foreachWithSubqueries { node =>
+      val childExprIds = node.children.flatMap(_.output).map(_.exprId).toSet
+      node.output
+        .filterNot(attribute => childExprIds.contains(attribute.exprId))
+        .foreach(attribute => origins.put(attribute.exprId, node))
+    }
+    origins.toMap
+  }
+
+  private def describeAttribute(attribute: Attribute): String = s"${attribute.name}#${attribute.exprId.id}"
+
+  private def describeExprId(exprId: ExprId, names: Map[ExprId, String]): String = {
+    s"${names.getOrElse(exprId, "?")}#${exprId.id}"
+  }
+
+  private def describeNode(node: LogicalPlan): String = {
+    truncate(Try(node.simpleString(maxNodeFields)).getOrElse(node.nodeName))
   }
 
   /**
@@ -264,15 +383,17 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
    *
    * @param inputFields the input columns found, empty if the column is not created from an input column.
    * @param expression  the expression defining the column, if it is not created from an input column.
-   * @param isComplete  false if a column was reached which could neither be traced back further nor attributed
-   *                    to an input DataObject. The lineage of such a column is unknown, not empty.
+   * @param deadEnds    the paths which ended at a column that could neither be traced back further nor
+   *                    attributed to an input DataObject. The lineage of such a column is unknown, not empty.
    */
-  private case class Resolution(inputFields: Seq[ColumnLineageInputField], expression: Option[String], isComplete: Boolean) {
+  private case class Resolution(inputFields: Seq[ColumnLineageInputField], expression: Option[String], deadEnds: Seq[Seq[ExprId]]) {
+    def isComplete: Boolean = deadEnds.isEmpty
+
     // several columns of a DataFrame can have the same name, in which case their lineage is combined
     def combineWith(other: Resolution): Resolution = Resolution(
       (inputFields ++ other.inputFields).distinctBy(f => (f.dataObjectId, f.column)),
       expression.orElse(other.expression),
-      isComplete && other.isComplete
+      (deadEnds ++ other.deadEnds).distinctBy(_.last)
     )
   }
 
