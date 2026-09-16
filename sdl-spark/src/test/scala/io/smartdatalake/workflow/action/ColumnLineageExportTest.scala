@@ -84,6 +84,14 @@ class ColumnLineageExportTest extends AnyFunSuite with ColumnLineageExportBehavi
     testNoColumnLineageIsCollectedWithoutTheLineageExportTestMode()
   }
 
+  test("the column lineage debug output is exported if the debug switch is enabled") {
+    testTheColumnLineageDebugOutputIsExportedIfTheDebugSwitchIsEnabled()
+  }
+
+  test("no column lineage debug output is exported without the debug switch") {
+    testNoColumnLineageDebugOutputIsExportedWithoutTheDebugSwitch()
+  }
+
   test("the column lineage of an Action using a SQL transformer is collected") {
     withLineageExport { (instanceRegistry, contextExec, contextInitExport, _) =>
       implicit val registry: InstanceRegistry = instanceRegistry

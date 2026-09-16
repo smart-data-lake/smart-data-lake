@@ -62,6 +62,10 @@ class ScalaColumnLineageUtilTest extends AnyFunSuite with ColumnLineageBehaviour
     testAColumnOfADataFrameWhichIsNotAnInputIsReportedAsUnresolved()
   }
 
+  test("the debug switch records why a column could not be traced back") {
+    testTheDebugSwitchRecordsWhyAColumnCouldNotBeTracedBack()
+  }
+
   test("a join keeps the lineage of the columns of both inputs") {
     testAJoinKeepsTheLineageOfTheColumnsOfBothInputs()
   }

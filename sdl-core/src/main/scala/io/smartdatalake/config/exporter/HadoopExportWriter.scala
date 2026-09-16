@@ -49,6 +49,10 @@ case class HadoopExportWriter(path: HadoopPath, hadoopConfig: Configuration = ne
     writeFile(document, s"${dataObjectId}.lineage.json")
   }
 
+  override def writeLineageDebug(document: String, dataObjectId: DataObjectId): Unit = {
+    writeFile(document, s"${dataObjectId}.lineage-debug.txt")
+  }
+
   override def readLatestSchema(dataObjectId: DataObjectId): Option[String] = {
     readFile(s"${dataObjectId}.schema.json")
   }

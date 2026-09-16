@@ -37,8 +37,15 @@ import org.json4s.JsonAST.{JArray, JBool, JField, JObject, JString, JValue}
  *
  * @param fields            lineage per column of the DataFrame, ordered by column name to keep the export stable.
  * @param unresolvedColumns columns whose lineage could not be traced back completely, ordered by name.
+ * @param debugInfo         why these columns could not be traced back, collected only if
+ *                          `Environment.columnLineageDebug` is enabled. This is diagnostic output for
+ *                          developing the lineage extraction and is therefore not part of the Json export.
  */
-case class ColumnLineage(fields: Seq[ColumnLineageField], unresolvedColumns: Seq[String] = Seq()) {
+case class ColumnLineage(
+    fields: Seq[ColumnLineageField],
+    unresolvedColumns: Seq[String] = Seq(),
+    debugInfo: Option[ColumnLineageDebug] = None
+) {
 
   def isEmpty: Boolean = fields.isEmpty && unresolvedColumns.isEmpty
 
