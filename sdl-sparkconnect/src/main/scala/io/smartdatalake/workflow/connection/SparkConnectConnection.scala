@@ -54,6 +54,7 @@ case class SparkConnectConnection(
   val subFeedType: Type = typeOf[SparkConnectSubFeed]
 
   @transient private var _sparkSession: Option[SparkSession] = None
+  @transient private var _stopSparkSessionOnClose: Boolean = false
   def sparkSession(implicit context: ActionPipelineContext): SparkSession = {
     if (_sparkSession.isEmpty) {
       assert(CustomCodeUtil.getClassByNameIfExists("org.apache.spark.sql.connect.SparkSession").nonEmpty, "Spark Connect classes are missing on the classpath but sdl-sparkconnect is built for Spark Connect. Make sure to use a Spark Connect environment / cluster.")
@@ -64,9 +65,13 @@ case class SparkConnectConnection(
       if (sparkOptions.nonEmpty) logger.info(s"($id) additional sparkOptions: " + sparkOptions.map { case (k, v) => createMaskedSecretsKVLog(k, v.toString) }.mkString(", "))
       val builder = SparkSession.builder().remote(url)
         .config("spark.sql.sources.partitionOverwriteMode", "dynamic") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptions)
+      // remember an existing session, as getOrCreate returns it instead of creating a new one
+      val existingSparkSession = SparkSession.getActiveSession.orElse(SparkSession.getDefaultSession)
       val session = sparkOptions.foldLeft(builder) {
         case (builder, (key, value)) => builder.config(key, value.resolve())
       }.getOrCreate()
+      // only a session created by SDLB itself may be stopped on close, see also close()
+      _stopSparkSessionOnClose = !existingSparkSession.contains(session)
       _sparkSession = Some(session)
     }
     _sparkSession.get
@@ -79,6 +84,21 @@ case class SparkConnectConnection(
     val metadataId = context.currentAction.map(_.id).getOrElse(id)
     sparkSession.clearTags()
     sparkSession.addTag(s"${context.appConfig.appName}-$metadataId-runId-${context.executionId.runId}".replaceAll("[,.]", "-"))
+  }
+
+  /**
+   * Close the Spark Connect session if it was created by this connection, releasing the session on the remote server.
+   *
+   * A session provided by an embedding application (e.g. unit tests sharing one session over many tests) must not be
+   * stopped, as it might still be used after the SDLB run.
+   */
+  override def close(): Unit = {
+    if (_stopSparkSessionOnClose) _sparkSession.foreach { session =>
+      logger.info(s"($id) stopping Spark Connect session created by SDLB")
+      session.stop()
+    }
+    _sparkSession = None
+    _stopSparkSessionOnClose = false
   }
 }
 

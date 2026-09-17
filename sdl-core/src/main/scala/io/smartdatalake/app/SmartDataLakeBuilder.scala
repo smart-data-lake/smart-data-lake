@@ -34,6 +34,7 @@ import io.smartdatalake.workflow.ExecutionPhase.{Exec, ExecutionPhase, Init, Pre
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl, RuntimeInfo, SDLExecutionId}
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.apache.hadoop.conf.Configuration
 import org.slf4j.Logger
 import scopt.{OParser, OParserBuilder}
@@ -315,6 +316,9 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     // make sure memory logger timer task is stopped
     MemoryUtils.stopMemoryLogger()
 
+    // release resources of the engines used, e.g. stop a Spark session created by SDLB
+    closeEngineConnections()
+
     // invoke SDLPlugin if configured
     Environment.sdlPlugins.foreach(_.shutdown())
 
@@ -323,6 +327,24 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
     if (stopStatusInfoServer) {
       StatusInfoServer.stop()
     }
+  }
+
+  /**
+   * Close the engine connections used in this run to release their resources, e.g. stop a Spark session created by SDLB.
+   *
+   * Stopping the Spark session in an orderly manner is important, as otherwise the SparkContext is stopped by the JVM
+   * shutdown hook, racing with the daemon threads of Sparks listener bus and context cleaner. They are interrupted in
+   * this case, which Spark reports as "uncaught error in thread ..., stopping SparkContext" on log level error,
+   * even though the SDLB run was successful.
+   */
+  private def closeEngineConnections(): Unit = {
+    instanceRegistry.getConnections
+      .collect { case connection: Connection with EngineConnection => connection }
+      .foreach(connection =>
+        Try(connection.close()).failed.foreach(ex =>
+          logger.warn(s"(${connection.id}) Could not close engine connection: ${ex.getClass.getSimpleName} - ${ex.getMessage}")
+        )
+      )
   }
 
   /**

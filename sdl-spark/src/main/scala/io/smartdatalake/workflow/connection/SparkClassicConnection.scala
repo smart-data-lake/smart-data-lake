@@ -97,12 +97,17 @@ case class SparkClassicConnection(
   val subFeedType: Type = typeOf[SparkSubFeed]
 
   @transient private var _sparkSession: Option[SparkSession] = None
+  @transient private var _stopSparkSessionOnClose: Boolean = false
   def sparkSession(implicit context: ActionPipelineContext): SparkSession = {
     if (_sparkSession.isEmpty) {
       require(!master.contains("yarn") || System.getenv("SPARK_HOME") != null, "Env variable SPARK_HOME needs to be set in local mode with master=yarn!")
       val sparkOptionsExtended = additionalSparkOptions ++ sparkOptions
       checkCaseSensitivityIsConsistent(sparkOptionsExtended)
+      // remember an existing session, as getOrCreate returns it instead of creating a new one
+      val existingSparkSession = SparkSession.getActiveSession.orElse(SparkSession.getDefaultSession)
       val sparkSession = SparkClassicConnection.createSparkSession(context.application, master, deployMode, kryoClasses, sparkOptionsExtended, enableHive)
+      // only a session created by SDLB itself may be stopped on close, see also close()
+      _stopSparkSessionOnClose = !existingSparkSession.contains(sparkSession)
       registerUdf(sparkSession)
       // adjust log level
       if (System.getProperty("logLevel") != null) sparkSession.sparkContext.setLogLevel(System.getProperty("logLevel"))
@@ -190,6 +195,21 @@ case class SparkClassicConnection(
 
   override def activate(operation: Option[String])(implicit context: ActionPipelineContext): Unit = {
     setSparkJobMetadata(operation)
+  }
+
+  /**
+   * Stop the Spark session if it was created by this connection.
+   *
+   * A session provided by the environment (master=None, e.g. Databricks) or by an embedding application (e.g. unit tests
+   * sharing one session over many tests) must not be stopped, as it might still be used after the SDLB run.
+   */
+  override def close(): Unit = {
+    if (_stopSparkSessionOnClose) _sparkSession.filterNot(_.sparkContext.isStopped).foreach { session =>
+      logger.info(s"($id) stopping Spark session created by SDLB")
+      session.stop()
+    }
+    _sparkSession = None
+    _stopSparkSessionOnClose = false
   }
 }
 

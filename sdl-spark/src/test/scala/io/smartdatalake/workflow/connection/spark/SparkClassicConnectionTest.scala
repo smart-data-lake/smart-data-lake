@@ -71,6 +71,19 @@ class SparkClassicConnectionTest extends AnyFunSuite with BeforeAndAfter {
     assert(sparkSession.conf.get("spark.authenticate.secret") == "resolvedSecret")
   }
 
+  test("close does not stop a Spark session provided by the environment") {
+    // the Spark session is provided by the test setup, SparkClassicConnection just gets it from the environment
+    assert(!session.sparkContext.isStopped)
+    val sparkClassicConnection = SparkClassicConnection(id = "testConnection", master = Some("local"))
+    assert(sparkClassicConnection.sparkSession(contextExec) == session)
+
+    // execute
+    sparkClassicConnection.close()
+
+    // check
+    assert(!session.sparkContext.isStopped)
+  }
+
   test("apply udf from spark connection") {
     import session.implicits._
 
