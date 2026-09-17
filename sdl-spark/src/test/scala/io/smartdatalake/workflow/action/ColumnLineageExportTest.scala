@@ -20,6 +20,8 @@ package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.app.DefaultSmartDataLakeBuilder
+import io.smartdatalake.testutils.ColumnLineageBehaviour.withColumnLineageDebug
 import io.smartdatalake.testutils.ColumnLineageExportBehaviour
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.workflow.action.generic.transformer.{SQLDfTransformer, SQLDfsTransformer}
@@ -35,6 +37,7 @@ import org.apache.spark.sql.functions.{col, udf}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.funsuite.AnyFunSuite
 
+import java.nio.file.Files
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
@@ -84,12 +87,38 @@ class ColumnLineageExportTest extends AnyFunSuite with ColumnLineageExportBehavi
     testNoColumnLineageIsCollectedWithoutTheLineageExportTestMode()
   }
 
-  test("the column lineage debug output is exported if the debug switch is enabled") {
-    testTheColumnLineageDebugOutputIsExportedIfTheDebugSwitchIsEnabled()
+  test("no column lineage debug output is exported if all columns are resolved") {
+    testNoColumnLineageDebugOutputIsExportedIfAllColumnsAreResolved()
   }
 
-  test("no column lineage debug output is exported without the debug switch") {
-    testNoColumnLineageDebugOutputIsExportedWithoutTheDebugSwitch()
+  test("the column lineage debug output is exported for the columns which could not be traced back") {
+    withLineageExport { (instanceRegistry, contextExec, contextInitExport, tempDir) =>
+      implicit val registry: InstanceRegistry = instanceRegistry
+      implicit val dataFrameContext: ActionPipelineContext = contextExec
+      val srcDO = createDataObject("src1")
+      srcDO.writeDataFrame(Seq(("Bern", "CH")).toDF("name", "country"), Seq(), isRecursiveInput = false, None)(contextExec)
+      val tgtDO = createDataObject("tgt1")
+      // the inline table is not an input DataObject, so the rating column can not be traced back
+      val action = CopyAction("copyCities", srcDO.id, tgtDO.id,
+        transformers = Seq(SQLDfTransformer(code = Some(
+          "select c.name, r.rating from src1 c cross join (values ('x', 5)) as r(k, rating)"
+        )))
+      )
+      instanceRegistry.register(action)
+
+      withColumnLineageDebug {
+        action.init(Seq(inputSubFeed(srcDO.id)))(contextInitExport)
+        DefaultSmartDataLakeBuilder.exportColumnLineage(contextInitExport)
+      }
+
+      val content = Files.readString(tempDir.resolve(s"${tgtDO.id}.lineage-debug.txt"))
+      assert(content.contains("Action copyCities -> DataObject tgt1"))
+      // the columns of the input DataObject, the unresolved column and where it comes from
+      assert(content.contains("src1: name#"))
+      assert(content.contains("rating"))
+      assert(content.contains("produced by LocalRelation"))
+      assert(content.contains("Analyzed plan:"))
+    }
   }
 
   test("the column lineage of an Action using a SQL transformer is collected") {
@@ -142,9 +171,11 @@ class ColumnLineageExportTest extends AnyFunSuite with ColumnLineageExportBehavi
       val lineage = contextInitExport.columnLineageExportRegistry.getColumnLineages(tgtDO.id).lineage
       // the column belongs to both inputs, as inter1 is a copy of src1 which was not materialized in between
       assert(inputsOf(lineage, "fromInter") == Seq(("inter1", "name", Identity), ("src1", "name", Identity)))
-      // Spark's analyzer replaces the expression ids of one side of a join reading the same columns twice, so
-      // the columns of that side can not be traced back. They are reported as unresolved and not as a wrong source.
-      assert(lineage.unresolvedColumns == Seq("fromSrc"))
+      // Spark's analyzer replaces the expression ids of one side of a join reading the same columns twice.
+      // That side is recognized as a copy of the src1 DataFrame, which is the input it is read from, so its
+      // columns are traced back as well - and more precisely than the columns sharing the expression ids.
+      assert(inputsOf(lineage, "fromSrc") == Seq(("src1", "country", Identity)))
+      assert(lineage.unresolvedColumns.isEmpty)
     }
   }
 

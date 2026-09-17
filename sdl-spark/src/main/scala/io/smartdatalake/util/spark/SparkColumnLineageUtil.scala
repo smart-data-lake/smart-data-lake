@@ -23,7 +23,7 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataframe.{ColumnLineage, ColumnLineageDebug, ColumnLineageDebugColumn, ColumnLineageDebugDeadEnd, ColumnLineageDebugInput, ColumnLineageField, ColumnLineageInputField, ColumnTransformation}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeReference, ExprId, Expression, ScalarSubquery, SubqueryExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeReference, ExprId, Expression, ScalarSubquery, SubqueryExpression, WindowExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{Expand, Generate, LogicalPlan, ObjectProducer, SerializeFromObject, Union}
 
 import scala.collection.mutable
@@ -51,10 +51,6 @@ import scala.util.{Failure, Success, Try}
  *   influence the output without being part of its value, and are reported as INDIRECT by OpenLineage.
  *   The same holds for an aggregation over all rows, e.g. count(*), which depends on the input dataset but
  *   not on one of its columns.
- * - A column read from the same DataObject twice, e.g. in a self-join, is only traced back for one of the two
- *   occurrences, as Spark's analyzer replaces the duplicated expression ids. This also happens if an Action
- *   reads both the cached output of a previous Action (cacheOutput=true) and a DataObject which that Action
- *   passed through unchanged, as both inputs then share the same columns.
  * - Columns of a typed Dataset transformation, e.g. a map over a case class, are traced back to all columns
  *   read by that transformation, as the Scala function transforming them is opaque.
  */
@@ -79,13 +75,9 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
    * @return the columns of `df` which could be traced back to a column of an input DataObject.
    */
   def extractColumnLineage(df: DataFrame, inputs: Seq[(DataObjectId, DataFrame)]): ColumnLineage = {
-    val sources = collectSources(inputs)
-    // there is nothing to trace back to, but the debug output still tells why the inputs are unknown
-    if (sources.isEmpty) {
-      return if (Environment.columnLineageDebug) ColumnLineage(Seq(), Seq(), collectDebugInfo(df, inputs, Seq()))
-      else ColumnLineage.empty
-    }
     val plan = df.queryExecution.analyzed
+    val sources = collectSources(plan, inputs)
+    if (sources.isEmpty) return ColumnLineage.empty
     val definitions = collectDefinitions(plan)
     val resolutions = plan.output
       .groupBy(_.name)
@@ -113,13 +105,50 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
    * and caches its output (cacheOutput=true) hands the very same columns to the next Action, so if that Action
    * reads the original DataObject as well, both inputs share the expression id. Such a column is reported for
    * every input it belongs to, as there is no way to tell which one it was read from - and both are true.
+   *
+   * An input DataObject which is read more than once appears in the plan with replaced expression ids, which
+   * are collected by [[collectCopiedSources]].
    */
-  private def collectSources(inputs: Seq[(DataObjectId, DataFrame)]): Map[ExprId, Seq[(DataObjectId, String)]] = {
-    inputs
-      .flatMap {
-        case (dataObjectId, df) => df.queryExecution.analyzed.output.map(a => a.exprId -> (dataObjectId, a.name))
+  private def collectSources(plan: LogicalPlan, inputs: Seq[(DataObjectId, DataFrame)]): Map[ExprId, Seq[(DataObjectId, String)]] = {
+    val inputPlans = inputs.map { case (dataObjectId, df) => (dataObjectId, df.queryExecution.analyzed) }
+    val sources = inputPlans.flatMap {
+      case (dataObjectId, inputPlan) => inputPlan.output.map(a => a.exprId -> (dataObjectId, a.name))
+    }
+    (sources ++ collectCopiedSources(plan, inputPlans)).distinct.groupMap(_._1)(_._2)
+  }
+
+  /**
+   * Map the expression ids of the copies of an input DataFrame in the plan to the DataObject they belong to.
+   *
+   * Spark's analyzer replaces the expression ids of a plan which is read more than once, e.g. if an Action
+   * joins a DataObject with itself, reads it in both branches of a union, or joins it with an aggregate over
+   * the same DataObject. Such a copy can not be recognized by its expression ids, but it produces the same
+   * result as the input DataFrame, which `sameResult` detects by comparing the canonicalized plans - these
+   * are normalized, so they no longer depend on the expression ids. The columns of a copy are therefore the
+   * columns of the input DataObject, in the same order.
+   *
+   * If two input DataObjects produce the very same result, their copies can not be told apart and are
+   * reported for both of them, as for the shared columns described in [[collectSources]].
+   */
+  private def collectCopiedSources(
+      plan: LogicalPlan,
+      inputPlans: Seq[(DataObjectId, LogicalPlan)]
+  ): Seq[(ExprId, (DataObjectId, String))] = {
+    val sources = mutable.Buffer[(ExprId, (DataObjectId, String))]()
+    plan.foreachWithSubqueries { node =>
+      inputPlans.foreach {
+        case (dataObjectId, inputPlan) =>
+          // comparing the canonicalized plans is expensive, so the columns are checked first
+          val couldBeCopy = node.output.size == inputPlan.output.size &&
+            node.output.map(_.dataType) == inputPlan.output.map(_.dataType)
+          if (couldBeCopy && node.sameResult(inputPlan)) {
+            node.output.zip(inputPlan.output).foreach {
+              case (attribute, source) => sources.append(attribute.exprId -> (dataObjectId, source.name))
+            }
+          }
       }
-      .groupMap(_._1)(_._2)
+    }
+    sources.toSeq
   }
 
   /**
@@ -198,10 +227,13 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
    *
    * A subquery expression holds its plan in a field and not as a child, so its result column is not one of the
    * columns it references. The columns correlating a subquery with the outer query on the other hand are
-   * referenced, but they influence the value only indirectly and are therefore left out here.
+   * referenced, but they influence the value only indirectly and are therefore left out here. The same holds
+   * for the partition and order by columns of a window function, which are part of its window specification.
    */
   private def directReferences(expression: Expression): Seq[ExprId] = expression match {
     case attribute: AttributeReference => Seq(attribute.exprId)
+    // the columns a window function is partitioned and ordered by influence its value only indirectly
+    case window: WindowExpression => directReferences(window.windowFunction)
     // a scalar subquery evaluates to the single column its plan returns
     case subquery: ScalarSubquery => subquery.plan.output.map(_.exprId)
     // other subquery expressions, e.g. IN or EXISTS, are conditions and therefore INDIRECT lineage
@@ -277,8 +309,8 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
   }
 
   /**
-   * Collect why the lineage of the given columns could not be traced back completely, if the debug switch
-   * `Environment.columnLineageDebug` is enabled.
+   * Collect why the lineage of the given columns could not be traced back completely, if there are such
+   * columns and the debug switch `Environment.columnLineageDebug` is enabled.
    *
    * The interesting part is the plan node which created the column a lineage dead-ended at: if that node type
    * is not handled by [[collectDefinitions]], the extraction has to be extended for it. If on the other hand
@@ -292,7 +324,7 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
       inputs: Seq[(DataObjectId, DataFrame)],
       unresolved: Seq[(String, Resolution)]
   ): Option[ColumnLineageDebug] = {
-    if (!Environment.columnLineageDebug) return None
+    if (!Environment.columnLineageDebug || unresolved.isEmpty) return None
     val debugInfo = Try {
       val plan = df.queryExecution.analyzed
       val names = collectAttributeNames(plan)
@@ -319,10 +351,8 @@ private[smartdatalake] object SparkColumnLineageUtil extends SmartDataLakeLogger
           }
           ColumnLineageDebugColumn(name, deadEnds)
       }
-      if (debugColumns.nonEmpty) {
-        val nodeTypes = debugColumns.flatMap(_.deadEnds.flatMap(_.producedBy)).distinct
-        logger.warn(s"Could not trace back ${debugColumns.size} columns, dead-ending at ${nodeTypes.mkString(", ")}")
-      }
+      val nodeTypes = debugColumns.flatMap(_.deadEnds.flatMap(_.producedBy)).distinct
+      logger.warn(s"Could not trace back ${debugColumns.size} columns, dead-ending at ${nodeTypes.mkString(", ")}")
       ColumnLineageDebug("Spark", debugInputs, debugColumns, plan.treeString.linesIterator.toSeq)
     }
     debugInfo match {

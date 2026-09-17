@@ -70,11 +70,7 @@ private[smartdatalake] object ScalaColumnLineageUtil extends SmartDataLakeLogger
    */
   def extractColumnLineage(df: ScalaDataFrame, inputs: Seq[(DataObjectId, ScalaDataFrame)]): ColumnLineage = {
     val sources = collectSources(inputs)
-    // there is nothing to trace back to, but the debug output still tells why the inputs are unknown
-    if (sources.isEmpty) {
-      return if (Environment.columnLineageDebug) ColumnLineage(Seq(), Seq(), collectDebugInfo(df, inputs, Seq()))
-      else ColumnLineage.empty
-    }
+    if (sources.isEmpty) return ColumnLineage.empty
     val resolutions = df.cols
       .groupBy(_.definition.name)
       .toSeq
@@ -166,8 +162,8 @@ private[smartdatalake] object ScalaColumnLineageUtil extends SmartDataLakeLogger
   }
 
   /**
-   * Collect why the lineage of the given columns could not be traced back completely, if the debug switch
-   * `Environment.columnLineageDebug` is enabled.
+   * Collect why the lineage of the given columns could not be traced back completely, if there are such
+   * columns and the debug switch `Environment.columnLineageDebug` is enabled.
    *
    * A column which dead-ends has no provenance to describe where it comes from, as it belongs to a DataFrame
    * created from data inside a transformation. The path leading to it therefore tells which transformation to
@@ -181,7 +177,7 @@ private[smartdatalake] object ScalaColumnLineageUtil extends SmartDataLakeLogger
       inputs: Seq[(DataObjectId, ScalaDataFrame)],
       unresolved: Seq[(String, Resolution)]
   ): Option[ColumnLineageDebug] = {
-    if (!Environment.columnLineageDebug) return None
+    if (!Environment.columnLineageDebug || unresolved.isEmpty) return None
     val debugInfo = Try {
       val used = collectUsedProvenances(df)
       val debugInputs = inputs.map {
@@ -199,9 +195,7 @@ private[smartdatalake] object ScalaColumnLineageUtil extends SmartDataLakeLogger
           }
           ColumnLineageDebugColumn(name, deadEnds)
       }
-      if (debugColumns.nonEmpty) {
-        logger.warn(s"Could not trace back ${debugColumns.size} columns, dead-ending at a column created from data")
-      }
+      logger.warn(s"Could not trace back ${debugColumns.size} columns, dead-ending at a column created from data")
       ColumnLineageDebug("plainScala", debugInputs, debugColumns)
     }
     debugInfo match {

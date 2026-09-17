@@ -112,9 +112,9 @@ sdlb --config config/ --feed-sel '.*' --test dry-run-with-lineage-export -Dsdl.c
 ```
 
 It can also be set as environment variable `SDL_COLUMN_LINEAGE_DEBUG=true` or in the configuration under
-`global.environment.columnLineageDebug`. SDLB then writes an additional text file
-`<dataObjectId>.lineage-debug.txt` next to the exported lineage, holding the columns of the input DataObjects,
-every column which could not be traced back, and the plan the lineage was read from:
+`global.environment.columnLineageDebug`. For every DataObject with unresolved columns SDLB then writes an
+additional text file `<dataObjectId>.lineage-debug.txt` next to the exported lineage, holding the columns of
+the input DataObjects, every column which could not be traced back, and the plan the lineage was read from:
 
 ```
 Action selectCities -> DataObject tgt1 (engine Spark)
@@ -149,8 +149,9 @@ How to read it:
   DataFrame is derived from these input columns. Either the transformation really does not use them, or it
   re-created them, e.g. by reading the data itself, which breaks the lineage.
 
-The debug output describes engine internals, its format is not stable, and it is meant to be read by a
-developer. Leave it switched off for regular exports.
+A DataObject whose columns are all traced back gets no debug file, so the files which are there are the ones
+to look at. The debug output describes engine internals, its format is not stable, and it is meant to be read
+by a developer. Leave it switched off for regular exports.
 
 ## Caching
 
@@ -164,9 +165,7 @@ wrote it. There is no need to turn caching off to export lineage.
 
 If an Action reads both the cached output of a previous Action and a DataObject that previous Action passed
 through unchanged, both inputs share the very same columns. Such a column is reported for both input
-DataObjects, as there is no way to tell which one it was read from - and both are true. With the Spark engine
-this case degrades further if the two inputs are joined: Spark's analyzer replaces the column ids of one side
-of the join, so the columns of that side cannot be traced back and are reported in `unresolvedFields`.
+DataObjects, as there is no way to tell which one it was read from - and both are true.
 
 ## Limitations
 
@@ -180,12 +179,9 @@ unresolved rather than with a wrong source. This is the case for
 
 - transformations which break the DataFrame lineage, e.g. a custom transformer which reads data itself, or a
   DataFrame created from data inside a transformation
-- columns read from the same DataObject twice with the Spark engine, e.g. in a self-join, where only one of
-  the two occurrences is traced back, as Spark replaces the duplicated expression ids. The same happens for
-  the cached pass-through described above.
 
-Columns which are used in a join, filter, group by, sort or window condition influence the output without
-being part of its value. They are not reported yet - OpenLineage calls this `INDIRECT` lineage and collects it
+Columns which are used in a join, filter, group by or sort condition, or which a window function is
+partitioned and ordered by, influence the output without being part of its value. They are not reported yet - OpenLineage calls this `INDIRECT` lineage and collects it
 in the `dataset` list of the facet. An aggregation over all rows such as `count(*)` belongs there too, and is
 reported without input columns until then.
 
