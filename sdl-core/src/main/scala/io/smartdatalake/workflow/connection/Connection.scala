@@ -72,4 +72,11 @@ trait EngineConnection {
    */
   def activate(operation: Option[String])(implicit context: ActionPipelineContext): Unit = ()
 
+  /**
+   * A hook for subclasses to release resources of the engine when the SDLB run is finished, see also SmartDataLakeBuilder.shutdown.
+   * Note that implementations must only release resources they created themselves, and never resources provided by the
+   * environment (e.g. a Spark session of a Databricks cluster) or by an embedding application (e.g. unit tests).
+   */
+  def close(): Unit = ()
+
 }
