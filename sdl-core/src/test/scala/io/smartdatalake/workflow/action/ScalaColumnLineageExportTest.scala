@@ -72,11 +72,7 @@ class ScalaColumnLineageExportTest extends AnyFunSuite with ColumnLineageExportB
     testNoColumnLineageIsCollectedWithoutTheLineageExportTestMode()
   }
 
-  test("the column lineage debug output is exported if the debug switch is enabled") {
-    testTheColumnLineageDebugOutputIsExportedIfTheDebugSwitchIsEnabled()
-  }
-
-  test("no column lineage debug output is exported without the debug switch") {
-    testNoColumnLineageDebugOutputIsExportedWithoutTheDebugSwitch()
+  test("no column lineage debug output is exported if all columns are resolved") {
+    testNoColumnLineageDebugOutputIsExportedIfAllColumnsAreResolved()
   }
 }

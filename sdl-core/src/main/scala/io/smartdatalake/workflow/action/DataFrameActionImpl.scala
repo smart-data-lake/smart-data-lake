@@ -437,11 +437,8 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     val inputs = inputSubFeeds.flatMap(subFeed => subFeed.dataFrame.map(df => (subFeed.dataObjectId, df)))
     Try(dataFrame.getColumnLineage(inputs)) match {
       case Success(Some(columnLineage)) =>
-        // a lineage without any column is registered as well if it has debug info, so that the debug output
-        // tells why nothing could be analyzed, see Environment.columnLineageDebug
-        if (columnLineage.nonEmpty || columnLineage.debugInfo.isDefined) {
-          context.columnLineageExportRegistry.register(id, dataObjectId, columnLineage)
-        } else logger.warn(s"($id) No column lineage could be analyzed for $dataObjectId")
+        if (columnLineage.nonEmpty) context.columnLineageExportRegistry.register(id, dataObjectId, columnLineage)
+        else logger.warn(s"($id) No column lineage could be analyzed for $dataObjectId")
       case Success(None) =>
         logger.warn(s"($id) Analyzing column lineage is not supported for ${dataFrame.subFeedType.typeSymbol.name}")
       case Failure(ex) =>

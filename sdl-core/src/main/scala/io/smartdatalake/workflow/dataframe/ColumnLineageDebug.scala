@@ -22,8 +22,8 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 
 /**
  * Why the lineage of the columns listed in [[ColumnLineage.unresolvedColumns]] could not be traced back,
- * collected if `Environment.columnLineageDebug` is enabled and exported as an additional debug file, see
- * [[io.smartdatalake.app.TestMode.DryRunWithLineageExport]].
+ * collected if there are such columns and `Environment.columnLineageDebug` is enabled, and exported as an
+ * additional debug file, see [[io.smartdatalake.app.TestMode.DryRunWithLineageExport]].
  *
  * This is diagnostic output for developing the lineage extraction itself and not part of the exported
  * lineage: it describes engine internals, e.g. Sparks logical plan, and its format is not stable.

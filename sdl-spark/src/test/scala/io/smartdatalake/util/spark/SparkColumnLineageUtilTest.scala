@@ -26,6 +26,7 @@ import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.ColumnLineage
 import io.smartdatalake.workflow.dataframe.ColumnTransformation.{Identity, Transformation}
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.funsuite.AnyFunSuite
@@ -229,14 +230,51 @@ class SparkColumnLineageUtilTest extends AnyFunSuite with ColumnLineageBehaviour
 
   test("the debug output lists input columns which do not occur in the plan of the output DataFrame") {
     withColumnLineageDebug {
-      // a DataFrame created a second time has other expression ids, so its columns can not be traced back
-      val df = sparkCities.withColumn("upperName", upper($"name"))
-      val lineage = extract(df, "src1" -> sparkCities)
-      assert(lineage.unresolvedColumns == Seq("country", "name", "upperName"))
+      val src1 = sparkCities
+      val src2 = sparkCountries
+      val other = Seq(("x", 1)).toDF("other", "cnt")
+      // src2 is not read by the output DataFrame at all, while the columns of `other` are unknown
+      val df = src1.join(other, lit(true), "inner")
+      val lineage = extract(df, "src1" -> src1, "src2" -> src2)
       val debug = lineage.debugInfo.get
-      assert(debug.inputs.map(_.dataObjectId.id) == Seq("src1"))
-      assert(debug.inputs.head.columnsNotInPlan == Seq("name", "country"))
+      assert(debug.inputs.map(_.dataObjectId.id) == Seq("src1", "src2"))
+      assert(debug.inputs.head.columnsNotInPlan.isEmpty)
+      assert(debug.inputs.last.columnsNotInPlan == Seq("code", "label", "population"))
     }
+  }
+
+  test("a column of a DataObject read twice is traced back although Spark replaced its column ids") {
+    val src = sparkCities
+    // Sparks analyzer gives the columns of the second occurrence of the same plan new expression ids
+    val df = src.as("a").join(src.as("b"), $"a.country" === $"b.country")
+      .select($"a.name", $"b.country".as("otherCountry"))
+    val lineage = extract(df, "src1" -> src)
+    assert(inputsOf(lineage, "name") == Seq(("src1", "name", Identity)))
+    assert(inputsOf(lineage, "otherCountry") == Seq(("src1", "country", Identity)))
+    assert(lineage.unresolvedColumns.isEmpty)
+  }
+
+  test("a DataObject read twice in one SQL statement is traced back for both occurrences") {
+    val src = sparkCities
+    src.createOrReplaceTempView("lineage_cities_twice")
+    val df = session.sql(
+      "select c.name, b.lastCity from lineage_cities_twice c join " +
+        "(select country, max(name) as lastCity from lineage_cities_twice group by country) b on c.country = b.country"
+    )
+    val lineage = extract(df, "src1" -> src)
+    assert(inputsOf(lineage, "name") == Seq(("src1", "name", Identity)))
+    assert(inputsOf(lineage, "lastCity") == Seq(("src1", "name", Transformation)))
+    assert(lineage.unresolvedColumns.isEmpty)
+  }
+
+  test("a window function does not depend on the columns it is partitioned and ordered by") {
+    val src = sparkCountries
+    val window = Window.partitionBy($"code").orderBy($"label")
+    val df = src.select($"code", sum($"population").over(window).as("totalPopulation"))
+    val lineage = extract(df, "src1" -> src)
+    // the partition and order by columns influence the value without being part of it, which is INDIRECT lineage
+    assert(inputsOf(lineage, "totalPopulation") == Seq(("src1", "population", Transformation)))
+    assert(lineage.unresolvedColumns.isEmpty)
   }
 
   test("a column created by a correlated scalar subquery is traced back into the subquery") {
