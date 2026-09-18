@@ -18,7 +18,8 @@
  */
 package io.smartdatalake.testutils
 
-import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil.registerDataObject
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -27,6 +28,8 @@ import io.smartdatalake.workflow.dataframe.{GenericField, GenericSchema}
 import io.smartdatalake.workflow.dataobject.DataObjectMetadata
 import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, ExecutionPhase}
+
+import scala.util.Try
 
 /**
  * Parameters for creating the table DataObject under test, see [[CatalogMetadataBehaviour]].
@@ -252,14 +255,15 @@ trait CatalogMetadataBehaviour extends GenericTestTool {
     implicit val registry: InstanceRegistry = instanceRegistry
     implicit val context: ActionPipelineContext = actionPipelineContext
 
+    val customerDataObjectId = "customerDO"
     val customerParams = CatalogMetadataTestParams("catalogmeta_fk_customer",
       primaryKey = Some(Seq("id")), createAndReplacePrimaryKey = true)
     val orderParams = CatalogMetadataTestParams("catalogmeta_fk_order",
       primaryKey = Some(Seq("id")), createAndReplacePrimaryKey = true,
-      foreignKeys = Some(Seq(ForeignKey(None, customerParams.tableName, Map("customer_id" -> "id"), Some("catalogmeta_fk")))),
+      foreignKeys = Some(Seq(ForeignKey(DataObjectId(customerDataObjectId), Map("customer_id" -> "id"), Some("catalogmeta_fk")))),
       createAndReplaceForeignKeys = true)
     val orderDataObject = createDataObjectWithoutTable(createDataObject("orderDO", orderParams, instanceRegistry))
-    val customerDataObject = createDataObjectWithoutTable(createDataObject("customerDO", customerParams, instanceRegistry))
+    val customerDataObject = createDataObjectWithoutTable(createDataObject(customerDataObjectId, customerParams, instanceRegistry))
     implicit val companion: DataFrameSubFeedCompanion = companionOf(orderDataObject)
 
     val exportedSchemas = Map(
@@ -286,6 +290,7 @@ trait CatalogMetadataBehaviour extends GenericTestTool {
 
   /**
    * Foreign keys are metadata for the data catalog only if table.createAndReplaceForeignKeys is not set.
+   * The referenced DataObject is then not looked up either, which is why it is not registered here.
    */
   def testForeignKeysNotCreatedIfNotEnabled(createDataObject: ForeignKeysDataObjectFactory): Unit = {
     val (instanceRegistry, actionPipelineContext) = setupRegistryAndContext()
@@ -293,12 +298,35 @@ trait CatalogMetadataBehaviour extends GenericTestTool {
     implicit val context: ActionPipelineContext = actionPipelineContext
 
     val params = CatalogMetadataTestParams("catalogmeta_fk_disabled",
-      foreignKeys = Some(Seq(ForeignKey(None, "catalogmeta_fk_customer", Map("customer_id" -> "id"), None))))
+      foreignKeys = Some(Seq(ForeignKey(DataObjectId("unregisteredCustomerDO"), Map("customer_id" -> "id")))))
     val dataObject = createDataObjectWithoutTable(createDataObject("foreignKeyDisabledDO", params, instanceRegistry))
     implicit val companion: DataFrameSubFeedCompanion = companionOf(dataObject)
     val applier = new CatalogMetadataApplier(_ => Some(schemaOf(field("id", "integer"), field("customer_id", "integer"))))
 
     val changes = applier.plan(dataObject).get
     assert(changes.foreignKeys.isEmpty, changes.describe.mkString(", "))
+  }
+
+  /**
+   * A foreign key referencing a DataObject which is not defined in the configuration is reported with a
+   * ConfigurationException naming the missing DataObject.
+   */
+  def testForeignKeyReferencingUnknownDataObject(createDataObject: ForeignKeysDataObjectFactory): Unit = {
+    val (instanceRegistry, actionPipelineContext) = setupRegistryAndContext()
+    implicit val registry: InstanceRegistry = instanceRegistry
+    implicit val context: ActionPipelineContext = actionPipelineContext
+
+    val params = CatalogMetadataTestParams("catalogmeta_fk_unknown",
+      foreignKeys = Some(Seq(ForeignKey(DataObjectId("unknownCustomerDO"), Map("customer_id" -> "id")))),
+      createAndReplaceForeignKeys = true)
+    val dataObject = createDataObjectWithoutTable(createDataObject("foreignKeyUnknownDO", params, instanceRegistry))
+    implicit val companion: DataFrameSubFeedCompanion = companionOf(dataObject)
+    val applier = new CatalogMetadataApplier(_ => Some(schemaOf(field("id", "integer"), field("customer_id", "integer"))))
+
+    val result = Try(applier.plan(dataObject))
+    assert(result.isFailure, s"expected a ConfigurationException, got ${result.map(_.map(_.describe))}")
+    val exception = result.failed.get
+    assert(exception.isInstanceOf[ConfigurationException] && exception.getMessage.contains("unknownCustomerDO"),
+      s"unexpected error $exception")
   }
 }

@@ -26,7 +26,7 @@ import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.action.SDLExecutionId
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataobject.DataObject
-import io.smartdatalake.workflow.dataobject.generic.{CatalogMetadataApplier, CatalogMetadataChanges}
+import io.smartdatalake.workflow.dataobject.generic.{CatalogMetadataApplier, CatalogMetadataChanges, TableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.conf.Configuration
 import scopt.OptionParser
@@ -168,6 +168,17 @@ object CatalogSchemaUpdater extends SmartDataLakeLogger {
       }
     }
 
+    // a foreign key references a DataObject of the configuration, which is looked up to get the name of the
+    // referenced table, see CanHandleForeignKeys.getReferencedTable. It can only be created if that table
+    // exists with its primary key, which is not guaranteed if the DataObject is not processed in this run.
+    val processedIds = dataObjects.map(_.id).toSet
+    plans.filter { case (_, changes) => changes.hasForeignKeyChanges }.foreach { case (dataObject, _) =>
+      val notProcessed = referencedDataObjectIds(dataObject).filterNot(processedIds.contains)
+      if (notProcessed.nonEmpty) logger.warn(s"(${dataObject.id}) foreign keys reference the DataObjects" +
+        s" ${notProcessed.map(_.id).mkString(", ")}, which are not included in this run. Their tables must already" +
+        " exist with the referenced primary key, otherwise creating the foreign keys will fail.")
+    }
+
     // apply in two phases: the tables including their primary keys first, then the foreign keys referencing
     // them, see CanHandleForeignKeys.
     def applyPhase(describe: CatalogMetadataChanges => Seq[String],
@@ -188,5 +199,13 @@ object CatalogSchemaUpdater extends SmartDataLakeLogger {
     val changed = (changedTables ++ changedForeignKeys).distinct
     if (changed.isEmpty) logger.info("Catalog metadata is up to date, nothing to apply")
     else logger.info(s"${if (isPlan) "Would change" else "Changed"} catalog metadata of ${changed.size} DataObjects: ${changed.map(_.id).mkString(", ")}")
+  }
+
+  /**
+   * The DataObjects referenced by the foreign keys defined in the configuration of a DataObject.
+   */
+  private def referencedDataObjectIds(dataObject: DataObject): Seq[DataObjectId] = dataObject match {
+    case tableDataObject: TableDataObject => tableDataObject.table.foreignKeys.toSeq.flatten.map(_.dataObjectId)
+    case _ => Seq()
   }
 }
