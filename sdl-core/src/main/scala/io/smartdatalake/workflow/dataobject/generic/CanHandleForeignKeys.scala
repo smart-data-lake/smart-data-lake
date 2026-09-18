@@ -18,7 +18,11 @@
  */
 package io.smartdatalake.workflow.dataobject.generic
 
+import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataobject.DataObject
+
+import scala.util.Try
 
 /**
  * A foreign key constraint as defined in the configuration ([[Table.foreignKeys]]) or as read from the catalog.
@@ -69,19 +73,40 @@ trait CanHandleForeignKeys { self: TransactionalTableDataObject =>
   def createForeignKeyConstraint(foreignKey: ForeignKeyDefinition)(implicit context: ActionPipelineContext): Unit
 
   /**
-   * The foreign keys defined in the configuration of this DataObject.
+   * The foreign keys defined in the configuration of this DataObject, with the referenced DataObjects
+   * resolved to their tables.
    */
-  def getDefinedForeignKeys: Seq[ForeignKeyDefinition] = {
+  def getDefinedForeignKeys(implicit context: ActionPipelineContext): Seq[ForeignKeyDefinition] = {
     table.foreignKeys.toSeq.flatten.map { fk =>
-      val referencedTable = Table(db = fk.db.orElse(table.db), name = fk.table, catalog = table.catalog)
-      ForeignKeyDefinition(fk.columns, referencedTable.fullName, Some(foreignKeyConstraintName(fk)))
+      val referencedTable = getReferencedTable(fk)
+      ForeignKeyDefinition(fk.columns, referencedTable.fullName, Some(foreignKeyConstraintName(fk, referencedTable)))
+    }
+  }
+
+  /**
+   * The table referenced by a foreign key, looked up from the DataObject it refers to.
+   *
+   * Catalog and database default to the ones of this table, e.g. if the referenced DataObject gets them
+   * from the session and not from its configuration or connection.
+   */
+  def getReferencedTable(fk: ForeignKey)(implicit context: ActionPipelineContext): Table = {
+    val describeForeignKey = s"foreign key ${fk.name.map(_ + " ").getOrElse("")}(${fk.columns.keys.mkString(", ")})"
+    val referencedDataObject = Try(context.instanceRegistry.get[DataObject](fk.dataObjectId))
+      .getOrElse(throw ConfigurationException(s"($id) $describeForeignKey references" +
+        s" ${fk.dataObjectId}, which is not defined as a DataObject in the configuration"))
+    referencedDataObject match {
+      case tableDataObject: TableDataObject =>
+        tableDataObject.table.overrideCatalogAndDb(table.catalog, table.db)
+      case _ => throw ConfigurationException(s"($id) $describeForeignKey references DataObject ${fk.dataObjectId}" +
+        s" of type ${referencedDataObject.getClass.getSimpleName}, which has no table")
     }
   }
 
   /**
    * Constraint name to use, defaults to sdlb_"tableName"_"referencedTableName"_fk.
    */
-  def foreignKeyConstraintName(fk: ForeignKey): String = fk.name.getOrElse(s"sdlb_${table.name}_${fk.table}_fk")
+  def foreignKeyConstraintName(fk: ForeignKey, referencedTable: Table): String =
+    fk.name.getOrElse(s"sdlb_${table.name}_${referencedTable.name}_fk")
 
   /**
    * Create the given foreign key constraints, replacing an existing constraint with the same name or content.

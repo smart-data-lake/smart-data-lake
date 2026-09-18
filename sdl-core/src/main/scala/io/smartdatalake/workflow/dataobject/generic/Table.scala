@@ -18,6 +18,8 @@
  */
 package io.smartdatalake.workflow.dataobject.generic
 
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+
 /**
  * Table attributes
  *
@@ -51,18 +53,17 @@ package io.smartdatalake.workflow.dataobject.generic
  *                                    see [[io.smartdatalake.workflow.dataobject.generic.CanHandleForeignKeys]].
  *                                    Note that the referenced table must exist and have a primary key on the
  *                                    referenced columns.
- * Each foreign key in the .conf files is an object with the following properties: 
- * {db: string, table: string , name: string map: Map[String]}, whereas a Map[String] is simply 
- * a further object of the type {<local_column_name>:string, <external_column_name>:string}. For example: 
+ * Each foreign key in the .conf files is an object with the following properties:
+ * {dataObjectId: string, columns: Map[String], name: string}, whereas a Map[String] is simply
+ * a further object of the type {<local_column_name>:string, <referenced_column_name>:string}. For example:
  *   foreignKeys = [
  *       {
- *         db = "OPTIONAL_DB_name" 
- *         table = "table_id" 
- *         columns = { 
- *           "local_column_name": "external_column_name" 
- *           } 
- *         name = "OPTIONAL_key_name" 
- *       } 
+ *         dataObjectId = "referenced_data_object_id"
+ *         columns = {
+ *           "local_column_name": "referenced_column_name"
+ *           }
+ *         name = "OPTIONAL_key_name"
+ *       }
  *     ]
  */
 case class Table(
@@ -93,37 +94,39 @@ case class Table(
 /**
  * Foreign key definition.
  *
- * @param db target database, if not defined it is assumed to be the same as the table owning the foreign key
- * @param table referenced target table name
+ * The referenced table is not given by name, but by the id of the DataObject defining it. Its catalog,
+ * database and table name are looked up in the configuration when the foreign key is applied,
+ * see [[CanHandleForeignKeys]].
+ *
+ * @param dataObjectId id of the DataObject referenced by this foreign key. It must be a table DataObject.
+ *                     If its table does not define a catalog or database, the ones of the table owning the
+ *                     foreign key are used.
  * @param columns mapping of source column(s) to referenced target table column(s). The map is given
- * as a list of objects with the following syntax: {"local_column_name" : "external_column_name"}
+ * as a list of objects with the following syntax: {"local_column_name" : "referenced_column_name"}
  * @param name optional name for foreign key, e.g. to depict its role.
- * 
- * 
- * Foreign keys in .conf files are to be defined like the following example 
- * (here two foreign key objects): 
+ *
+ *
+ * Foreign keys in .conf files are to be defined like the following example
+ * (here two foreign key objects):
  *   foreignKeys = [
  *       {
- *         db = "OPTIONAL_DB_name"
- *         table = "table_id"
+ *         dataObjectId = "referenced_data_object_id"
  *         columns = {
- *           "local_column_name": "external_column_name"
+ *           "local_column_name": "referenced_column_name"
  *           }
  *         name = "OPTIONAL_key_name"
  *       },
  *       {
- *         table = "another_table_id"
+ *         dataObjectId = "another_referenced_data_object_id"
  *         columns = {
- *           "another_local_column_name": "another_external_column_name"
+ *           "another_local_column_name": "another_referenced_column_name"
  *         }
  *         name = "another_OPTIONAL_key_name"
  *       }
  *     ]
  */
 case class ForeignKey(
-                       db: Option[String],
-                       table: String,
+                       dataObjectId: DataObjectId,
                        columns: Map[String,String],
-                       name: Option[String]
+                       name: Option[String] = None
                      )
-

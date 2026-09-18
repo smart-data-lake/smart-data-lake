@@ -199,8 +199,29 @@ location, partitioning and options as it would get from the first run of the dat
 columns are made not null if `table.createAndReplacePrimaryKey` is set.
 
 Foreign keys are applied in a second phase, after all tables of the configuration have been created with
-their primary keys, as a foreign key can only reference an existing primary key. The referenced table is
-`foreignKeys.table` in the database `foreignKeys.db`, which defaults to the database of this table.
+their primary keys, as a foreign key can only reference an existing primary key. A foreign key references
+the DataObject owning the target table with `foreignKeys.dataObjectId`, and its catalog, database and table
+name are looked up in the configuration. Catalog and database default to the ones of the referencing table
+if the referenced DataObject does not define them.
+
+```hocon
+table {
+  db = sales
+  name = orders
+  primaryKey = [id]
+  createAndReplacePrimaryKey = true
+  createAndReplaceForeignKeys = true
+  foreignKeys = [{
+    dataObjectId = customers          # the DataObject owning the referenced table
+    columns = { customer_id = id }    # this column references that column of the referenced table
+    name = orders_customer_fk         # optional, defaults to sdlb_<tableName>_<referencedTableName>_fk
+  }]
+}
+```
+
+The referenced DataObject should be part of the same run: if it is excluded with `--includeRegex` or
+`--excludeRegex`, its table is neither created nor updated here, so it must already exist in the catalog
+with the referenced primary key. This is reported with a warning.
 
 Support by DataObject:
 

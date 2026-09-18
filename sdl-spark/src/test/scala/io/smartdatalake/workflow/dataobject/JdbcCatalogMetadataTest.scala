@@ -62,4 +62,9 @@ class JdbcCatalogMetadataTest extends DataObjectTestSuite with SparkTestTool wit
   test("foreign keys are not created if not enabled") {
     testForeignKeysNotCreatedIfNotEnabled(createDataObject)
   }
+
+  // this is engine independent, so it is tested for jdbc only
+  test("foreign key referencing an unknown DataObject") {
+    testForeignKeyReferencingUnknownDataObject(createDataObject)
+  }
 }
