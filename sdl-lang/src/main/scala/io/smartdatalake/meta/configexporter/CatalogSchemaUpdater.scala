@@ -20,7 +20,7 @@ package io.smartdatalake.meta.configexporter
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
-import io.smartdatalake.config.exporter.ExportWriter
+import io.smartdatalake.config.exporter.{ColumnDescriptionParser, ExportWriter}
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException}
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.action.SDLExecutionId
@@ -89,7 +89,7 @@ object CatalogSchemaUpdater extends SmartDataLakeLogger {
       .text("Source URI to read exported schemas from. Defaults to global.dataObjectsSchemaSource.")
     opt[String]('d', "descriptionPath")
       .action((value, c) => c.copy(descriptionPath = Some(value)))
-      .text("Path of the directory containing the Markdown description files of the DataObjects. Column descriptions defined there with @column are applied as column comments.")
+      .text("Path of the directory containing the Markdown description files of the DataObjects. Column descriptions defined there with @column are applied as column comments. Defaults to global.descriptionPath.")
     opt[String]('i', "includeRegex")
       .action((value, c) => c.copy(includeRegex = value))
       .text("Regular expression used to include DataObjects, matching DataObject ids. Default: .*")
@@ -145,10 +145,15 @@ object CatalogSchemaUpdater extends SmartDataLakeLogger {
     def readSchema(dataObjectId: DataObjectId): Option[GenericSchema] =
       schemaWriter.flatMap(_.readLatestSchema(dataObjectId)).map(ExportWriter.parseSchema(_)._1)
 
-    // column descriptions from the Markdown description files override the exported schema comments
-    val columnDescriptions = config.descriptionPath.map(path => ColumnDescriptionParser.parse(path)).getOrElse(Map())
+    // column descriptions from the Markdown description files override the exported schema comments.
+    // Note that schemas exported with global.descriptionPath already contain them.
+    // The description of an array element, e.g. "addresses.[]", has no column to be set on in the catalog, it would
+    // override the comment of the array column itself.
+    val columnDescriptions = config.descriptionPath.orElse(globalConfig.descriptionPath)
+      .map(path => ColumnDescriptionParser.parse(path)).getOrElse(Map())
       .map { case (dataObjectId, descriptions) =>
-        dataObjectId -> descriptions.map { case (name, d) => ColumnDescriptionParser.toColumnPath(name) -> d }
+        dataObjectId -> descriptions.filterNot(_._1.endsWith(".[]"))
+          .map { case (name, d) => ColumnDescriptionParser.toColumnPath(name) -> d }
       }
 
     val applier = new CatalogMetadataApplier(readSchema, columnDescriptions)

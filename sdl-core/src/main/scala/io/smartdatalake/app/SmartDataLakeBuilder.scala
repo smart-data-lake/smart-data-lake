@@ -23,7 +23,7 @@ import io.smartdatalake.communication.statusinfo.StatusInfoServer
 import io.smartdatalake.communication.statusinfo.api.SnapshotStatusInfoListener
 import io.smartdatalake.communication.statusinfo.websocket.IncrementalStatusInfoListener
 import io.smartdatalake.config.SdlConfigObject.ActionId
-import io.smartdatalake.config.exporter.ExportWriter
+import io.smartdatalake.config.exporter.{ColumnDescriptionParser, ExportWriter}
 import io.smartdatalake.config.{ConfigParser, ConfigurationException, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.LogUtils.debugLog
@@ -36,6 +36,7 @@ import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{Action, DataFrameActionImpl, RuntimeInfo, SDLExecutionId}
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.apache.hadoop.conf.Configuration
+import org.json4s.JArray
 import org.slf4j.Logger
 import scopt.{OParser, OParserBuilder}
 
@@ -627,6 +628,8 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
    *
    * The exported files are read back by [[GlobalConfig.getSchemaFromSource]] for dry-runs on a local
    * environment, and by CatalogSchemaUpdater to apply table metadata to a catalog at deployment time.
+   * The column descriptions of `global.descriptionPath` are merged into the exported schemas, see
+   * [[ColumnDescriptionParser.mergeIntoSchemaJson]].
    */
   private[smartdatalake] def exportDataObjectSchemas(context: ActionPipelineContext): Unit = {
     val globalConfig = context.globalConfig
@@ -645,8 +648,19 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         hadoopConfig = Some(context.hadoopConf)
       )
       val version = System.currentTimeMillis() / 1000
+      // column descriptions of the Markdown description files override the comments of the schema
+      val columnDescriptions = globalConfig.descriptionPath
+        .map(path => ColumnDescriptionParser.parse(path)(context.hadoopConf))
+        .getOrElse(Map())
       schemas.foreach { case (dataObjectId, schema) =>
-        writer.writeSchema(ExportWriter.formatSchema(Some(schema), None), dataObjectId, version)
+        def mergeColumnDescriptions(schemaJson: JArray): JArray = columnDescriptions.get(dataObjectId) match {
+          case Some(descriptions) =>
+            val (mergedJson, unresolved) = ColumnDescriptionParser.mergeIntoSchemaJson(schemaJson, descriptions)
+            unresolved.foreach(column => logger.warn(s"($dataObjectId) column '$column' of the description file not found in the exported schema"))
+            mergedJson
+          case None => schemaJson
+        }
+        writer.writeSchema(ExportWriter.formatSchema(Some(schema), None, mergeColumnDescriptions), dataObjectId, version)
       }
       logger.info(s"Exported ${schemas.size} DataObject schemas to '$target'")
     }

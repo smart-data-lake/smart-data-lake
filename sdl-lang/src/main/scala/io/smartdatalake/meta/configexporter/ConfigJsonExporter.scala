@@ -90,7 +90,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
       .text("Whether to add an additional property 'origin' including source filename and line number to first class configuration objects.")
     opt[String]('d', "descriptionPath")
       .action((value, c) => c.copy(descriptionPath = Some(value)))
-      .text("Path to the markdown description files of the DataObjects. Used together with --uploadDescriptions to upload them to the visualizer backend. Note that the column descriptions defined there with @column are applied to the catalog by CatalogSchemaUpdater and exported with the schema by DataObjectSchemaExporter, they are not part of the exported config anymore.")
+      .text("Path to the markdown description files of the DataObjects. Used together with --uploadDescriptions to upload them to the visualizer backend. Note that the column descriptions defined there with @column are not part of the exported config anymore. They are merged into the schemas exported by an SDLB run with '--test dry-run-with-schema-export' if global.descriptionPath is set, and applied to the catalog by CatalogSchemaUpdater.")
     opt[Unit]("uploadDescriptions")
       .action((_, c) => c.copy(uploadDescriptions = true))
       .text("Upload description markdown files to visualizer backend.")

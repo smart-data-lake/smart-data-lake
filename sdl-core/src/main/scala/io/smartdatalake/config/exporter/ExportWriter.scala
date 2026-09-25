@@ -82,10 +82,16 @@ object ExportWriter {
     }
   }
 
-  def formatSchema(schema: Option[GenericSchema], info: Option[String]): String = {
+  /**
+   * Format a schema as Json document.
+   *
+   * @param transformSchemaJson optional transformation of the schema Json, e.g. to merge column descriptions,
+   *                            see [[ColumnDescriptionParser.mergeIntoSchemaJson]].
+   */
+  def formatSchema(schema: Option[GenericSchema], info: Option[String], transformSchemaJson: JArray => JArray = identity): String = {
     val contentJson = JObject(Seq(
       info.toSeq.map("info" -> JString(_)),
-      schema.toSeq.map("schema" -> _.toJson),
+      schema.toSeq.map(s => "schema" -> transformSchemaJson(s.toJson)),
       schema.toSeq.map(s => "subFeedType" -> JString(s.subFeedType.typeSymbol.name.toString))
     ).flatten.toIndexedSeq: _*)
     pretty(contentJson)
