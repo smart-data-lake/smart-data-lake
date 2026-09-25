@@ -38,6 +38,7 @@ case class DataObjectSchemaExporterConfig(configPaths: Seq[String] = null,
                                           targets: Seq[String] = Seq("./schema"),
                                           includeRegex: String = ".*",
                                           excludeRegex: Option[String] = None,
+                                          withSchema: Boolean = true,
                                           withStats: Boolean = true,
                                           updateStats: Boolean = true,
                                           preferredSubFeedType: Option[String] = None,
@@ -68,6 +69,9 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     opt[String]('e', "excludeRegex")
       .action((value, c) => c.copy(excludeRegex = Some(value)))
       .text("Regular expression used to exclude DataObjects from export, matching DataObject ids. `excludeRegex` is applied after `includeRegex`. Default: no excludes")
+    opt[String]("withSchema")
+      .action((value, c) => c.copy(withSchema = value.toBoolean))
+      .text("If true, DataObject schemas are exported, otherwise not. Default: true")
     opt[String]('w', "withStats")
       .action((value, c) => c.copy(withStats = value.toBoolean))
       .text("If true, DataObject statistics are exported, otherwise not. Default: true")
@@ -117,40 +121,42 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     val writers = config.targets.map(ExportWriter.apply(_, config.configPaths))
 
     // get and write Schemas
-    val atLeastOneSchemaSuccessful = dataObjects.map { dataObject =>
-      logger.info(s"get schema for ${dataObject.id} (${dataObject.getClass.getSimpleName})")
-      val exportedSchema = dataObject match {
-        case dataObject: SparkFileDataObject =>
-          val schema = Try(dataObject.getSchema)
-          val info = schema match {
-            case Success(Some(s)) => None
-            case Success(None) => Some(s"${dataObject.id} of type ${dataObject.getClass.getSimpleName} did not return a schema")
-            case Failure(ex) => Some(s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
-          }
-          Some((schema.toOption.flatten, info, schema.isSuccess, schema.failed.toOption))
-        case dataObject: CanCreateDataFrame =>
-          // prefer given subFeedType if defined, otherwise take first subFeedType defined by the DataObject
-          val subFeedType = dataObject.getSubFeedSupportedTypes.find(tpe => config.preferredSubFeedType.contains(tpe.typeSymbol.name.toTermName.toString))
-            .getOrElse(dataObject.getSubFeedSupportedTypes.head)
-          val schema = Try(dataObject.getDataFrame(Seq(), subFeedType).schema)
-          val info = schema.failed.toOption.map(ex => s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
-          Some((schema.toOption, info, schema.isSuccess, schema.failed.toOption))
-        case _ => None
-      }
-      // log errors, then throw first exception
-      exportedSchema.flatMap(_._2).foreach {
-        info => logger.warn(s"Could not get schema for ${dataObject.id}: $info")
-      }
-      if (config.stopOnError) exportedSchema.flatMap(_._4).foreach(throw _)
-      // write schemas
-      exportedSchema.foreach {
-        case (schema, info, _, _) =>
-          writers.foreach(_.writeSchema(formatSchema(schema, info), dataObject.id, getCurrentVersion))
-      }
-      // return true if no exception
-      exportedSchema.forall(_._3)
-    }.reduceOption(_ || _).getOrElse(false)
-    require(atLeastOneSchemaSuccessful, "Schema export failed for all DataObjects!")
+    if (config.withSchema) {
+      val atLeastOneSchemaSuccessful = dataObjects.map { dataObject =>
+        logger.info(s"get schema for ${dataObject.id} (${dataObject.getClass.getSimpleName})")
+        val exportedSchema = dataObject match {
+          case dataObject: SparkFileDataObject =>
+            val schema = Try(dataObject.getSchema)
+            val info = schema match {
+              case Success(Some(s)) => None
+              case Success(None) => Some(s"${dataObject.id} of type ${dataObject.getClass.getSimpleName} did not return a schema")
+              case Failure(ex) => Some(s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
+            }
+            Some((schema.toOption.flatten, info, schema.isSuccess, schema.failed.toOption))
+          case dataObject: CanCreateDataFrame =>
+            // prefer given subFeedType if defined, otherwise take first subFeedType defined by the DataObject
+            val subFeedType = dataObject.getSubFeedSupportedTypes.find(tpe => config.preferredSubFeedType.contains(tpe.typeSymbol.name.toTermName.toString))
+              .getOrElse(dataObject.getSubFeedSupportedTypes.head)
+            val schema = Try(dataObject.getDataFrame(Seq(), subFeedType).schema)
+            val info = schema.failed.toOption.map(ex => s"${ex.getClass.getSimpleName}: ${ex.getMessage}")
+            Some((schema.toOption, info, schema.isSuccess, schema.failed.toOption))
+          case _ => None
+        }
+        // log errors, then throw first exception
+        exportedSchema.flatMap(_._2).foreach {
+          info => logger.warn(s"Could not get schema for ${dataObject.id}: $info")
+        }
+        if (config.stopOnError) exportedSchema.flatMap(_._4).foreach(throw _)
+        // write schemas
+        exportedSchema.foreach {
+          case (schema, info, _, _) =>
+            writers.foreach(_.writeSchema(formatSchema(schema, info), dataObject.id, getCurrentVersion))
+        }
+        // return true if no exception
+        exportedSchema.forall(_._3)
+      }.reduceOption(_ || _).getOrElse(false)
+      require(atLeastOneSchemaSuccessful, "Schema export failed for all DataObjects!")
+    }
 
     // get and write Stats
     if (config.withStats) {

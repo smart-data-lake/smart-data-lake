@@ -151,6 +151,22 @@ class DataObjectSchemaExporterTest extends AnyFunSuite with BeforeAndAfter {
     assert(actual2 == expected2)
   }
 
+  test("export stats only with withSchema=false") {
+    DataObjectSchemaExporter.main(Array(
+      "-c",
+      configPath,
+      "-t",
+      target,
+      "-i",
+      "dataObjectCsv1",
+      "--withSchema",
+      "false"
+    ))
+    val writer = FileExportWriter(exportPath)
+    assert(writer.getLatestData("dataObjectCsv1", "schema").isEmpty)
+    assert(writer.getLatestData("dataObjectCsv1", "stats").isDefined)
+  }
+
   test("schema file is not updated if unchanged") {
     val dataObjectId = DataObjectId("test")
     val path = Paths.get("target/schemaUpdate")
