@@ -7870,6 +7870,10 @@
         "defaultSparkConnectionId" : {
           "type" : "string",
           "description" : "Optional default ConnectionId for Spark connections. This is used to avoid having to specify\nthe Spark connection for every Spark Action. Note that the default connection can still be\noverwritten for each Spark Action by specifying the sparkConnectionId in the action's\nconfiguration."
+        },
+        "descriptionPath" : {
+          "type" : "string",
+          "description" : "Optional path of the directory containing the Markdown description files of the DataObjects, Actions and\nConnections, e.g.`dataObjects/myDataObject.md`. The column descriptions defined there are merged into the\nschemas exported by`--test dry-run-with-schema-export`, overriding the comments of the schema, so that they\nare shown in the SDLB UI. It is also the default for the`--descriptionPath` option of CatalogSchemaUpdater."
         }
       },
       "title" : "GlobalConfig",
