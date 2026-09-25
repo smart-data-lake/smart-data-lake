@@ -144,7 +144,8 @@ time in two steps instead.
 
 **1. Export the schemas on the development environment.** A dry-run with schema export writes the schema of
 every output DataObject, including the column comments SDLB assembled from `schemaMin`, from the Markdown
-description files and from the ScalaDoc of case classes, to `global.dataObjectsSchemaSource`:
+description files in `global.descriptionPath` and from the ScalaDoc of case classes, to
+`global.dataObjectsSchemaSource`:
 
 ```bash
 sdlb --config config/ --feed-sel '.*' --test dry-run-with-schema-export
@@ -157,8 +158,16 @@ Commit the resulting schema files together with the configuration.
 ```hocon
 global {
   dataObjectsSchemaSource = "file:./schema"
+  descriptionPath = "./description"
 }
 ```
+
+A column description defined with `@column` in the Markdown description file of a DataObject overrides the
+comment of the schema. The exported schema files are also where the SDLB UI reads the column descriptions from.
+A description of an array element or of a map key or value itself, e.g. `@column addresses.[]` or
+`@column attributes.value`, has no column to be set on. It is exported as attribute `elementComment`,
+`keyComment` or `valueComment` of the array or map data type instead. A description of a column not found
+in the schema is logged as a warning.
 
 **2. Apply the changes on the target environment.** `CatalogSchemaUpdater` reads the desired state from
 the configuration and from the exported schema files, compares it with the catalog and writes only what
@@ -167,15 +176,17 @@ differs:
 ```bash
 # report what would change, without changing anything - this is the default mode
 java -cp sdlb.jar io.smartdatalake.meta.configexporter.CatalogSchemaUpdater \
-  --config config/ --mode plan --descriptionPath ./description
+  --config config/ --mode plan
 
 # apply the changes
 java -cp sdlb.jar io.smartdatalake.meta.configexporter.CatalogSchemaUpdater \
-  --config config/ --mode apply --descriptionPath ./description
+  --config config/ --mode apply
 ```
 
 Applying is idempotent: running it twice makes no second change. Column descriptions defined with `@column`
-in the Markdown description files override the comments from the exported schema.
+in the Markdown description files override the comments from the exported schema. They are read from
+`--descriptionPath`, which defaults to `global.descriptionPath`, so that schema files exported without the
+descriptions get them as well. Descriptions of array elements are not applied to the catalog.
 
 The following changes are applied:
 

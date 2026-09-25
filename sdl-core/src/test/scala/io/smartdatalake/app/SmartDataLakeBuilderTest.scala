@@ -19,15 +19,24 @@
 package io.smartdatalake.app
 
 import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.exporter.ExportWriter
 import io.smartdatalake.testutils.plainScala.{MockScalaDataObject, ScalaTestUtil}
 import io.smartdatalake.testutils.{GenericExecFailTransformer, SmartDataLakeBuilderBehaviour}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, ScalaClassGenericDfTransformer}
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import io.smartdatalake.workflow.dataobject.expectation.{Expectation, SQLExpectation}
 import org.apache.hadoop.conf.Configuration
+import org.json4s.jackson.JsonMethods
+import org.json4s.{JArray, JNothing, JString}
 import org.scalatest.funsuite.AnyFunSuite
+
+import java.nio.file.Files
+import scala.reflect.runtime.universe.typeOf
 
 /**
  * End-to-end tests for [[SmartDataLakeBuilder]] with the plain-Scala engine,
@@ -108,5 +117,37 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with SmartDataLakeLogger with
 
   test("sdlb run with 2 actions and PartitionDiffMode, recovery after action 2 failed the first time") {
     testPartitionDiffModeRecoveryWithExpectation()
+  }
+
+  test("dry-run schema export merges the column descriptions of global.descriptionPath") {
+    val tempDir = Files.createTempDirectory("schemaExport")
+    val descriptionDir = Files.createDirectories(tempDir.resolve("description/dataObjects"))
+    Files.writeString(descriptionDir.resolve("tgt1.md"),
+      """# tgt1
+        |@column a description of a
+        |@column c description of a column not existing
+        |""".stripMargin)
+    val schema = GenericSchema.fromJson(JsonMethods.parse(
+      """[
+        |  {"name": "a", "dataType": "string", "nullable": true, "comment": "schema comment of a"},
+        |  {"name": "b", "dataType": "string", "nullable": true, "comment": "schema comment of b"}
+        |]""".stripMargin).asInstanceOf[JArray], typeOf[ScalaSubFeed])
+    implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+    val context = ScalaTestUtil.getDefaultActionPipelineContext.copy(globalConfig = GlobalConfig(
+      dataObjectsSchemaSource = Some(tempDir.resolve("schema").toUri.toString),
+      descriptionPath = Some(tempDir.resolve("description").toUri.toString)
+    ))
+    context.schemaExportRegistry.register(DataObjectId("tgt1"), schema)
+
+    sdlb.exportDataObjectSchemas(context)
+
+    val exported = JsonMethods.parse(ExportWriter(context.globalConfig.dataObjectsSchemaSource.get).readLatestSchema(DataObjectId("tgt1")).get)
+    val fields = (exported \ "schema").asInstanceOf[JArray].arr
+    def comment(name: String) = fields.find(f => (f \ "name") == JString(name)).map(_ \ "comment").getOrElse(JNothing)
+    // the description overrides the comment of the schema, other comments are kept
+    assert(comment("a") == JString("description of a"))
+    assert(comment("b") == JString("schema comment of b"))
+    // the exported schema can be read back
+    assert(ExportWriter.parseSchema(JsonMethods.compact(exported))._1.fields.map(_.name) == Seq("a", "b"))
   }
 }

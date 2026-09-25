@@ -89,6 +89,11 @@ import org.apache.hadoop.conf.Configuration
  *   the Spark connection for every Spark Action. Note that the default connection can still be
  *   overwritten for each Spark Action by specifying the sparkConnectionId in the action's
  *   configuration.
+ * @param descriptionPath
+ *   Optional path of the directory containing the Markdown description files of the DataObjects, Actions and
+ *   Connections, e.g. `dataObjects/myDataObject.md`. The column descriptions defined there are merged into the
+ *   schemas exported by `--test dry-run-with-schema-export`, overriding the comments of the schema, so that they
+ *   are shown in the SDLB UI. It is also the default for the `--descriptionPath` option of CatalogSchemaUpdater.
  */
 case class GlobalConfig(
     hadoopOptions: Option[Map[String, StringOrSecret]] = None,
@@ -104,7 +109,8 @@ case class GlobalConfig(
     pluginOptions: Map[String, StringOrSecret] = Map(),
     uiBackend: Option[UIBackendConfig] = None,
     dataObjectsSchemaSource: Option[String] = None,
-    defaultSparkConnectionId: Option[ConnectionId] = None
+    defaultSparkConnectionId: Option[ConnectionId] = None,
+    descriptionPath: Option[String] = None
 ) extends SmartDataLakeLogger {
 
   // start memory logger, else log memory once

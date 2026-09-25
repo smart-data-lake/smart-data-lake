@@ -70,14 +70,16 @@ Lets now add some descriptions, tags and other metadata to our configuration fil
 Additionally, we want to create a comprehensive documentation for DataObject `btl-distances`, as the logic could need some explanation.
 For this we will write a separate markdown file. The UI will search markdown files for configuration objects according to the
 following path convention: `[dataObjects|actions|connections]/<id>.md`, below the directory passed as `--descriptionPath` to
-_ConfigJsonExporter_. In this project that directory is `viz/description`.
+_ConfigJsonExporter_. In this project that directory is `viz/description`. Configure the same directory as
+`global.descriptionPath`, so that SDLB finds the column descriptions as well.
 Let's edit therefore file `viz/description/dataObjects/btl-distances.md`.
 
 The existing file already contains some examples to create titles, tables and include images.
 And there is an example of a special syntax to create column descriptions using `@column` keyword.
-These column descriptions are applied as column comments by `CatalogSchemaUpdater`, see
-[Managing tables in the catalog at deploy time](/docs/reference/schema#managing-tables-in-the-catalog-at-deploy-time),
-and are therefore shown as column comments in the schema. They override a comment coming from the schema itself.
+These column descriptions are merged into the schemas exported by a dry-run with `--test dry-run-with-schema-export`,
+which is where the UI shows them from, and are applied as column comments to the catalog by `CatalogSchemaUpdater`, see
+[Managing tables in the catalog at deploy time](/docs/reference/schema#managing-tables-in-the-catalog-at-deploy-time).
+They override a comment coming from the schema itself.
 
 Lets add an additional comment for column `dep_name` to the markdown.
 
