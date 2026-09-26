@@ -38,23 +38,25 @@ case class HadoopExportWriter(path: HadoopPath, hadoopConfig: Configuration = ne
   }
 
   override def writeSchema(document: String, dataObjectId: DataObjectId, version: Long): Unit = {
-    writeFile(document, s"${dataObjectId}.schema.json")
+    writeFile(document, s"${dataObjectId.id}.schema.json")
   }
 
   override def writeStats(document: String, dataObjectId: DataObjectId, version: Long): Unit = {
-    writeFile(document, s"${dataObjectId}.stats.json")
+    writeFile(document, s"${dataObjectId.id}.stats.json")
   }
 
   override def writeLineage(document: String, dataObjectId: DataObjectId, version: Long): Unit = {
-    writeFile(document, s"${dataObjectId}.lineage.json")
+    writeFile(document, s"${dataObjectId.id}.lineage.json")
   }
 
   override def writeLineageDebug(document: String, dataObjectId: DataObjectId): Unit = {
-    writeFile(document, s"${dataObjectId}.lineage-debug.txt")
+    writeFile(document, s"${dataObjectId.id}.lineage-debug.txt")
   }
 
   override def readLatestSchema(dataObjectId: DataObjectId): Option[String] = {
-    readFile(s"${dataObjectId}.schema.json")
+    readFile(s"${dataObjectId.id}.schema.json")
+      // fallback to file names prefixed with "DataObject~", as written by HadoopExportWriter since version 2.9
+      .orElse(readFile(s"${dataObjectId}.schema.json"))
   }
 
   private def readFile(filename: String): Option[String] = {

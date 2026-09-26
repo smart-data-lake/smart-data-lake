@@ -223,10 +223,10 @@ trait ColumnLineageExportBehaviour {
         DefaultSmartDataLakeBuilder.exportColumnLineage(contextInitExport)
       }
 
-      // the exported files are named like the DataObject, see HadoopExportWriter
-      assert(Files.exists(tempDir.resolve(s"${tgtDO.id}.lineage.json")))
+      // the exported files are named like the DataObject id, without "DataObject~" prefix, see HadoopExportWriter
+      assert(Files.exists(tempDir.resolve(s"${tgtDO.id.id}.lineage.json")))
       // every column of this Action is traced back, so there is nothing to debug
-      assert(!Files.exists(tempDir.resolve(s"${tgtDO.id}.lineage-debug.txt")))
+      assert(!Files.exists(tempDir.resolve(s"${tgtDO.id.id}.lineage-debug.txt")))
   }
 
   def testNoColumnLineageIsCollectedWithoutTheLineageExportTestMode(): Unit = withLineageExport {

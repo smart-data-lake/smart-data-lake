@@ -111,7 +111,7 @@ class ColumnLineageExportTest extends AnyFunSuite with ColumnLineageExportBehavi
         DefaultSmartDataLakeBuilder.exportColumnLineage(contextInitExport)
       }
 
-      val content = Files.readString(tempDir.resolve(s"${tgtDO.id}.lineage-debug.txt"))
+      val content = Files.readString(tempDir.resolve(s"${tgtDO.id.id}.lineage-debug.txt"))
       assert(content.contains("Action copyCities -> DataObject tgt1"))
       // the columns of the input DataObject, the unresolved column and where it comes from
       assert(content.contains("src1: name#"))
