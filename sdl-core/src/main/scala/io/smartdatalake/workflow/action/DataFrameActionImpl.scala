@@ -342,6 +342,14 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     // enrich with fresh DataFrame if needed
     preparedSubFeed = enrichSubFeedDataFrame(input = input, subFeed = preparedSubFeed,
       phase = context.phase, isRecursive = isRecursive)
+    // Collect the schema of input DataObjects not written by any DataFrame-Action to be exported at the end of a
+    // dry-run with schema export. They are written by other Actions (e.g. FileTransferAction) or by external
+    // systems, so their init phase DataFrame is created from the declared or inferred schema of the DataObject.
+    // The schema of all other DataObjects is collected as output of the DataFrame-Action writing them.
+    if (context.phase == ExecutionPhase.Init && context.appConfig.isSchemaExport
+      && !context.instanceRegistry.isWrittenByDataFrameAction(input.id)) {
+      preparedSubFeed.dataFrame.foreach(df => context.schemaExportRegistry.register(input.id, df.schema))
+    }
     // materialize input DataFrame if requested. Only needed in exec phase, as init phase works on empty DataFrames.
     if (cacheInput && context.isExecPhase && subFeedHelper.canCacheDataFrame && !preparedSubFeed.isStreamingDataFrame) {
       preparedSubFeed = preparedSubFeed.cache

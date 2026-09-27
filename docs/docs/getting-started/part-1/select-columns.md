@@ -143,7 +143,7 @@ to see all options that are available. For your convenience, here is the current
 --parallelism <int>      Max number of parallel executed SDLB actions.
 --state-path <path>      Hadoop path to save run state files. Must be set to enable recovery in case of failures.
 --test <config|dry-run|dry-run-with-schema-export>
-                         Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage, dry-run-with-schema-export -> like dry-run, and export the schemas of the output DataObjects to global.dataObjectsSchemaSource
+                         Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage, dry-run-with-schema-export -> like dry-run, and export the schemas of the output and input-only DataObjects to global.dataObjectsSchemaSource
 --help                   Display the help text.
 --version                Display version information.
 ```

@@ -27,6 +27,8 @@ import scala.collection.mutable
 /**
  * Collects the schemas written to output DataObjects during the init phase, so they can be exported
  * at the end of a dry-run, see [[io.smartdatalake.app.TestMode.DryRunWithSchemaExport]].
+ * Additionally it collects the schemas of input DataObjects not written by any DataFrame-Action, e.g. files
+ * delivered by a FileTransferAction. They are taken from the declared or inferred schema of the DataObject.
  *
  * The schemas are taken from the init phase DataFrames and therefore include the column comments
  * assembled by SDLB, e.g. from schemaMin or from the ScalaDoc of case classes returned by user defined
