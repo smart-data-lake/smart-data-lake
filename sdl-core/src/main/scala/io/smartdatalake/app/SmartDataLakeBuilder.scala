@@ -85,6 +85,8 @@ object TestMode extends Enumeration {
    * `global.dataObjectsSchemaSource`. The schemas are taken from the init phase and therefore include
    * the column comments assembled by SDLB, e.g. from schemaMin or from the ScalaDoc of case classes
    * returned by user defined functions.
+   * The schemas of input DataObjects not written by any DataFrame-Action, e.g. files delivered by a
+   * FileTransferAction, are exported as well. They are taken from the declared or inferred schema of the DataObject.
    *
    * Use this on a development environment to create the schema files needed by CatalogSchemaUpdater
    * to apply table metadata to the catalog of a target environment at deployment time.
@@ -200,7 +202,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
         .valueName("<config|dry-run|dry-run-with-schema-export|dry-run-with-lineage-export>")
         .text(
           "Run in test mode: config -> validate configuration, dry-run -> execute prepare- and init-phase only to check environment and spark lineage, " +
-            "dry-run-with-schema-export -> like dry-run, and export the schemas of the output DataObjects to global.dataObjectsSchemaSource, " +
+            "dry-run-with-schema-export -> like dry-run, and export the schemas of the output and input-only DataObjects to global.dataObjectsSchemaSource, " +
             "dry-run-with-lineage-export -> like dry-run, and export the column level lineage of the output DataObjects to global.dataObjectsSchemaSource"
         ),
       help("help").text("Display the help text."),

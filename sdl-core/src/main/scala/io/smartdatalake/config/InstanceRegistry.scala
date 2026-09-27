@@ -43,7 +43,7 @@ class InstanceRegistry {
    */
   def register[A <: ConfigObjectId, B <: SdlConfigObject](instancesToAdd: Map[A, B]): Unit = {
     instances ++= instancesToAdd
-    _dataObjectIdsToValidateOnRead = None // reset precomputed value
+    resetPrecomputedValues()
   }
 
   /**
@@ -59,7 +59,7 @@ class InstanceRegistry {
    * @param instance the instance to register
    */
   def register(instance: SdlConfigObject): Unit = {
-    _dataObjectIdsToValidateOnRead = None // reset precomputed value
+    resetPrecomputedValues()
     instances(instance.id) = instance
   }
 
@@ -86,7 +86,7 @@ class InstanceRegistry {
    *          or `None` if no instance was registered with this id.
    */
   def remove(objectId: ConfigObjectId): Option[SdlConfigObject] = {
-    _dataObjectIdsToValidateOnRead = None // reset precomputed value
+    resetPrecomputedValues()
     instances.remove(objectId)
   }
 
@@ -97,7 +97,7 @@ class InstanceRegistry {
    * Registered instances can not be garbage collected by the JVM.
    */
   def clear(): Unit = {
-    _dataObjectIdsToValidateOnRead = None // reset precomputed value
+    resetPrecomputedValues()
     instances.clear()
   }
 
@@ -124,14 +124,29 @@ class InstanceRegistry {
     if (_dataObjectIdsToValidateOnRead.isEmpty) {
       // only DataObjects that can Create/Write DataFrames with ExpectationValidation are relevant
       val expectationValidationDataObjects = getDataObjects.collect{case x: CanCreateDataFrame with CanWriteDataFrame with ExpectationValidation => x}
-      // get DataObjects that are written by an Action using DataFrames
-      val dataFrameActions = getActions.collect{case x: DataFrameActionImpl => x}.flatMap(_.dataFrameOutputs)
-      // all DataObjects which are not used as an output should be validated on read
-      _dataObjectIdsToValidateOnRead = Some(expectationValidationDataObjects.map(_.id).diff(dataFrameActions.map(_.id)))
+      // all DataObjects which are not used as an output of an Action using DataFrames should be validated on read
+      _dataObjectIdsToValidateOnRead = Some(expectationValidationDataObjects.map(_.id).filterNot(isWrittenByDataFrameAction))
     }
     _dataObjectIdsToValidateOnRead.get
   }
   private var _dataObjectIdsToValidateOnRead: Option[Seq[DataObjectId]] = None
+
+  /**
+   * Check if a DataObject is the output of an Action using DataFrames, e.g. its schema is defined by that Action.
+   * Value is precomputed to avoid evaluation for every Action.
+   */
+  def isWrittenByDataFrameAction(id: DataObjectId): Boolean = {
+    if (_dataFrameActionOutputIds.isEmpty) {
+      _dataFrameActionOutputIds = Some(getActions.collect{case x: DataFrameActionImpl => x}.flatMap(_.dataFrameOutputs.map(_.id)).toSet)
+    }
+    _dataFrameActionOutputIds.get.contains(id)
+  }
+  private var _dataFrameActionOutputIds: Option[Set[DataObjectId]] = None
+
+  private def resetPrecomputedValues(): Unit = {
+    _dataObjectIdsToValidateOnRead = None
+    _dataFrameActionOutputIds = None
+  }
 
   /**
    * Check if this is DataObject should be validated on read
