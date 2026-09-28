@@ -90,6 +90,7 @@ case class DataObjectsExporterDataObject(
     val exportObjects = dataObjects.map {
       dataObject =>
         val metadata = getOptionalFieldData[DataObjectMetadata](dataObject, "metadata")
+        val table = getFieldData[Table](dataObject, "table")
         // return tuple:
         (
           // id
@@ -105,13 +106,15 @@ case class DataObjectsExporterDataObject(
           // metadata subjectArea
           metadata.flatMap(_.subjectArea),
           // metadata tags
-          metadata.map(_.tags).map(_.mkString(listElementsSeparator)),
+          metadata.map(_.tags).filter(_.nonEmpty).map(_.mkString(listElementsSeparator)),
           // path
           getEventuallyOptionalFieldData[String](dataObject, "path"),
           // partitions
-          getFieldData[Seq[String]](dataObject, "partitions").map(_.mkString(listElementsSeparator)),
+          getFieldData[Seq[String]](dataObject, "partitions").filter(_.nonEmpty).map(_.mkString(listElementsSeparator)),
           // table
-          getFieldData[Table](dataObject, "table").map(_.toString),
+          table.map(_.fullName),
+          // primaryKey
+          table.flatMap(_.primaryKey).map(_.mkString(listElementsSeparator)),
           // connectionId
           getEventuallyOptionalFieldData[Any](dataObject, "connectionId").map(getIdFromConfigObjectIdOrString)
         )
@@ -129,6 +132,7 @@ case class DataObjectsExporterDataObject(
       "path",
       "partitions",
       "table",
+      "primaryKey",
       "connectionId"
     )
   }
