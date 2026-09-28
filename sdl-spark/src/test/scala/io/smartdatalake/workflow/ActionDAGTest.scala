@@ -1421,6 +1421,47 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     Environment._globalConfig = Environment._globalConfig.copy(allowAsRecursiveInput = Seq())
   }
 
+  // see #892: the files read by the first action are archived by FileIncrementalMoveMode before the second action runs.
+  // The second action must not reuse a DataFrame whose lineage still reads these files.
+  private def testFileIncrementalMoveModeFollowedByAction(cacheOutput: Boolean): Unit = {
+    val srcDO = CsvFileDataObject("src1", tempPath + s"/moveMode$cacheOutput/src1", csvOptions = Map("header" -> "true"),
+      schema = Some(SparkSchema(StructType(Seq(StructField("lastname", StringType), StructField("firstname", StringType), StructField("rating", StringType))))))
+    srcDO.deleteAll(contextExec)
+    instanceRegistry.register(srcDO)
+    val tgt1DO = ParquetFileDataObject("tgt1", tempPath + s"/moveMode$cacheOutput/tgt1")
+    instanceRegistry.register(tgt1DO)
+    val tgt2DO = MockSparkDataObject("tgt2").register
+
+    val l1 = Seq(("doe", "john", "5"), ("doe", "john", "3"), ("smith", "jane", "4")).toDF("lastname", "firstname", "rating")
+    srcDO.writeSparkDataFrame(l1, Seq())(contextExec)
+    assert(srcDO.getFileRefs(Seq())(contextExec).nonEmpty)
+
+    val action1 = CopyAction("a", srcDO.id, tgt1DO.id, cacheOutput = cacheOutput, executionMode = Some(FileIncrementalMoveMode(archivePath = Some("_archive"))))
+    val action2 = CustomDataFrameAction("b", Seq(tgt1DO.id), Seq(tgt2DO.id), transformers = Seq(SQLDfsTransformer(code = Map(tgt2DO.id.id ->
+      "select lastname, firstname, rating from (select *, row_number() over (partition by lastname, firstname order by rating desc) as rn from %{inputViewName_tgt1}) where rn = 1"
+    ))))
+    Seq(action1, action2).foreach(instanceRegistry.register)
+    val dag = ActionDAGRun(Seq(action1, action2))
+
+    dag.prepare(contextPrep)
+    dag.init(contextInit)
+    dag.exec(contextExec)
+
+    // source files are archived
+    assert(srcDO.getFileRefs(Seq())(contextExec).isEmpty)
+    // second action processed the data
+    val r1 = tgt2DO.getSparkDataFrame()(contextExec).select($"lastname", $"rating").as[(String, String)].collect().toSet
+    assert(r1 == Set(("doe", "5"), ("smith", "4")))
+  }
+
+  test("action dag with FileIncrementalMoveMode followed by an action reading its output") {
+    testFileIncrementalMoveModeFollowedByAction(cacheOutput = false)
+  }
+
+  test("action dag with FileIncrementalMoveMode followed by an action reading its output, cacheOutput=true") {
+    testFileIncrementalMoveModeFollowedByAction(cacheOutput = true)
+  }
+
   test("DataFrameCacheRegistry shared between ActionPipelineContext when cloning") {
     val context1 = SparkTestUtil.getDefaultActionPipelineContext
     context1.cacheRegistry.registerConsumer("test", "action1")
