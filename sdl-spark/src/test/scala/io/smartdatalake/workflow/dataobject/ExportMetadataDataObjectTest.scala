@@ -20,6 +20,8 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.{Config, ConfigFactory}
 import io.smartdatalake.config.objects.{TestAction, TestConnection, TestDataObject}
+import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.dataobject.generic.Table
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.workflow.action.ActionMetadata
 
@@ -40,6 +42,22 @@ class ExportMetadataDataObjectTest extends DataObjectTestSuite {
     df.select("name").head().get(0) should be (metaData.name.get)
     df.select("description").head().get(0) should be (metaData.description.get)
     df.select("connectionId").head().get(0) should be (testDo.connectionId.get.id)
+    assert(df.select("tags").head().get(0) == null)
+  }
+
+  test("Test DataObjects Export of table, primaryKey and partitions") {
+    val jdbcCon = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:ExportMetadataDataObjectTest", "org.hsqldb.jdbcDriver")
+    instanceRegistry.register(jdbcCon)
+    val tableDo = JdbcTableDataObject(id = "tableDo", table = Table(db = Some("public"), name = "tab1", primaryKey = Some(Seq("id1", "id2"))), connectionId = "jdbcCon1")
+    instanceRegistry.register(tableDo)
+    val fileDo = ParquetFileDataObject(id = "fileDo", path = "/tmp/fileDo", partitions = Seq("dt", "type"))
+    instanceRegistry.register(fileDo)
+
+    val dataObjectsExporter = DataObjectsExporterDataObject.fromConfig(ConfigFactory.parseString("id = dataObjects-exporter"))
+    val rows = dataObjectsExporter.getSparkDataFrame().select("id", "table", "primaryKey", "partitions").collect()
+      .map(r => r.getString(0) -> (Option(r.getString(1)), Option(r.getString(2)), Option(r.getString(3)))).toMap
+    rows("tableDo") shouldBe (Some("public.tab1"), Some("id1,id2"), None)
+    rows("fileDo") shouldBe (None, None, Some("dt,type"))
   }
 
   test("Test DataObjects Export (from config option)") {
