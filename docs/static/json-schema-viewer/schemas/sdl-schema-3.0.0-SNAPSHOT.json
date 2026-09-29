@@ -254,6 +254,88 @@
         "description" : "Spark streaming execution mode uses Spark Structured Streaming to incrementally execute data\nloads and keep track of processed data. This mode needs a DataObject implementing\nCanCreateStreamingDataFrame and works only with SparkSubFeeds. This mode can be executed\nsynchronously in the DAG by using triggerType=Once, or asynchronously as Streaming Query with\ntriggerType = ProcessingTime or Continuous. Example:\n```\nactions = {\n  copy-departures {\n    type = CopyAction\n    inputId = stg-departures\n    outputId = int-departures\n    executionMode = {\n      type = SparkStreamingMode\n      checkpointLocation = \"~{env.basedir}/checkpoints/copy-departures\"\n      triggerType = ProcessingTime\n      triggerTime = \"10 seconds\"\n    }\n  }\n}\n```\n\n\nNOTE: The checkpoint location holds the streaming state. Deleting it makes the query restart from the source's\nconfigured starting position (which for some sources, e.g. Kafka with startingOffsets=latest, skips data\ninstead of reprocessing it); two actions must never share the same location."
       }
     },
+    "GenericFileTransformer" : {
+      "ScalaClassFileTransformer" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "ScalaClassFileTransformer"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "name of the transformer"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Optional description of the transformer"
+          },
+          "className" : {
+            "type" : "string",
+            "description" : "class name implementing trait`CustomFileTransformer`"
+          },
+          "options" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Options to pass to the transformation"
+          },
+          "runtimeOptions" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.  \nThe spark sql expressions are evaluated against an instance of`DefaultExpressionData`."
+          }
+        },
+        "title" : "ScalaClassFileTransformer",
+        "required" : [ "type", "className" ],
+        "additionalProperties" : false,
+        "description" : "Configuration of a custom file transformation as Java/Scala Class, creating one or more output files from one input file.  \nThe Java/Scala class has to implement interface `CustomFileTransformer`.  \nBesides transforming the content of a file, it can also transform the partition values of the output file by\nimplementing `CustomFileTransformer.transformPartitionValues`, e.g. to standardize partition values extracted\nfrom the file path.\n\nThe class is instantiated by reflection through its no-argument constructor, so it must be on the classpath of the\nSDLB job. It is serialized and shipped to the Spark executors, where the transformation is executed. Example:\n```\nactions = {\n  transform-airports {\n    type = CustomFileAction\n    inputId = stg-airports\n    outputId = int-airports\n    transformer = {\n      type = ScalaClassFileTransformer\n      className = com.sample.CutColumnsFileTransformer\n      options = { delimiter = \",\" }\n    }\n  }\n}\n```\n"
+      },
+      "ScalaCodeFileTransformer" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "ScalaCodeFileTransformer"
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "name of the transformer"
+          },
+          "description" : {
+            "type" : "string",
+            "description" : "Optional description of the transformer"
+          },
+          "code" : {
+            "type" : "string",
+            "description" : "Scala code for transformation. Either file or code must be defined."
+          },
+          "file" : {
+            "type" : "string",
+            "description" : "File where Scala code for transformation is loaded from. Either file or code must be defined."
+          },
+          "options" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Options to pass to the transformation"
+          },
+          "runtimeOptions" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.  \nThe spark sql expressions are evaluated against an instance of`DefaultExpressionData`."
+          }
+        },
+        "title" : "ScalaCodeFileTransformer",
+        "required" : [ "type" ],
+        "additionalProperties" : false,
+        "description" : "Configuration of a custom file transformation between one input and one output stream (1:1) as Scala code, which\nis compiled at runtime. The code must either be a function of type `(Map[String,String], InputStream, OutputStream) => Option[Exception]` , or evaluate to an instance of `CustomFileTransformer`. Only the latter can also create multiple output files or transform partition values.\n\nThe code is compiled on the driver and again on every Spark executor, as classes compiled at runtime are not\navailable on the classpath of the executors. Example:\n```\nactions = {\n  transform-airports {\n    type = CustomFileAction\n    inputId = stg-airports\n    outputId = int-airports\n    transformer = {\n      type = ScalaCodeFileTransformer\n      code = \"\"\"\n        import java.io.{InputStream, OutputStream}\n        (options: Map[String,String], input: InputStream, output: OutputStream) => {\n          input.transferTo(output)\n          None\n        }\n      \"\"\"\n    }\n  }\n}\n```\n"
+      }
+    },
     "ValidationRule" : {
       "RowLevelValidationRule" : {
         "type" : "object",
@@ -3967,31 +4049,12 @@
             "description" : "output DataObject"
           },
           "transformer" : {
-            "type" : "object",
-            "properties" : {
-              "className" : {
-                "type" : "string",
-                "description" : "Optional class name to load transformer code from"
-              },
-              "scalaFile" : {
-                "type" : "string",
-                "description" : "Optional file where Scala code for transformation is loaded from"
-              },
-              "scalaCode" : {
-                "type" : "string",
-                "description" : "Optional Scala code for transformation"
-              },
-              "options" : {
-                "type" : "object",
-                "additionalProperties" : {
-                  "type" : "string"
-                },
-                "description" : "Options to pass to the transformation"
-              }
-            },
-            "title" : "CustomFileTransformerConfig",
-            "additionalProperties" : false,
-            "description" : "a custom file transformer, which reads a file from HadoopFileDataObject and writes it back to another HadoopFileDataObject"
+            "oneOf" : [ {
+              "$ref" : "#/definitions/GenericFileTransformer/ScalaClassFileTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericFileTransformer/ScalaCodeFileTransformer"
+            } ],
+            "description" : "file transformer to apply, e.g. ScalaClassFileTransformer or ScalaCodeFileTransformer.  \nIt reads a file from HadoopFileDataObject and writes one or more files to another HadoopFileDataObject."
           },
           "filesPerPartition" : {
             "type" : "integer",
@@ -4056,7 +4119,7 @@
         "title" : "CustomFileAction",
         "required" : [ "type", "inputId", "outputId", "transformer" ],
         "additionalProperties" : false,
-        "description" : "`Action` to transform files between two Hadoop Data Objects.  \nThe transformation is executed in distributed mode on Spark executors.  \nA custom file transformer must be given, which reads a file from Hadoop and writes it back to Hadoop.\n\nUse this Action if files must be processed as files (byte or line streams), e.g. to unzip, decrypt or repair a file\nformat Spark can not read. The list of files to transfer is created on the driver and then distributed to the\nexecutors, where the transformer gets the input stream and the output stream of one file at a time. If the content\ncan be read as a DataFrame, prefer `CopyAction`, if the files only need to be moved unchanged prefer `FileTransferAction`. Example:\n```\nactions = {\n  transform-airports {\n    type = CustomFileAction\n    inputId = stg-airports\n    outputId = int-airports\n    transformer = {\n      className = com.company.transformer.CutColumnsFileTransformer\n      options = { delimiter = \",\" }\n    }\n    filesPerPartition = 5\n  }\n}\n```\n\n\nNOTE: inputId must be a HadoopFileDataObject and outputId a SparkFileDataObject, and the transformer code must be\nserializable as it is shipped to the Spark executors."
+        "description" : "`Action` to transform files between two Hadoop Data Objects.  \nThe transformation is executed in distributed mode on Spark executors.  \nA custom file transformer must be given, which reads a file as input stream and writes one or more output files.  \nThe transformer can also transform partition values, e.g. to standardize partition values extracted from the file path\nof the input into different partition columns of the output.\n\nUse this Action if files must be processed as files (byte or line streams), e.g. to unzip, decrypt or repair a file\nformat Spark can not read. The list of files to transfer is created on the driver and then distributed to the\nexecutors, where the transformer gets the input stream and the output stream of one file at a time. If the content\ncan be read as a DataFrame, prefer `CopyAction`, if the files only need to be moved unchanged prefer `FileTransferAction`. Example:\n```\nactions = {\n  transform-airports {\n    type = CustomFileAction\n    inputId = stg-airports\n    outputId = int-airports\n    transformer = {\n      type = ScalaClassFileTransformer\n      className = com.company.transformer.CutColumnsFileTransformer\n      options = { delimiter = \",\" }\n    }\n    filesPerPartition = 5\n  }\n}\n```\n\n\nIf the transformer returns or throws an exception for a file, the remaining files are still processed, but the Action\nfails afterwards, listing all failed files. Note that the output files already written stay in place.  \nNote that the file references created in init phase are a prediction with one output file per input file and the default\nfile name, as files are only written in exec phase. If the transformer creates multiple or differently named output files,\nthe file references passed on to the next Action therefore differ between init and exec phase. This is relevant\nfor runs only executing the init phase, e.g. simulation.\n\nNOTE: inputId must be a HadoopFileDataObject and outputId a SparkFileDataObject, and the transformer code must be\nserializable as it is shipped to the Spark executors."
       },
       "CustomScriptAction" : {
         "type" : "object",
@@ -4291,6 +4354,14 @@
             "type" : "string",
             "description" : "A regex to extract a part of the filename to keep in the translated FileRef.  \nIf the regex contains group definitions, the first group is taken, otherwise the whole regex match.  \nDefault is None which keeps the whole filename (without path)."
           },
+          "transformer" : {
+            "oneOf" : [ {
+              "$ref" : "#/definitions/GenericFileTransformer/ScalaClassFileTransformer"
+            }, {
+              "$ref" : "#/definitions/GenericFileTransformer/ScalaCodeFileTransformer"
+            } ],
+            "description" : "optional file transformer, e.g. ScalaClassFileTransformer or ScalaCodeFileTransformer.  \nThe transformation is executed on the driver, see above.  \nIf a transformation fails for a file, the remaining files are still processed, but the Action fails afterwards."
+          },
           "createFileRefLineage" : {
             "type" : "boolean",
             "description" : "If set to false, this action does not propagate output FileRefs to further actions.  \nThis helps to avoid performance and memory problems with too many FileRefs.  \nDefault is true."
@@ -4350,7 +4421,7 @@
         "title" : "FileTransferAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "`Action` to transfer files between SFtp, Hadoop, local Filesystem and a Webservice. Note that the Input DataObject and Output DataObject are not interpreted by this Action: the Data is just transferred as is.  \nAs data is transferred as is, matching the data format between the Input DataObject (e.g. CSV from WebserviceFileDataObject) and Output DataObject (e.g. CsvFileDataObject) is in the responsibility of the developer/user.  \nIf you want to convert or transform data formats between input and output, use the CopyAction instead. CopyAction will read the data from the Input DataObject into a DataFrame, and write that DataFrame to the Output DataObject. In this case the DataObjects are responsible to convert the data into a DataFrame and back. Example:\n```\nactions = {\n  download-airports {\n    type = FileTransferAction\n    inputId = ext-airports\n    outputId = stg-airports\n    overwrite = false\n    maxParallelism = 4\n  }\n}\n```\n"
+        "description" : "`Action` to transfer files between SFtp, Hadoop, local Filesystem and a Webservice. Note that the Input DataObject and Output DataObject are not interpreted by this Action: the Data is just transferred as is.  \nAs data is transferred as is, matching the data format between the Input DataObject (e.g. CSV from WebserviceFileDataObject) and Output DataObject (e.g. CsvFileDataObject) is in the responsibility of the developer/user.  \nIf you want to convert or transform data formats between input and output, use the CopyAction instead. CopyAction will read the data from the Input DataObject into a DataFrame, and write that DataFrame to the Output DataObject. In this case the DataObjects are responsible to convert the data into a DataFrame and back.\n\nOptionally a file transformer can be configured to transform files as byte streams, create multiple output files per input\nfile, or transform partition values, e.g. to standardize partition values extracted from the file path of the input.  \nNote that the transformation is executed on the driver, in up to maxParallelism threads. Large files or CPU intensive\ntransformations can therefore cause memory and CPU resource problems on the driver.  \nUse CustomFileAction instead to distribute the transformation on Spark executors if the input is a HadoopFileDataObject.  \nNote that the file references created in init phase are a prediction with one output file per input file and the default\nfile name, as files are only written in exec phase. If the transformer creates multiple or differently named output files,\nthe file references passed on to the next Action therefore differ between init and exec phase. This is relevant\nfor runs only executing the init phase, e.g. simulation. Example:\n```\nactions = {\n  download-airports {\n    type = FileTransferAction\n    inputId = ext-airports\n    outputId = stg-airports\n    overwrite = false\n    maxParallelism = 4\n  }\n}\n```\n"
       },
       "HistorizeAction" : {
         "type" : "object",
