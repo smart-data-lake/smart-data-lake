@@ -530,6 +530,11 @@ trait GenericField extends GenericTypedObject {
 
   def removeMetadata: GenericField
 
+  /**
+   * Returns a copy of this field with another data type and nullability, keeping its name and metadata (e.g. comment).
+   */
+  def withDataType(dataType: GenericDataType, nullable: Boolean): GenericField
+
   def toJson: JObject = {
     JObject(
       "name" -> JString(name),

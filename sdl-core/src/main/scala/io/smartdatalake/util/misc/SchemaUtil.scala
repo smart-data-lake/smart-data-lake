@@ -138,6 +138,36 @@ object SchemaUtil {
     else colsLeft.map(_.toLowerCase).diff(colsRight.map(_.toLowerCase))
   }
 
+  /**
+   * Normalizes a column name for comparison, e.g. converts it to lowercase if comparison is case-insensitive.
+   */
+  def normalizeColName(name: String, caseSensitive: Boolean): String = {
+    if (caseSensitive) name else name.toLowerCase
+  }
+
+  /**
+   * Checks if two lists of column names are equal, including their order.
+   */
+  def isColListEqual(a: Seq[String], b: Seq[String], caseSensitive: Boolean): Boolean = {
+    a.map(normalizeColName(_, caseSensitive)) == b.map(normalizeColName(_, caseSensitive))
+  }
+
+  /**
+   * Returns the column names of `a` which are not contained in `b`, keeping the original spelling of `a`.
+   */
+  def colListDiff(a: Seq[String], b: Seq[String], caseSensitive: Boolean): Seq[String] = {
+    val bSet = b.map(normalizeColName(_, caseSensitive)).toSet
+    a.filterNot(x => bSet.contains(normalizeColName(x, caseSensitive)))
+  }
+
+  /**
+   * Finds an element of a list by its name.
+   */
+  def findByName[A](a: Seq[A], name: String, extractor: A => String, caseSensitive: Boolean): Option[A] = {
+    if (caseSensitive) a.find(e => extractor(e) == name)
+    else a.find(e => extractor(e).equalsIgnoreCase(name))
+  }
+
   def checkPartitionMatch(configuredPartitions: Seq[String], existingPartitions: Seq[String], caseSensitive: Boolean): (Boolean, Set[String], Set[String]) = {
     val (confPartitions, existPartitions) = if (caseSensitive) (configuredPartitions.toSet, existingPartitions.toSet)
     else (configuredPartitions.map(_.toLowerCase()).toSet, existingPartitions.map(_.toLowerCase()).toSet)

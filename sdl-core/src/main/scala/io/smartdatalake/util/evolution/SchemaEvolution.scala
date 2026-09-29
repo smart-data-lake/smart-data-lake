@@ -19,10 +19,30 @@
 package io.smartdatalake.util.evolution
 
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.SchemaUtil.{colListDiff, findByName, isColListEqual, normalizeColName}
+import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger, StringUtil}
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe._
 
+/**
+ * Result of converting a column from one DataType to another, see [[SchemaEvolution.convertDataType]].
+ *
+ * @param oldColumn expression converting the column of the old DataFrame to the target DataType
+ * @param newColumn expression converting the column of the new DataFrame to the target DataType
+ * @param dataType target DataType
+ */
+case class ColumnConversion(oldColumn: GenericColumn, newColumn: GenericColumn, dataType: GenericDataType)
+
+/**
+ * Describes how a column of the evolved schema is created from the old and the new DataFrame,
+ * see [[SchemaEvolution.createColumnMappings]].
+ *
+ * @param name name of the column in the evolved schema
+ * @param oldColumn expression to create the column from the old DataFrame, or None if it is not selected from the old DataFrame
+ * @param newColumn expression to create the column from the new DataFrame, or None if it is not selected from the new DataFrame
+ * @param info description of the evolution applied to the column, or None if the column is unchanged
+ */
+case class ColumnMapping(name: String, oldColumn: Option[GenericColumn], newColumn: Option[GenericColumn], info: Option[String])
 
 /**
   * Functions for schema evolution
@@ -40,17 +60,17 @@ object SchemaEvolution extends SmartDataLakeLogger {
   /**
    * Sorts all columns of a DataFrame according to defined sort order
    */
-  def sortColumns(df: GenericDataFrame, cols: Seq[String], caseSensitive: Boolean = false): GenericDataFrame = {
+  @deprecated("not used by SDLB anymore, use GenericDataFrame.select instead", "3.0.0")
+  def sortColumns(df: GenericDataFrame, cols: Seq[String], caseSensitive: Boolean = Environment.caseSensitive): GenericDataFrame = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(df.subFeedType)
-    val dfCols = if (caseSensitive) df.columns else df.columns.map(_.toLowerCase)
-    val colsToSelect = if (caseSensitive) cols.filter(c => dfCols.contains(c)).map(functions.col) else cols.filter(c => dfCols.contains(c.toLowerCase)).map(functions.col)
-    df.select(colsToSelect)
+    val dfCols = df.columns.map(normalizeColName(_, caseSensitive)).toSet
+    df.select(cols.filter(c => dfCols.contains(normalizeColName(c, caseSensitive))).map(functions.col))
   }
 
   /**
    * Verifies that two DataFrames contain the same columns.
    */
-  def hasSameColNamesAndTypes(oldDf: GenericDataFrame, newDf: GenericDataFrame, caseSensitiveComparison: Boolean = false): Boolean = {
+  def hasSameColNamesAndTypes(oldDf: GenericDataFrame, newDf: GenericDataFrame, caseSensitiveComparison: Boolean = Environment.caseSensitive): Boolean = {
     hasSameColNamesAndTypes(oldDf.schema, newDf.schema, caseSensitiveComparison)
   }
 
@@ -75,23 +95,89 @@ object SchemaEvolution extends SmartDataLakeLogger {
    * @param column a Column
    * @param left original DataType
    * @param right new DataType
-   * @return A column with the transformation expression applied
+   * @param caseSensitive if true, names of nested fields are compared case-sensitive
+   * @return the expressions to convert the old and the new column to the target DataType, or None if the conversion is not supported
    */
-  def convertDataType(column: GenericColumn, left: GenericDataType, right: GenericDataType, ignoreOldDeletedNestedColumns: Boolean): Option[(GenericColumn, GenericColumn, GenericDataType)] = {
+  def convertDataType(column: GenericColumn, left: GenericDataType, right: GenericDataType, ignoreOldDeletedNestedColumns: Boolean, caseSensitive: Boolean = Environment.caseSensitive): Option[ColumnConversion] = {
     val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(column.subFeedType)
-    (left,right) match {
+    (left, right) match {
       // simple type
-      case (left: GenericDataType with GenericSimpleDataType, right: GenericDataType with GenericSimpleDataType) =>
-        Some(column.cast(right), column.cast(right), right)
+      case (_: GenericSimpleDataType, _: GenericSimpleDataType) =>
+        Some(ColumnConversion(column.cast(right), column.cast(right), right))
       // same complex type
-      case (left: GenericDataType, right: GenericDataType) if left.typeName == right.typeName =>
-        val tgtType = TypeConsolidation.consolidateType(left, right, ignoreOldDeletedNestedColumns)
+      case _ if left.typeName == right.typeName =>
+        val tgtType = TypeConsolidation.consolidateType(left, right, ignoreOldDeletedNestedColumns, caseSensitive = caseSensitive)
         val convertLeftUdf = functions.schemaEvolutionUdf(left, tgtType)
         val convertRightUdf = functions.schemaEvolutionUdf(right, tgtType)
-        Some(convertLeftUdf.convert(column), convertRightUdf.convert(column), tgtType)
+        Some(ColumnConversion(convertLeftUdf.convert(column), convertRightUdf.convert(column), tgtType))
       // default
       case _ => None
     }
+  }
+
+  /**
+   * Creates the mapping of old and new columns to the columns of the evolved schema.
+   * See [[process]] for the supported schema changes and the meaning of the parameters.
+   *
+   * @return one [[ColumnMapping]] per column of the evolved schema, in the order of the evolved schema.
+   * @throws SchemaEvolutionException if a data type change is not supported
+   */
+  def createColumnMappings(oldSchema: GenericSchema, newSchema: GenericSchema, colsToIgnore: Seq[String] = Seq(), ignoreOldDeletedColumns: Boolean = false, ignoreOldDeletedNestedColumns: Boolean = true, caseSensitiveComparison: Boolean = Environment.caseSensitive): Seq[ColumnMapping] = {
+    require(oldSchema.subFeedType == newSchema.subFeedType, s"subFeedType of old and new schema must be the same, got ${oldSchema.subFeedType} and ${newSchema.subFeedType}")
+    val functions = DataFrameSubFeed.getFunctions(oldSchema.subFeedType)
+    import functions._
+    def norm(name: String) = normalizeColName(name, caseSensitiveComparison)
+
+    val colsToIgnoreSet = colsToIgnore.map(norm).toSet
+    def isColToIgnore(name: String) = colsToIgnoreSet.contains(norm(name))
+    val oldFields = oldSchema.fields.filterNot(f => isColToIgnore(f.name))
+    val newFields = newSchema.fields.filterNot(f => isColToIgnore(f.name))
+    val oldFieldsMap = oldSchema.fields.map(f => norm(f.name) -> f).toMap
+    val newFieldsMap = newSchema.fields.map(f => norm(f.name) -> f).toMap
+
+    // prepare target column names. This defines the ordering of the resulting DataFrame's.
+    // Columns to ignore are placed at the end, if they exist in one of the schemas.
+    val existingColsToIgnore = colsToIgnore.flatMap(c => oldFieldsMap.get(norm(c)).orElse(newFieldsMap.get(norm(c)))).map(_.name).distinct
+    val tgtCols = if (Environment.schemaEvolutionNewColumnsLast) {
+      oldFields.map(_.name) ++ colListDiff(newFields.map(_.name), oldFields.map(_.name), caseSensitiveComparison) ++ existingColsToIgnore
+    } else {
+      newFields.map(_.name) ++ colListDiff(oldFields.map(_.name), newFields.map(_.name), caseSensitiveComparison) ++ existingColsToIgnore
+    }
+
+    // select a column with its name in the source schema, and rename it if the target name is spelled differently.
+    def colAs(srcName: String, tgtName: String) = if (srcName == tgtName) col(srcName) else col(srcName).as(tgtName)
+
+    // create mapping
+    val mappingsOrErrors = tgtCols.map { c =>
+      (oldFieldsMap.get(norm(c)), newFieldsMap.get(norm(c))) match {
+        // column is new -> fill in old data with null
+        case (None, Some(n)) =>
+          Right(ColumnMapping(c, Some(lit(null).cast(n.dataType).as(c)), Some(colAs(n.name, c)), Some(s"column $c is new")))
+        // column is old -> fill in new data with null
+        case (Some(o), None) =>
+          if (isColToIgnore(c)) Right(ColumnMapping(c, Some(colAs(o.name, c)), None, Some(s"column $c is ignored because it is in the list of columns to ignore")))
+          else if (ignoreOldDeletedColumns) Right(ColumnMapping(c, None, None, Some(s"column $c is old and will be removed because ignoreOldDeletedColumns=true")))
+          else Right(ColumnMapping(c, Some(colAs(o.name, c)), Some(lit(null).cast(o.dataType).as(c)), Some(s"column $c is old and will be set to null for new records")))
+        // datatypes are *not* equal -> conversion of old to new datatype required
+        case (Some(o), Some(n)) if !hasSameColNamesAndTypes(Seq(o), Seq(n), caseSensitiveComparison) =>
+          convertDataType(col(o.name), o.dataType, n.dataType, ignoreOldDeletedNestedColumns, caseSensitiveComparison) match {
+            case Some(conversion) =>
+              // the column has the same name in both DataFrames except for case (if case-insensitive), so it's ok to use the same expression for both.
+              Right(ColumnMapping(c, Some(conversion.oldColumn.as(c)), Some(conversion.newColumn.as(c)),
+                Some(s"column $c is converted from ${o.dataType.typeName}/${n.dataType.typeName} to ${conversion.dataType.typeName}")))
+            case None => Left(s"column $c cannot be converted from ${o.dataType.typeName} to ${n.dataType.typeName}")
+          }
+        // datatypes are equal -> no conversion required
+        case (Some(o), Some(n)) =>
+          Right(ColumnMapping(c, Some(colAs(o.name, c)), Some(colAs(n.name, c)), None))
+        case (None, None) => throw new IllegalStateException(s"column $c must exist in old or new schema")
+      }
+    }
+
+    // stop on errors
+    val errors = mappingsOrErrors.collect { case Left(err) => err }
+    if (errors.nonEmpty) throw SchemaEvolutionException(s"Data types are different: ${errors.mkString(", ")}")
+    mappingsOrErrors.collect { case Right(mapping) => mapping }
   }
 
   /**
@@ -115,129 +201,57 @@ object SchemaEvolution extends SmartDataLakeLogger {
    * @return tuple of (oldExtendedDf, newExtendedDf) evolved to new schema
    */
   def process(oldDf: GenericDataFrame, newDf: GenericDataFrame, colsToIgnore: Seq[String] = Seq(), ignoreOldDeletedColumns: Boolean = false, ignoreOldDeletedNestedColumns: Boolean = true, caseSensitiveComparison: Boolean = Environment.caseSensitive): (GenericDataFrame, GenericDataFrame) = {
-    assert(oldDf.subFeedType == newDf.subFeedType)
+    require(oldDf.subFeedType == newDf.subFeedType, s"subFeedType of old and new DataFrame must be the same, got ${oldDf.subFeedType} and ${newDf.subFeedType}")
     val functions = DataFrameSubFeed.getFunctions(oldDf.subFeedType)
-    import functions._
-
-    // internal structure and functions
-    case class ColumnDetail(name: String, oldToNewColumn: Option[GenericColumn], newColumn: Option[GenericColumn], infoMsg: Option[String], errMsg: Option[String])
-
-    def getNullColumnOfType(d: GenericDataType) = lit(null).cast(d)
+    val oldSchema = oldDf.schema
+    val newSchema = newDf.schema
 
     // log entry point
-    logger.debug(s"old schema: ${oldDf.schema.treeString()}")
-    logger.debug(s"new schema: ${newDf.schema.treeString()}")
+    logger.debug(s"old schema: ${oldSchema.treeString()}")
+    logger.debug(s"new schema: ${newSchema.treeString()}")
 
-    val oldColsWithoutTechCols = if (caseSensitiveComparison) {
-      oldDf.columns.filter(c => !colsToIgnore.contains(c))
-    } else {
-      oldDf.columns.filter(c => !colsToIgnore.map(_.toLowerCase).contains(c.toLowerCase))
-    }
-
-    val newColsWithoutTechCols = if (caseSensitiveComparison) {
-      newDf.columns.filter(c => !colsToIgnore.contains(c))
-    } else {
-      newDf.columns.filter(c => !colsToIgnore.map(_.toLowerCase).contains(c.toLowerCase))
-    }
+    val colsToIgnoreSet = colsToIgnore.map(normalizeColName(_, caseSensitiveComparison)).toSet
+    def isColToIgnore(name: String) = colsToIgnoreSet.contains(normalizeColName(name, caseSensitiveComparison))
+    val oldFieldsWithoutTechCols = oldSchema.fields.filterNot(f => isColToIgnore(f.name))
+    val newFieldsWithoutTechCols = newSchema.fields.filterNot(f => isColToIgnore(f.name))
 
     // check if schema is identical
-    if (hasSameColNamesAndTypes(oldDf.select(oldColsWithoutTechCols.map(col)), newDf.select(newColsWithoutTechCols.map(col)), caseSensitiveComparison)) {
+    if (hasSameColNamesAndTypes(oldFieldsWithoutTechCols, newFieldsWithoutTechCols, caseSensitiveComparison)) {
+      val oldColsWithoutTechCols = oldFieldsWithoutTechCols.map(_.name)
       // check column order
-      if (isStringListEqual(oldColsWithoutTechCols, newColsWithoutTechCols, caseSensitiveComparison)) {
+      if (isColListEqual(oldColsWithoutTechCols, newFieldsWithoutTechCols.map(_.name), caseSensitiveComparison)) {
         logger.info("Schemas are identical: no evolution needed")
         (oldDf, newDf)
       } else {
         logger.info("Schemas are identical but column order differs: columns of newDf are sorted according to oldDf")
-        val newSchemaOnlyCols = stringListDiff(newDf.columns, oldColsWithoutTechCols, caseSensitiveComparison)
-        (oldDf, newDf.select((oldColsWithoutTechCols ++ newSchemaOnlyCols).map(col)))
+        val newSchemaOnlyCols = colListDiff(newDf.columns, oldColsWithoutTechCols, caseSensitiveComparison)
+        (oldDf, newDf.select((oldColsWithoutTechCols ++ newSchemaOnlyCols).map(functions.col)))
       }
     } else {
-
-      // prepare target column names
-      // this defines the ordering of the resulting DataFrame's
-      val tgtCols = if (Environment.schemaEvolutionNewColumnsLast) {
-        // new columns last
-        oldColsWithoutTechCols ++ newColumns(oldDf, newDf) ++ (if (caseSensitiveComparison) colsToIgnore else colsToIgnore.map(_.toLowerCase))
-      } else {
-        // deleted columns last
-        newColsWithoutTechCols ++ deletedColumns(oldDf, newDf) ++ (if (caseSensitiveComparison) colsToIgnore else colsToIgnore.map(_.toLowerCase))
-      }
-
-      // create mapping
-      val tgtColumns = tgtCols.map {
-        c =>
-          val oldType = if (caseSensitiveComparison) oldDf.schema.fields.find(_.name == c).map(_.dataType) else oldDf.schema.fields.find(_.name.toLowerCase == c.toLowerCase).map(_.dataType)
-          val newType = if (caseSensitiveComparison) newDf.schema.fields.find(_.name == c).map(_.dataType) else newDf.schema.fields.find(_.name.toLowerCase == c.toLowerCase).map(_.dataType)
-          val thisColumn = Some(col(c))
-          // define conversion
-          val (oldToNewColumn, newColumn, infoMsg, errMsg) = (oldType,newType) match {
-            // column is new -> fill in old data with null
-            case (None,Some(n)) =>
-              val nullColumn = Some(getNullColumnOfType(n).as(c))
-              val info = Some(s"column $c is new")
-              (nullColumn, thisColumn, info, None)
-            // column is old -> fill in new data with null
-            case (Some(o),None) =>
-              val (oldToNewColumn,newColumn,info) = if (colsToIgnore.contains(if(caseSensitiveComparison) c else c.toLowerCase)) (thisColumn, None, Some(s"column $c is ignored because it is in the list of columns to ignore"))
-              else if (ignoreOldDeletedColumns) (None, None, Some(s"column $c is old and will be removed because ignoreOldDeletedColumns=true"))
-              else (thisColumn, Some(getNullColumnOfType(o).as(c)), Some(s"column $c is old and will be set to null for new records"))
-              (oldToNewColumn, newColumn, info, None)
-            // datatypes are *not* equal -> conversion of old to new datatype required
-            case (Some(o), Some(n))
-              if !hasSameColNamesAndTypes(Seq(functions.field(c, o, nullable = true)), Seq(functions.field(c, n, nullable = true)), caseSensitiveComparison) =>
-              val convertedColumns = convertDataType(col(if(caseSensitiveComparison) c else c.toLowerCase), o, n, ignoreOldDeletedNestedColumns)
-              val info = if (convertedColumns.isDefined) Some(s"column $c is converted from ${o.typeName}/${n.typeName} to ${convertedColumns.get._3.typeName}") else None
-              val err = if (convertedColumns.isEmpty) Some(s"column $c cannot be converted from ${o.typeName} to ${n.typeName}") else None
-              (convertedColumns.map(_._1.as(c)), convertedColumns.map(_._2.as(c)), info, err)
-            // datatypes are equal -> no conversion required
-            case (Some(_),Some(_)) => (thisColumn,thisColumn,None,None)
-            case (None,None) => throw new Exception("Either old or new type should be present, got (None, None)")
-          }
-          ColumnDetail(c, oldToNewColumn, newColumn, infoMsg, errMsg)
-      }
-
-      // stop on errors
-      if (tgtColumns.exists(_.errMsg.isDefined)) {
-        val errList = tgtColumns.flatMap(_.errMsg).mkString(", ")
-        throw SchemaEvolutionException(s"Data types are different: $errList")
-      }
+      val mappings = createColumnMappings(oldSchema, newSchema, colsToIgnore, ignoreOldDeletedColumns, ignoreOldDeletedNestedColumns, caseSensitiveComparison)
 
       // log information
-      val infoList = tgtColumns.flatMap(_.infoMsg).map("-> " + _).mkString("\n")
-      val infoTxt = indent(s"$infoList\nold schema:\n${oldDf.schema.treeString().stripTrailing()}\nnew schema:\n${newDf.schema.treeString().stripTrailing()}", 2)
-      logger.info(s"schema evolution needed. mapping is:\n$infoTxt"
-      )
+      val infoList = mappings.flatMap(_.info).map("-> " + _).mkString("\n")
+      val infoTxt = StringUtil.indent(s"$infoList\nold schema:\n${oldSchema.treeString().stripTrailing()}\nnew schema:\n${newSchema.treeString().stripTrailing()}", 2)
+      logger.info(s"schema evolution needed. mapping is:\n$infoTxt")
 
       // prepare dataframes
-      val oldExtendedDf = oldDf.select(tgtColumns.flatMap(_.oldToNewColumn))
-      val newExtendedDf = newDf.select(tgtColumns.flatMap(_.newColumn))
-
-      // return
+      val oldExtendedDf = oldDf.select(mappings.flatMap(_.oldColumn))
+      val newExtendedDf = newDf.select(mappings.flatMap(_.newColumn))
       (oldExtendedDf, newExtendedDf)
     }
   }
 
-  def indent(s: String, spaces: Int): String = {
-    val pad = " " * spaces
-    s.linesIterator.map("  " + _).mkString(System.lineSeparator())
-  }
+  @deprecated("use StringUtil.indent instead", "3.0.0")
+  def indent(s: String, spaces: Int): String = StringUtil.indent(s, spaces)
 
-  def isStringListEqual(a: Seq[String], b: Seq[String], caseSensitiveComparison: Boolean): Boolean = {
-    if (caseSensitiveComparison) a == b
-    else a.map(_.toLowerCase) == b.map(_.toLowerCase)
-  }
+  @deprecated("use SchemaUtil.isColListEqual instead", "3.0.0")
+  def isStringListEqual(a: Seq[String], b: Seq[String], caseSensitiveComparison: Boolean): Boolean = isColListEqual(a, b, caseSensitiveComparison)
 
-  def stringListDiff(a: Seq[String], b: Seq[String], caseSensitiveComparison: Boolean): Seq[String] = {
-    if (caseSensitiveComparison) a.diff(b)
-    else {
-      val bLowerSet = b.map(_.toLowerCase).toSet
-      a.filter(x => !bLowerSet.contains(x.toLowerCase))
-    }
-  }
+  @deprecated("use SchemaUtil.colListDiff instead", "3.0.0")
+  def stringListDiff(a: Seq[String], b: Seq[String], caseSensitiveComparison: Boolean): Seq[String] = colListDiff(a, b, caseSensitiveComparison)
 
-  def listFind[A](a: Seq[A], str: String, extractor: A => String, caseSensitiveComparison: Boolean): Option[A] = {
-    if (caseSensitiveComparison) a.find(e => extractor(e) == str)
-    else a.find(e => extractor(e).equalsIgnoreCase(str))
-  }
+  @deprecated("use SchemaUtil.findByName instead", "3.0.0")
+  def listFind[A](a: Seq[A], str: String, extractor: A => String, caseSensitiveComparison: Boolean): Option[A] = findByName(a, str, extractor, caseSensitiveComparison)
 
 }

@@ -24,7 +24,7 @@ import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe.DataFrameFunctions
 import io.smartdatalake.workflow.dataframe.spark._
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.scalatest.funsuite.AnyFunSuite
@@ -1118,4 +1118,97 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
 
   }
 
+
+  test("Columns to ignore are not duplicated if deleted columns are placed last") {
+    val schemaOld = StructType(List(StructField("a", StringType), StructField("b", IntegerType), StructField("dl_ts_captured", TimestampType), StructField("dl_ts_delimited", TimestampType)))
+    val schemaNew = StructType(List(StructField("a", StringType), StructField("c", IntegerType)))
+    val oldDf = SparkDataFrame(SparkTestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(SparkTestUtil.arbitraryDataFrame(schemaNew))
+    val colsToIgnore = Seq("dl_ts_captured", "dl_ts_delimited")
+
+    val previousNewColumnsLast = Environment._schemaEvolutionNewColumnsLast
+    Environment._schemaEvolutionNewColumnsLast = Some(false)
+    try {
+      val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, colsToIgnore)
+      assert(oldEvoDf.columns.toSeq == Seq("a", "c", "b") ++ colsToIgnore)
+      assert(newEvoDf.columns.toSeq == Seq("a", "c", "b"))
+    } finally {
+      Environment._schemaEvolutionNewColumnsLast = previousNewColumnsLast
+    }
+  }
+
+  test("Columns to ignore which do not exist are skipped") {
+    val schemaOld = StructType(List(StructField("a", StringType), StructField("b", IntegerType)))
+    val schemaNew = StructType(List(StructField("a", StringType), StructField("c", IntegerType)))
+    val oldDf = SparkDataFrame(SparkTestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(SparkTestUtil.arbitraryDataFrame(schemaNew))
+
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, colsToIgnore = Seq("DL_TS_CAPTURED"))
+    assert(oldEvoDf.columns.toSeq == Seq("a", "b", "c"))
+    assert(newEvoDf.columns.toSeq == Seq("a", "b", "c"))
+  }
+
+  test("New and deleted columns keep their spelling in case-insensitive mode") {
+    val schemaOld = StructType(List(StructField("a", StringType), StructField("Old_Col", IntegerType)))
+    val schemaNew = StructType(List(StructField("A", StringType), StructField("New_Col", IntegerType)))
+    val oldDf = SparkDataFrame(SparkTestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(SparkTestUtil.arbitraryDataFrame(schemaNew))
+
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = false)
+    // existing columns are named according to oldDf, as new columns are placed last by default
+    assert(oldEvoDf.columns.toSeq == Seq("a", "Old_Col", "New_Col"))
+    assert(newEvoDf.columns.toSeq == Seq("a", "Old_Col", "New_Col"))
+  }
+
+  test("Changed case of nested field is not handled as new field in case-insensitive mode") {
+    val schemaOld = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", IntegerType), StructField("b2", IntegerType))))))
+    val schemaNew = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("B1", IntegerType), StructField("b2", StringType))))))
+    val oldDf = SparkDataFrame(session.createDataFrame(java.util.List.of(Row("x", Row(1, 2))), schemaOld))
+    val newDf = SparkDataFrame(session.createDataFrame(java.util.List.of(Row("y", Row(3, "4"))), schemaNew))
+
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf, caseSensitiveComparison = false)
+    assert(SchemaEvolution.hasSameColNamesAndTypes(oldEvoDf, newEvoDf, caseSensitiveComparison = true))
+    val bType = oldEvoDf.schema.getDataType("b").asInstanceOf[SparkStructDataType]
+    assert(bType.fields.map(_.name) == Seq("B1", "b2"))
+    // values of the old field are kept
+    assert(oldEvoDf.select(col("b.B1")).collect.map(_.getAs[Int](0)).toSeq == Seq(1))
+    assert(oldEvoDf.select(col("b.b2")).collect.map(_.getAs[String](0)).toSeq == Seq("2"))
+  }
+
+  test("Metadata of nested fields is kept") {
+    val metadata = new MetadataBuilder().putString("comment", "my comment").build()
+    val schemaOld = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", IntegerType), StructField("b2", IntegerType))))))
+    val schemaNew = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", IntegerType, nullable = true, metadata), StructField("b2", StringType))))))
+    val oldDf = SparkDataFrame(SparkTestUtil.arbitraryDataFrame(schemaOld))
+    val newDf = SparkDataFrame(SparkTestUtil.arbitraryDataFrame(schemaNew))
+
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
+    Seq(oldEvoDf, newEvoDf).foreach { df =>
+      val bType = df.schema.getDataType("b").asInstanceOf[SparkStructDataType]
+      assert(bType.fields.find(_.name == "b1").flatMap(_.comment).contains("my comment"))
+    }
+  }
+
+  test("createColumnMappings describes the evolution per column") {
+    val schemaOld = SparkSchema(StructType(List(StructField("a", StringType), StructField("b", IntegerType), StructField("c", IntegerType))))
+    val schemaNew = SparkSchema(StructType(List(StructField("a", StringType), StructField("b", StringType), StructField("d", IntegerType))))
+
+    val mappings = SchemaEvolution.createColumnMappings(schemaOld, schemaNew)
+    assert(mappings.map(_.name) == Seq("a", "b", "c", "d"))
+    assert(mappings.map(m => (m.oldColumn.isDefined, m.newColumn.isDefined)) == Seq((true, true), (true, true), (true, true), (true, true)))
+    assert(mappings.head.info.isEmpty)
+    assert(mappings(1).info.exists(_.contains("converted")))
+    assert(mappings(2).info.exists(_.contains("old")))
+    assert(mappings(3).info.exists(_.contains("new")))
+
+    val mappingsIgnoreDeleted = SchemaEvolution.createColumnMappings(schemaOld, schemaNew, ignoreOldDeletedColumns = true)
+    assert(mappingsIgnoreDeleted.filter(_.oldColumn.isDefined).map(_.name) == Seq("a", "b", "d"))
+  }
+
+  test("createColumnMappings fails on unsupported data type change") {
+    val schemaOld = SparkSchema(StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", IntegerType)))))))
+    val schemaNew = SparkSchema(StructType(List(StructField("a", StringType), StructField("b", ArrayType(IntegerType)))))
+    val ex = intercept[SchemaEvolutionException](SchemaEvolution.createColumnMappings(schemaOld, schemaNew))
+    assert(ex.getMessage.contains("column b cannot be converted"))
+  }
 }

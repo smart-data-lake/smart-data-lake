@@ -23,9 +23,9 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.StringUtil.indent
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import org.apache.commons.lang3.StringUtils
 import org.slf4j.event.Level
 
 /**
@@ -93,15 +93,6 @@ case class DebugTransformer(override val name: String = "debug", override val de
     }
     // return
     df
-  }
-
-  /**
-   * This functionality is included in Java 17, e.g. string.indent(n). It's implemented here to be compatible with Java 8.
-   */
-  private def indent(s: String, n: Int) = {
-    assert(n > 0)
-    val prefix = StringUtils.repeat(' ', n)
-    s.linesIterator.map(prefix + _).mkString(System.lineSeparator())
   }
 }
 

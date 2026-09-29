@@ -87,4 +87,14 @@ object StringUtil {
     x.toLowerCase.replaceAll("[^a-zA-Z0-9_]", "")
   }
 
+  /**
+   * Prefixes every line of a string with the given number of blanks.
+   * Other than Java's String.indent, lines are joined with the system line separator and no trailing line break is added.
+   */
+  def indent(x: String, spaces: Int): String = {
+    require(spaces >= 0, s"spaces must not be negative, got $spaces")
+    val prefix = " " * spaces
+    x.linesIterator.map(prefix + _).mkString(System.lineSeparator())
+  }
+
 }

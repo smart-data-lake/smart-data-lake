@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataframe.sparkconnect
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.evolution.SchemaEvolution.listFind
+import io.smartdatalake.util.misc.SchemaUtil.findByName
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.dataframe._
@@ -255,7 +255,7 @@ case class SparkConnectSchema(inner: StructType) extends GenericSchema {
   }
 
   override def getDataType(colName: String): SparkConnectDataType = {
-    SparkConnectDataType(listFind[StructField](inner, colName, _.name, Environment.caseSensitive)
+    SparkConnectDataType(findByName[StructField](inner, colName, _.name, Environment.caseSensitive)
       .getOrElse(throw new IllegalArgumentException(s"Column $colName does not exists. Available: ${inner.fieldNames.mkString(", ")}")).dataType
     )
   }
@@ -403,6 +403,11 @@ case class SparkConnectField(inner: StructField) extends GenericField {
   override def toLowerCase: SparkConnectField = SparkConnectField(inner.copy(dataType = dataType.toLowerCase.inner, name = inner.name.toLowerCase))
 
   override def removeMetadata: SparkConnectField = SparkConnectField(inner.copy(dataType = dataType.removeMetadata.inner, metadata = Metadata.empty))
+
+  override def withDataType(dataType: GenericDataType, nullable: Boolean): SparkConnectField = dataType match {
+    case d: SparkConnectDataType => SparkConnectField(inner.copy(dataType = d.inner, nullable = nullable))
+    case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataType)
+  }
 }
 
 

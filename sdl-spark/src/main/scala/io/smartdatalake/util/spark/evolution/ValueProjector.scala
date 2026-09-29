@@ -19,7 +19,7 @@
 package io.smartdatalake.util.spark.evolution
 
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.evolution.SchemaEvolution.listFind
+import io.smartdatalake.util.misc.SchemaUtil.findByName
 import io.smartdatalake.util.evolution.SchemaEvolutionException
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
@@ -109,14 +109,16 @@ private[smartdatalake] object ValueProjector {
     tgtSchema.map {
       tgtField =>
         val name = tgtField.name
-        val srcTypeOpt = listFind[StructField](srcSchema.fields.toSeq, name, _.name, Environment.caseSensitive).map(_.dataType)
+        val srcFieldOpt = findByName[StructField](srcSchema.fields.toSeq, name, _.name, Environment.caseSensitive)
         val tgtType = tgtField.dataType
         val newPath = path :+ name
-        if (srcTypeOpt.isDefined) {
-          val srcIdx = srcSchema.fieldIndex(name)
-          FieldProjector.getFieldProjection(srcIdx, srcTypeOpt.get, tgtType, newPath)
-        } else {
-          NewFieldProjector(tgtType, newPath)
+        srcFieldOpt match {
+          case Some(srcField) =>
+            // lookup index with the name of the source field, as it might be spelled differently if case-insensitive
+            val srcIdx = srcSchema.fieldIndex(srcField.name)
+            FieldProjector.getFieldProjection(srcIdx, srcField.dataType, tgtType, newPath)
+          case None =>
+            NewFieldProjector(tgtType, newPath)
         }
     }
   }

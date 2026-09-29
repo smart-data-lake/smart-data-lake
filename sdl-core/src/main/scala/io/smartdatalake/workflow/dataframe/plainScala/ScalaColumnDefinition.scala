@@ -18,7 +18,8 @@
  */
 package io.smartdatalake.workflow.dataframe.plainScala
 
-import io.smartdatalake.workflow.dataframe.GenericField
+import io.smartdatalake.workflow.DataFrameSubFeed
+import io.smartdatalake.workflow.dataframe.{GenericDataType, GenericField}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
@@ -46,6 +47,12 @@ case class ScalaColumnDefinition[A: ClassTag](name: String,
   def toLowerCase: ScalaColumnDefinition[A] = copy(name = name.toLowerCase)
 
   def removeMetadata: ScalaColumnDefinition[A] = copy(comment = None)
+
+  def withDataType(dataType: GenericDataType, nullable: Boolean): ScalaColumnDefinition[_] = dataType match {
+    case scalaDataType: ScalaDataType[_] =>
+      scalaDataType.createColumnDefinition(name, nullable, comment).withDataFrameAlias(dataFrameAlias).withProvenance(provenance)
+    case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataType)
+  }
 
   def createColumn(data: IndexedSeq[Option[_]]): ScalaColumn[A] = {
     ScalaColumn(this, data.asInstanceOf[IndexedSeq[Option[A]]])

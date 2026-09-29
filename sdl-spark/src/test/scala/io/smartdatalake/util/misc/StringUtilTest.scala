@@ -57,4 +57,10 @@ class StringUtilTest extends AnyFlatSpec with Matchers
       .values.forall(identity[Boolean]) shouldBe true
   }
 
+  "indent" should "prefix every line with the given number of blanks" in {
+    val nl = System.lineSeparator()
+    indent("a\nb", 4) shouldBe s"    a$nl    b"
+    indent("a", 0) shouldBe "a"
+  }
+
 }

@@ -24,7 +24,7 @@ import com.snowflake.snowpark.types._
 import com.snowflake.snowpark.{Column, DataFrame, RelationalGroupedDataFrame, Row}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.evolution.SchemaEvolution.listFind
+import io.smartdatalake.util.misc.SchemaUtil.findByName
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataframe._
@@ -197,7 +197,7 @@ case class SnowparkSchema(inner: StructType) extends GenericSchema {
   }
 
   override def getDataType(colName: String): GenericDataType = {
-    SnowparkDataType(listFind[StructField](inner, colName, _.name, Environment.caseSensitive)
+    SnowparkDataType(findByName[StructField](inner, colName, _.name, Environment.caseSensitive)
       .getOrElse(throw new IllegalArgumentException(s"Column $colName does not exists. Available: ${inner.names.mkString(", ")}")).dataType
     )
   }
@@ -327,6 +327,11 @@ case class SnowparkField(inner: StructField) extends GenericField {
   override def makeNullable: SnowparkField = SnowparkField(inner.copy(dataType = dataType.makeNullable.inner, nullable = true))
   override def toLowerCase: SnowparkField = SnowparkField(inner.copy(dataType = dataType.toLowerCase.inner, columnIdentifier = ColumnIdentifier(inner.name.toLowerCase)))
   override def removeMetadata: SnowparkField = this // metadata is not existing in Snowpark
+
+  override def withDataType(dataType: GenericDataType, nullable: Boolean): SnowparkField = dataType match {
+    case d: SnowparkDataType => SnowparkField(inner.copy(dataType = d.inner, nullable = nullable))
+    case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataType)
+  }
 }
 
 trait SnowparkDataType extends GenericDataType {

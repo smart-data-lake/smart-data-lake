@@ -18,4 +18,11 @@
  */
 package io.smartdatalake.util.evolution
 
-private[smartdatalake] case class SchemaEvolutionException(message: String) extends RuntimeException(message) {}
+/**
+ * Thrown if the schema of a DataFrame can not be evolved to another schema, e.g. because a data type change is not supported.
+ */
+class SchemaEvolutionException(message: String, cause: Throwable = null) extends RuntimeException(message, cause)
+
+object SchemaEvolutionException {
+  def apply(message: String, cause: Throwable = null): SchemaEvolutionException = new SchemaEvolutionException(message, cause)
+}
