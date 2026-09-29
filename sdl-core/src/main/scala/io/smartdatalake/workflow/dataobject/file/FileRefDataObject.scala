@@ -81,15 +81,21 @@ trait FileRefDataObject extends FileDataObject {
           .map(m => if (m.groupCount>0) m.group(1) else m.matched)
           .getOrElse(f.fileName)
         // make filename match this DataObjects FileName pattern.
-        if (!newFileName.matches(this.fileName.replace("*",".*"))) {
-          newFileName += this.fileName.replace("*","")
-        }
+        newFileName = getTargetFileName(newFileName)
         // prepend path and partition string before fileName
         val newPath = getPartitionString(f.partitionValues.addKey(Environment.runIdPartitionColumnName, context.executionId.runId.toString))
           .map(partitionString => getPath + separator + partitionString + newFileName)
           .getOrElse(getPath + separator + newFileName)
         FileRefMapping(f, f.copy(fullPath = newPath, fileName = newFileName))
     }
+  }
+
+  /**
+   * Make a file name match the file name pattern of this DataObject by appending the pattern without wildcards, e.g. its extension.
+   */
+  def getTargetFileName(fileName: String): String = {
+    if (fileName.matches(this.fileName.replace("*", ".*"))) fileName
+    else fileName + this.fileName.replace("*", "")
   }
 
   /**

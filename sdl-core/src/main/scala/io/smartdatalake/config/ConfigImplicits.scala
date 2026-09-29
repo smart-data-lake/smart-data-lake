@@ -24,7 +24,7 @@ import io.smartdatalake.definitions._
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.util.secrets.{SecretProviderConfig, StringOrSecret}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
-import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, GenericFileTransformer}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, HttpAuthMode}
@@ -91,6 +91,15 @@ trait ConfigImplicits {
   implicit val dfTransformerReader: ConfigReader[GenericDfTransformer] = ConfigReader.fromTry { (c, p) =>
     implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
     ConfigParser.parseConfigObject[GenericDfTransformer](c.getConfig(p))
+  }
+
+  /**
+   * A reader that reads [[GenericFileTransformer]] values.
+   * Note that GenericFileTransformer must be parsed according to it's 'type' attribute by using SDL ConfigParser.
+   */
+  implicit val fileTransformerReader: ConfigReader[GenericFileTransformer] = ConfigReader.fromTry { (c, p) =>
+    implicit val instanceRegistry: InstanceRegistry = Environment._instanceRegistry
+    ConfigParser.parseConfigObject[GenericFileTransformer](c.getConfig(p))
   }
 
   /**

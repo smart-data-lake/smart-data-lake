@@ -113,8 +113,9 @@ case class FileIncrementalMoveMode(archivePath: Option[String] = None, archiveIn
       case (fileRefInput: FileRefDataObject, fileSubFeed: FileSubFeed) =>
         fileSubFeed.fileRefMapping.foreach {
           fileRefs =>
-            logger.info(s"Cleaning up ${fileRefs.size} processed input files")
-            val inputFiles = fileRefs.map(_.src.fullPath)
+            // an input file might be mapped to multiple output files, e.g. by a file transformer
+            val inputFiles = fileRefs.map(_.src.fullPath).distinct
+            logger.info(s"Cleaning up ${inputFiles.size} processed input files")
             if (archivePath.isDefined) {
               val newBasePath = if (fileRefInput.isAbsolutePath(archivePath.get)) archivePath.get
               else fileRefInput.concatPath(fileRefInput.getPath, archivePath.get)

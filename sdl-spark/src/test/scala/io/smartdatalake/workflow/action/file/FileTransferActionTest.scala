@@ -28,6 +28,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.action.FileTransferAction
 import io.smartdatalake.workflow.action.executionMode.FileIncrementalMoveMode
+import io.smartdatalake.workflow.action.generic.transformer.ScalaClassFileTransformer
 import io.smartdatalake.workflow.connection.SFtpFileRefConnection
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
 import io.smartdatalake.workflow.dataobject._
@@ -559,5 +560,56 @@ class FileTransferActionTest extends AnyFunSuite with BeforeAndAfter with Before
 
     val r1 = tgtDO.getFileRefs(Seq())
     assert(r1.map(_.fileName).toSet == Set("result-0.json", "result-1.json"))
+    // file lineage contains the files actually written
+    assert(tgtSubFeed.asInstanceOf[FileSubFeed].fileRefs.get.map(_.fileName).toSet == Set("result-0.json", "result-1.json"))
+  }
+
+  test("transform hadoop files with multiple output files and partition value transformation") {
+
+    val tempDir = Files.createTempDirectory("filetransfer")
+    val srcPath = tempDir.resolve("testSrc")
+    val tgtPath = tempDir.resolve("testTgt")
+    Files.createDirectories(srcPath.resolve("year=2002/month=12"))
+    Files.writeString(srcPath.resolve("year=2002/month=12/data.csv"), "id\n1\n2\n3\n")
+    val srcDO = CsvFileDataObject("src1", srcPath.toString.replace('\\', '/'), partitions = Seq("year", "month"), csvOptions = Map("header" -> "true"))
+    val tgtDO = CsvFileDataObject("tgt1", tgtPath.toString.replace('\\', '/'), partitions = Seq("dt"), csvOptions = Map("header" -> "true"))
+    instanceRegistry.register(srcDO)
+    instanceRegistry.register(tgtDO)
+
+    // split each file into one file per data row, and map partitions to dt
+    val transformer = ScalaClassFileTransformer(className = classOf[TestSplitRowsFileTransformer].getName)
+    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, transformer = Some(transformer))
+    val tgtSubFeed = action1.exec(Seq(FileSubFeed(None, "src1", partitionValues = Seq()))).head.asInstanceOf[FileSubFeed]
+
+    val expectedFileNames = Seq("data-0.csv", "data-1.csv", "data-2.csv")
+    assert(tgtSubFeed.fileRefs.get.map(_.fileName).sorted == expectedFileNames)
+    assert(tgtSubFeed.partitionValues == Seq(PartitionValues(Map("dt" -> "200212"))))
+    assert(tgtSubFeed.metrics.get("files_written") == 3)
+    assert(tgtDO.getFileRefs(Seq()).map(_.fileName).sorted == expectedFileNames)
+    assert(tgtDO.listPartitions == Seq(PartitionValues(Map("dt" -> "200212"))))
+    assert(tgtDO.getSparkDataFrame().count() == 3)
+  }
+
+  test("transform hadoop files fails after all files are processed if a file returned an error") {
+
+    val tempDir = Files.createTempDirectory("filetransfer")
+    val srcPath = tempDir.resolve("testSrc")
+    val tgtPath = tempDir.resolve("testTgt")
+    Files.createDirectories(srcPath)
+    Files.writeString(srcPath.resolve("ok.csv"), "id\n1\n")
+    Files.writeString(srcPath.resolve("fail.csv"), "fail")
+    val srcDO = CsvFileDataObject("src1", srcPath.toString.replace('\\', '/'))
+    val tgtDO = CsvFileDataObject("tgt1", tgtPath.toString.replace('\\', '/'))
+    instanceRegistry.register(srcDO)
+    instanceRegistry.register(tgtDO)
+
+    val transformer = ScalaClassFileTransformer(className = classOf[TestFailOnContentFileTransformer].getName)
+    val action1 = FileTransferAction("fta", srcDO.id, tgtDO.id, transformer = Some(transformer))
+    val ex = intercept[Exception](action1.exec(Seq(FileSubFeed(None, "src1", partitionValues = Seq()))))
+    val exMessages = Iterator.iterate[Throwable](ex)(_.getCause).takeWhile(_ != null).map(_.getMessage).toSeq
+    assert(exMessages.exists(m => m.contains("file transformation failed for 1 of 2 files") && m.contains("fail.csv")), exMessages.mkString(" / "))
+
+    // the other file is processed nevertheless
+    assert(tgtPath.resolve("ok.csv").toFile.exists)
   }
 }

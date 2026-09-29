@@ -24,7 +24,6 @@ import io.smartdatalake.workflow.action
 import io.smartdatalake.workflow.action.generic.transformer._
 import io.smartdatalake.workflow.action.script.CmdScript
 import io.smartdatalake.workflow.action.spark.TestCopyDfTransformer
-import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfTransformer
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -151,7 +150,9 @@ private[smartdatalake] class ActionImplTests extends AnyFlatSpec with Matchers {
         |   inputId = tdo3
         |   outputId = tdo4
         |   transformer = {
+        |     type = ScalaClassFileTransformer
         |     class-name = io.smartdatalake.config.objects.TestFileTransformer
+        |     options = { test = "true" }
         |   }
         |   breakFileRefLineage = true
         | }
@@ -165,9 +166,37 @@ private[smartdatalake] class ActionImplTests extends AnyFlatSpec with Matchers {
       inputId = "tdo3",
       outputId = "tdo4",
       breakFileRefLineage = true,
-      transformer = CustomFileTransformerConfig(
-        className = Some("io.smartdatalake.config.objects.TestFileTransformer")
+      transformer = ScalaClassFileTransformer(
+        className = "io.smartdatalake.config.objects.TestFileTransformer",
+        options = Map("test" -> "true")
       )
+    )
+  }
+
+  "FileTransferAction" should "be parsable with transformer" in {
+
+    val config = ConfigFactory.parseString(
+      """
+        |actions = {
+        | 123 = {
+        |   type = FileTransferAction
+        |   inputId = tdo3
+        |   outputId = tdo4
+        |   transformer = {
+        |     type = ScalaClassFileTransformer
+        |     class-name = io.smartdatalake.config.objects.TestFileTransformer
+        |   }
+        | }
+        |}
+        |""".stripMargin).withFallback(dataObjectConfig).resolve
+
+    implicit val registry: InstanceRegistry = ConfigParser.parse(config)
+
+    registry.getActions.head shouldBe action.FileTransferAction(
+      id = "123",
+      inputId = "tdo3",
+      outputId = "tdo4",
+      transformer = Some(ScalaClassFileTransformer(className = "io.smartdatalake.config.objects.TestFileTransformer"))
     )
   }
 
@@ -281,7 +310,9 @@ private[smartdatalake] class ActionImplTests extends AnyFlatSpec with Matchers {
         |   inputId = tdo1
         |   outputId = tdo1
         |   transformer = {
+        |     type = ScalaClassFileTransformer
         |     class-name = io.smartdatalake.config.objects.TestFileTransformer
+        |     options = { test = "true" }
         |   }
         | }
         |}

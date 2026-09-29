@@ -22,7 +22,7 @@ import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.misc.ScaladocUtil.{extractScalaDoc, formatScaladocString, formatScaladocWithTags}
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
-import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, ValidationRule}
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, GenericFileTransformer, ValidationRule}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
@@ -60,6 +60,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     typeOf[ConnectionMetadata],
     typeOf[GenericDfTransformer],
     typeOf[GenericDfsTransformer],
+    typeOf[GenericFileTransformer],
     typeOf[ParsableScriptDef],
   typeOf[ExecutionMode],
   typeOf[HousekeepingMode],
