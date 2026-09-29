@@ -40,6 +40,7 @@ Your own implementation is referenced exactly like a built-in one, and its const
 | ExecutionMode | `ExecutionMode`, see [Execution Modes](executionModes#implement-your-own-execution-mode) | `actions.<id>.executionMode.type` |
 | Transformer 1:1 | `GenericDfTransformer` | `actions.<id>.transformers[].type` |
 | Transformer n:m | `GenericDfsTransformer` | `actions.<id>.transformers[].type` |
+| File transformer | `GenericFileTransformer`, see [File transformations](transformations#file-transformations) | `actions.<id>.transformer.type` of a CustomFileAction or FileTransferAction |
 | Expectation | `Expectation` (on a DataObject) or `ActionExpectation` (on an Action), see [Data Quality](dataQuality) | `dataObjects.<id>.expectations[].type` |
 | HousekeepingMode | `HousekeepingMode` | `dataObjects.<id>.housekeepingMode.type` |
 | AuthMode | `AuthMode`, or `HttpAuthMode` for webservices | `connections.<id>.authMode.type` |
@@ -73,7 +74,7 @@ Parameters are passed as `options`, so no companion object is needed.
 | `CustomGenericDfTransformer` | engine independent 1:1 DataFrame transformation | `transformers[]` of type `ScalaClassGenericDfTransformer` |
 | `CustomGenericDfsTransformer` | engine independent n:m DataFrame transformation | `transformers[]` of type `ScalaClassGenericDfsTransformer` |
 | `CustomDfTransformer` / `CustomDfsTransformer` | classic Spark DataFrame transformation | `transformers[]` of type `ScalaClassSparkDfTransformer` / `...DfsTransformer` |
-| `CustomFileTransformer` | transform one file as byte streams on Spark executors | `CustomFileAction.transformer.className` |
+| `CustomFileTransformer` | transform a file as byte streams into one or more files, optionally mapping partition values | `transformer` of type `ScalaClassFileTransformer` in CustomFileAction or FileTransferAction |
 | `CustomPartitionModeLogic` | select partition values to process | `executionMode` of type `CustomPartitionMode` |
 | `StateListener` | react on Action state changes and metrics | `global.stateListeners[].className` |
 | `SecretProvider` | resolve secrets from an own store | `global.secretProviders` |

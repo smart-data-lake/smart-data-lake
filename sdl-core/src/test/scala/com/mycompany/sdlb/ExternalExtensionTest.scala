@@ -25,7 +25,8 @@ import io.smartdatalake.definitions.{Condition, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
-import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformerDef
+import io.smartdatalake.workflow.action.generic.customlogic.{CustomFileTransformer, OutputStreamFactory}
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformerDef, GenericFileTransformer, ScalaClassFileTransformer}
 import io.smartdatalake.workflow.action.{Action, ActionMetadata, DataFrameOneToOneActionImpl}
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
@@ -35,6 +36,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
@@ -58,6 +60,45 @@ class ExternalExtensionTest extends AnyFunSuite with Matchers {
     action.inputs.map(_.id.id) shouldBe Seq("ext-src")
     action.outputs.map(_.id.id) shouldBe Seq("ext-tgt")
   }
+
+  test("own file transformers outside the io.smartdatalake package can be applied") {
+    Seq(ExternalFileTransformer(), ScalaClassFileTransformer(className = classOf[ExternalCustomFileTransformer].getName)).foreach { transformer =>
+      val os = new ByteArrayOutputStream()
+      val (fileNames, error) = GenericFileTransformer.transformToFiles(transformer, Map(), new ByteArrayInputStream("x".getBytes), "data", identity, _ => os)
+      error shouldBe None
+      fileNames shouldBe Seq("data")
+      os.toString shouldBe "x-ext"
+    }
+  }
+}
+
+/**
+ * An own GenericFileTransformer implemented outside the `io.smartdatalake` package.
+ */
+case class ExternalFileTransformer(override val name: String = "ext") extends GenericFileTransformer {
+  override def transformToFiles(options: Map[String, String], input: InputStream, fileName: String, outputs: OutputStreamFactory): Option[Exception] = {
+    val output = outputs.create(fileName)
+    input.transferTo(output)
+    output.write("-ext".getBytes)
+    None
+  }
+}
+
+object ExternalFileTransformer extends FromConfigFactory[GenericFileTransformer] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): ExternalFileTransformer =
+    extract[ExternalFileTransformer](config)
+}
+
+/**
+ * An own CustomFileTransformer implemented outside the `io.smartdatalake` package.
+ */
+class ExternalCustomFileTransformer extends CustomFileTransformer {
+  override def transform(options: Map[String, String], input: InputStream, output: OutputStream): Option[Exception] = {
+    input.transferTo(output)
+    output.write("-ext".getBytes)
+    None
+  }
+  override def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues, PartitionValues]] = None
 }
 
 /**

@@ -358,6 +358,58 @@ In general, Python >= 3.10 is required and PySpark package needs to be installed
 Further environment variable PYSPARK_PYTHON needs to be set to the python executable of the corresponding python environment to be used.
 
 
+### File transformations
+CustomFileAction and FileTransferAction do not work with DataFrames, but can transform files as byte streams with a file transformer, e.g. to unzip, decrypt or repair a file format.
+The `transformer` attribute takes a file transformer: `ScalaClassFileTransformer` references a class implementing `CustomFileTransformer`, `ScalaCodeFileTransformer` compiles Scala code at runtime.
+If several transformation steps are needed, chain them inside your transformer.
+If a transformer returns or throws an exception for a file, the remaining files are still processed, but the Action fails once all files are processed.
+
+CustomFileAction executes the transformation distributed on the Spark executors.
+FileTransferAction executes it on the driver, in up to `maxParallelism` threads: large files or CPU intensive transformations can cause resource problems on the driver.
+
+`CustomFileTransformer` has two methods to implement the transformation:
+- `transform(options, input, output)` to transform one input file into one output file.
+- `transformToFiles(options, input, fileName, outputs)` to create multiple output files from one input file, e.g. to unzip an archive.
+  Call `outputs.create(name)` for every output file. The files are created in the output partition of the input file, and the extension of the output DataObjects `fileName` pattern is appended if the name doesn't match it.
+
+:::note
+Files are only written in the exec phase. The file references an Action passes on in the init phase are therefore a prediction, with one output file per input file and the default file name.
+If a transformer creates multiple or differently named files, the init phase lineage differs from what is written in the exec phase, e.g. in a simulation run.
+A following file Action skips creating its sample file in the init phase if its input file doesn't exist yet.
+:::
+
+A file transformer can also transform partition values by implementing `transformPartitionValues`.
+This is useful if partition values are extracted from the file path, e.g. with `customPartitionLayout`, and need to be standardized for the output:
+
+```scala
+class DtPartitionFileTransformer extends CustomFileTransformer {
+  override def transform(options: Map[String, String], input: InputStream, output: OutputStream): Option[Exception] = {
+    input.transferTo(output)
+    None
+  }
+  // year=2002/month=12 -> dt=200212
+  override def transformPartitionValues(options: Map[String, String], partitionValues: Seq[PartitionValues]): Option[Map[PartitionValues, PartitionValues]] =
+    Some(partitionValues.map(pv => (pv, PartitionValues(Map("dt" -> (pv("year").toString + pv("month").toString))))).toMap)
+}
+```
+
+```
+actions {
+  standardize-files {
+    type = CustomFileAction
+    inputId = ext-files   # partitions = [year, month]
+    outputId = stg-files  # partitions = [dt]
+    transformer = {
+      type = ScalaClassFileTransformer
+      className = com.sample.DtPartitionFileTransformer
+    }
+  }
+}
+```
+
+All output files of an input file are written to the same output partition.
+Code given to ScalaCodeFileTransformer can only create multiple files or transform partition values if it evaluates to an instance of `CustomFileTransformer`, not if it is a plain function.
+
 ### Options / RuntimeOptions
 So far these transformations have been quite static: 
 Code written can probably only be used for one specific action. 

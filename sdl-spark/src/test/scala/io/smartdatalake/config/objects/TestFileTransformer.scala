@@ -18,10 +18,11 @@
  */
 package io.smartdatalake.config.objects
 
-import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformer
-import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream}
+import io.smartdatalake.workflow.action.generic.customlogic.CustomFileTransformer
+
+import java.io.{InputStream, OutputStream}
 
 class TestFileTransformer extends CustomFileTransformer {
-  override def transform(options: Map[String,String], input: FSDataInputStream, output: FSDataOutputStream): Option[Exception] = None
+  override def transform(options: Map[String,String], input: InputStream, output: OutputStream): Option[Exception] = None
   override def equals(obj: Any): Boolean = getClass.equals(obj.getClass)
 }

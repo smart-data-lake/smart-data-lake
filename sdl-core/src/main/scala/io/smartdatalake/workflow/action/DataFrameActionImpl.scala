@@ -27,7 +27,7 @@ import io.smartdatalake.util.misc.ScalaUtil
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.executionMode.DataFrameStreamingExecutionMode
-import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformerDef, PartitionValueTransformer}
+import io.smartdatalake.workflow.action.generic.transformer.GenericDfsTransformerDef
 import io.smartdatalake.workflow.dataframe.{CombinedObservation, GenericDataFrame, SuffixedObservation}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, Expectation, ExpectationScope}
@@ -612,16 +612,6 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     outputDfsMap
   }
 
-
-  /**
-   * apply transformer to partition values
-   */
-  protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String, String])
-                                 (implicit context: ActionPipelineContext): Map[PartitionValues, PartitionValues] = {
-    transformers.foldLeft(PartitionValues.oneToOneMapping(partitionValues)) {
-      case (partitionValuesMap, transformer) => transformer.applyTransformation(id, partitionValuesMap, executionModeResultOptions)
-    }
-  }
 
   /**
    * The transformed DataFrame is validated to have the output's partition columns included, partition columns are moved to the end and SubFeeds partition values updated.

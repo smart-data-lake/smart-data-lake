@@ -22,10 +22,10 @@ import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, TypeMismatchException}
 import io.smartdatalake.definitions.Condition
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
-import io.smartdatalake.workflow.action.spark.customlogic.CustomFileTransformerConfig
-import io.smartdatalake.workflow.connection.{Connection, EngineConnection, SparkClassicConnection}
+import io.smartdatalake.workflow.action.generic.transformer.GenericFileTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.file.HadoopFileDataObject
 import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
@@ -37,7 +37,9 @@ import scala.util.Using
 /**
  * [[Action]] to transform files between two Hadoop Data Objects.
  * The transformation is executed in distributed mode on Spark executors.
- * A custom file transformer must be given, which reads a file from Hadoop and writes it back to Hadoop.
+ * A custom file transformer must be given, which reads a file as input stream and writes one or more output files.
+ * The transformer can also transform partition values, e.g. to standardize partition values extracted from the file path
+ * of the input into different partition columns of the output.
  *
  * Use this Action if files must be processed as files (byte or line streams), e.g. to unzip, decrypt or repair a file
  * format Spark can not read. The list of files to transfer is created on the driver and then distributed to the
@@ -53,6 +55,7 @@ import scala.util.Using
  *     inputId = stg-airports
  *     outputId = int-airports
  *     transformer = {
+ *       type = ScalaClassFileTransformer
  *       className = com.company.transformer.CutColumnsFileTransformer
  *       options = { delimiter = "," }
  *     }
@@ -61,17 +64,25 @@ import scala.util.Using
  * }
  * }}}
  *
+ * If the transformer returns or throws an exception for a file, the remaining files are still processed, but the Action
+ * fails afterwards, listing all failed files. Note that the output files already written stay in place.
+ * Note that the file references created in init phase are a prediction with one output file per input file and the default
+ * file name, as files are only written in exec phase. If the transformer creates multiple or differently named output files,
+ * the file references passed on to the next Action therefore differ between init and exec phase. This is relevant
+ * for runs only executing the init phase, e.g. simulation.
+ *
  * @note inputId must be a HadoopFileDataObject and outputId a SparkFileDataObject, and the transformer code must be
  *       serializable as it is shipped to the Spark executors.
  * @param inputId inputs DataObject
  * @param outputId output DataObject
- * @param transformer a custom file transformer, which reads a file from HadoopFileDataObject and writes it back to another HadoopFileDataObject
+ * @param transformer file transformer to apply, e.g. ScalaClassFileTransformer or ScalaCodeFileTransformer.
+ *                    It reads a file from HadoopFileDataObject and writes one or more files to another HadoopFileDataObject.
  * @param filesPerPartition number of files per Spark partition
  */
 case class CustomFileAction(override val id: ActionId,
                             inputId: DataObjectId,
                             outputId: DataObjectId,
-                            transformer: CustomFileTransformerConfig,
+                            transformer: GenericFileTransformer,
                             filesPerPartition: Int = 10,
                             override val breakFileRefLineage: Boolean = false,
                             override val executionMode: Option[ExecutionMode] = None,
@@ -89,17 +100,31 @@ case class CustomFileAction(override val id: ActionId,
   override val inputs: Seq[HadoopFileDataObject] = Seq(input)
   override val outputs: Seq[SparkFileDataObject] = Seq(output)
 
+  // the transformer might map input partitions to different output partitions, which is validated at runtime in transform
+  override protected def transformsPartitionValues: Boolean = true
+
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
+    super.prepare
+    transformer.prepare(id)
+  }
+
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String, String])(implicit
+      context: ActionPipelineContext
+  ): Map[PartitionValues, PartitionValues] =
+    applyTransformers(Seq(transformer), partitionValues, executionModeResultOptions)
+
   override def transform(inputSubFeed: FileSubFeed, outputSubFeed: FileSubFeed)(implicit context: ActionPipelineContext): FileSubFeed = {
-    assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for FileTransferAction.doTransform")
+    assert(inputSubFeed.fileRefs.nonEmpty, "inputSubFeed.fileRefs must be defined for CustomFileAction.doTransform")
     val inputFileRefs = inputSubFeed.fileRefs.get
-    val fileRefMapping = output.translateFileRefs(inputFileRefs)
+    // create target file references with transformed partition values
+    val fileRefMapping = translateFileRefs(inputFileRefs, inputSubFeed.executionModeResultOptions)
     val partitionValues = if (outputSubFeed.partitionValues.nonEmpty || output.partitions.isEmpty) outputSubFeed.partitionValues
     else fileRefMapping.map(_.tgt.partitionValues).distinct
     outputSubFeed.copy(fileRefs = Some(fileRefMapping.map(_.tgt)), fileRefMapping = Some(fileRefMapping), partitionValues = partitionValues)
   }
 
   override def writeSubFeed(subFeed: FileSubFeed, isRecursive: Boolean)(implicit context: ActionPipelineContext): FileSubFeed = {
-    val fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
+    var fileRefMapping = subFeed.fileRefMapping.getOrElse(throw new IllegalStateException(s"($id) file mapping is not defined"))
     output.startWritingOutputStreams(subFeed.partitionValues)
     if (fileRefMapping.nonEmpty) {
       val session = SparkSubFeed.getSparkSession
@@ -111,49 +136,59 @@ case class CustomFileAction(override val id: ActionId,
       val tgtDO = output // avoid serialization of whole action by assigning output to local variable
       tgtDO.filesystem // init filesystem to prepare serializable hadoop configuration
       val transformerVal = transformer // avoid serialization of whole action by assigning transformer to local variable
-      val filePathPairs = fileRefMapping.map{ m => (m.src.fullPath, m.tgt.fullPath)}
+      // prepare options on the driver, as they might need the ActionPipelineContext to evaluate runtimeOptions
+      val options = transformer.prepareOptions(id, subFeed.partitionValues, subFeed.executionModeResultOptions)
+      val filePathPairs = fileRefMapping.map(m => (m.src.fullPath, m.tgt.fullPath, m.tgt.fileName))
       val nbOfPartitions = math.max(filePathPairs.size / filesPerPartition, 1)
       val transformedDs = filePathPairs.toDS().repartition(nbOfPartitions)
-        .map { case (srcPath, tgtPath) =>
+        .map { case (srcPath, tgtPath, tgtFileName) =>
           val hadoopSrcPath = new Path(srcPath)
-          val hadoopTgtPath = new Path(tgtPath)
-          val result = Using.resource(srcDO.getFilesystem(hadoopSrcPath).open(hadoopSrcPath)) { is =>
-            Using.resource(tgtDO.getFilesystem(hadoopTgtPath).create(hadoopTgtPath, true)) { os => // overwrite = true
-              transformerVal.transform(is, os)
-            }
+          val tgtDir = tgtPath.stripSuffix(tgtFileName)
+          val (fileNames, error) = Using.resource(srcDO.getFilesystem(hadoopSrcPath).open(hadoopSrcPath)) { is =>
+            GenericFileTransformer.transformToFiles(transformerVal, options, is, tgtFileName, tgtDO.getTargetFileName, { fileName =>
+              val hadoopTgtPath = new Path(tgtDir + fileName)
+              tgtDO.getFilesystem(hadoopTgtPath).create(hadoopTgtPath, true) // overwrite = true
+            })
           }
-          (srcPath, tgtPath, result.map(_.getMessage))
+          (srcPath, tgtDir, fileNames, error.map(_.toString))
         }
 
       // execute the data set and log results
       val results = transformedDs.collect()
-      results.foreach { case (_, tgt, ex) =>
-        if (ex.isEmpty) logger.info(s"transformed $tgt")
-        else logger.error(s"transformed $tgt with error $ex")
+      results.foreach { case (src, tgtDir, fileNames, error) =>
+        if (error.isEmpty) logger.info(s"transformed $src to ${fileNames.map(tgtDir + _).mkString(", ")}")
+        else logger.error(s"transformed $src with error ${error.get}")
+      }
+      // fail after all files are processed if any transformation returned an error
+      GenericFileTransformer.throwIfTransformationsFailed(results.collect { case (src, _, _, Some(error)) => (src, error) }.toSeq, results.length)
+      // create mapping to the output files actually created
+      val createdFiles = results.map { case (src, tgtDir, fileNames, _) => (src, (tgtDir, fileNames)) }.toMap
+      fileRefMapping = fileRefMapping.flatMap { m =>
+        val (tgtDir, fileNames) = createdFiles(m.src.fullPath)
+        fileNames.map(fileName => m.copy(tgt = m.tgt.copy(fullPath = tgtDir + fileName, fileName = fileName)))
       }
     }
     output.endWritingOutputStreams(subFeed.partitionValues)
     // return metric to action
     val filesWritten = fileRefMapping.size.toLong
-    val metrics = Map("files_written"->fileRefMapping.size.toLong) ++ (if (filesWritten == 0) Map ("no_data" -> true) else Map())
-    subFeed.withMetrics(metrics).asInstanceOf[FileSubFeed]
+    val metrics = Map("files_written" -> filesWritten) ++ (if (filesWritten == 0) Map("no_data" -> true) else Map())
+    subFeed.copy(fileRefs = Some(fileRefMapping.map(_.tgt)), fileRefMapping = Some(fileRefMapping)).withMetrics(metrics).asInstanceOf[FileSubFeed]
   }
 
   override def postprocessOutputSubFeedCustomized(subFeed: FileSubFeed, inputSubFeeds: Seq[FileSubFeed])(implicit context: ActionPipelineContext): FileSubFeed = {
     // create output sample file in init-phase
     if (context.phase == ExecutionPhase.Init) {
-      subFeed.fileRefMapping.flatMap(_.headOption).foreach {
+      subFeed.fileRefMapping.flatMap(_.headOption).filter(m => sampleInputFileExists(m.src)).foreach {
         sampleFileRefMapping =>
           val sampleFile = output.createSampleFile
           // exec only if output returned a sample file to create
           sampleFile.foreach {
             file =>
+              val options = transformer.prepareOptions(id, subFeed.partitionValues, subFeed.executionModeResultOptions)
               val hadoopSrcPath = new Path(sampleFileRefMapping.src.fullPath)
-              val hadoopTgtPath = new Path(file)
               Using.resource(input.filesystem.open(hadoopSrcPath)) { is =>
-                Using.resource(output.filesystem.create(hadoopTgtPath, true)) { os => // overwrite = true
-                  transformer.transform(is, os)
-                }
+                GenericFileTransformer.transformToSampleFile(transformer, options, is, sampleFileRefMapping.tgt.fileName,
+                  () => output.filesystem.create(new Path(file), true)) // overwrite = true
               }.foreach(ex => throw ex)
           }
       }

@@ -21,7 +21,6 @@ package io.smartdatalake.workflow.action.generic.transformer
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil}
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.IS_EXEC
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
@@ -118,20 +117,8 @@ trait OptionsGenericDfsTransformer extends GenericDfsTransformer {
   }
 
   private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])
-                                   (implicit context: ActionPipelineContext): Map[String, String] = {
-    lazy val data = DefaultExpressionData.from(context, partitionValues)
-    val evaluatedOptions = runtimeOptions.map {
-      case (key, expr) => (key, expr, ExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data))
-    }
-    // an option whose expression evaluates to null is left undefined. Log this, as a later substitution of %{key} fails.
-    evaluatedOptions.filter(_._3.isEmpty).foreach { case (key, expr, _) =>
-      logger.warn(s"($actionId) runtimeOption '$key' of transformation $name is not defined," +
-        s" because its expression \"$expr\" evaluated to null in phase ${context.phase}." +
-        " Note that metrics of previous Actions are only available in the exec phase." +
-        s" Use coalesce(<expression>, <default>) if $key should be defined in all phases.")
-    }
-    evaluatedOptions.collect { case (key, _, Some(value)) => (key, value) }.toMap
-  }
+                                   (implicit context: ActionPipelineContext): Map[String, String] =
+    evaluateRuntimeOptions(actionId, name, runtimeOptions, partitionValues)
 }
 object OptionsGenericDfsTransformer {
   final val IS_EXEC = "isExec"

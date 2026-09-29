@@ -29,7 +29,29 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-trait Transformer extends SmartDataLakeLogger
+trait Transformer extends SmartDataLakeLogger {
+
+  /**
+   * Evaluate runtimeOptions expressions against [[DefaultExpressionData]].
+   * An option whose expression evaluates to null is left undefined and a warning is logged.
+   */
+  protected def evaluateRuntimeOptions(actionId: ActionId, transformerName: String, runtimeOptions: Map[String, String], partitionValues: Seq[PartitionValues])(implicit
+      context: ActionPipelineContext
+  ): Map[String, String] = {
+    lazy val data = DefaultExpressionData.from(context, partitionValues)
+    val evaluatedOptions = runtimeOptions.map {
+      case (key, expr) => (key, expr, ExpressionUtil.evaluateString(actionId, Some(s"transformations.$transformerName.runtimeOptions"), expr, data))
+    }
+    // an option whose expression evaluates to null is left undefined. Log this, as a later substitution of %{key} fails.
+    evaluatedOptions.filter(_._3.isEmpty).foreach { case (key, expr, _) =>
+      logger.warn(s"($actionId) runtimeOption '$key' of transformation $transformerName is not defined," +
+        s" because its expression \"$expr\" evaluated to null in phase ${context.phase}." +
+        " Note that metrics of previous Actions are only available in the exec phase." +
+        s" Use coalesce(<expression>, <default>) if $key should be defined in all phases.")
+    }
+    evaluatedOptions.collect { case (key, _, Some(value)) => (key, value) }.toMap
+  }
+}
 
 trait PartitionValueTransformer extends Transformer {
 
@@ -204,20 +226,7 @@ trait OptionsGenericDfTransformer extends GenericDfTransformer {
 
   private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit
       context: ActionPipelineContext
-  ): Map[String, String] = {
-    lazy val data = DefaultExpressionData.from(context, partitionValues)
-    val evaluatedOptions = runtimeOptions.map {
-      case (key, expr) => (key, expr, ExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data))
-    }
-    // an option whose expression evaluates to null is left undefined. Log this, as a later substitution of %{key} fails.
-    evaluatedOptions.filter(_._3.isEmpty).foreach { case (key, expr, _) =>
-      logger.warn(s"($actionId) runtimeOption '$key' of transformation $name is not defined," +
-        s" because its expression \"$expr\" evaluated to null in phase ${context.phase}." +
-        " Note that metrics of previous Actions are only available in the exec phase." +
-        s" Use coalesce(<expression>, <default>) if $key should be defined in all phases.")
-    }
-    evaluatedOptions.collect { case (key, _, Some(value)) => (key, value) }.toMap
-  }
+  ): Map[String, String] = evaluateRuntimeOptions(actionId, name, runtimeOptions, partitionValues)
 }
 object OptionsGenericDfTransformer {
   private[smartdatalake] val PREVIOUS_TRANSFORMER_NAME = "previousTransformerName"

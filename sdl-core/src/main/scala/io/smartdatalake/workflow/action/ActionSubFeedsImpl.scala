@@ -26,6 +26,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.MetricsUtil.{orderMetrics, orderMetricsDefault}
 import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.action.generic.transformer.PartitionValueTransformer
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.generic.CanHandlePartitions
 
@@ -406,6 +407,16 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
    */
   def transformPartitionValues(partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String, String])
                                                      (implicit context: ActionPipelineContext): Map[PartitionValues, PartitionValues] = PartitionValues.oneToOneMapping(partitionValues)
+
+  /**
+   * apply transformer to partition values
+   */
+  protected def applyTransformers(transformers: Seq[PartitionValueTransformer], partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String, String])
+                                 (implicit context: ActionPipelineContext): Map[PartitionValues, PartitionValues] = {
+    transformers.foldLeft(PartitionValues.oneToOneMapping(partitionValues)) {
+      case (partitionValuesMap, transformer) => transformer.applyTransformation(id, partitionValuesMap, executionModeResultOptions)
+    }
+  }
 
   /**
    * Transform subfeed content
