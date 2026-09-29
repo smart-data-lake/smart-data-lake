@@ -102,7 +102,8 @@ private[smartdatalake] object ValueProjector {
       case (s, t: DecimalType) if TypeEvolutionUtil.integralDecimalType(s).exists(d => isDecimalWidening(d, t)) =>
         (x => new java.math.BigDecimal(x.asInstanceOf[Number].longValue).setScale(t.scale))
       case (s: DecimalType, t: DecimalType) if isDecimalWidening(s, t) => (x => toBigDecimal(x).bigDecimal.setScale(t.scale))
-      // TODO #936: make non-strict, e.g converting decimal 255 to byte. Also for lines below...
+      // decimals to numbers: only if all values fit. Schema evolution widens decimal/integral combinations to decimal,
+      // so these are only used when TypeEvolutionUtil is called directly with a narrower target type.
       case (d: DecimalType, _: ByteType) if d.scale == 0 && d.precision <= 2 => (x => toBigDecimal(x).toByte)
       case (d: DecimalType, _: ShortType) if d.scale == 0 && d.precision <= 4 => (x => toBigDecimal(x).toShort)
       case (d: DecimalType, _: IntegerType) if d.scale == 0 && d.precision <= 9 => (x => toBigDecimal(x).toInt)
