@@ -26,12 +26,14 @@ import io.smartdatalake.workflow.dataframe.{DataFrameWrapper, GenericDataFrame}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.file.{FileRefDataObject, HadoopFileDataObject}
-import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanHandlePartitions, TableDataObject}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanHandlePartitions, CanWriteDataFrame, TableDataObject}
+import io.smartdatalake.workflow.dataobject.spark.SparkDataObjectOps._
 import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{Column, DataFrame, Dataset}
 
 import java.time.{Instant, LocalDateTime, ZoneId}
+import scala.reflect.runtime.universe.typeOf
 import java.util.TimeZone
 
 /**
@@ -76,6 +78,9 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateDataFrame](da
         s" but called getWithPartitions(...) with partitions ${partitions.mkString(",")}")
     dataObject match {
       case o: CanWriteSparkDataFrame =>
+        o.writeSparkDataFrame(ds.toDF(), partitions.map(pv => PartitionValues(pv)))(context)
+      // engine-agnostic DataObjects, e.g. JdbcTableDataObject or DeltaLakeTableDataObject
+      case o: CanWriteDataFrame if o.writeSubFeedSupportedTypes.exists(_ =:= typeOf[SparkSubFeed]) =>
         o.writeSparkDataFrame(ds.toDF(), partitions.map(pv => PartitionValues(pv)))(context)
       case _ => throw NotSupportedException(dataObject.id, "can not write Spark DataFrames")
     }

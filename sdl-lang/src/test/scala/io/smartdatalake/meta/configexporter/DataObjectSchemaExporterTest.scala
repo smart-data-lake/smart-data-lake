@@ -28,6 +28,7 @@ import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
+import io.smartdatalake.workflow.dataobject.spark.SparkDataObjectOps._
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}

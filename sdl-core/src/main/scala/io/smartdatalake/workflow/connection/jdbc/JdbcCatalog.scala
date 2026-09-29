@@ -18,33 +18,29 @@
  */
 package io.smartdatalake.workflow.connection.jdbc
 
-import io.smartdatalake.util.misc.{JdbcExecution, SQLUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{GenericJdbcExecution, SQLUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.generic.{ForeignKeyDefinition, PrimaryKeyDefinition}
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils
-import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
-import org.apache.spark.sql.types.{DataType, StructType}
 
 import scala.collection.mutable.{Set => MutableSet}
-import java.sql.{ResultSet, SQLException, Connection => SqlConnection}
+import java.sql.{ResultSet, SQLException}
 
 /**
  * SQL JDBC Catalog query method definition.
  * Implementations may vary depending on the concrete DB system.
+ *
+ * Note that the catalog is independent of any DataFrame engine. DDL statements depending on the data types of an
+ * engine, e.g. for schema evolution, are created by the engine, see `SparkJdbcCatalog` in sdl-spark.
+ *
+ * @param connection connection to execute catalog queries
+ * @param url JDBC url of the connection, used to determine how identifiers are quoted
  */
-private[smartdatalake] abstract class JdbcCatalog(connection: Connection with JdbcExecution) extends SmartDataLakeLogger  {
-  // get spark jdbc dialect definitions
-  JdbcDialects.registerDialect(HSQLDbDialect)
-  JdbcDialects.registerDialect(MariaDbDialect)
-  protected lazy val jdbcDialect: JdbcDialect = connection.jdbcDialect
-  protected lazy val isNoopDialect: Boolean = jdbcDialect.getClass.getSimpleName.startsWith("NoopDialect") // The default implementation is used for unknown url types
-  // use jdbcDialect to define identifiers used for quoting
-  protected lazy val (quoteStart,quoteEnd) = {
-    val dbUnquoted = jdbcDialect.quoteIdentifier("dummy")
-    val quoteStart = dbUnquoted.replaceFirst("dummy.*", "")
-    val quoteEnd = dbUnquoted.replaceFirst(".*dummy", "")
-    (quoteStart, quoteEnd)
+abstract class JdbcCatalog(connection: Connection with GenericJdbcExecution, url: String) extends SmartDataLakeLogger  {
+
+  // identifiers are quoted with double quotes (standard SQL), except by databases in MySQL tradition
+  protected lazy val (quoteStart, quoteEnd) = {
+    val subProtocol = url.split(':').drop(1).headOption.map(_.toLowerCase).getOrElse("")
+    if (JdbcCatalog.backtickQuotingSubProtocols.contains(subProtocol)) ("`", "`") else ("\"", "\"")
   }
   // true if the given identifier is quoted
   def isQuotedIdentifier(s: String) : Boolean = {
@@ -56,35 +52,7 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
   }
   // quote identifier for this database
   def quoteIdentifier(s: String) : String = {
-    jdbcDialect.quoteIdentifier(s)
-  }
-
-  // convert Spark DataType to SQL type
-  def getSqlType(t: DataType, isNullable: Boolean = true): String = {
-    val sqlType = JdbcUtils.getJdbcType(t, jdbcDialect)
-    val nullable = if (!isNullable) " NOT NULL" else ""
-    s"${sqlType.databaseTypeDefinition}$nullable"
-  }
-
-  // create ddl to add a column
-  def getAddColumnSql(table: String, column: String, dataType: String): String = {
-    val sql = jdbcDialect.getAddColumnQuery(table, column, dataType)
-    // we need to fix column name quotation as many dialects always quote them, which is not optimal.
-    sql.replace(quoteIdentifier(column), column)
-  }
-
-  // create ddl to add alter column type
-  def getAlterColumnSql(table: String, column: String, sqlType: String): String = {
-    val sql = jdbcDialect.getUpdateColumnTypeQuery(table, column, sqlType)
-    // we need to fix column name quotation as many dialects always quote them, which is not optimal.
-    sql.replace(quoteIdentifier(column), column)
-  }
-
-  // create ddl to add alter column type
-  def getAlterColumnNullableSql(table: String, column: String, isNullable: Boolean = true): String = {
-    val sql = jdbcDialect.getUpdateColumnNullabilityQuery(table, column, isNullable)
-    // we need to fix column name quotation as many dialects always quote them, which is not optimal.
-    sql.replace(quoteIdentifier(column), column)
+    s"$quoteStart${s.replace(quoteEnd, quoteEnd + quoteEnd)}$quoteEnd"
   }
 
   // create ddl to set the comment of a table.
@@ -121,7 +89,7 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
   }
 
   def isTableExisting(tableName: String): Boolean = {
-    val tableExistsQuery = jdbcDialect.getTableExistsQuery(tableName)
+    val tableExistsQuery = s"SELECT 1 FROM $tableName WHERE 1=0"
     try {
       connection.execJdbcStatement(tableExistsQuery, logging = false)
       true
@@ -129,14 +97,6 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
       case _: Throwable =>
         logger.debug("No access on table or table does not exist: " +tableName)
         false
-    }
-  }
-
-  def getSchemaFromTable(table: String): StructType = {
-    connection.execWithJdbcConnection { c =>
-      val schemaQuery = jdbcDialect.getSchemaQuery(table)
-      val rs = c.prepareStatement(schemaQuery).executeQuery()
-      JdbcUtils.getSchema(c, rs, jdbcDialect)
     }
   }
 
@@ -180,12 +140,15 @@ private[smartdatalake] abstract class JdbcCatalog(connection: Connection with Jd
     }
   }
 }
-private[smartdatalake] object JdbcCatalog {
-  def fromJdbcDriver(driver: String, connection: JdbcTableConnection): JdbcCatalog = {
+object JdbcCatalog {
+  // JDBC sub protocols of databases quoting identifiers with backticks
+  private val backtickQuotingSubProtocols = Set("mysql", "mariadb", "databricks")
+
+  def fromJdbcDriver(driver: String, connection: Connection with GenericJdbcExecution, url: String): JdbcCatalog = {
     driver match {
-      case d if d.toLowerCase.contains("oracle") => new OracleJdbcCatalog(connection)
-      case d if d.toLowerCase.contains("com.sap.db") => new SapHanaJdbcCatalog(connection)
-      case _ => new DefaultJdbcCatalog(connection)
+      case d if d.toLowerCase.contains("oracle") => new OracleJdbcCatalog(connection, url)
+      case d if d.toLowerCase.contains("com.sap.db") => new SapHanaJdbcCatalog(connection, url)
+      case _ => new DefaultJdbcCatalog(connection, url)
     }
   }
 }
@@ -193,7 +156,7 @@ private[smartdatalake] object JdbcCatalog {
 /**
  * Default SQL JDBC Catalog query implementation using INFORMATION_SCHEMA
  */
-private[smartdatalake] class DefaultJdbcCatalog(connection: Connection with JdbcExecution) extends JdbcCatalog(connection) {
+class DefaultJdbcCatalog(connection: Connection with GenericJdbcExecution, url: String) extends JdbcCatalog(connection, url) {
   override def isDbExisting(db: String): Boolean = {
     val cntTableInCatalog = if(isQuotedIdentifier(db)) {
       s"select count(*) from INFORMATION_SCHEMA.SCHEMATA where TABLE_SCHEMA='${removeQuotes(db)}'"
@@ -218,7 +181,7 @@ private[smartdatalake] class DefaultJdbcCatalog(connection: Connection with Jdbc
 /**
  * Oracle SQL JDBC Catalog query implementation
  */
-private[smartdatalake] class OracleJdbcCatalog(connection: Connection with JdbcExecution) extends JdbcCatalog(connection) {
+class OracleJdbcCatalog(connection: Connection with GenericJdbcExecution, url: String) extends JdbcCatalog(connection, url) {
   override def isDbExisting(db: String): Boolean = {
     val cntTableInCatalog = if(isQuotedIdentifier(db))  {
       s"select count(*) from ALL_USERS where USERNAME='${removeQuotes(db)}'"
@@ -233,7 +196,7 @@ private[smartdatalake] class OracleJdbcCatalog(connection: Connection with JdbcE
 /**
  * SAP HANA JDBC Catalog query implementation
  */
-private[smartdatalake] class SapHanaJdbcCatalog(connection: Connection with JdbcExecution) extends JdbcCatalog(connection) {
+class SapHanaJdbcCatalog(connection: Connection with GenericJdbcExecution, url: String) extends JdbcCatalog(connection, url) {
   override def isDbExisting(db: String): Boolean = {
     val cntTableInCatalog = if(isQuotedIdentifier(db))  {
       s"select count(*) from PUBLIC.SCHEMAS where SCHEMA_NAME='${removeQuotes(db)}'"

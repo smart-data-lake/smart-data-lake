@@ -32,6 +32,7 @@ import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcTableC
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
 import io.smartdatalake.workflow.dataobject.generic.Table
+import io.smartdatalake.workflow.dataobject.spark.SparkDataObjectOps._
 import org.slf4j.Logger
 
 import java.nio.file.Files

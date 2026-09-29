@@ -28,10 +28,14 @@ import io.smartdatalake.util.misc.NameUtil.prepareTolerantKey
 import io.smartdatalake.util.misc.NotFoundError
 import io.smartdatalake.workflow.action.generic.customlogic.TransformInfo
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfsTransformer, TransformDfsMethod}
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.generic.CanCreateDataFrame
 import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
+import io.smartdatalake.workflow.dataobject.spark.SparkDataObjectOps._
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+
+import scala.reflect.runtime.universe.typeOf
 
 import scala.collection.mutable
 
@@ -112,6 +116,8 @@ case class SmartDataLakeBuilderLab[D,A](
           val dataObject = dataObjectsTolerantKey.getOrElse(name, throw NotFoundError(s"No DataObject found with name $name"))
           val df = dataObject match {
             case sparkDataObject: CanCreateSparkDataFrame => sparkDataObject.getSparkDataFrame(partitionValues)(context)
+            // engine-agnostic DataObjects, e.g. JdbcTableDataObject or DeltaLakeTableDataObject
+            case o: CanCreateDataFrame if o.getSubFeedSupportedTypes.exists(_ =:= typeOf[SparkSubFeed]) => o.getSparkDataFrame(partitionValues)(context)
             case x => throw new IllegalStateException(s"${x.id} does not support creating Spark DataFrames")
           }
           (dataObject.id.id, df)

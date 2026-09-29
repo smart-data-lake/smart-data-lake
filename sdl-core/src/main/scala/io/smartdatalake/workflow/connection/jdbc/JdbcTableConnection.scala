@@ -21,18 +21,11 @@ package io.smartdatalake.workflow.connection.jdbc
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.generic.{ForeignKeyDefinition, PrimaryKeyDefinition}
 import org.apache.commons.pool2.impl.GenericObjectPool
-import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
-import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.apache.spark.sql.execution.datasources.jdbc.JdbcOptionsInWrite
-import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils.getJdbcType
-import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
-import org.apache.spark.sql.types.StructType
 
 import java.sql.{Connection => SqlConnection, DatabaseMetaData, DriverManager, ResultSet}
 
@@ -105,7 +98,7 @@ case class JdbcTableConnection(
     directTableOverwrite: Boolean = false,
     connectionPool: ConnectionPoolConfig = ConnectionPoolConfig(),
     override val metadata: Option[ConnectionMetadata] = None
-) extends Connection with JdbcExecution with SmartDataLakeLogger {
+) extends Connection with GenericJdbcExecution with SmartDataLakeLogger {
 
   // Allow only supported authentication modes
   private val supportedAuths = Seq(classOf[BasicAuthMode])
@@ -115,11 +108,10 @@ case class JdbcTableConnection(
   )
 
   // prepare catalog implementation
-  val catalog: JdbcCatalog = JdbcCatalog.fromJdbcDriver(driver, this)
+  val catalog: JdbcCatalog = JdbcCatalog.fromJdbcDriver(driver, this, url)
   // setup connection pool
   override val pool: GenericObjectPool[SqlConnection] = connectionPool
     .create(maxParallelConnections = maxParallelConnections, factoryFun = getConnection, initSql = connectionInitSql)
-  override val jdbcDialect: JdbcDialect = JdbcDialects.get(url)
 
   def test(): Unit =
     execWithJdbcConnection(_ => ())
@@ -139,45 +131,6 @@ case class JdbcTableConnection(
       case _                => throw new IllegalArgumentException(s"${authMode.getClass.getSimpleName} not supported.")
     }
     else Map()
-
-  /**
-   * Code partly copied from Spark: JdbcUtils to adapt schemaString method to not quote identifiers
-   * if Spark is in case-insensitive mode.
-   */
-  def createTableFromSchema(tableName: String, schema: StructType, rawOptions: Map[String, String]): Unit = {
-    def schemaString(
-        schema: StructType,
-        caseSensitive: Boolean,
-        url: String,
-        createTableColumnTypes: Option[String] = None
-    ): String = {
-      val sb = new StringBuilder()
-      val dialect = JdbcDialects.get(url)
-      val userSpecifiedColTypesMap = createTableColumnTypes
-        .map(parseUserSpecifiedCreateTableColumnTypes(caseSensitive, _))
-        .getOrElse(Map.empty[String, String])
-      schema.fields.foreach { field =>
-        // Change is here - do not quote if not case-sensitive and normal characters used:
-        val name = if (caseSensitive || SQLUtil.hasIdentifierSpecialChars(field.name)) dialect.quoteIdentifier(field.name)
-        else field.name
-        val typ = userSpecifiedColTypesMap
-          .getOrElse(field.name, getJdbcType(field.dataType, dialect).databaseTypeDefinition)
-        val nullable = if (field.nullable) "" else "NOT NULL"
-        sb.append(s", $name $typ $nullable")
-      }
-      if (sb.length < 2) "" else sb.substring(2)
-    }
-    def parseUserSpecifiedCreateTableColumnTypes(caseSensitive: Boolean, createTableColumnTypes: String): Map[String, String] = {
-      val userSchema = CatalystSqlParser.parseTableSchema(createTableColumnTypes)
-      val userSchemaMap = userSchema.fields.map(f => f.name -> f.dataType.catalogString).toMap
-      if (caseSensitive) userSchemaMap else CaseInsensitiveMap(userSchemaMap)
-    }
-    val options = new JdbcOptionsInWrite(url, tableName, rawOptions)
-    val strSchema = schemaString(schema, Environment.caseSensitive, options.url, options.createTableColumnTypes)
-    val createTableOptions = options.createTableOptions
-    val sql = s"CREATE TABLE $tableName ($strSchema) $createTableOptions"
-    execJdbcStatement(sql)
-  }
 
   def dropTable(tableName: String, logging: Boolean = true): Unit =
     if (catalog.isTableExisting(tableName)) {

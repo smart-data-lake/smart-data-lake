@@ -43,6 +43,7 @@ import io.smartdatalake.workflow.dataobject.expectation.{CountExpectation, Expec
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, Table, TransactionalTableDataObject}
 import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import io.smartdatalake.workflow.dataobject.spark.SparkDataObjectOps._
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{lit, raise_error, udf}
