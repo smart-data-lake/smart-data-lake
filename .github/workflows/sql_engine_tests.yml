@@ -1,0 +1,53 @@
+name: SQL Engine Tests
+
+# The SQL engine (sdl-sql) runs SQLGlot in an embedded Python interpreter (jep), which the Snapshot Build does not have,
+# so the tests of sdl-sql needing Python cancel themselves there. This workflow creates the environment with uv and runs them.
+# It is separate from the Snapshot Build, so it neither makes that build longer nor gates the snapshot deploy.
+on:
+  # allow running it manually
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'sdl-sql/**'
+      - '.github/workflows/sql_engine_tests.yml'
+
+jobs:
+  sql-engine-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+      - name: Set up JDK 17
+        # jep is compiled against the JDK on installation, it finds it through JAVA_HOME set by this action
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 17
+      - name: Extract Spark version from pom.xml
+        id: get_spark_version
+        run: |
+          SPARK_VERSION=$(grep -oPm1 '(?<=<spark.version>)[^<]+' pom.xml)
+          echo "spark_version=$SPARK_VERSION" >> $GITHUB_OUTPUT
+      - name: Cache Maven
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: sdl-sql/uv.lock
+      - name: Create the Python environment of sdl-sql
+        run: |
+          uv sync --frozen --project sdl-sql
+          echo "SDLB_PYTHON=$PWD/sdl-sql/.venv/bin/python" >> $GITHUB_ENV
+      - name: Run the Python tests
+        working-directory: sdl-sql
+        run: uv run --frozen pytest
+      - name: Run the Scala tests
+        # license headers are already checked by the Snapshot Build
+        run: |
+          mvn -B -ntp -Daether.dependencyCollector.impl=bf install -pl sdl-sql -am -DskipTests -Dlicense.skip=true
+          mvn -B -ntp test -pl sdl-sql -Dlicense.skip=true
