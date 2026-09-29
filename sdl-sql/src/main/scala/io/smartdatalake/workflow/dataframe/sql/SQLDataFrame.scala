@@ -20,8 +20,11 @@ package io.smartdatalake.workflow.dataframe.sql
 
 import io.smartdatalake.util.sqlglot.{DataFrameInfo, SqlGlotBridge}
 import io.smartdatalake.workflow.DataFrameSubFeed
+import io.smartdatalake.workflow.connection.SQLEngineConnection
 import io.smartdatalake.workflow.dataframe._
 
+import java.sql.ResultSet
+import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.{Type, typeOf}
 
@@ -29,10 +32,10 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * DataFrame of the SQL engine. It remote-controls an SQLGlot query in the embedded Python interpreter, and renders
  * it as SQL statement for a database with [[toSql]].
  *
- * Operations that need to read data (collect, count, isEmpty, show) are not supported yet, they need the SQL
- * statement to be executed on the database (see issue #866).
+ * Operations that need to read data (collect, count, isEmpty, show) execute the SQL statement on the database of
+ * the [[SQLEngineConnection]].
  */
-class SQLDataFrame private(val info: DataFrameInfo, @transient val bridge: SqlGlotBridge) extends GenericDataFrame {
+class SQLDataFrame private(val info: DataFrameInfo, @transient val bridge: SqlGlotBridge, @transient val connection: SQLEngineConnection) extends GenericDataFrame {
 
   override def subFeedType: Type = typeOf[SQLSubFeed]
 
@@ -56,7 +59,7 @@ class SQLDataFrame private(val info: DataFrameInfo, @transient val bridge: SqlGl
     bridge.toSql(id, dialect, optimized, pretty)
 
   private def op(name: String, args: (String, Any)*): SQLDataFrame =
-    SQLDataFrame(bridge.callDataFrame(name, ("df" -> id) +: args: _*), bridge)
+    SQLDataFrame(bridge.callDataFrame(name, ("df" -> id) +: args: _*), bridge, connection)
 
   private def other(df: GenericDataFrame): SQLDataFrame = df match {
     case sqlDf: SQLDataFrame => sqlDf
@@ -122,13 +125,30 @@ class SQLDataFrame private(val info: DataFrameInfo, @transient val bridge: SqlGl
 
   override def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): SQLDataFrame = this
 
-  // reading data needs the SQL statement to be executed on the database, which is not implemented yet.
-  private def notSupported(operation: String): Nothing =
-    throw new NotImplementedError(s"SQLDataFrame.$operation needs executing SQL on the database, which is not implemented yet (#866)")
-  override def collect: Seq[GenericRow] = notSupported("collect")
-  override def isEmpty: Boolean = notSupported("isEmpty")
-  override def count: Long = notSupported("count")
-  override def showString(options: Map[String, String]): String = notSupported("show")
+  /**
+   * The SQL statement of this DataFrame in the dialect of the database
+   */
+  def toDatabaseSql: String = toSql(Some(connection.databaseDialect))
+
+  // reading data executes the SQL statement on the database
+
+  override def collect: Seq[SQLRow] = connection.execJdbcQuery(toDatabaseSql, SQLDataFrame.readRows)
+
+  override def count: Long = agg(Seq(SQLSubFeed.count(SQLSubFeed.col("*")).as("count"))).collect.head.get(0) match {
+    case n: Number => n.longValue
+    case x => throw new IllegalStateException(s"Unexpected result of count: $x")
+  }
+
+  override def isEmpty: Boolean = limit(1).collect.isEmpty
+
+  override def showString(options: Map[String, String]): String = {
+    val numRows = options.get("numRows").map(_.toInt).getOrElse(20)
+    val rows = limit(numRows).collect.map(_.values.map(v => String.valueOf(v)))
+    val widths = columns.indices.map(i => (columns(i) +: rows.map(_(i))).map(_.length).max)
+    def line(values: Seq[String]) = values.zip(widths).map { case (v, w) => v.padTo(w, ' ') }.mkString("|", "|", "|")
+    val separator = widths.map("-" * _).mkString("+", "+", "+")
+    (Seq(separator, line(columns), separator) ++ rows.map(line) :+ separator).mkString(System.lineSeparator())
+  }
 
   override def toString: String = s"SQLDataFrame($id, ${columns.mkString(", ")})"
 }
@@ -138,8 +158,8 @@ object SQLDataFrame {
    * Create a SQLDataFrame for a DataFrame of the bridge. The DataFrame in Python is released when the SQLDataFrame is
    * garbage collected.
    */
-  private[sql] def apply(info: DataFrameInfo, bridge: SqlGlotBridge): SQLDataFrame = {
-    val df = new SQLDataFrame(info, bridge)
+  private[sql] def apply(info: DataFrameInfo, bridge: SqlGlotBridge, connection: SQLEngineConnection): SQLDataFrame = {
+    val df = new SQLDataFrame(info, bridge, connection)
     bridge.registerForRelease(df, info.id)
     df
   }
@@ -147,20 +167,41 @@ object SQLDataFrame {
   /**
    * Create a SQLDataFrame reading a database table.
    *
-   * @param bridge    the SQLGlot bridge
-   * @param tableName name of the table, optionally qualified with database and catalog, in the given dialect
-   * @param schema    schema of the table
-   * @param dialect   SQLGlot dialect of `tableName`
+   * @param connection connection to the database
+   * @param tableName  name of the table, optionally qualified with database and catalog, in the dialect of the database
+   * @param schema     schema of the table
    */
-  def table(bridge: SqlGlotBridge, tableName: String, schema: SQLSchema, dialect: Option[String] = None): SQLDataFrame =
-    SQLDataFrame(bridge.callDataFrame("table", "name" -> tableName, "columns" -> schema.toBridge, "dialect" -> dialect), bridge)
+  def table(connection: SQLEngineConnection, tableName: String, schema: SQLSchema): SQLDataFrame = {
+    val bridge = connection.bridge
+    SQLDataFrame(bridge.callDataFrame("table", "name" -> tableName, "columns" -> schema.toBridge, "dialect" -> connection.databaseDialect), bridge, connection)
+  }
+
+  private[sql] def readRows(rs: ResultSet): Seq[SQLRow] = {
+    val numColumns = rs.getMetaData.getColumnCount
+    val rows = Seq.newBuilder[SQLRow]
+    while (rs.next()) rows += SQLRow((1 to numColumns).map(i => fromJdbcValue(rs.getObject(i))))
+    rows.result()
+  }
+
+  /**
+   * Convert JDBC values of complex types to Scala: arrays to Seq, structs to SQLRow and maps to Map
+   */
+  private[sql] def fromJdbcValue(value: Any): Any = value match {
+    case array: java.sql.Array => array.getArray match {
+      case values: Array[_] => values.toSeq.map(fromJdbcValue)
+      case x => x
+    }
+    case struct: java.sql.Struct => SQLRow(struct.getAttributes.toSeq.map(fromJdbcValue))
+    case map: java.util.Map[_, _] => map.asScala.map { case (k, v) => (fromJdbcValue(k), fromJdbcValue(v)) }.toMap
+    case x => x
+  }
 }
 
 case class SQLGroupedDataFrame(df: SQLDataFrame, groupColumns: Seq[SQLColumn]) extends GenericGroupedDataFrame {
   override def subFeedType: Type = typeOf[SQLSubFeed]
   override def agg(columns: Seq[GenericColumn]): SQLDataFrame =
     SQLDataFrame(df.bridge.callDataFrame("group_by_agg", "df" -> df.id,
-      "group_columns" -> groupColumns.map(_.projectionSql), "aggregate_columns" -> columns.map(SQLColumn.of(_).projectionSql)), df.bridge)
+      "group_columns" -> groupColumns.map(_.projectionSql), "aggregate_columns" -> columns.map(SQLColumn.of(_).projectionSql)), df.bridge, df.connection)
 }
 
 case class SQLRow(values: Seq[Any]) extends GenericRow {

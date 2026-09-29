@@ -6,9 +6,9 @@ Transformations are built as an [SQLGlot](https://github.com/tobymao/sqlglot) qu
 it in the SQL dialect of the target database. SQLGlot supports many dialects and translates between them, so SQL
 transformers can be written in Spark SQL and executed on e.g. Postgres, SQL Server or Snowflake.
 
-**Status**: step 1 of #866. DataFrame operations and SQL transformers are translated into SQL statements, but the
-statements are not executed yet, and there are no DataObjects reading or writing `SQLSubFeed`s yet. Operations that
-need data (`collect`, `count`, `isEmpty`, `show`) throw `NotImplementedError`.
+**Status**: DataFrame operations and SQL transformers are translated into SQL statements, and operations reading
+data (`collect`, `count`, `isEmpty`, `show`, observations) execute them on the database of the `SQLEngineConnection`.
+There are no DataObjects reading or writing `SQLSubFeed`s yet (next step of #866).
 
 ## Architecture
 
@@ -24,7 +24,7 @@ SQLGlot is a Python library. It runs in a Python interpreter embedded into the J
 | `SQLDataFrame` | `workflow/dataframe/sql/SQLDataFrame.scala` | Remote-controls a DataFrame of the bridge by its id. `toSql(dialect)` renders the SQL statement. |
 | `SQLColumn` | `workflow/dataframe/sql/SQLColumn.scala` | A column expression as SQL text in the default SQLGlot dialect. Operators and functions compose the SQL text in Scala, no call to Python is needed. |
 | `SQLSchema` | `workflow/dataframe/sql/SQLSchema.scala` | Schema, fields and data types. Types of results are inferred by SQLGlot. |
-| `SQLEngineConnection` | `workflow/connection/SQLEngineConnection.scala` | `EngineConnection` selecting the SQL engine, with the SQLGlot `dialect` of the database and the `sqlDialect` of SQL transformers. |
+| `SQLEngineConnection` | `workflow/connection/SQLEngineConnection.scala` | `EngineConnection` selecting the SQL engine, and JDBC connection (pool) to the database executing its statements, see `GenericJdbcExecution` in sdl-core. The SQLGlot `dialect` of the database is derived from the JDBC url if not configured, `sqlDialect` is the dialect of SQL transformers. |
 
 Every DataFrame operation wraps its input as subquery. The SQLGlot optimizer merges these subqueries again when
 rendering the statement, e.g.
@@ -68,5 +68,6 @@ cd sdl-sql && uv run pytest                       # Python side
 mvn -B test -pl sdl-sql -Dlicense.skip=true       # Scala side, needs SDLB_PYTHON
 ```
 
-The Scala tests needing Python cancel themselves if no environment with jep is found, so the normal build needs no
+The Scala tests execute SQL on a [DuckDB](https://duckdb.org) database file in `target/duckdb`, see `SQLTestUtil`.
+The tests needing Python cancel themselves if no environment with jep is found, so the normal build needs no
 Python. They run in the GitHub workflow `sql_engine_tests.yml`.

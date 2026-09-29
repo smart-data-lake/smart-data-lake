@@ -211,6 +211,21 @@ def test_values():
     df = call("values", rows=[["1", "'a'"], ["2", "NULL"]], columns=[["num", "INT"], ["str", "TEXT"]])
     assert df["columns"] == ["num", "str"]
     assert to_sql(df, "tsql") == (
-        "SELECT [_v].[num] AS [num], CAST([_v].[str] AS VARCHAR(MAX)) AS [str] "
+        "SELECT CAST([_v].[num] AS INTEGER) AS [num], CAST([_v].[str] AS VARCHAR(MAX)) AS [str] "
         "FROM (VALUES (1, 'a'), (2, NULL)) AS [_v]([num], [str])")
     assert call("schema", df=df["id"]) == [{"name": "num", "type": {"type": "INT"}}, {"name": "str", "type": {"type": "TEXT"}}]
+
+
+def test_values_keep_casts():
+    # SQLGlot considers the cast of 1.5 to DOUBLE redundant, but databases might type 1.5 as DECIMAL
+    df = call("values", rows=[["1.5"]], columns=[["d", "DOUBLE"]])
+    assert "CAST(" in to_sql(df, "duckdb")
+
+
+def test_unqualified_join_column_after_join_on_columns():
+    left, right = table(), table("other", (("a", "INT"), ("z", "INT")))
+    df = call("join", df=left["id"], other=right["id"], how="inner", on=["a"])
+    df = call("filter", df=df["id"], condition='"a" > 1')
+    df = call("select", df=df["id"], columns=['"a"', '"z"'])
+    assert df["columns"] == ["a", "z"]
+    assert to_sql(df).startswith('SELECT "test_table"."a" AS "a", "other"."z" AS "z"')

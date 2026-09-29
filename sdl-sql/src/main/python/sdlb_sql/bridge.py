@@ -41,9 +41,16 @@ from dataclasses import dataclass
 
 import sqlglot
 from sqlglot import exp
+from sqlglot.errors import OptimizeError
 from sqlglot.optimizer import optimize
+from sqlglot.optimizer.canonicalize import canonicalize
+from sqlglot.optimizer.optimizer import RULES
 from sqlglot.optimizer.qualify import qualify
 from sqlglot.schema import MappingSchema
+
+# canonicalize is left out: it rewrites expressions based on the types inferred by SQLGlot, e.g. it removes casts it
+# considers redundant, but the database might infer different types (e.g. DECIMAL instead of DOUBLE for 1.5).
+_OPTIMIZER_RULES = tuple(rule for rule in RULES if rule is not canonicalize)
 
 _PLACEHOLDER_PREFIX = "__sdlb_t"
 _ROW_NUMBER_COLUMN = "__sdlb_rn"
@@ -76,7 +83,8 @@ class _DataFrame:
     columns: list
     alias: str
     # True if expr is a join whose inputs can still be referenced by their alias, e.g. `"_t1"."id"`.
-    # Projections and filters are then applied to expr directly instead of wrapping it into a subquery.
+    # Projections and filters are then applied to expr directly instead of wrapping it into a subquery, see
+    # Session._in_join_scope.
     join_scope: bool = False
 
 
@@ -144,6 +152,17 @@ class Session:
     def _sub(self, df):
         return df.expr.subquery(exp.to_identifier(df.alias, quoted=True))
 
+    def _in_join_scope(self, df, direct, wrapped):
+        """Apply an operation directly to a join if its columns can be resolved there, so that they can reference the
+        inputs of the join by their alias. Otherwise, e.g. for the join column of a join on columns which exists on
+        both sides, apply it to the join wrapped as subquery, where the output columns of the join are referenced."""
+        if df.join_scope:
+            try:
+                return direct()
+            except OptimizeError:
+                pass
+        return wrapped()
+
     def release(self, ids):
         for df_id in ids:
             self._dfs.pop(df_id, None)
@@ -207,33 +226,38 @@ class Session:
 
     def select(self, df, columns):
         d = self._df(df)
-        projections = [_parse(c) for c in columns]
-        if d.join_scope:
-            expr = d.expr.copy().select(*projections, append=False)
-        else:
-            expr = exp.select(*projections).from_(self._sub(d))
-        return self._register(expr)
+        return self._in_join_scope(
+            d,
+            lambda: self._register(d.expr.copy().select(*[_parse(c) for c in columns], append=False)),
+            lambda: self._register(exp.select(*[_parse(c) for c in columns]).from_(self._sub(d))))
 
     def filter(self, df, condition):
         d = self._df(df)
-        if d.join_scope:
-            return self._register(d.expr.copy().where(_parse(condition)), join_scope=True, columns=d.columns)
-        return self._register(exp.select("*").from_(self._sub(d)).where(_parse(condition)), columns=d.columns)
+        return self._in_join_scope(
+            d,
+            lambda: self._register(d.expr.copy().where(_parse(condition)), join_scope=True),
+            lambda: self._register(exp.select("*").from_(self._sub(d)).where(_parse(condition)), columns=d.columns))
 
     def with_column(self, df, name, column):
         d = self._df(df)
-        projection = _parse(column).as_(name, quoted=True)
-        if d.join_scope:
+
+        def direct():
+            projection = _parse(column).as_(name, quoted=True)
             existing = d.expr.expressions
             if name in d.columns:
                 projections = [projection if p.alias_or_name == name else p.copy() for p in existing]
             else:
                 projections = [p.copy() for p in existing] + [projection]
             return self._register(d.expr.copy().select(*projections, append=False), join_scope=True)
-        projections = [projection if c == name else _col(c) for c in d.columns]
-        if name not in d.columns:
-            projections.append(projection)
-        return self._register(exp.select(*projections).from_(self._sub(d)))
+
+        def wrapped():
+            projection = _parse(column).as_(name, quoted=True)
+            projections = [projection if c == name else _col(c) for c in d.columns]
+            if name not in d.columns:
+                projections.append(projection)
+            return self._register(exp.select(*projections).from_(self._sub(d)))
+
+        return self._in_join_scope(d, direct, wrapped)
 
     def with_column_renamed(self, df, name, new_name):
         d = self._df(df)
@@ -345,13 +369,13 @@ class Session:
 
     def schema(self, df):
         """Return the fields of the DataFrame as list of {name, type} with type inferred by SQLGlot"""
-        expr = optimize(self._df(df).expr.copy(), schema=self._schema)
+        expr = optimize(self._df(df).expr.copy(), schema=self._schema, rules=_OPTIMIZER_RULES)
         return [{"name": s.alias_or_name, "type": _type_json(s.type)} for s in expr.selects]
 
     def to_sql(self, df, dialect=None, optimized=True, pretty=False):
         expr = self._df(df).expr.copy()
         if optimized:
-            expr = optimize(expr, schema=self._schema)
+            expr = optimize(expr, schema=self._schema, rules=_OPTIMIZER_RULES)
         return self._replace_placeholders(expr).sql(dialect=dialect, pretty=pretty)
 
     def transpile(self, sql, read=None, write=None):

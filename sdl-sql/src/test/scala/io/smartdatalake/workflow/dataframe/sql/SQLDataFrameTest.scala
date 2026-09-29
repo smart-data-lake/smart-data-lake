@@ -18,16 +18,16 @@
  */
 package io.smartdatalake.workflow.dataframe.sql
 
-import io.smartdatalake.definitions.Environment
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
+import io.smartdatalake.testutils.sql.SQLTestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.python.JepInterpreter
 import io.smartdatalake.util.sqlglot.SqlGlotException
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.connection.SQLEngineConnection
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import org.scalatest.Outcome
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -35,20 +35,29 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 /**
- * Tests for SQLDataFrame. They need a Python environment with sqlglot and jep, see sdl-sql/pyproject.toml,
- * and cancel themselves if there is none.
+ * Tests for SQLDataFrame, executing SQL on a DuckDB database. The SQL of transformers is written in Spark SQL.
+ * Tests of the rendered SQL use other dialects explicitly.
+ *
+ * The tests need a Python environment with sqlglot and jep, see sdl-sql/pyproject.toml, and cancel themselves if
+ * there is none.
  */
 class SQLDataFrameTest extends AnyFunSuite {
 
   import SQLSubFeed._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  // SQL of transformers is written in Spark SQL, the target database is Postgres
-  instanceRegistry.register(SQLEngineConnection(ConnectionId(Environment.defaultEngineConnectionId), dialect = "postgres", sqlDialect = Some("spark")))
+  private val connection: SQLEngineConnection = SQLTestUtil.createEngineConnection("SQLDataFrameTest")
+  instanceRegistry.register(connection)
   implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
 
+  connection.execJdbcStatement("create schema db")
+  connection.execJdbcStatement("create table db.test_table (a int, b int, c varchar)")
+  connection.execJdbcStatement("insert into db.test_table values (1, 10, 'x'), (2, 20, 'y'), (3, 30, 'it''s'), (4, null, null)")
+  connection.execJdbcStatement("create table other (a int, z decimal(10, 2))")
+  connection.execJdbcStatement("insert into other values (1, 1.5), (3, -2.25), (5, 0)")
+
   override def withFixture(test: NoArgTest): Outcome = {
-    val reason = JepInterpreter.unavailableReason
+    val reason = SQLTestUtil.pythonUnavailableReason
     assume(reason.isEmpty, reason.getOrElse(""))
     super.withFixture(test)
   }
@@ -159,7 +168,7 @@ class SQLDataFrameTest extends AnyFunSuite {
     val df = Seq((1, "a"), (2, "it's")).toDF("num", "str").asInstanceOf[SQLDataFrame]
     assert(df.columns == Seq("num", "str"))
     assert(df.toSql(Some("postgres")) ==
-      """SELECT "_v"."num" AS "num", CAST("_v"."str" AS TEXT) AS "str" FROM (VALUES (1, 'a'), (2, 'it''s')) AS "_v"("num", "str")""")
+      """SELECT CAST("_v"."num" AS INT) AS "num", CAST("_v"."str" AS TEXT) AS "str" FROM (VALUES (1, 'a'), (2, 'it''s')) AS "_v"("num", "str")""")
   }
 
   test("empty DataFrame") {
@@ -191,7 +200,7 @@ class SQLDataFrameTest extends AnyFunSuite {
   }
 
   test("column SQL round-trips through SQLGlot") {
-    val bridge = getBridge
+    val bridge = connection.bridge
     val columns = Seq(
       (col("a") + lit(1)) * lit(2),
       col("a") > lit(1) and col("b").isNull or not(col("c") === lit("x")),
@@ -229,8 +238,80 @@ class SQLDataFrameTest extends AnyFunSuite {
     }
   }
 
-  test("reading data is not supported yet") {
-    intercept[NotImplementedError](testTable.count)
-    intercept[NotImplementedError](testTable.collect)
+  // executing SQL on the database
+
+  private def rows(df: GenericDataFrame): Seq[Seq[Any]] = df.collect.map(_.toSeq)
+
+  test("collect executes the SQL statement on the database") {
+    val df = testTable.filter(col("a") > lit(1)).select(Seq(col("a"), (col("b") * lit(2)).as("b2"))).orderBy(Seq(col("a")))
+    assert(rows(df) == Seq(Seq(2, 40), Seq(3, 60), Seq(4, null)))
+    assert(df.toDatabaseSql.contains("FROM db.test_table"))
+  }
+
+  test("count and isEmpty") {
+    assert(testTable.count == 4)
+    assert(testTable.filter(col("b").isNull).count == 1)
+    assert(!testTable.isEmpty)
+    assert(testTable.filter(col("a") > lit(100)).isEmpty)
+  }
+
+  test("join and aggregate on the database") {
+    val dfJoined = testTable.join(otherTable, Seq("a"), "full_outer").orderBy(Seq(col("a")))
+    assert(rows(dfJoined.select(Seq(col("a"), col("c"), col("z")))) == Seq(
+      Seq(1, "x", new java.math.BigDecimal("1.50")),
+      Seq(2, "y", null),
+      Seq(3, "it's", new java.math.BigDecimal("-2.25")),
+      Seq(4, null, null),
+      Seq(5, null, new java.math.BigDecimal("0.00"))
+    ))
+    val dfAgg = testTable.groupBy(Seq((col("a") > lit(2)).as("big"))).agg(Seq(count(col("*")).as("cnt"), max(col("b")).as("max_b")))
+      .orderBy(Seq(col("big")))
+    assert(rows(dfAgg) == Seq(Seq(false, 2L, 20), Seq(true, 2L, 30)))
+  }
+
+  test("SQLDfTransformer with Spark SQL is executed on the database") {
+    val transformer = SQLDfTransformer(code = Some("select a, nvl(c, 'none') as c2 from %{inputViewName} where a > 2 order by a"))
+    val df = transformer.transformWithOptions(ActionId("action1"), Seq(), testTable, DataObjectId("src1"), Map())
+    assert(rows(df) == Seq(Seq(3, "it's"), Seq(4, "none")))
+  }
+
+  test("DataFrame from values is executed on the database") {
+    import implicits._
+    val df = Seq((1, "a", 1.5), (2, "b", -1.0)).toDF("num", "str", "dbl")
+    assert(rows(df) == Seq(Seq(1, "a", 1.5), Seq(2, "b", -1.0)))
+    assert(df.schema.fields.map(_.dataType.sql) == Seq("INT", "TEXT", "DOUBLE"))
+  }
+
+  test("arrays and structs are converted") {
+    val df = testTable.filter(col("a") === lit(1)).select(Seq(array(col("a"), col("b")).as("arr"), struct(col("a"), col("c")).as("s")))
+    val row = df.collect.head
+    assert(row.get(0) == Seq(1, 10))
+    assert(row.getStruct(1) == SQLRow(Seq(1, "x")))
+  }
+
+  test("generic DataFrame functions work on the database") {
+    import implicits._
+    val df = Seq((1, "a"), (1, "b"), (2, "c"), (3, null)).toDF("id", "v").asInstanceOf[SQLDataFrame]
+    assert(df.getPKviolators(Seq("id")).count == 2)
+    assert(df.getNulls(Seq("v")).count == 1)
+    assert(df.isEqual(df))
+    assert(!df.isEqual(df.filter(col("id") > lit(1))))
+    assert(df.dropDuplicates(Seq("id")).count == 3)
+  }
+
+  test("observations are calculated on the database") {
+    val (_, observation) = testTable.setupObservation("obs", Seq(count(col("*")).as("count"), max(col("a")).as("max_a")), isExecPhase = true)
+    assert(observation.waitFor() == Map("count" -> 4L, "max_a" -> 4))
+  }
+
+  test("show formats the rows") {
+    val str = testTable.orderBy(Seq(col("a"))).limit(2).showString()
+    assert(str.linesIterator.toSeq == Seq("+-+--+-+", "|a|b |c|", "+-+--+-+", "|1|10|x|", "|2|20|y|", "+-+--+-+"))
+  }
+
+  test("DataFrames can be executed from multiple threads") {
+    implicit val ec: ExecutionContext = ExecutionContext.global
+    val counts = Await.result(Future.sequence((0 to 4).map(i => Future(testTable.filter(col("a") > lit(i)).count))), 60.seconds)
+    assert(counts == Seq(4L, 3L, 2L, 1L, 0L))
   }
 }

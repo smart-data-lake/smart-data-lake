@@ -22,7 +22,6 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.sqlglot.SqlGlotBridge
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.connection.SQLEngineConnection
@@ -120,14 +119,23 @@ object SQLSubFeed extends DataFrameSubFeedCompanion {
       })
   }
 
-  def getBridge(implicit context: ActionPipelineContext): SqlGlotBridge =
-    getEngineConnection.map(_.bridge).getOrElse(SqlGlotBridge.get())
+  /**
+   * The SQLEngineConnection to use for creating DataFrames, see [[getEngineConnection]].
+   */
+  def requireEngineConnection(implicit context: ActionPipelineContext): SQLEngineConnection = getEngineConnection
+    .getOrElse(throw new IllegalStateException(s"No SQLEngineConnection found, neither for the current action nor with id ${Environment.defaultEngineConnectionId}"))
 
   /**
    * Create a SQLDataFrame reading a database table. See [[SQLDataFrame.table]].
    */
   def table(tableName: String, schema: SQLSchema)(implicit context: ActionPipelineContext): SQLDataFrame =
-    SQLDataFrame.table(getBridge, tableName, schema, getEngineConnection.map(_.dialect))
+    SQLDataFrame.table(requireEngineConnection, tableName, schema)
+
+  private def create(op: String, args: (String, Any)*)(implicit context: ActionPipelineContext): SQLDataFrame = {
+    val connection = requireEngineConnection
+    val bridge = connection.bridge
+    SQLDataFrame(bridge.callDataFrame(op, args: _*), bridge, connection)
+  }
 
   // Members declared in SubFeedConverter and DataFrameSubFeedCompanion
 
@@ -137,9 +145,7 @@ object SQLSubFeed extends DataFrameSubFeedCompanion {
   }
 
   override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SQLDataFrame = schema match {
-    case sqlSchema: SQLSchema =>
-      val bridge = getBridge
-      SQLDataFrame(bridge.callDataFrame("empty", "columns" -> sqlSchema.toBridge), bridge)
+    case sqlSchema: SQLSchema => create("empty", "columns" -> sqlSchema.toBridge)
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
   }
 
@@ -174,9 +180,8 @@ object SQLSubFeed extends DataFrameSubFeedCompanion {
   override def createDataFrame[A <: Product : ClassTag : TypeTag](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): SQLDataFrame = {
     val types = productFields[A].map(f => sqlTypeOf(f._2))
     require(types.size == colNames.size, s"Number of column names ${colNames.size} does not match number of fields ${types.size}")
-    val bridge = getBridge
     val values = rows.map(_.productIterator.map(v => SQLColumn.literal(v).expr).toSeq)
-    SQLDataFrame(bridge.callDataFrame("values", "rows" -> values, "columns" -> colNames.zip(types).map { case (n, t) => Seq(n, t.sql) }), bridge)
+    create("values", "rows" -> values, "columns" -> colNames.zip(types).map { case (n, t) => Seq(n, t.sql) })
   }
 
   private def productFields[A: TypeTag]: Seq[(String, Type)] = {
@@ -275,9 +280,7 @@ object SQLSubFeed extends DataFrameSubFeedCompanion {
   override def field(name: String, dataType: GenericDataType, nullable: Boolean): SQLField = SQLField(name, SQLDataType.of(dataType), nullable)
 
   override def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SQLDataFrame = {
-    val bridge = getBridge
-    val dialect = getEngineConnection.map(c => c.sqlDialect.getOrElse(c.dialect))
-    SQLDataFrame(bridge.callDataFrame("sql", "query" -> query, "dialect" -> dialect), bridge)
+    create("sql", "query" -> query, "dialect" -> requireEngineConnection.queryDialect)
   }
 
   override def rowFromSeq(values: Seq[Any]): SQLRow = SQLRow(values)

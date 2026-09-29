@@ -19,7 +19,8 @@
 package io.smartdatalake.workflow.connection
 
 import com.typesafe.config.ConfigFactory
-import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
+import io.smartdatalake.config.{ConfigParser, ConfigurationException, InstanceRegistry}
+import io.smartdatalake.testutils.sql.SQLTestUtil
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.workflow.dataframe.sql.SQLSubFeed
 import org.scalatest.funsuite.AnyFunSuite
@@ -31,9 +32,25 @@ class SQLEngineConnectionTest extends AnyFunSuite {
   test("SQLEngineConnection is parsable") {
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     val connection = ConfigParser.parseConfigObject[Connection](
-      ConfigFactory.parseString("type = SQLEngineConnection, id = sql-engine, dialect = postgres, sqlDialect = spark")
+      ConfigFactory.parseString("""type = SQLEngineConnection, id = sql-engine, url = "jdbc:postgresql://localhost/db", sqlDialect = spark""")
     )
-    assert(connection == SQLEngineConnection(ConnectionId("sql-engine"), dialect = "postgres", sqlDialect = Some("spark")))
+    assert(connection == SQLEngineConnection(ConnectionId("sql-engine"), url = "jdbc:postgresql://localhost/db", sqlDialect = Some("spark")))
     assert(connection.asInstanceOf[EngineConnection].subFeedType =:= typeOf[SQLSubFeed])
+  }
+
+  test("dialect is derived from the JDBC url") {
+    val connection = SQLEngineConnection(ConnectionId("c"), url = "jdbc:sqlserver://localhost:1433;databaseName=db")
+    assert(connection.databaseDialect == "tsql")
+    assert(connection.queryDialect == "tsql")
+    assert(SQLEngineConnection(ConnectionId("c"), url = "jdbc:duckdb:").databaseDialect == "duckdb")
+    assert(SQLEngineConnection(ConnectionId("c"), url = "jdbc:hsqldb:mem:x", dialect = Some("postgres")).databaseDialect == "postgres")
+    intercept[ConfigurationException](SQLEngineConnection(ConnectionId("c"), url = "jdbc:hsqldb:mem:x"))
+  }
+
+  test("SQL is executed on the database") {
+    val connection = SQLTestUtil.createEngineConnection("SQLEngineConnectionTest")
+    connection.execJdbcStatement("create table t as select 1 as a")
+    assert(connection.execJdbcQuery("select a from t", rs => { rs.next(); rs.getInt(1) }) == 1)
+    connection.pool.close()
   }
 }

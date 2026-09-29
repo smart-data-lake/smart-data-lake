@@ -18,14 +18,11 @@
  */
 package io.smartdatalake.workflow.action.generic.transformer
 
-import io.smartdatalake.definitions.Environment
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.testutils.SQLDfTransformerBehaviour
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
-import io.smartdatalake.util.python.JepInterpreter
+import io.smartdatalake.testutils.sql.SQLTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.connection.SQLEngineConnection
 import io.smartdatalake.workflow.dataframe.sql.SQLSubFeed
 import org.scalatest.Outcome
 import org.scalatest.funsuite.AnyFunSuite
@@ -36,11 +33,11 @@ class SQLDfTransformerTest extends AnyFunSuite with SQLDfTransformerBehaviour {
 
   override def subFeedType: Type = typeOf[SQLSubFeed]
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
-  instanceRegistry.register(SQLEngineConnection(ConnectionId(Environment.defaultEngineConnectionId), dialect = "postgres", sqlDialect = Some("spark")))
+  instanceRegistry.register(SQLTestUtil.createEngineConnection("SQLDfTransformerTest"))
   implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
 
   override def withFixture(test: NoArgTest): Outcome = {
-    val reason = JepInterpreter.unavailableReason
+    val reason = SQLTestUtil.pythonUnavailableReason
     assume(reason.isEmpty, reason.getOrElse(""))
     super.withFixture(test)
   }
