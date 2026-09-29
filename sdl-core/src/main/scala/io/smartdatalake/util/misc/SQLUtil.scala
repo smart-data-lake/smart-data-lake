@@ -69,7 +69,8 @@ object SQLUtil extends SmartDataLakeLogger {
     val joinConditionStr = targetTable.primaryKey.get.map(quoteCaseSensitiveColumn).map(colName => s"new.$colName = existing.$colName").reduce(_+" AND "+_)
     val deleteClauseStr = saveModeOptions.deleteCondition.map(c => s"\nWHEN MATCHED AND $c THEN DELETE").getOrElse("")
     val updateConditionStr = saveModeOptions.updateCondition.map(c => s" AND $c").getOrElse("")
-    val updateSpecStr = saveModeOptions.updateColumnsOpt.getOrElse(columns).diff(targetTable.primaryKey.get).map(quoteCaseSensitiveColumn).map(colName => s"existing.$colName = new.$colName").reduce(_+", "+_)
+    // the target columns of UPDATE SET are not qualified, as this is not allowed by standard SQL, e.g. by Postgres and DuckDB
+    val updateSpecStr = saveModeOptions.updateColumnsOpt.getOrElse(columns).diff(targetTable.primaryKey.get).map(quoteCaseSensitiveColumn).map(colName => s"$colName = new.$colName").reduce(_+", "+_)
     val insertConditionStr = saveModeOptions.insertCondition.map(c => s" AND $c").getOrElse("")
     val insertCols = columns.diff(saveModeOptions.insertColumnsToIgnore)
     val insertSpecStr = insertCols.map(quoteCaseSensitiveColumn).reduce(_+", "+_)
@@ -91,7 +92,8 @@ object SQLUtil extends SmartDataLakeLogger {
       val updateExistingConditionStr = saveModeOptions.updateExistingCondition.map(c => s" AND $c").getOrElse("")
       // columns which are not inserted into the target table do not exist there and can not be updated either
       val updateExistingCols = columns.diff(Seq(Historization.historizeOperationColName)).diff(saveModeOptions.insertColumnsToIgnore)
-      val updateExistingSpecStr = updateExistingCols.map(colName => s"existing.$colName = new.$colName").reduce(_ + ", " + _)
+      // the target columns of UPDATE SET are not qualified, as this is not allowed by standard SQL, e.g. by Postgres and DuckDB
+      val updateExistingSpecStr = updateExistingCols.map(colName => s"$colName = new.$colName").reduce(_ + ", " + _)
 
       Some(s"""
          | MERGE INTO ${targetTable.fullName} as existing

@@ -62,6 +62,17 @@ private[smartdatalake] class JdbcTransaction(pool: GenericObjectPool[SqlConnecti
     }
   }
 
+  /**
+   * Execute an SQL Data Manipulation Language (DML) statement in the transaction
+   * @return the number of rows affected
+   */
+  def execJdbcDmlStatement(sql:String, logging: Boolean = true) : Int = {
+    JdbcUtil.execWithJdbcStatement(jdbcConnection, doCommit = false) { stmt =>
+      if (logging) logger.info(s"($id) execJdbcDmlStatement in transaction $transactionId: $sql")
+      stmt.executeUpdate(sql)
+    }
+  }
+
   def commit(): Unit = {
       logger.info(s"($id) commit transaction $transactionId")
       jdbcConnection.commit()

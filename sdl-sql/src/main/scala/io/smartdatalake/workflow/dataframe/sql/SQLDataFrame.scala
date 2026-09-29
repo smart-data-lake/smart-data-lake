@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataframe.sql
 
 import io.smartdatalake.util.sqlglot.{DataFrameInfo, SqlGlotBridge}
 import io.smartdatalake.workflow.DataFrameSubFeed
-import io.smartdatalake.workflow.connection.SQLEngineConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe._
 
 import java.sql.ResultSet
@@ -33,9 +33,9 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * it as SQL statement for a database with [[toSql]].
  *
  * Operations that need to read data (collect, count, isEmpty, show) execute the SQL statement on the database of
- * the [[SQLEngineConnection]].
+ * the [[JdbcTableConnection]]. All DataFrames combined, e.g. by a join, must belong to the same connection.
  */
-class SQLDataFrame private(val info: DataFrameInfo, @transient val bridge: SqlGlotBridge, @transient val connection: SQLEngineConnection) extends GenericDataFrame {
+class SQLDataFrame private(val info: DataFrameInfo, @transient val bridge: SqlGlotBridge, @transient val connection: JdbcTableConnection) extends GenericDataFrame {
 
   override def subFeedType: Type = typeOf[SQLSubFeed]
 
@@ -62,7 +62,10 @@ class SQLDataFrame private(val info: DataFrameInfo, @transient val bridge: SqlGl
     SQLDataFrame(bridge.callDataFrame(name, ("df" -> id) +: args: _*), bridge, connection)
 
   private def other(df: GenericDataFrame): SQLDataFrame = df match {
-    case sqlDf: SQLDataFrame => sqlDf
+    case sqlDf: SQLDataFrame =>
+      if (sqlDf.connection.id != connection.id) throw new IllegalArgumentException(
+        s"DataFrames of different connections can not be combined, ${connection.id} and ${sqlDf.connection.id}")
+      sqlDf
     case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(df)
   }
 
@@ -128,7 +131,7 @@ class SQLDataFrame private(val info: DataFrameInfo, @transient val bridge: SqlGl
   /**
    * The SQL statement of this DataFrame in the dialect of the database
    */
-  def toDatabaseSql: String = toSql(Some(connection.databaseDialect))
+  def toDatabaseSql: String = toSql(Some(connection.sqlGlotDialect))
 
   // reading data executes the SQL statement on the database
 
@@ -158,7 +161,7 @@ object SQLDataFrame {
    * Create a SQLDataFrame for a DataFrame of the bridge. The DataFrame in Python is released when the SQLDataFrame is
    * garbage collected.
    */
-  private[sql] def apply(info: DataFrameInfo, bridge: SqlGlotBridge, connection: SQLEngineConnection): SQLDataFrame = {
+  private[sql] def apply(info: DataFrameInfo, bridge: SqlGlotBridge, connection: JdbcTableConnection): SQLDataFrame = {
     val df = new SQLDataFrame(info, bridge, connection)
     bridge.registerForRelease(df, info.id)
     df
@@ -171,9 +174,26 @@ object SQLDataFrame {
    * @param tableName  name of the table, optionally qualified with database and catalog, in the dialect of the database
    * @param schema     schema of the table
    */
-  def table(connection: SQLEngineConnection, tableName: String, schema: SQLSchema): SQLDataFrame = {
-    val bridge = connection.bridge
-    SQLDataFrame(bridge.callDataFrame("table", "name" -> tableName, "columns" -> schema.toBridge, "dialect" -> connection.databaseDialect), bridge, connection)
+  def table(connection: JdbcTableConnection, tableName: String, schema: SQLSchema): SQLDataFrame = {
+    val bridge = SqlGlotBridge.get()
+    SQLDataFrame(bridge.callDataFrame("table", "name" -> tableName, "columns" -> schema.toBridge, "dialect" -> connection.sqlGlotDialect), bridge, connection)
+  }
+
+  /**
+   * Create a SQLDataFrame reading the result of a query.
+   *
+   * @param connection connection to the database
+   * @param query      the query in the dialect of the database
+   * @param schema     schema of the result of the query
+   */
+  def query(connection: JdbcTableConnection, query: String, schema: SQLSchema): SQLDataFrame = {
+    val bridge = SqlGlotBridge.get()
+    SQLDataFrame(bridge.callDataFrame("query", "query" -> query, "columns" -> schema.toBridge, "dialect" -> connection.sqlGlotDialect), bridge, connection)
+  }
+
+  def of(df: GenericDataFrame): SQLDataFrame = df match {
+    case sqlDf: SQLDataFrame => sqlDf
+    case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(df)
   }
 
   private[sql] def readRows(rs: ResultSet): Seq[SQLRow] = {

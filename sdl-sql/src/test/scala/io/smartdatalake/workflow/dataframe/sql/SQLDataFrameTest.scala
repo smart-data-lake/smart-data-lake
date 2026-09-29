@@ -26,7 +26,8 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.sqlglot.SqlGlotException
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
-import io.smartdatalake.workflow.connection.SQLEngineConnection
+import io.smartdatalake.util.sqlglot.SqlGlotBridge
+import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import org.scalatest.Outcome
 import org.scalatest.funsuite.AnyFunSuite
@@ -35,7 +36,7 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 /**
- * Tests for SQLDataFrame, executing SQL on a DuckDB database. The SQL of transformers is written in Spark SQL.
+ * Tests for SQLDataFrame, executing SQL on a DuckDB database. The SQL of transformers is written in Spark SQL, the default.
  * Tests of the rendered SQL use other dialects explicitly.
  *
  * The tests need a Python environment with sqlglot and jep, see sdl-sql/pyproject.toml, and cancel themselves if
@@ -46,7 +47,7 @@ class SQLDataFrameTest extends AnyFunSuite {
   import SQLSubFeed._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  private val connection: SQLEngineConnection = SQLTestUtil.createEngineConnection("SQLDataFrameTest")
+  private val connection: JdbcTableConnection = SQLTestUtil.createEngineConnection("SQLDataFrameTest")
   instanceRegistry.register(connection)
   implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
 
@@ -200,7 +201,7 @@ class SQLDataFrameTest extends AnyFunSuite {
   }
 
   test("column SQL round-trips through SQLGlot") {
-    val bridge = connection.bridge
+    val bridge = SqlGlotBridge.get()
     val columns = Seq(
       (col("a") + lit(1)) * lit(2),
       col("a") > lit(1) and col("b").isNull or not(col("c") === lit("x")),

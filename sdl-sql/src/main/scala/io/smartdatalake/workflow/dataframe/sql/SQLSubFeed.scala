@@ -24,7 +24,9 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
-import io.smartdatalake.workflow.connection.SQLEngineConnection
+import io.smartdatalake.util.sqlglot.SqlGlotBridge
+import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
+import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.{ActionPipelineContext, ColumnFilter, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 
@@ -34,7 +36,7 @@ import scala.reflect.runtime.universe.{MethodSymbol, Type, TypeTag, typeOf}
 
 /**
  * A SubFeed of the SQL engine. Its DataFrame is an SQLGlot query, which is rendered as SQL statement to be executed
- * on the database. See [[SQLEngineConnection]].
+ * on the database. The SQL engine is used by Actions with a [[JdbcTableConnection]] as engine connection.
  */
 case class SQLSubFeed(@transient override val dataFrame: Option[SQLDataFrame],
                       override val dataObjectId: DataObjectId,
@@ -103,27 +105,28 @@ case class SQLSubFeed(@transient override val dataFrame: Option[SQLDataFrame],
  *
  * Column expressions are SQL text in the default SQLGlot dialect, see [[SQLColumn]]. This also applies to
  * expressions given as string, e.g. `expr("a > 1")`. SQL queries of SQL transformers are parsed in the SQL dialect
- * of the [[SQLEngineConnection]] instead.
+ * configured on the transformer instead, default is `spark`.
  */
 object SQLSubFeed extends DataFrameSubFeedCompanion {
 
   @transient override protected def subFeedType: Type = typeOf[SQLSubFeed]
 
   /**
-   * The SQLEngineConnection of the current Action, or otherwise the default engine connection if it is a SQLEngineConnection.
+   * The JdbcTableConnection used as engine connection by the current Action, or otherwise the default engine
+   * connection if it is a JdbcTableConnection.
    */
-  def getEngineConnection(implicit context: ActionPipelineContext): Option[SQLEngineConnection] = {
-    context.engineConnection.collect { case c: SQLEngineConnection => c }
+  def getEngineConnection(implicit context: ActionPipelineContext): Option[JdbcTableConnection] = {
+    context.engineConnection.collect { case c: JdbcTableConnection => c }
       .orElse(context.instanceRegistry.getConnections.collectFirst {
-        case c: SQLEngineConnection if c.id.id == Environment.defaultEngineConnectionId => c
+        case c: JdbcTableConnection if c.id.id == Environment.defaultEngineConnectionId => c
       })
   }
 
   /**
-   * The SQLEngineConnection to use for creating DataFrames, see [[getEngineConnection]].
+   * The engine connection to use for creating DataFrames, see [[getEngineConnection]].
    */
-  def requireEngineConnection(implicit context: ActionPipelineContext): SQLEngineConnection = getEngineConnection
-    .getOrElse(throw new IllegalStateException(s"No SQLEngineConnection found, neither for the current action nor with id ${Environment.defaultEngineConnectionId}"))
+  def requireEngineConnection(implicit context: ActionPipelineContext): JdbcTableConnection = getEngineConnection
+    .getOrElse(throw new IllegalStateException(s"No JdbcTableConnection found as engine connection, neither for the current action nor with id ${Environment.defaultEngineConnectionId}"))
 
   /**
    * Create a SQLDataFrame reading a database table. See [[SQLDataFrame.table]].
@@ -133,7 +136,7 @@ object SQLSubFeed extends DataFrameSubFeedCompanion {
 
   private def create(op: String, args: (String, Any)*)(implicit context: ActionPipelineContext): SQLDataFrame = {
     val connection = requireEngineConnection
-    val bridge = connection.bridge
+    val bridge = SqlGlotBridge.get()
     SQLDataFrame(bridge.callDataFrame(op, args: _*), bridge, connection)
   }
 
@@ -279,9 +282,15 @@ object SQLSubFeed extends DataFrameSubFeedCompanion {
   override def mapType(keyType: GenericDataType, valueType: GenericDataType): SQLMapDataType = createMapDataType(keyType, valueType)
   override def field(name: String, dataType: GenericDataType, nullable: Boolean): SQLField = SQLField(name, SQLDataType.of(dataType), nullable)
 
-  override def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SQLDataFrame = {
-    create("sql", "query" -> query, "dialect" -> requireEngineConnection.queryDialect)
-  }
+  override def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SQLDataFrame =
+    sql(query, dataObjectId, SQLDfTransformer.DefaultSqlDialect)
+
+  /**
+   * Create a DataFrame from an SQL query in the given SQLGlot dialect. Temporary views registered with
+   * createOrReplaceTempView are replaced by their DataFrame.
+   */
+  override def sql(query: String, dataObjectId: DataObjectId, sqlDialect: String)(implicit context: ActionPipelineContext): SQLDataFrame =
+    create("sql", "query" -> query, "dialect" -> sqlDialect)
 
   override def rowFromSeq(values: Seq[Any]): SQLRow = SQLRow(values)
 

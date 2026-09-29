@@ -86,13 +86,18 @@ import org.apache.hadoop.fs.Path
  * @param options        Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param sqlDialect     SQL dialect the SQL code is written in, default is `spark`. It is used by engines translating the
+ *                       SQL code for the database, e.g. the SQL engine of sdl-sql, which parses it with SQLGlot and
+ *                       supports the dialects listed in https://sqlglot.com/sqlglot/dialects.html.
+ *                       Spark engines expect Spark SQL and ignore it.
  */
 case class SQLDfsTransformer(override val name: String = "sqlTransform",
                              override val description: Option[String] = None,
                              files: Map[String, String] = Map(),
                              code: Map[String, String] = Map(),
                              options: Map[String, String] = Map(),
-                             runtimeOptions: Map[String, String] = Map())
+                             runtimeOptions: Map[String, String] = Map(),
+                             sqlDialect: String = SQLDfTransformer.DefaultSqlDialect)
   extends OptionsGenericDfsTransformer with SmartDataLakeLogger {
   assert(files.nonEmpty || code.nonEmpty, s"Either `files` or `code` must be non empty for SQLDfsTransformer")
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
@@ -123,7 +128,7 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform",
           }
           // create DataFrame from SQL
           logger.debug(s"($actionId.transformers.$name) Preparing DataFrame $outputName from SQL statement: $preparedSql")
-          functions.sql(preparedSql, outputDataObjectId)
+          functions.sql(preparedSql, outputDataObjectId, sqlDialect)
         } catch {
           case e: Throwable => throw new SQLTransformationException(s"($actionId.transformers.$name) SQL query error for $outputName: ${e.getMessage}. Also note to use tokens '%{inputViewName_<inputName>}' as temporary view names in the SQL statement.", e)
         }

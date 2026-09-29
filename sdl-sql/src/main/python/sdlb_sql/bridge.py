@@ -36,6 +36,7 @@ JSON object, and returning a JSON object with either `result` or `error` and `tr
 """
 
 import json
+import re
 import traceback
 from dataclasses import dataclass
 
@@ -94,6 +95,10 @@ def _col(name, table=None):
 
 def _parse(sql):
     return sqlglot.parse_one(sql)
+
+
+def _is_simple_identifier(name):
+    return re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) is not None
 
 
 def _parse_ordered(sql):
@@ -179,6 +184,19 @@ class Session:
         source = exp.Table(this=exp.to_identifier(placeholder),
                            alias=exp.TableAlias(this=exp.to_identifier(real.name, quoted=True)))
         expr = exp.select(*[_col(c, real.name) for c, _ in columns]).from_(source)
+        return self._register(expr, columns=[c for c, _ in columns])
+
+    def query(self, query, columns, dialect=None, alias="q"):
+        """Create a DataFrame reading the result of the SQL query `query` in the dialect of the database, with `columns`
+        as list of [name, type]. It is used for DataObjects defined by a query instead of a table."""
+        placeholder = f"{_PLACEHOLDER_PREFIX}{self._next_id()}"
+        parsed = sqlglot.parse_one(query, read=dialect)
+        if not isinstance(parsed, exp.Query):
+            raise ValueError(f"SQL statement must be a query, but is {type(parsed).__name__}: {query}")
+        self._tables[placeholder] = parsed
+        self._schema.add_table(placeholder, {c: exp.DataType.build(t, udt=True) for c, t in columns})
+        source = exp.Table(this=exp.to_identifier(placeholder), alias=exp.TableAlias(this=exp.to_identifier(alias, quoted=True)))
+        expr = exp.select(*[_col(c, alias) for c, _ in columns]).from_(source)
         return self._register(expr, columns=[c for c, _ in columns])
 
     def empty(self, columns):
@@ -359,13 +377,21 @@ class Session:
     # rendering
 
     def _replace_placeholders(self, expr):
-        for table in expr.find_all(exp.Table):
+        for table in list(expr.find_all(exp.Table)):
             real = self._tables.get(table.name)
-            if real is not None:
+            if isinstance(real, exp.Query):
+                alias = table.args.get("alias") or exp.TableAlias(this=exp.to_identifier("q"))
+                table.replace(exp.Subquery(this=real.copy(), alias=alias.copy()))
+            elif real is not None:
                 for part in ("this", "db", "catalog"):
                     value = real.args.get(part)
                     table.set(part, value.copy() if value is not None else None)
         return expr
+
+    def _render(self, expr, optimized=True):
+        if optimized:
+            expr = optimize(expr, schema=self._schema, rules=_OPTIMIZER_RULES)
+        return self._replace_placeholders(expr)
 
     def schema(self, df):
         """Return the fields of the DataFrame as list of {name, type} with type inferred by SQLGlot"""
@@ -373,10 +399,49 @@ class Session:
         return [{"name": s.alias_or_name, "type": _type_json(s.type)} for s in expr.selects]
 
     def to_sql(self, df, dialect=None, optimized=True, pretty=False):
-        expr = self._df(df).expr.copy()
-        if optimized:
-            expr = optimize(expr, schema=self._schema, rules=_OPTIMIZER_RULES)
-        return self._replace_placeholders(expr).sql(dialect=dialect, pretty=pretty)
+        return self._render(self._df(df).expr.copy(), optimized).sql(dialect=dialect, pretty=pretty)
+
+    def create_table_as(self, df, table, dialect=None, with_data=True, quote_names=False):
+        """Create a `CREATE TABLE <table> AS <query>` statement for the DataFrame. `table` is given in the dialect of the
+        database. If `with_data` is false, the table is created empty. If `quote_names` is false, column names which
+        are valid identifiers are not quoted, so that the database normalizes their case as for unquoted identifiers."""
+        d = self._df(df)
+        expr = d.expr.copy()
+        if not with_data:
+            expr = exp.select("*").from_(expr.subquery(exp.to_identifier("_ctas", quoted=True))).where(exp.false())
+        expr = self._render(expr)
+        if not quote_names:
+            for projection in expr.selects:
+                alias = projection.args.get("alias")
+                if isinstance(projection, exp.Alias) and alias is not None and _is_simple_identifier(alias.name):
+                    alias.set("quoted", False)
+        create = exp.Create(this=exp.to_table(table, dialect=dialect), kind="TABLE", expression=expr)
+        return create.sql(dialect=dialect)
+
+    def create_table(self, table, columns, dialect=None, quote_names=False):
+        """Create a `CREATE TABLE` statement with `columns` as list of [name, type, nullable]"""
+        column_defs = [
+            exp.ColumnDef(this=exp.to_identifier(name, quoted=quote_names or not _is_simple_identifier(name)),
+                          kind=exp.DataType.build(tpe, udt=True),
+                          constraints=[] if nullable else [exp.ColumnConstraint(kind=exp.NotNullColumnConstraint())])
+            for name, tpe, nullable in columns
+        ]
+        create = exp.Create(this=exp.Schema(this=exp.to_table(table, dialect=dialect), expressions=column_defs), kind="TABLE")
+        return create.sql(dialect=dialect)
+
+    def parse_types(self, types, dialect=None):
+        """Convert data types of the database, given as list of [type name, precision, scale], e.g. from JDBC metadata,
+        into SQLGlot types. The result has the same format as the types of `schema`."""
+        result = []
+        for name, precision, scale in types:
+            try:
+                data_type = exp.DataType.build(name, dialect=dialect, udt=True)
+            except Exception:
+                data_type = exp.DataType.build("UNKNOWN")
+            if data_type.this == exp.DataType.Type.DECIMAL and not data_type.expressions and precision:
+                data_type = exp.DataType.build(f"DECIMAL({precision}, {scale or 0})")
+            result.append(_type_json(data_type))
+        return result
 
     def transpile(self, sql, read=None, write=None):
         """Translate an SQL statement or expression from dialect `read` to dialect `write`"""
@@ -391,6 +456,7 @@ _OPS = {
     "table": _session.table,
     "empty": _session.empty,
     "values": _session.values,
+    "query": _session.query,
     "register_view": _session.register_view,
     "sql": _session.sql,
     "alias": _session.alias,
@@ -409,6 +475,9 @@ _OPS = {
     "limit": _session.limit,
     "schema": _session.schema,
     "to_sql": _session.to_sql,
+    "create_table_as": _session.create_table_as,
+    "create_table": _session.create_table,
+    "parse_types": _session.parse_types,
     "transpile": _session.transpile,
 }
 

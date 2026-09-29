@@ -6,9 +6,39 @@ Transformations are built as an [SQLGlot](https://github.com/tobymao/sqlglot) qu
 it in the SQL dialect of the target database. SQLGlot supports many dialects and translates between them, so SQL
 transformers can be written in Spark SQL and executed on e.g. Postgres, SQL Server or Snowflake.
 
-**Status**: DataFrame operations and SQL transformers are translated into SQL statements, and operations reading
-data (`collect`, `count`, `isEmpty`, `show`, observations) execute them on the database of the `SQLEngineConnection`.
-There are no DataObjects reading or writing `SQLSubFeed`s yet (next step of #866).
+## Usage
+
+An Action uses the SQL engine if its `engineConnectionId` references a `JdbcTableConnection`. All its inputs and
+outputs must then be `JdbcTableDataObject`s of this connection. The data is never transferred out of the database:
+the transformations are executed with `INSERT INTO ... SELECT` statements, or a merge statement.
+
+```hocon
+connections {
+  dwh {
+    type = JdbcTableConnection
+    url = "jdbc:postgresql://localhost:5432/dwh"
+    driver = org.postgresql.Driver
+    # dialect = postgres  # SQLGlot dialect of the database, derived from the url by default
+  }
+}
+actions {
+  load-customers {
+    type = CopyAction
+    inputId = stg-customers
+    outputId = int-customers
+    engineConnectionId = dwh
+    transformers = [{
+      type = SQLDfTransformer
+      code = "select id, upper(name) as name, nvl(city, 'unknown') as city from %{inputViewName}"
+      # sqlDialect = spark  # SQLGlot dialect of the SQL code, default is spark
+    }]
+  }
+}
+```
+
+Supported are the save modes Overwrite (delete and insert in one transaction, also for virtual partitions), Append
+and Merge (with a temporary table created by `CREATE TABLE ... AS SELECT`), and incremental output with
+`DataObjectStateIncrementalMode`.
 
 ## Architecture
 
@@ -24,13 +54,15 @@ SQLGlot is a Python library. It runs in a Python interpreter embedded into the J
 | `SQLDataFrame` | `workflow/dataframe/sql/SQLDataFrame.scala` | Remote-controls a DataFrame of the bridge by its id. `toSql(dialect)` renders the SQL statement. |
 | `SQLColumn` | `workflow/dataframe/sql/SQLColumn.scala` | A column expression as SQL text in the default SQLGlot dialect. Operators and functions compose the SQL text in Scala, no call to Python is needed. |
 | `SQLSchema` | `workflow/dataframe/sql/SQLSchema.scala` | Schema, fields and data types. Types of results are inferred by SQLGlot. |
-| `SQLEngineConnection` | `workflow/connection/SQLEngineConnection.scala` | `EngineConnection` selecting the SQL engine, and JDBC connection (pool) to the database executing its statements, see `GenericJdbcExecution` in sdl-core. The SQLGlot `dialect` of the database is derived from the JDBC url if not configured, `sqlDialect` is the dialect of SQL transformers. |
+| `JdbcTableSqlEngine` | `workflow/dataobject/JdbcTableSqlEngine.scala` | SQL engine implementation of the `JdbcTableEngine` SPI of `JdbcTableDataObject` (sdl-core), discovered on the classpath like the Spark implementation in sdl-spark. Reads the table schema from the JDBC metadata, validates that the DataObject uses the engine connection, and executes the writes. |
+
+`JdbcTableConnection` (sdl-core) is the engine connection of the SQL engine: its SubFeed type is `SQLSubFeed`.
 
 Every DataFrame operation wraps its input as subquery. The SQLGlot optimizer merges these subqueries again when
 rendering the statement, e.g.
 
 ```scala
-val df = SQLSubFeed.table("db.test_table", schema).withColumn("d", col("a") * lit(2))
+val df = SQLSubFeed.table("db.test_table", schema) // in the context of an Action using the SQL engine.withColumn("d", col("a") * lit(2))
 df.createOrReplaceTempView("test_table_int")
 SQLSubFeed.sql("select *, d * 2 as e from test_table_int", DataObjectId("do1"))
   .toSql(Some("postgres"))
@@ -42,9 +74,12 @@ name when rendering. Temporary views are replaced by their query when parsing th
 
 Known limitations:
 - Expressions given as string (`expr(...)`, filters of execution modes) are parsed in the default SQLGlot dialect,
-  only SQL of transformers is parsed in `sqlDialect`.
+  only SQL of transformers is parsed in their `sqlDialect`.
 - Column names are case-sensitive. Unquoted identifiers in SQL of transformers are normalized to lower case.
-- Not implemented: `hash`, `from_json`, `raise_error`, `array_construct_compact`, UDFs and schema evolution.
+- Data types of written DataFrames are not validated against the table, only column names, as the types inferred
+  by SQLGlot are not exact.
+- Not implemented: schema evolution (`allowSchemaEvolution`, applying schema changes), `hash`, `from_json`,
+  `raise_error`, `array_construct_compact` and UDFs.
 
 ## Python environment
 
@@ -57,8 +92,7 @@ uv sync
 export SDLB_PYTHON=$PWD/.venv/bin/python   # .venv\Scripts\python.exe on Windows
 ```
 
-SDLB finds the environment through `SDLB_PYTHON` or the `pythonExecutable` attribute of `SQLEngineConnection`, and
-otherwise uses `python3` on the PATH. The version of the jep Maven dependency in `pom.xml` must match the jep Python
+SDLB finds the environment through the environment variable `SDLB_PYTHON`, and otherwise uses `python3` on the PATH. The version of the jep Maven dependency in `pom.xml` must match the jep Python
 package.
 
 ## Tests

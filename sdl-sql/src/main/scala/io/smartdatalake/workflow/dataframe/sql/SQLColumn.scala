@@ -145,6 +145,11 @@ object SQLColumn {
   def quoteIdentifier(name: String): String = "\"" + name.replace("\"", "\"\"") + "\""
 
   /**
+   * Create a reference to the column with exactly the given name, without interpreting dots or backticks.
+   */
+  def byName(colName: String): SQLColumn = SQLColumn(quoteIdentifier(colName), name = Some(colName))
+
+  /**
    * Create a column reference. Like in Spark, the name can be qualified with a dot (`table.column` or
    * `struct.field`), and parts can be quoted with backticks (`` `my.column` ``).
    */

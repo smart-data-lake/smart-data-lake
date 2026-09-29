@@ -20,14 +20,16 @@ package io.smartdatalake.workflow.connection.jdbc
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode}
-import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
+import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata, EngineConnection}
 import io.smartdatalake.workflow.dataobject.generic.{ForeignKeyDefinition, PrimaryKeyDefinition}
 import org.apache.commons.pool2.impl.GenericObjectPool
 
 import java.sql.{Connection => SqlConnection, DatabaseMetaData, DriverManager, ResultSet}
+import scala.reflect.runtime.universe.Type
+import scala.util.Try
 
 /**
  * Connection information for JDBC tables. If authentication is needed, user and password must be
@@ -86,6 +88,10 @@ import java.sql.{Connection => SqlConnection, DatabaseMetaData, DriverManager, R
  * @param connectionPool
  *   fine tuning of the JDBC connection pool used by SDLB, see [[ConnectionPoolConfig]], e.g. idle timeout and
  *   connection validation. Default is [[ConnectionPoolConfig]] with its default values.
+ * @param dialect
+ *   SQL dialect of the database as named by SQLGlot, e.g. postgres, tsql, oracle, snowflake or duckdb, see
+ *   https://sqlglot.com/sqlglot/dialects.html. It is used by the SQL engine of sdl-sql to create SQL statements for
+ *   the database. Default is to derive it from the JDBC url.
  */
 case class JdbcTableConnection(
     override val id: ConnectionId,
@@ -97,8 +103,9 @@ case class JdbcTableConnection(
     connectionInitSql: Option[String] = None,
     directTableOverwrite: Boolean = false,
     connectionPool: ConnectionPoolConfig = ConnectionPoolConfig(),
+    dialect: Option[String] = None,
     override val metadata: Option[ConnectionMetadata] = None
-) extends Connection with GenericJdbcExecution with SmartDataLakeLogger {
+) extends Connection with GenericJdbcExecution with EngineConnection with SmartDataLakeLogger {
 
   // Allow only supported authentication modes
   private val supportedAuths = Seq(classOf[BasicAuthMode])
@@ -115,6 +122,19 @@ case class JdbcTableConnection(
 
   def test(): Unit =
     execWithJdbcConnection(_ => ())
+
+  /**
+   * A JdbcTableConnection can be used as engine connection of an Action with the SQL engine of sdl-sql, which
+   * executes the Action with SQL statements on the database. All input and output DataObjects of the Action must
+   * then be JdbcTableDataObjects of this connection.
+   */
+  override def subFeedType: Type = JdbcTableConnection.sqlEngineSubFeedType
+
+  /**
+   * SQLGlot dialect of the database, see attribute `dialect`.
+   */
+  def sqlGlotDialect: String = dialect.orElse(JdbcTableConnection.dialectFromUrl(url))
+    .getOrElse(throw ConfigurationException(s"($id) SQLGlot dialect can not be derived from JDBC url $url, please configure attribute dialect", Some(s"connections.$id.dialect")))
 
   private def getConnection(): SqlConnection = {
     Class.forName(driver)
@@ -187,6 +207,30 @@ case class JdbcTableConnection(
 }
 
 object JdbcTableConnection extends FromConfigFactory[Connection] {
+
+  private val sqlEngineSubFeedTypeName = "io.smartdatalake.workflow.dataframe.sql.SQLSubFeed"
+
+  // the SubFeed type of the SQL engine, which is implemented in sdl-sql
+  private lazy val sqlEngineSubFeedType: Type = Try(ReflectionUtil.classToType(Class.forName(sqlEngineSubFeedTypeName)))
+    .getOrElse(throw ConfigurationException(s"Using a JdbcTableConnection as engine connection needs the SQL engine $sqlEngineSubFeedTypeName, please add sdl-sql to the classpath"))
+
+  // sub protocol of JDBC urls and the corresponding SQLGlot dialect
+  private val dialectBySubProtocol = Map(
+    "postgresql" -> "postgres", "sqlserver" -> "tsql", "oracle" -> "oracle", "mysql" -> "mysql", "mariadb" -> "mysql",
+    "duckdb" -> "duckdb", "snowflake" -> "snowflake", "sqlite" -> "sqlite", "redshift" -> "redshift", "trino" -> "trino",
+    "presto" -> "presto", "databricks" -> "databricks", "clickhouse" -> "clickhouse", "teradata" -> "teradata",
+    "bigquery" -> "bigquery", "exasol" -> "exasol"
+  )
+
+  /**
+   * Derive the SQLGlot dialect from the sub protocol of a JDBC url, e.g. `jdbc:postgresql://...` -> postgres
+   */
+  def dialectFromUrl(url: String): Option[String] =
+    url.split(':').toSeq match {
+      case Seq("jdbc", subProtocol, _*) => dialectBySubProtocol.get(subProtocol.toLowerCase)
+      case _ => None
+    }
+
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): JdbcTableConnection =
     extract[JdbcTableConnection](config)
 }

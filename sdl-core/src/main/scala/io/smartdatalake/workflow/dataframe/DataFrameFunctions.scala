@@ -113,6 +113,14 @@ trait DataFrameFunctions {
    */
   def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame
 
+  /**
+   * Create a DataFrame from an SQL query written in the given SQL dialect, e.g. `spark` or `postgres`.
+   * Only engines translating the query for the database consider the dialect, e.g. the SQL engine of sdl-sql.
+   * The default implementation ignores it, and expects the query in the SQL dialect of the engine.
+   */
+  def sql(query: String, dataObjectId: DataObjectId, sqlDialect: String)(implicit context: ActionPipelineContext): GenericDataFrame =
+    sql(query, dataObjectId)
+
   def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn
 
   def row_number: GenericColumn

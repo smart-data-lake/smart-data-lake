@@ -229,3 +229,29 @@ def test_unqualified_join_column_after_join_on_columns():
     df = call("select", df=df["id"], columns=['"a"', '"z"'])
     assert df["columns"] == ["a", "z"]
     assert to_sql(df).startswith('SELECT "test_table"."a" AS "a", "other"."z" AS "z"')
+
+
+def test_query():
+    df = call("query", query="select top 1 a from db.x", columns=[["a", "INT"]], dialect="tsql")
+    df = call("filter", df=df["id"], condition='"a" > 1')
+    assert to_sql(df, "postgres") == 'SELECT "q"."a" AS "a" FROM (SELECT a FROM db.x LIMIT 1) AS "q" WHERE "q"."a" > 1'
+
+
+def test_create_table_as():
+    df = call("with_column", df=table()["id"], name="My Col", column='"a" * 2')
+    assert call("create_table_as", df=df["id"], table="db.tgt", dialect="postgres") == (
+        'CREATE TABLE db.tgt AS SELECT "test_table"."a" AS a, "test_table"."b" AS b, "test_table"."c" AS c, '
+        '"test_table"."a" * 2 AS "My Col" FROM db.test_table AS "test_table"')
+    assert call("create_table_as", df=df["id"], table="db.tgt", dialect="tsql", with_data=False).startswith("SELECT ")
+    assert call("create_table_as", df=df["id"], table="db.tgt", dialect="postgres", with_data=False).endswith("WHERE FALSE")
+
+
+def test_create_table():
+    assert call("create_table", table="db.tgt", columns=[["a", "INT", False], ["My Col", "TEXT", True]], dialect="tsql") == \
+        "CREATE TABLE db.tgt (a INTEGER NOT NULL, [My Col] VARCHAR(MAX))"
+
+
+def test_parse_types():
+    assert call("parse_types", types=[["int4", 10, 0], ["numeric", 10, 2], ["varchar", 20, 0], ["INTEGER[]", 0, 0], ["geometry", 0, 0]], dialect="postgres") == [
+        # database specific types are passed through
+        {"type": "INT"}, {"type": "DECIMAL(10, 2)"}, {"type": "VARCHAR"}, {"array": {"type": "INT"}}, {"type": "GEOMETRY"}]

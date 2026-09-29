@@ -77,13 +77,18 @@ import org.apache.hadoop.fs.Path
  * @param options        Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param sqlDialect     SQL dialect the SQL code is written in, default is `spark`. It is used by engines translating the
+ *                       SQL code for the database, e.g. the SQL engine of sdl-sql, which parses it with SQLGlot and
+ *                       supports the dialects listed in https://sqlglot.com/sqlglot/dialects.html.
+ *                       Spark engines expect Spark SQL and ignore it.
  */
 case class SQLDfTransformer(override val name: String = "sqlTransform",
                             override val description: Option[String] = None,
                             file: Option[String] = None,
                             code: Option[String] = None,
                             options: Map[String, String] = Map(),
-                            runtimeOptions: Map[String, String] = Map())
+                            runtimeOptions: Map[String, String] = Map(),
+                            sqlDialect: String = SQLDfTransformer.DefaultSqlDialect)
   extends OptionsGenericDfTransformer with SmartDataLakeLogger {
   assert(file.isEmpty || code.isEmpty, s"Only one of `file` or `code` must be defined for SQLDfTransformer")
 
@@ -105,7 +110,7 @@ case class SQLDfTransformer(override val name: String = "sqlTransform",
       }
       // create DataFrame from SQL
       logger.debug(s"($actionId.transformers.$name) Preparing DataFrame from SQL statement: $preparedSql")
-      function.sql(preparedSql, dataObjectId)
+      function.sql(preparedSql, dataObjectId, sqlDialect)
     } catch {
       case e: Throwable => throw new SQLTransformationException(s"($actionId.transformers.$name) SQL query error: ${e.getMessage}. Also note to use token '%{inputViewName}' or '$inputViewName' as temporary view name in the SQL statement.", e)
     }
@@ -118,6 +123,11 @@ object SQLDfTransformer extends FromConfigFactory[GenericDfTransformer] {
   }
 
   private[smartdatalake] val INPUT_VIEW_NAME = "inputViewName"
+
+  /**
+   * Default SQL dialect of SQL transformers
+   */
+  val DefaultSqlDialect = "spark"
 }
 
 

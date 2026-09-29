@@ -75,7 +75,7 @@ case class SQLSchema(fields: Seq[SQLField]) extends GenericSchema {
 }
 
 object SQLSchema {
-  private[sql] def fromBridge(fields: Seq[SqlGlotField]): SQLSchema =
+  def fromBridge(fields: Seq[SqlGlotField]): SQLSchema =
     SQLSchema(fields.map(f => SQLField(f.name, SQLDataType.fromBridge(f.dataType))))
 }
 
@@ -190,7 +190,7 @@ object SQLDataType {
     SQLSimpleDataType(sparkTypeNames.getOrElse(base, base.toUpperCase) + params)
   }
 
-  private[sql] def fromBridge(json: JValue): SQLDataType = {
+  def fromBridge(json: JValue): SQLDataType = {
     implicit val formats: Formats = DefaultFormats
     json match {
       case j: JObject if (j \ "struct") != JNothing =>
