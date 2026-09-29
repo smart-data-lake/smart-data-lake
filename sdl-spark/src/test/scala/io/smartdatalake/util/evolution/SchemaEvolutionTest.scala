@@ -1211,4 +1211,43 @@ class SchemaEvolutionTest extends AnyFunSuite with Checkers with SmartDataLakeLo
     val ex = intercept[SchemaEvolutionException](SchemaEvolution.createColumnMappings(schemaOld, schemaNew))
     assert(ex.getMessage.contains("column b cannot be converted"))
   }
+
+  test("Changed data type: old and new data are converted to the wider data type (#339)") {
+    val schemaOld = StructType(List(StructField("id", IntegerType), StructField("dec", DecimalType(38, 10)), StructField("int2dec", DecimalType(38, 0)), StructField("long", LongType), StructField("int", IntegerType), StructField("str", StringType)))
+    val schemaNew = StructType(List(StructField("id", IntegerType), StructField("dec", DecimalType(3, 0)), StructField("int2dec", IntegerType), StructField("long", IntegerType), StructField("int", LongType), StructField("str", IntegerType)))
+    val oldDf = SparkDataFrame(session.createDataFrame(java.util.List.of(Row(1, new java.math.BigDecimal("12345.6789012345"), new java.math.BigDecimal("12345678901234567890"), 12345678901L, 1, "abc")), schemaOld))
+    val newDf = SparkDataFrame(session.createDataFrame(java.util.List.of(Row(2, new java.math.BigDecimal(123), 5, 6, 7L, 8)), schemaNew))
+
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
+    val expectedTypes = Seq(IntegerType, DecimalType(38, 10), DecimalType(38, 0), LongType, LongType, StringType)
+    assert(oldEvoDf.schema.fields.map(_.dataType.asInstanceOf[SparkDataType].inner) == expectedTypes)
+    assert(newEvoDf.schema.fields.map(_.dataType.asInstanceOf[SparkDataType].inner) == expectedTypes)
+    // existing data is not lost
+    val oldRow = oldEvoDf.asInstanceOf[SparkDataFrame].inner.collect().head
+    assert(oldRow.getDecimal(1).compareTo(new java.math.BigDecimal("12345.6789012345")) == 0)
+    assert(oldRow.getDecimal(2).compareTo(new java.math.BigDecimal("12345678901234567890")) == 0)
+    assert(oldRow.getLong(3) == 12345678901L)
+    assert(oldRow.getString(5) == "abc")
+    val newRow = newEvoDf.asInstanceOf[SparkDataFrame].inner.collect().head
+    assert(newRow.getDecimal(1).compareTo(new java.math.BigDecimal(123)) == 0)
+    assert(newRow.getString(5) == "8")
+  }
+
+  test("Changed data type in struct type: old and new data are converted to the wider data type (#339)") {
+    val schemaOld = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", DecimalType(38, 10)), StructField("b2", LongType))))))
+    val schemaNew = StructType(List(StructField("a", StringType), StructField("b", StructType(List(StructField("b1", DecimalType(3, 0)), StructField("b2", IntegerType))))))
+    val oldDf = SparkDataFrame(session.createDataFrame(java.util.List.of(Row("x", Row(new java.math.BigDecimal("12345.6789012345"), 12345678901L))), schemaOld))
+    val newDf = SparkDataFrame(session.createDataFrame(java.util.List.of(Row("y", Row(new java.math.BigDecimal(123), 5))), schemaNew))
+
+    val (oldEvoDf, newEvoDf) = SchemaEvolution.process(oldDf, newDf)
+    val expectedType = StructType(List(StructField("b1", DecimalType(38, 10)), StructField("b2", LongType)))
+    assert(oldEvoDf.schema.getDataType("b").asInstanceOf[SparkDataType].inner == expectedType)
+    assert(newEvoDf.schema.getDataType("b").asInstanceOf[SparkDataType].inner == expectedType)
+    val oldB = oldEvoDf.asInstanceOf[SparkDataFrame].inner.collect().head.getStruct(1)
+    assert(oldB.getDecimal(0).compareTo(new java.math.BigDecimal("12345.6789012345")) == 0)
+    assert(oldB.getLong(1) == 12345678901L)
+    val newB = newEvoDf.asInstanceOf[SparkDataFrame].inner.collect().head.getStruct(1)
+    assert(newB.getDecimal(0).compareTo(new java.math.BigDecimal(123)) == 0)
+    assert(newB.getLong(1) == 5L)
+  }
 }

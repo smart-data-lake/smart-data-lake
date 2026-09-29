@@ -288,4 +288,21 @@ class ScalaDataFrameTest extends AnyFunSuite {
 
   // TODO: check null values handling
 
+
+  test("schema evolution converts old and new data to the wider data type") {
+    val oldDf = Seq(Seq[Any](1, 1.5d)).toDF("a", "b")
+    val newDf = Seq(Seq[Any](2, 3)).toDF("a", "b")
+    val (oldEvoDf, newEvoDf) = io.smartdatalake.util.evolution.SchemaEvolution.process(oldDf, newDf)
+    assert(oldEvoDf.schema.getDataType("b") == ScalaDoubleDataType)
+    assert(newEvoDf.schema.getDataType("b") == ScalaDoubleDataType)
+    assert(oldEvoDf.collect.map(_.get(1)) == Seq(1.5d))
+    assert(newEvoDf.collect.map(_.get(1)) == Seq(3d))
+  }
+
+  test("widerSimpleType") {
+    assert(widerSimpleType(ScalaIntDataType, ScalaDoubleDataType).contains(ScalaDoubleDataType))
+    assert(widerSimpleType(ScalaDoubleDataType, ScalaIntDataType).contains(ScalaDoubleDataType))
+    assert(widerSimpleType(ScalaIntDataType, ScalaStringDataType).contains(ScalaStringDataType))
+    assert(widerSimpleType(ScalaTimestampDataType, ScalaIntDataType).isEmpty)
+  }
 }

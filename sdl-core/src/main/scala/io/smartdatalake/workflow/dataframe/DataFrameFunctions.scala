@@ -125,6 +125,14 @@ trait DataFrameFunctions {
 
   def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf
 
+  /**
+   * Returns the wider of two simple data types, e.g. a data type that can hold the values of both data types,
+   * or None if there is no such data type or it is not known to the engine.
+   * Schema evolution uses the wider data type if the data type of a column changes, so that existing data is not
+   * converted to a narrower data type.
+   */
+  def widerSimpleType(left: GenericDataType, right: GenericDataType): Option[GenericDataType] = None
+
 }
 
 trait GenericWhen {

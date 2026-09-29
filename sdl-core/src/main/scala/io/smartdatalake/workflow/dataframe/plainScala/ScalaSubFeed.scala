@@ -204,6 +204,14 @@ object ScalaSubFeed extends DataFrameSubFeedCompanion {
 
   def field(name: String, dataType: GenericDataType, nullable: Boolean): GenericField = throwNotImplementedError
 
+  override def widerSimpleType(left: GenericDataType, right: GenericDataType): Option[GenericDataType] = (left, right) match {
+    // getGreaterType returns the data type itself if the other is not greater, also for unrelated data types
+    case (l: ScalaDataType[_], r: ScalaDataType[_]) =>
+      val greaterType = l.getGreaterType(r)
+      if (greaterType == r.getGreaterType(l)) Some(greaterType) else None
+    case _ => None
+  }
+
   def hash(column: GenericColumn): ScalaAbstractColumn = throwNotImplementedError
 
   override def colscomparisonExpr(cols: Seq[GenericColumn], useHash: Boolean): ScalaAbstractColumn = {

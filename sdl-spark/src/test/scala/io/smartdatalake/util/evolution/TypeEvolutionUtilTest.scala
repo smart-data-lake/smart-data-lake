@@ -114,4 +114,49 @@ class TypeEvolutionUtilTest extends AnyFunSuite {
       TypeEvolutionUtil.schemaEvolution(srcRows.iterator, srcSchema, tgtSchema).toSeq
     }
   }
+
+  test("wider simple type") {
+    import TypeEvolutionUtil.widerSimpleType
+    def assertWider(l: DataType, r: DataType, expected: Option[DataType]): Unit = {
+      assert(widerSimpleType(l, r) == expected, s"$l / $r")
+      assert(widerSimpleType(r, l) == expected, s"$r / $l")
+    }
+    assertWider(IntegerType, IntegerType, Some(IntegerType))
+    assertWider(IntegerType, LongType, Some(LongType))
+    assertWider(ByteType, ShortType, Some(ShortType))
+    assertWider(ShortType, FloatType, Some(FloatType))
+    assertWider(IntegerType, FloatType, Some(DoubleType))
+    assertWider(LongType, DoubleType, Some(DoubleType))
+    assertWider(FloatType, DoubleType, Some(DoubleType))
+    assertWider(DecimalType(38, 10), DecimalType(3, 0), Some(DecimalType(38, 10)))
+    assertWider(DecimalType(10, 2), DecimalType(5, 4), Some(DecimalType(12, 4)))
+    // integral digits are kept if the maximum precision is exceeded
+    assertWider(DecimalType(38, 0), DecimalType(10, 5), Some(DecimalType(38, 0)))
+    assertWider(DecimalType(38, 0), IntegerType, Some(DecimalType(38, 0)))
+    assertWider(DecimalType(3, 0), IntegerType, Some(DecimalType(10, 0)))
+    assertWider(DecimalType(5, 2), LongType, Some(DecimalType(22, 2)))
+    assertWider(DecimalType(10, 2), DoubleType, Some(DoubleType))
+    assertWider(DecimalType(20, 2), DoubleType, None)
+    assertWider(IntegerType, StringType, Some(StringType))
+    assertWider(DecimalType(10, 2), StringType, Some(StringType))
+    assertWider(BooleanType, IntegerType, None)
+    assertWider(DateType, TimestampType, None)
+  }
+
+  test("nested decimal and integral are converted to wider decimal") {
+    val srcSchema = StructType(Seq(StructField("a", DecimalType(3, 0)), StructField("b", IntegerType), StructField("c", IntegerType)))
+    val tgtSchema = StructType(Seq(StructField("a", DecimalType(38, 10)), StructField("b", DecimalType(38, 0)), StructField("c", DoubleType)))
+    val srcRows = Seq(Row(new java.math.BigDecimal(123), 5, 7), Row(null, null, null))
+    val tgtRows = TypeEvolutionUtil.schemaEvolution(srcRows.iterator, srcSchema, tgtSchema).toSeq
+    assert(tgtRows.head == Row(new java.math.BigDecimal(123).setScale(10), new java.math.BigDecimal(5), 7d))
+    assert(tgtRows(1) == Row(null, null, null))
+  }
+
+  test("nested decimal can not be converted to narrower decimal") {
+    val srcSchema = StructType(Seq(StructField("a", DecimalType(38, 10))))
+    val tgtSchema = StructType(Seq(StructField("a", DecimalType(3, 0))))
+    intercept[SchemaEvolutionException] {
+      TypeEvolutionUtil.schemaEvolution(Iterator(Row(new java.math.BigDecimal(1))), srcSchema, tgtSchema).toSeq
+    }
+  }
 }

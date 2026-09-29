@@ -87,7 +87,8 @@ object SchemaEvolution extends SmartDataLakeLogger {
    * Converts a col from one DataType to another
    *
    * The following conversion of data types are supported:
-   * - simple type to compatible simple type
+   * - simple type to compatible simple type. Both columns are converted to the wider of both data types, if the engine
+   *   knows one (see [[DataFrameFunctions.widerSimpleType]]), otherwise to the new data type.
    * - delete column in complex type (array, struct, map)
    * - new column in complex type (array, struct, map)
    * - changed data type in complex type (array, struct, map) according to the rules above
@@ -103,7 +104,8 @@ object SchemaEvolution extends SmartDataLakeLogger {
     (left, right) match {
       // simple type
       case (_: GenericSimpleDataType, _: GenericSimpleDataType) =>
-        Some(ColumnConversion(column.cast(right), column.cast(right), right))
+        val tgtType = functions.widerSimpleType(left, right).getOrElse(right)
+        Some(ColumnConversion(column.cast(tgtType), column.cast(tgtType), tgtType))
       // same complex type
       case _ if left.typeName == right.typeName =>
         val tgtType = TypeConsolidation.consolidateType(left, right, ignoreOldDeletedNestedColumns, caseSensitive = caseSensitive)

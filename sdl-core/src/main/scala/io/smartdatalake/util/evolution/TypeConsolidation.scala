@@ -52,8 +52,8 @@ object TypeConsolidation {
         functions.mapType(consolidatedKeyType, consolidatedValueType)
       case (leftType, rightType) if leftType.isSameType(rightType) => // data type equal
         rightType
-      case (leftType: GenericDataType with GenericSimpleDataType, rightType: GenericDataType with GenericSimpleDataType) => // assume that it is castable
-        rightType
+      case (leftType: GenericDataType with GenericSimpleDataType, rightType: GenericDataType with GenericSimpleDataType) => // take the wider type, assuming that it is castable
+        functions.widerSimpleType(leftType, rightType).getOrElse(rightType)
       case _ => // otherwise not supported
         throw SchemaEvolutionException(s"schema evolution from $leftType to $rightType not supported (field ${path.mkString(".")})")
     }

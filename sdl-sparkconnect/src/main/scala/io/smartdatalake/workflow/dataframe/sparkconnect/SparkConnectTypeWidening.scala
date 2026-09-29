@@ -16,58 +16,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package io.smartdatalake.util.spark.evolution
+package io.smartdatalake.workflow.dataframe.sparkconnect
 
-import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.evolution.SchemaEvolutionException
-import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.dataframe.spark.SparkDataType
-import org.apache.spark.sql.catalyst.expressions.Expression
-import org.apache.spark.sql.custom.UnsafeUnaryUdf
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, Row}
 
-import scala.util.Try
-
-object TypeEvolutionUtil extends SmartDataLakeLogger {
-
-  /**
-   * Conversion of Spark [[Row]]'s from one schema to another.
-   *
-   * @param rows      input rows
-   * @param srcSchema schema of the input rows
-   * @param tgtSchema target schema
-   * @return rows converted to target schema
-   * @throws SchemaEvolutionException if conversion is not possible
-   */
-  def schemaEvolution(rows: Iterator[Row], srcSchema: StructType, tgtSchema: StructType): Iterator[Row] = {
-    // initialize schema projection
-    val projector = StructTypeValueProjector(srcSchema, tgtSchema, Seq())
-    logger.info(s"projection: $projector")
-    // apply projection to all rows
-    rows.map(row => projector.get(row))
-  }
-
-  /**
-   * Creates a Spark udf to convert an Expression from one schema to another.
-   *
-   * @param srcType DataType of the column to be converted
-   * @param tgtType target DataType
-   * @return udf to convert an Expression to the target DataType
-   * @throws SchemaEvolutionException if conversion is not possible
-   */
-  def schemaEvolutionUdf(srcType: StructType, tgtType: StructType): Expression => Expression = {
-    val projector = ValueProjector.getProjection(srcType, tgtType, Seq())
-    UnsafeUnaryUdf((row: Any) => projector.getWithCast(row), srcType, tgtType)
-  }
-
-  def isSameType(t1: DataType, t2: DataType): Boolean = {
-    val t1Clean = SparkDataType(t1).removeMetadata.inner
-    val t2Clean = SparkDataType(t2).removeMetadata.inner
-    if (Environment.caseSensitive) DataType.equalsIgnoreNullability(t1Clean, t2Clean)
-    else DataType.equalsIgnoreCaseAndNullability(t1Clean, t2Clean)
-  }
-
+/**
+ * Type widening for schema evolution with Spark Connect.
+ * This is the same implementation as in sdl-spark TypeEvolutionUtil.widerSimpleType, keep them in sync.
+ * It can not be shared, as sdl-spark and sdl-sparkconnect can not be used together.
+ */
+object SparkConnectTypeWidening {
 
   /**
    * Returns the wider of two simple Spark data types, e.g. a data type that can hold the values of both data types,
@@ -122,12 +80,4 @@ object TypeEvolutionUtil extends SmartDataLakeLogger {
     val scale = math.min(math.max(l.scale, r.scale), math.max(DecimalType.MAX_PRECISION - integralDigits, 0))
     DecimalType(math.min(integralDigits + scale, DecimalType.MAX_PRECISION), scale)
   }
-
-  /**
-   * Checks if a Spark DataType is castable to another
-   */
-  def isSimpleTypeCastable(left: DataType, right: DataType): Boolean = {
-    Try(ValueProjector.getSimpleTypeConverter(left, right, Seq())).isSuccess
-  }
-
 }

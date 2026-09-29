@@ -91,18 +91,45 @@ private[smartdatalake] object ValueProjector {
       case (_: ByteType, _: IntegerType) => (x => x.asInstanceOf[Byte].toInt)
       case (_: ShortType, _: IntegerType) => (x => x.asInstanceOf[Short].toInt)
       case (_: ByteType, _: ShortType) => (x => x.asInstanceOf[Byte].toShort)
+      case (_: ByteType, _: FloatType) => (x => x.asInstanceOf[Byte].toFloat)
+      case (_: ShortType, _: FloatType) => (x => x.asInstanceOf[Short].toFloat)
       case (_: FloatType, _: DoubleType) => (x => x.asInstanceOf[Float].toDouble)
+      case (_: ByteType, _: DoubleType) => (x => x.asInstanceOf[Byte].toDouble)
+      case (_: ShortType, _: DoubleType) => (x => x.asInstanceOf[Short].toDouble)
+      case (_: IntegerType, _: DoubleType) => (x => x.asInstanceOf[Int].toDouble)
+      case (_: LongType, _: DoubleType) => (x => x.asInstanceOf[Long].toDouble)
+      // numbers to decimals
+      case (s, t: DecimalType) if TypeEvolutionUtil.integralDecimalType(s).exists(d => isDecimalWidening(d, t)) =>
+        (x => new java.math.BigDecimal(x.asInstanceOf[Number].longValue).setScale(t.scale))
+      case (s: DecimalType, t: DecimalType) if isDecimalWidening(s, t) => (x => toBigDecimal(x).bigDecimal.setScale(t.scale))
       // TODO #936: make non-strict, e.g converting decimal 255 to byte. Also for lines below...
-      case (d: DecimalType, _: ByteType) if d.scale == 0 && d.precision <= 2 => (x => x.asInstanceOf[BigDecimal].toByte)
-      case (d: DecimalType, _: ShortType) if d.scale == 0 && d.precision <= 4 => (x => x.asInstanceOf[BigDecimal].toShort)
-      case (d: DecimalType, _: IntegerType) if d.scale == 0 && d.precision <= 9 => (x => x.asInstanceOf[BigDecimal].toInt)
-      case (d: DecimalType, _: LongType) if d.scale == 0 && d.precision <= 18 => (x => x.asInstanceOf[BigDecimal].toLong)
-      case (d: DecimalType, _: FloatType) if d.precision <= 7 => (x => x.asInstanceOf[BigDecimal].toFloat)
-      case (d: DecimalType, _: DoubleType) if d.precision <= 16 => (x => x.asInstanceOf[BigDecimal].toDouble)
+      case (d: DecimalType, _: ByteType) if d.scale == 0 && d.precision <= 2 => (x => toBigDecimal(x).toByte)
+      case (d: DecimalType, _: ShortType) if d.scale == 0 && d.precision <= 4 => (x => toBigDecimal(x).toShort)
+      case (d: DecimalType, _: IntegerType) if d.scale == 0 && d.precision <= 9 => (x => toBigDecimal(x).toInt)
+      case (d: DecimalType, _: LongType) if d.scale == 0 && d.precision <= 18 => (x => toBigDecimal(x).toLong)
+      case (d: DecimalType, _: FloatType) if d.precision <= 7 => (x => toBigDecimal(x).toFloat)
+      case (d: DecimalType, _: DoubleType) if d.precision <= 16 => (x => toBigDecimal(x).toDouble)
       case _ => throw SchemaEvolutionException(s"""schema evolution from $srcType to $tgtType not supported (field ${path.mkString(",")})""")
     }
     // add null check
     (x => if (x != null) converterFunc(x) else x)
+  }
+
+  /**
+   * True if all values of decimal type `s` can be represented by decimal type `t`
+   */
+  private def isDecimalWidening(s: DecimalType, t: DecimalType): Boolean = {
+    t.scale >= s.scale && (t.precision - t.scale) >= (s.precision - s.scale)
+  }
+
+  /**
+   * Decimal values of Spark Rows are java.math.BigDecimal, but might also be scala BigDecimal or Spark Decimal
+   */
+  private def toBigDecimal(x: Any): BigDecimal = x match {
+    case d: BigDecimal => d
+    case d: java.math.BigDecimal => BigDecimal(d)
+    case d: Decimal => d.toBigDecimal
+    case _ => throw new IllegalArgumentException(s"Unexpected value of class ${x.getClass.getName} for decimal type")
   }
 
   private[evolution] def getStructTypeProjection(srcSchema: StructType, tgtSchema: StructType, path: Seq[String] = Seq()): Seq[FieldProjector] = {

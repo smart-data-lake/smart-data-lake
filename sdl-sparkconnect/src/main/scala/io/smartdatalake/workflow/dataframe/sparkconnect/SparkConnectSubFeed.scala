@@ -384,6 +384,11 @@ object SparkConnectSubFeed extends DataFrameSubFeedCompanion {
     SparkConnectRow(Row.fromSeq(values))
   }
 
+  override def widerSimpleType(left: GenericDataType, right: GenericDataType): Option[GenericDataType] = (left, right) match {
+    case (l: SparkConnectSimpleDataType, r: SparkConnectSimpleDataType) => SparkConnectTypeWidening.widerSimpleType(l.inner, r.inner).map(SparkConnectDataType(_))
+    case _ => None
+  }
+
   override def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf = (srcType, tgtType) match {
     case (srcType, tgtType) if srcType.isSameType(tgtType) => SparkConnectUnaryUdf(x => x)
     case (_: SparkConnectSimpleDataType, tgtType: SparkConnectSimpleDataType) => SparkConnectUnaryUdf(x => x.cast(tgtType.inner))
