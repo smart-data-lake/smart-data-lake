@@ -114,6 +114,24 @@ class SQLColumnTest extends AnyFunSuite {
     assert(mapType(stringType, createSimpleDataType("int")).sql == "MAP<TEXT, INT>")
   }
 
+  test("wider data types") {
+    def wider(l: String, r: String) = widerSimpleType(SQLSimpleDataType(l), SQLSimpleDataType(r)).map(_.sql)
+    assert(wider("INT", "INT").contains("INT"))
+    assert(wider("INT", "BIGINT").contains("BIGINT"))
+    assert(wider("SMALLINT", "TINYINT").contains("SMALLINT"))
+    assert(wider("INT", "DECIMAL(5, 2)").contains("DECIMAL(12, 2)"))
+    assert(wider("DECIMAL(10, 2)", "DECIMAL(5, 4)").contains("DECIMAL(12, 4)"))
+    assert(wider("DECIMAL(38, 10)", "DECIMAL(38, 20)").contains("DECIMAL(38, 20)"))
+    assert(wider("INT", "DOUBLE").contains("DOUBLE"))
+    assert(wider("FLOAT", "DECIMAL(10, 2)").contains("DOUBLE"))
+    assert(wider("VARCHAR(10)", "VARCHAR(20)").contains("VARCHAR(20)"))
+    assert(wider("VARCHAR(10)", "TEXT").contains("TEXT"))
+    assert(wider("CHAR(10)", "VARCHAR(5)").contains("TEXT"))
+    assert(wider("DATE", "TIMESTAMP").contains("TIMESTAMP"))
+    assert(wider("INT", "TEXT").isEmpty)
+    assert(wider("BOOLEAN", "INT").isEmpty)
+  }
+
   test("schema") {
     val schema = SQLSchema(Seq(SQLField("A", SQLSimpleDataType("INT")), SQLField("b", SQLSimpleDataType("TEXT"), nullable = false)))
     assert(schema.columns == Seq("A", "b"))

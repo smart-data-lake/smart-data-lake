@@ -75,6 +75,11 @@ case class SQLSchema(fields: Seq[SQLField]) extends GenericSchema {
 }
 
 object SQLSchema {
+  def of(schema: GenericSchema): SQLSchema = schema match {
+    case s: SQLSchema => s
+    case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(schema)
+  }
+
   def fromBridge(fields: Seq[SqlGlotField]): SQLSchema =
     SQLSchema(fields.map(f => SQLField(f.name, SQLDataType.fromBridge(f.dataType))))
 }
@@ -109,16 +114,25 @@ sealed trait SQLDataType extends GenericDataType {
 }
 
 case class SQLSimpleDataType(sql: String) extends SQLDataType with GenericSimpleDataType {
-  private lazy val baseType = sql.takeWhile(_ != '(').trim.toUpperCase
+  /**
+   * The type name without parameters, e.g. DECIMAL for DECIMAL(10, 2)
+   */
+  lazy val baseType: String = sql.takeWhile(_ != '(').trim.toUpperCase
+
+  /**
+   * The numeric parameters of the type, e.g. Seq(10, 2) for DECIMAL(10, 2), or Seq(20) for VARCHAR(20)
+   */
+  lazy val parameters: Seq[Int] = sql.dropWhile(_ != '(').drop(1).takeWhile(_ != ')').split(',').map(_.trim)
+    .filter(_.nonEmpty).flatMap(_.toIntOption).toSeq
   override def typeName: String = standardizeTypeName(baseType)
   override def isSortable: Boolean = true
   override def isNumeric: Boolean = SQLDataType.numericTypes.contains(baseType)
   override def isImpreciseNumeric: Boolean = SQLDataType.impreciseNumericTypes.contains(baseType)
   override def getDecimalSpec: Option[(Int, Int)] = {
     if (baseType != "DECIMAL") None
-    else sql.dropWhile(_ != '(').drop(1).takeWhile(_ != ')').split(',').map(_.trim).filter(_.nonEmpty).map(_.toInt) match {
-      case Array(precision, scale) => Some((precision, scale))
-      case Array(precision) => Some((precision, 0))
+    else parameters match {
+      case Seq(precision, scale) => Some((precision, scale))
+      case Seq(precision) => Some((precision, 0))
       case _ => None
     }
   }
@@ -161,6 +175,47 @@ case class SQLMapDataType(keyDataType: SQLDataType, valueDataType: SQLDataType) 
 }
 
 object SQLDataType {
+
+  private[sql] val integerTypes = Seq("TINYINT", "SMALLINT", "INT", "BIGINT") // ordered by width
+  private val integerDigits = Map("TINYINT" -> 3, "SMALLINT" -> 5, "INT" -> 10, "BIGINT" -> 19)
+  val stringTypes: Set[String] = Set("CHAR", "VARCHAR", "NCHAR", "NVARCHAR", "TEXT")
+  private val maxDecimalPrecision = 38
+
+  /**
+   * The wider type of two simple types, to which both can be cast without loss, or None if there is none.
+   * Integer types are widened to the larger integer type, integer and decimal types to a decimal type with enough
+   * digits, numeric types with FLOAT or DOUBLE to DOUBLE, string types to the longer or unbounded string type,
+   * and DATE with TIMESTAMP to TIMESTAMP.
+   */
+  def wider(left: SQLSimpleDataType, right: SQLSimpleDataType): Option[SQLSimpleDataType] = {
+    def decimal(t: SQLSimpleDataType): Option[(Int, Int)] = t.baseType match {
+      case "DECIMAL" => t.getDecimalSpec.orElse(Some((maxDecimalPrecision, 0))) // DECIMAL without precision is not bounded here
+      case i if integerDigits.contains(i) => Some((integerDigits(i), 0))
+      case _ => None
+    }
+    (left.baseType, right.baseType) match {
+      case _ if left.isSameType(right) => Some(left)
+      case (l, r) if integerTypes.contains(l) && integerTypes.contains(r) =>
+        Some(if (integerTypes.indexOf(l) >= integerTypes.indexOf(r)) left else right)
+      case (l, r) if (l == "DECIMAL" || r == "DECIMAL") && decimal(left).isDefined && decimal(right).isDefined =>
+        val ((p1, s1), (p2, s2)) = (decimal(left).get, decimal(right).get)
+        val scale = math.max(s1, s2)
+        val precision = math.min(maxDecimalPrecision, math.max(p1 - s1, p2 - s2) + scale)
+        Some(SQLSimpleDataType(s"DECIMAL($precision, $scale)"))
+      case (l, r) if (impreciseNumericTypes.contains(l) || impreciseNumericTypes.contains(r)) && left.isNumeric && right.isNumeric =>
+        Some(SQLSimpleDataType("DOUBLE"))
+      case (l, r) if stringTypes.contains(l) && stringTypes.contains(r) =>
+        (left.parameters.headOption, right.parameters.headOption) match {
+          case (Some(n1), Some(n2)) if l == r => Some(if (n1 >= n2) left else right)
+          case (None, _) if l != "CHAR" && l != "NCHAR" => Some(left)
+          case (_, None) if r != "CHAR" && r != "NCHAR" => Some(right)
+          case _ => Some(SQLSimpleDataType("TEXT"))
+        }
+      case ("DATE", "TIMESTAMP") => Some(right)
+      case ("TIMESTAMP", "DATE") => Some(left)
+      case _ => None
+    }
+  }
 
   private[sql] val numericTypes = Set("TINYINT", "SMALLINT", "INT", "BIGINT", "DECIMAL", "FLOAT", "DOUBLE", "UTINYINT",
     "USMALLINT", "UINT", "UBIGINT", "INT128", "INT256", "MONEY", "SMALLMONEY")

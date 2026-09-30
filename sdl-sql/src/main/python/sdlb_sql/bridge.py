@@ -429,6 +429,47 @@ class Session:
         create = exp.Create(this=exp.Schema(this=exp.to_table(table, dialect=dialect), expressions=column_defs), kind="TABLE")
         return create.sql(dialect=dialect)
 
+    def alter_table(self, table, changes, dialect=None, quote_names=False):
+        """Create `ALTER TABLE` statements for schema changes, given as list of objects with keys `change` (add, type
+        or nullable), `column`, `type` (new type for add and type, current type for nullable) and `nullable`.
+        SQLGlot renders them for most dialects. Changes of nullability are not supported by SQLGlot for some dialects,
+        and are created here, as well as type changes for Oracle."""
+        dialect_name = (dialect or "").lower()
+        target = exp.to_table(table, dialect=dialect).sql(dialect=dialect)
+        statements = []
+        for change in changes:
+            name = change["column"]
+            identifier = exp.to_identifier(name, quoted=quote_names or not _is_simple_identifier(name))
+            column = identifier.sql(dialect=dialect)
+            data_type = exp.DataType.build(change["type"], udt=True) if change.get("type") else None
+            kind = change["change"]
+            if kind == "nullable" and dialect_name in ("tsql", "mysql", "oracle"):
+                null_sql = "NULL" if change["nullable"] else "NOT NULL"
+                if dialect_name == "oracle":
+                    statements.append(f"ALTER TABLE {target} MODIFY ({column} {null_sql})")
+                    continue
+                if data_type is None:
+                    raise ValueError(f"The current data type of column {name} is needed to change its nullability for {dialect}")
+                keyword = "ALTER COLUMN" if dialect_name == "tsql" else "MODIFY COLUMN"
+                statements.append(f"ALTER TABLE {target} {keyword} {column} {data_type.sql(dialect=dialect)} {null_sql}")
+                continue
+            if kind == "type" and dialect_name == "oracle":
+                statements.append(f"ALTER TABLE {target} MODIFY ({column} {data_type.sql(dialect=dialect)})")
+                continue
+            canonical_column = identifier.sql()
+            if kind == "add":
+                sql = f"ALTER TABLE t ADD COLUMN {canonical_column} {data_type.sql()}"
+            elif kind == "type":
+                sql = f"ALTER TABLE t ALTER COLUMN {canonical_column} SET DATA TYPE {data_type.sql()}"
+            elif kind == "nullable":
+                sql = f"ALTER TABLE t ALTER COLUMN {canonical_column} {'DROP' if change['nullable'] else 'SET'} NOT NULL"
+            else:
+                raise ValueError(f"Unknown schema change {kind}")
+            statement = sqlglot.parse_one(sql)
+            statement.set("this", exp.to_table(table, dialect=dialect))
+            statements.append(statement.sql(dialect=dialect))
+        return statements
+
     def parse_types(self, types, dialect=None):
         """Convert data types of the database, given as list of [type name, precision, scale], e.g. from JDBC metadata,
         into SQLGlot types. The result has the same format as the types of `schema`."""
@@ -477,6 +518,7 @@ _OPS = {
     "to_sql": _session.to_sql,
     "create_table_as": _session.create_table_as,
     "create_table": _session.create_table,
+    "alter_table": _session.alter_table,
     "parse_types": _session.parse_types,
     "transpile": _session.transpile,
 }

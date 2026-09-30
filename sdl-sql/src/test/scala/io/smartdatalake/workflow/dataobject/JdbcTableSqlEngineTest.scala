@@ -28,8 +28,8 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.generic.transformer.{SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.{Action, CopyAction, CustomDataFrameAction, DataFrameActionImpl}
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
-import io.smartdatalake.workflow.dataframe.sql.{SQLDataFrame, SQLSubFeed}
-import io.smartdatalake.workflow.dataobject.generic.Table
+import io.smartdatalake.workflow.dataframe.sql.{SQLDataFrame, SQLSimpleDataType, SQLSubFeed}
+import io.smartdatalake.workflow.dataobject.generic.{AddColumn, ChangeColumnNullable, ChangeColumnType, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.{BeforeAndAfterEach, Outcome}
@@ -79,9 +79,11 @@ class JdbcTableSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
   }
 
   private def jdbcDataObject(id: String, saveMode: SDLSaveMode = SDLSaveMode.Overwrite, primaryKey: Option[Seq[String]] = None,
-                             virtualPartitions: Seq[String] = Seq(), incrementalOutputExpr: Option[String] = None, connectionId: ConnectionId = connectionId): JdbcTableDataObject = {
+                             virtualPartitions: Seq[String] = Seq(), incrementalOutputExpr: Option[String] = None, connectionId: ConnectionId = connectionId,
+                             allowSchemaEvolution: Boolean = false): JdbcTableDataObject = {
     val dataObject = JdbcTableDataObject(DataObjectId(id), table = Table(db = Some("main"), name = id, primaryKey = primaryKey), saveMode = saveMode,
-      connectionId = connectionId, virtualPartitions = virtualPartitions, incrementalOutputExpr = incrementalOutputExpr)
+      connectionId = connectionId, virtualPartitions = virtualPartitions, incrementalOutputExpr = incrementalOutputExpr,
+      allowSchemaEvolution = allowSchemaEvolution)
     instanceRegistry.register(dataObject)
     dataObject
   }
@@ -197,5 +199,56 @@ class JdbcTableSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
     srcDO.setState(state)
     val df = srcDO.getDataFrame(Seq(), typeOf[SQLSubFeed])
     assert(df.collect.map(_.get(0)) == Seq(4))
+  }
+
+  // column name, type and nullability from the DuckDB catalog
+  private def columns(table: String): Seq[Seq[Any]] =
+    query(s"select column_name, data_type, is_nullable from information_schema.columns where table_name = '$table' order by ordinal_position")
+
+  test("schema evolution adds columns, widens types and makes deleted columns nullable") {
+    connection.execJdbcStatement("create table tgt (id int not null, name varchar, old_col varchar not null, score decimal(5, 1))")
+    connection.execJdbcStatement("insert into tgt values (9, 'other', 'x', 1.0)")
+    jdbcDataObject("src")
+    jdbcDataObject("tgt", saveMode = SDLSaveMode.Append, allowSchemaEvolution = true)
+    val action = CopyAction(ActionId("a1"), DataObjectId("src"), DataObjectId("tgt"), engineConnectionId = Some(connectionId),
+      transformers = Seq(SQLDfTransformer(code = Some("select cast(id as bigint) + 1 as id, name, city, cast(score as decimal(10, 2)) as score from %{inputViewName}"))))
+    run(action, Seq("src"))
+    assert(columns("tgt") == Seq(
+      Seq("id", "BIGINT", "NO"),
+      Seq("name", "VARCHAR", "YES"),
+      Seq("old_col", "VARCHAR", "YES"),
+      Seq("score", "DECIMAL(10,2)", "YES"),
+      Seq("city", "VARCHAR", "YES")
+    ))
+    assert(query("select id, old_col, city from tgt order by id") == Seq(Seq(2L, null, "Bern"), Seq(3L, null, "Basel"), Seq(4L, null, "Bern"), Seq(9L, "x", null)))
+    // a second run needs no changes
+    run(action, Seq("src"))
+    assert(query("select count(*) from tgt") == Seq(Seq(7L)))
+  }
+
+  test("schema evolution fails for incompatible data types") {
+    connection.execJdbcStatement("create table tgt (id int, name int)")
+    jdbcDataObject("src")
+    jdbcDataObject("tgt", saveMode = SDLSaveMode.Append, allowSchemaEvolution = true)
+    val action = CopyAction(ActionId("a1"), DataObjectId("src"), DataObjectId("tgt"), engineConnectionId = Some(connectionId),
+      transformers = Seq(SQLDfTransformer(code = Some("select id, name from %{inputViewName}"))))
+    val ex = intercept[Exception](run(action, Seq("src")))
+    val messages = Iterator.iterate[Throwable](ex)(_.getCause).takeWhile(_ != null).map(_.getMessage).toSeq
+    assert(messages.exists(_.contains("schema evolution of column name from INT to TEXT is not supported")), messages.mkString("\n"))
+  }
+
+  test("schema changes are applied") {
+    connection.execJdbcStatement("create table tgt (id int not null, name varchar)")
+    val tgtDO = jdbcDataObject("tgt")
+    val action = CopyAction(ActionId("a1"), DataObjectId("tgt"), DataObjectId("tgt"), engineConnectionId = Some(connectionId))
+    implicit val contextInit: ActionPipelineContext = context(Some(action))
+    tgtDO.applySchemaChanges(Seq(
+      AddColumn(Seq("amount"), SQLSimpleDataType("DECIMAL(10, 2)"), Some("the amount")),
+      ChangeColumnType(Seq("id"), SQLSimpleDataType("BIGINT"), SQLSimpleDataType("INT")),
+      ChangeColumnNullable(Seq("id"), nullable = true)
+    ))
+    assert(columns("tgt") == Seq(Seq("id", "BIGINT", "YES"), Seq("name", "VARCHAR", "YES"), Seq("amount", "DECIMAL(10,2)", "YES")))
+    assert(query("select comment from duckdb_columns() where table_name = 'tgt' and column_name = 'amount'") == Seq(Seq("the amount")))
+    assert(tgtDO.getCurrentSchema.get.columns == Seq("id", "name", "amount"))
   }
 }

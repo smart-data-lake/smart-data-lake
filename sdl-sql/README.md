@@ -40,6 +40,13 @@ Supported are the save modes Overwrite (delete and insert in one transaction, al
 and Merge (with a temporary table created by `CREATE TABLE ... AS SELECT`), and incremental output with
 `DataObjectStateIncrementalMode`.
 
+Schema evolution (`allowSchemaEvolution = true`) adds new columns, widens data types, and makes columns missing in
+the DataFrame nullable, with `ALTER TABLE` statements rendered by SQLGlot for the dialect of the database.
+As the types inferred by SQLGlot are not exact, a type is only changed if the new type is wider (e.g. `INT` to
+`BIGINT`, or `DECIMAL(5, 1)` to `DECIMAL(10, 2)`), and string types only if both have a length. Other changes,
+e.g. `INT` to `VARCHAR`, fail with a `SchemaEvolutionException`. Schema changes of `CatalogSchemaUpdater` are
+applied the same way.
+
 ## Architecture
 
 SQLGlot is a Python library. It runs in a Python interpreter embedded into the JVM with
@@ -78,8 +85,8 @@ Known limitations:
 - Column names are case-sensitive. Unquoted identifiers in SQL of transformers are normalized to lower case.
 - Data types of written DataFrames are not validated against the table, only column names, as the types inferred
   by SQLGlot are not exact.
-- Not implemented: schema evolution (`allowSchemaEvolution`, applying schema changes), `hash`, `from_json`,
-  `raise_error`, `array_construct_compact` and UDFs.
+- Schema evolution of nested columns is not supported, jdbc tables have no nested columns.
+- Not implemented: `hash`, `from_json`, `raise_error`, `array_construct_compact` and UDFs.
 
 ## Python environment
 

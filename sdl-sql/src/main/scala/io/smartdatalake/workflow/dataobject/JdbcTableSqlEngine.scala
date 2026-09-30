@@ -19,8 +19,9 @@
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.config.ConfigurationException
-import io.smartdatalake.definitions.{SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
+import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.evolution.SchemaEvolutionException
 import io.smartdatalake.util.misc.{SQLUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.sqlglot.SqlGlotBridge
 import io.smartdatalake.workflow.{ActionPipelineContext, SchemaViolationException}
@@ -28,7 +29,7 @@ import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.sql._
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
-import io.smartdatalake.workflow.dataobject.generic.TableSchemaChange
+import io.smartdatalake.workflow.dataobject.generic.{AddColumn, ChangeColumnNullable, ChangeColumnType, TableSchemaChange}
 import org.json4s.{DefaultFormats, Formats}
 
 import java.sql.{ResultSet, ResultSetMetaData, SQLException}
@@ -36,6 +37,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
  * SQL engine implementation of reading and writing a [[JdbcTableDataObject]], see [[JdbcTableEngine]].
+ * Schema evolution is implemented with `ALTER TABLE` statements created by SQLGlot, see `evolveTableSchema`.
  *
  * It is used by Actions with the JdbcTableConnection of the DataObject as engine connection. Reading creates an
  * SQLGlot query, and writing executes it on the database with an `INSERT INTO ... SELECT` statement, or a merge
@@ -109,8 +111,8 @@ class JdbcTableSqlEngine(dataObject: JdbcTableDataObject) extends JdbcTableEngin
     val targetDf = saveModeOptions.map(_.convertToTargetSchema(df)).getOrElse(df)
     validate(targetDf)
     if (dataObject.isTableExisting) {
-      if (dataObject.allowSchemaEvolution) throw new NotImplementedError(s"($id) Schema evolution is not yet implemented for the SQL engine")
-      validateColumnsOnWrite(targetDf)
+      if (dataObject.allowSchemaEvolution) evolveTableSchema(SQLSchema.of(targetDf.schema))
+      else validateColumnsOnWrite(targetDf)
     } else {
       // create an empty table with the schema of the DataFrame
       connection.execJdbcStatement(createTableAsStatement(sqlDataFrame(targetDf), table.fullName, withData = false))
@@ -235,8 +237,74 @@ class JdbcTableSqlEngine(dataObject: JdbcTableDataObject) extends JdbcTableEngin
     connection.execJdbcStatement(stmt)
   }
 
-  override def applySchemaChanges(changes: Seq[TableSchemaChange])(implicit context: ActionPipelineContext): Unit =
-    throw new NotImplementedError(s"($id) Applying schema changes is not yet implemented for the SQL engine")
+  /**
+   * SDL Schema evolution allows to add new columns and to widen data types. Deleted columns remain in the table and
+   * are made nullable. See also JdbcTableSparkClassicEngine.evolveTableSchema.
+   *
+   * As the types inferred by SQLGlot are not exact, a data type is only changed if the new type is wider, see
+   * [[SQLDataType.wider]], and string types are only changed if both have a length.
+   */
+  private def evolveTableSchema(newSchema: SQLSchema)(implicit context: ActionPipelineContext): Unit = {
+    val existingSchema = getExistingSqlSchema.get
+    def normalize(name: String) = if (Environment.caseSensitive) name else name.toLowerCase
+    val existingFields = existingSchema.fields.map(f => normalize(f.name) -> f).toMap
+    val newFieldNames = newSchema.fields.map(f => normalize(f.name)).toSet
+    val newColumns = newSchema.fields.filterNot(f => existingFields.contains(normalize(f.name)))
+      .map { f =>
+        if (f.dataType.sql == "UNKNOWN") throw SchemaEvolutionException(s"($id) Data type of new column ${f.name} can not be inferred, please cast it to the desired type")
+        AddColumn(Seq(f.name), f.dataType)
+      }
+    // as the nullability of the existing schema is taken from the result set metadata, the jdbc metadata is checked as well
+    val missingNotNullColumns = existingSchema.fields.filterNot(f => newFieldNames.contains(normalize(f.name)))
+      .filter(f => dataObject.getJdbcColumn(f.name).flatMap(_.isNullable).contains(false) || !f.nullable)
+      .map(f => ChangeColumnNullable(Seq(f.name), nullable = true))
+    val changedDataTypes = newSchema.fields.flatMap { newField =>
+      existingFields.get(normalize(newField.name)).flatMap(existingField =>
+        evolveDataType(existingField.name, existingField.dataType, newField.dataType)
+          .map(dataType => ChangeColumnType(Seq(existingField.name), dataType, existingField.dataType))
+      )
+    }
+    val changes = newColumns ++ missingNotNullColumns ++ changedDataTypes
+    if (changes.nonEmpty) {
+      logger.info(s"($id) schema evolution needed: ${changes.map(_.describe).mkString(", ")}")
+      applySchemaChanges(changes)
+      dataObject.resetCachedSchema()
+    }
+  }
+
+  private def evolveDataType(column: String, existing: SQLDataType, updated: SQLDataType): Option[SQLDataType] = (existing, updated) match {
+    case (_, u) if u.sql == "UNKNOWN" || existing.isSameType(updated) => None
+    case (e: SQLSimpleDataType, u: SQLSimpleDataType) =>
+      SQLDataType.wider(e, u) match {
+        // the length of strings inferred by SQLGlot is often unknown, e.g. for the result of a function
+        case _ if SQLDataType.stringTypes.contains(e.baseType) && SQLDataType.stringTypes.contains(u.baseType) && u.parameters.isEmpty => None
+        case Some(wider) if !wider.isSameType(e) => Some(wider)
+        case Some(_) => None
+        case None => throw SchemaEvolutionException(s"($id) schema evolution of column $column from ${e.sql} to ${u.sql} is not supported")
+      }
+    case _ => throw SchemaEvolutionException(s"($id) schema evolution of column $column from ${existing.sql} to ${updated.sql} is not supported for complex types")
+  }
+
+  override def applySchemaChanges(changes: Seq[TableSchemaChange])(implicit context: ActionPipelineContext): Unit = {
+    val currentTypes = getExistingSqlSchema.map(_.fields.map(f => f.name.toLowerCase -> f.dataType.sql).toMap).getOrElse(Map())
+    val bridgeChanges = changes.map { change =>
+      assert(change.columnPath.size == 1, s"($id) can not change nested column ${change.columnName}, jdbc tables have no nested columns")
+      val column = change.columnPath.head
+      change match {
+        case AddColumn(_, dataType, _) => Map("change" -> "add", "column" -> column, "type" -> SQLDataType.of(dataType).sql)
+        case ChangeColumnType(_, dataType, _) => Map("change" -> "type", "column" -> column, "type" -> SQLDataType.of(dataType).sql)
+        case ChangeColumnNullable(_, nullable) => Map("change" -> "nullable", "column" -> column, "nullable" -> nullable) ++
+          currentTypes.get(column.toLowerCase).map("type" -> _)
+      }
+    }
+    val statements = bridge.call("alter_table", "table" -> table.fullName, "changes" -> bridgeChanges,
+      "dialect" -> connection.sqlGlotDialect, "quote_names" -> Environment.caseSensitive).extract[Seq[String]]
+    statements.foreach(connection.execJdbcStatement(_))
+    // comments of new columns
+    changes.collect { case AddColumn(Seq(column), _, Some(comment)) =>
+      connection.execJdbcStatement(connection.catalog.getCommentOnColumnSql(table.fullName, dataObject.quoteCaseSensitiveColumn(column), comment))
+    }
+  }
 
   override def resetCachedSchema(): Unit = cachedExistingSchema = None
 }

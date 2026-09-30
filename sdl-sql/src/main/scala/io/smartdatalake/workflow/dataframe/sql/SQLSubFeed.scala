@@ -294,5 +294,10 @@ object SQLSubFeed extends DataFrameSubFeedCompanion {
 
   override def rowFromSeq(values: Seq[Any]): SQLRow = SQLRow(values)
 
+  override def widerSimpleType(left: GenericDataType, right: GenericDataType): Option[SQLSimpleDataType] = (left, right) match {
+    case (l: SQLSimpleDataType, r: SQLSimpleDataType) => SQLDataType.wider(l, r)
+    case _ => None
+  }
+
   override def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf = notImplemented("schemaEvolutionUdf")
 }

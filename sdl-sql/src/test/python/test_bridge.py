@@ -255,3 +255,27 @@ def test_parse_types():
     assert call("parse_types", types=[["int4", 10, 0], ["numeric", 10, 2], ["varchar", 20, 0], ["INTEGER[]", 0, 0], ["geometry", 0, 0]], dialect="postgres") == [
         # database specific types are passed through
         {"type": "INT"}, {"type": "DECIMAL(10, 2)"}, {"type": "VARCHAR"}, {"array": {"type": "INT"}}, {"type": "GEOMETRY"}]
+
+
+def test_alter_table():
+    changes = [
+        {"change": "add", "column": "c", "type": "DECIMAL(10, 2)"},
+        {"change": "type", "column": "My Col", "type": "BIGINT"},
+        {"change": "nullable", "column": "c", "type": "INT", "nullable": True},
+    ]
+    assert call("alter_table", table="db.t", changes=changes, dialect="duckdb") == [
+        "ALTER TABLE db.t ADD COLUMN c DECIMAL(10, 2)",
+        'ALTER TABLE db.t ALTER COLUMN "My Col" SET DATA TYPE BIGINT',
+        "ALTER TABLE db.t ALTER COLUMN c DROP NOT NULL",
+    ]
+    assert call("alter_table", table="db.t", changes=changes, dialect="tsql") == [
+        "ALTER TABLE db.t ADD c NUMERIC(10, 2)",
+        "ALTER TABLE db.t ALTER COLUMN [My Col] BIGINT",
+        "ALTER TABLE db.t ALTER COLUMN c INTEGER NULL",
+    ]
+    assert call("alter_table", table="db.t", changes=changes, dialect="oracle") == [
+        "ALTER TABLE db.t ADD c NUMBER(10, 2)",
+        'ALTER TABLE db.t MODIFY ("My Col" INT)',
+        "ALTER TABLE db.t MODIFY (c NULL)",
+    ]
+    assert call("alter_table", table="db.t", changes=changes[2:], dialect="mysql") == ["ALTER TABLE db.t MODIFY COLUMN c INT NULL"]
