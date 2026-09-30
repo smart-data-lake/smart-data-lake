@@ -26,5 +26,7 @@ import io.smartdatalake.workflow.dataobject.DataObject
  * The query is then evaluated on every read, so it must not depend on the current run: an Action writing a
  * ViewDataObject ignores the partition values and filters of its input SubFeeds, as they would otherwise become part
  * of the stored query, and it must not have an execution mode.
+ * Partition values of the main input are still passed on to the output SubFeed of a partitioned ViewDataObject,
+ * so that the next Action reads the view filtered by them.
  */
 trait ViewDataObject extends DataObject

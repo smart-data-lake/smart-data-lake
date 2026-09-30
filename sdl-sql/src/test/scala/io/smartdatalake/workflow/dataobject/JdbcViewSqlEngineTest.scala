@@ -31,7 +31,7 @@ import io.smartdatalake.workflow.action.{Action, CopyAction, DataFrameActionImpl
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.sql.SQLSubFeed
 import io.smartdatalake.workflow.dataobject.generic.Table
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SubFeed}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.{BeforeAndAfterEach, Outcome}
 
@@ -85,8 +85,9 @@ class JdbcViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
     dataObject
   }
 
-  private def viewDataObject(id: String): JdbcViewDataObject = {
-    val dataObject = JdbcViewDataObject(DataObjectId(id), table = Table(db = Some("main"), name = id), connectionId = connectionId)
+  private def viewDataObject(id: String, virtualPartitions: Seq[String] = Seq(), incrementalOutputExpr: Option[String] = None): JdbcViewDataObject = {
+    val dataObject = JdbcViewDataObject(DataObjectId(id), table = Table(db = Some("main"), name = id), connectionId = connectionId,
+      virtualPartitions = virtualPartitions, incrementalOutputExpr = incrementalOutputExpr)
     instanceRegistry.register(dataObject)
     dataObject
   }
@@ -112,6 +113,16 @@ class JdbcViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
   private def run(action: DataFrameActionImpl, inputIds: Seq[String], partitionValues: Seq[PartitionValues] = Seq()): Unit = {
     val subFeeds = init(action, inputIds, partitionValues)
     action.exec(subFeeds)(context(Some(action), ExecutionPhase.Exec))
+  }
+
+  /**
+   * Run Actions one after the other like a DAG: the output SubFeeds of an Action are the input SubFeeds of the next.
+   */
+  private def runChain(actions: Seq[DataFrameActionImpl], inputId: String, partitionValues: Seq[PartitionValues]): Seq[SubFeed] = {
+    val startSubFeeds: Seq[SubFeed] = Seq(SQLSubFeed(None, DataObjectId(inputId), partitionValues, isDAGStart = true))
+    actions.foreach(a => a.prepare(context(Some(a))))
+    actions.foldLeft(startSubFeeds)((subFeeds, a) => a.init(subFeeds)(context(Some(a))))
+    actions.foldLeft(startSubFeeds)((subFeeds, a) => a.exec(subFeeds)(context(Some(a), ExecutionPhase.Exec)))
   }
 
   test("CopyAction creates a view with the query of its transformer") {
@@ -163,6 +174,49 @@ class JdbcViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
     // in contrast to writing a table
     run(copyAction("src", "tgt", "select * from %{inputViewName}"), Seq("src"), partitionValues)
     assert(query("select count(*) from tgt") == Seq(Seq(2L)))
+  }
+
+  test("partition values are passed on by a partitioned view to the next Action") {
+    tableDataObject("src", virtualPartitions = Seq("city"))
+    val viewDO = viewDataObject("v", virtualPartitions = Seq("city"))
+    tableDataObject("tgt", virtualPartitions = Seq("city"))
+    val createView = copyAction("src", "v", "select * from %{inputViewName}")
+    val copyView = copyAction("v", "tgt", "select * from %{inputViewName}")
+    val partitionValues = Seq(PartitionValues(Map("city" -> "Bern")))
+    val outputSubFeeds = runChain(Seq(createView, copyView), "src", partitionValues)
+    // the view is not filtered
+    assert(query("select count(*) from v") == Seq(Seq(3L)))
+    assert(viewDO.listPartitions(context(Some(copyView))).toSet == Set(PartitionValues(Map("city" -> "Bern")), PartitionValues(Map("city" -> "Basel"))))
+    // but the next Action reads the partition values passed on by the view
+    assert(query("select id from tgt order by id") == Seq(Seq(1), Seq(3)))
+    assert(outputSubFeeds.map(_.partitionValues) == Seq(partitionValues))
+  }
+
+  test("the next Action reads the view incrementally") {
+    tableDataObject("src")
+    viewDataObject("v", incrementalOutputExpr = Some("id"))
+    tableDataObject("tgt")
+    run(copyAction("src", "v", "select id, name from %{inputViewName}"), Seq("src"))
+    // the Action reading the view has DataObjectStateIncrementalMode, which sets the state of the view
+    val readView = CopyAction(ActionId("v-tgt"), DataObjectId("v"), DataObjectId("tgt"), engineConnectionId = Some(connectionId),
+      executionMode = Some(DataObjectStateIncrementalMode()), saveModeOptions = Some(SaveModeGenericOptions(SDLSaveMode.Append)))
+    val viewDO = instanceRegistry.get[JdbcViewDataObject](DataObjectId("v"))
+    viewDO.setState(None)(context(Some(readView)))
+    run(readView, Seq("v"))
+    assert(query("select id from tgt order by id") == Seq(Seq(1), Seq(2), Seq(3)))
+    assert(viewDO.getState.contains("id;3;INT"))
+    // only new data is read on the next run
+    connection.execJdbcStatement("insert into src values (4, 'kim', 'Bern')")
+    viewDO.setState(viewDO.getState)(context(Some(readView)))
+    run(readView, Seq("v"))
+    assert(query("select id from tgt order by id") == Seq(Seq(1), Seq(2), Seq(3), Seq(4)))
+  }
+
+  test("the partition columns must exist in the view") {
+    tableDataObject("src")
+    viewDataObject("v", virtualPartitions = Seq("zip"))
+    val ex = intercept[Exception](run(copyAction("src", "v", "select * from %{inputViewName}"), Seq("src")))
+    assert(Iterator.iterate[Throwable](ex)(_.getCause).takeWhile(_ != null).exists(_.getMessage.contains("zip")))
   }
 
   test("an Action writing a view can not have an execution mode") {
