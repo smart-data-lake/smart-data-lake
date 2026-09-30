@@ -84,6 +84,39 @@ class SnowparkSchemaConverterTest extends AnyFunSuite {
     assert(sparkSchema == convertedSparkSchema)
   }
 
+  test("Snowflake schema is converted through its Json representation") {
+    val snowparkSchema = SnowparkSchema(snowpark.StructType(Seq(
+      snowpark.StructField("ID", snowpark.LongType, false),
+      snowpark.StructField("AMOUNT", snowpark.DecimalType(10, 2)),
+      snowpark.StructField("TS", snowpark.TimestampType)
+    )))
+    // Spark type names, and field names in lower case
+    assert(snowparkSchema.toJson.values == List(
+      Map("name" -> "id", "dataType" -> "long", "nullable" -> false),
+      Map("name" -> "amount", "dataType" -> "decimal(10,2)", "nullable" -> true),
+      Map("name" -> "ts", "dataType" -> "timestamp", "nullable" -> true)
+    ))
+    assert(snowparkSchema.convert(typeOf[SparkSubFeed]) == SparkSchema(spark.StructType(Seq(
+      spark.StructField("id", spark.LongType, false),
+      spark.StructField("amount", spark.DecimalType(10, 2)),
+      spark.StructField("ts", spark.TimestampType)
+    ))))
+  }
+
+  test("Spark types without Snowpark equivalent are converted to the closest Snowpark type") {
+    val sparkSchema = SparkSchema(spark.StructType(Seq(
+      spark.StructField("a", spark.VarcharType(10)),
+      spark.StructField("b", spark.TimestampNTZType)
+    )))
+    assert(sparkSchema.convert(typeOf[SnowparkSubFeed]) == SnowparkSchema(snowpark.StructType(Seq(
+      snowpark.StructField("a", snowpark.StringType),
+      snowpark.StructField("b", snowpark.TimestampType)
+    ))))
+    val ex = intercept[IllegalStateException](SparkSchema(spark.StructType(Seq(spark.StructField("c", spark.CalendarIntervalType))))
+      .convert(typeOf[SnowparkSubFeed]))
+    assert(ex.getMessage.contains("Data type interval is not supported by Snowpark"))
+  }
+
   test("test isNumeric function on snowflake dataframe") {
 
     val expectedSnowparkSchema = SnowparkSchema(

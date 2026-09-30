@@ -18,63 +18,30 @@
  */
 package io.smartdatalake.workflow.dataframe
 
-import io.smartdatalake.config.ConfigParser
-import io.smartdatalake.util.misc.{ReflectionUtil, ScalaUtil}
-import io.smartdatalake.workflow.DataFrameSubFeed
-import org.reflections.Reflections
-
 import scala.reflect.runtime.universe.Type
 
 /**
- * An interface for to be implementated by schema converters.
- * A schema converter can convert schemas from a specific SubFeedType A to a specific SubFeedType B.
+ * Converts schemas and data types from one SubFeedType to another, e.g. to pass a schema on to an Action with another
+ * engine, or to validate a DataFrame against a schema parsed by another engine.
  *
- * If there is no schema converter for a pair of SubFeedTypes, schemas are converted through their engine-neutral
- * Json representation, see [[GenericSchema.toJson]] and [[GenericSchema.fromJson]]. It uses the Spark type names
- * for simple data types, so a schema converter is only needed if an engine does not use these names.
+ * Schemas are converted through their engine-neutral Json representation, see [[GenericSchema.toJson]] and
+ * [[GenericSchema.fromJson]]. It uses the Spark type names for simple data types, so every engine must write these
+ * names in `toJson` and parse them in `DataFrameSubFeedCompanion.createSimpleDataType`.
  */
-private[smartdatalake] trait SchemaConverter {
-  def fromSubFeedType: Type
-  def toSubFeedType: Type
-  final def convert(schema: GenericSchema): GenericSchema = {
-    val helper = DataFrameSubFeed.getCompanion(toSubFeedType)
-    helper.createSchema(schema.fields.map(convertField))
-  }
-  def convertField(field: GenericField): GenericField
-  def convertDataType(dataType: GenericDataType): GenericDataType
-}
-
 private[smartdatalake] object SchemaConverter {
-
-  // search for converters by using reflection
-  implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections(ConfigParser.WORKFLOW_PACKAGE)
-  private lazy val converters = ReflectionUtil.getTraitImplClasses[SchemaConverter]
-    .map(c => ScalaUtil.companionOf[SchemaConverter](c.getName))
-    .map(o => ((o.fromSubFeedType,o.toSubFeedType), o)).toMap
-
-  /**
-   * Get the converter to convert schema from SubFeedType A to SubFeedType B, if there is a SchemaConverter
-   * implementation in the classpath for this combination.
-   */
-  private def getConverter(fromSubFeedType: Type, toSubFeedType:Type): Option[SchemaConverter] = {
-    converters.get(fromSubFeedType, toSubFeedType)
-  }
 
   private def conversionException(fromSubFeedType: Type, toSubFeedType: Type, e: Exception) =
     new IllegalStateException(s"Can not convert schema from ${fromSubFeedType.typeSymbol.name} to ${toSubFeedType.typeSymbol.name}: ${e.getMessage}", e)
 
   /**
-   * Convert a given schema with SubFeedType A to SubFeedType B, with a SchemaConverter if there is one,
-   * otherwise through its Json representation.
+   * Convert a given schema with SubFeedType A to SubFeedType B.
    */
   def convert(schema: GenericSchema, toSubFeedType: Type): GenericSchema = {
     // convert if needed
-    if (schema.subFeedType != toSubFeedType) getConverter(schema.subFeedType, toSubFeedType).map(_.convert(schema))
-      .getOrElse {
-        try GenericSchema.fromJson(schema.toJson, toSubFeedType)
-        catch { case e: Exception => throw conversionException(schema.subFeedType, toSubFeedType, e) }
-      }
-    else schema match {
+    if (schema.subFeedType != toSubFeedType) {
+      try GenericSchema.fromJson(schema.toJson, toSubFeedType)
+      catch { case e: Exception => throw conversionException(schema.subFeedType, toSubFeedType, e) }
+    } else schema match {
       // resolve lazy schema
       case x:LazyGenericSchema => x.get
       // otherwise return as is
@@ -86,11 +53,9 @@ private[smartdatalake] object SchemaConverter {
    * Convert a given data type with SubFeedType A to SubFeedType B.
    */
   def convertDatatype(dataType: GenericDataType, toSubFeedType: Type): GenericDataType = {
-    if (dataType.subFeedType != toSubFeedType) getConverter(dataType.subFeedType, toSubFeedType).map(_.convertDataType(dataType))
-      .getOrElse {
-        try GenericSchema.dataTypeFromJson(dataType.toJson, toSubFeedType)
-        catch { case e: Exception => throw conversionException(dataType.subFeedType, toSubFeedType, e) }
-      }
-    else dataType
+    if (dataType.subFeedType != toSubFeedType) {
+      try GenericSchema.dataTypeFromJson(dataType.toJson, toSubFeedType)
+      catch { case e: Exception => throw conversionException(dataType.subFeedType, toSubFeedType, e) }
+    } else dataType
   }
 }

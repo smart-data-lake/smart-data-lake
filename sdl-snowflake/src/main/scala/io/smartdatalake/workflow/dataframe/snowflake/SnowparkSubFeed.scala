@@ -103,7 +103,7 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
       case dataFrameSubFeed: DataFrameSubFeed =>
         // transport only the schema, the DataFrame is read again from the DataObject where it is needed
         SnowparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped,
-          keptSchema = dataFrameSubFeed.schemaOpt.map(_.convert(subFeedType)))
+          keptSchema = DataFrameSubFeed.convertSchema(dataFrameSubFeed, subFeedType))
       case _ => SnowparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }
@@ -365,8 +365,9 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
 
   override def createSimpleDataType(tpe: String): GenericDataType with GenericSimpleDataType = {
     val decimalPattern = "decimal\\(([0-9]+),([0-9]+)\\)".r
+    val stringPattern = "(var)?char\\([0-9]+\\)".r
     val snowparkType = tpe.toLowerCase.replace(" ", "") match {
-      case "string" => StringType
+      case "string" | stringPattern(_) => StringType
       case "boolean" => BooleanType
       case "byte" => ByteType
       case "short" => ShortType
@@ -376,9 +377,10 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
       case "double" => DoubleType
       case decimalPattern(precision, scale) => DecimalType(precision.toInt, scale.toInt)
       case "date" => DateType
-      case "timestamp" => TimestampType
+      case "timestamp" | "timestamp_ntz" => TimestampType
       case "binary" => BinaryType
       case "variant" => StringType
+      case _ => throw new IllegalArgumentException(s"Data type $tpe is not supported by Snowpark")
     }
     SnowparkSimpleDataType(snowparkType)
   }

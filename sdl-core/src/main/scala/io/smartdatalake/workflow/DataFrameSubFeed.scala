@@ -310,7 +310,7 @@ object DataFrameSubFeed extends SmartDataLakeLogger {
 
   /**
    * The schema of a SubFeed converted to another subFeedType, to pass it on to an Action with another engine, see
-   * [[SchemaConverter]]. If it can not be converted, e.g. because a data type has no equivalent in the other engine,
+   * SchemaConverter. If it can not be converted, e.g. because a data type has no equivalent in the other engine,
    * None is returned, and the schema is taken from the DataObject where it is needed.
    */
   def convertSchema(subFeed: DataFrameSubFeed, toSubFeedType: Type): Option[GenericSchema] = {

@@ -30,7 +30,7 @@ import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
-import org.json4s.JString
+import org.json4s.{JBool, JObject, JString}
 import org.json4s.JsonAST.JValue
 
 import scala.reflect.ClassTag
@@ -324,6 +324,11 @@ case class SnowparkField(inner: StructField) extends GenericField {
   override def dataType: SnowparkDataType = SnowparkDataType(inner.dataType)
   override def nullable: Boolean = inner.nullable
   override def comment: Option[String] = None
+  /**
+   * The name is written in lower case, as Snowflake stores unquoted identifiers in upper case,
+   * see GenericSchema.toJson for converting schemas to other engines.
+   */
+  override def toJson: JObject = JObject("name" -> JString(name.toLowerCase), "dataType" -> dataType.toJson, "nullable" -> JBool(nullable))
   override def makeNullable: SnowparkField = SnowparkField(inner.copy(dataType = dataType.makeNullable.inner, nullable = true))
   override def toLowerCase: SnowparkField = SnowparkField(inner.copy(dataType = dataType.toLowerCase.inner, columnIdentifier = ColumnIdentifier(inner.name.toLowerCase)))
   override def removeMetadata: SnowparkField = this // metadata is not existing in Snowpark
@@ -368,7 +373,14 @@ case class SnowparkSimpleDataType(inner: DataType) extends SnowparkDataType with
     case d: DecimalType => Some((d.precision, d.scale))
     case _ => None
   }
-  def toJson: JValue = JString(inner.typeName)
+  /**
+   * The Spark type name, which is the engine-neutral name of simple types in the Json representation of a schema,
+   * see GenericSchema.toJson. Types without Spark equivalent, e.g. variant, are given by their lower case type name.
+   */
+  def toJson: JValue = JString(inner match {
+    case d: DecimalType => s"decimal(${d.precision},${d.scale})"
+    case t => t.typeName.toLowerCase
+  })
 }
 case class SnowparkStructDataType(override val inner: StructType) extends SnowparkDataType with GenericStructDataType {
   override def makeNullable: SnowparkDataType = SnowparkStructDataType(SnowparkSchema(inner).makeNullable.inner)
