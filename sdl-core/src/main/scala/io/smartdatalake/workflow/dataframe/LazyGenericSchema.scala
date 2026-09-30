@@ -37,7 +37,7 @@ case class LazyGenericSchema(schemaConfig: String) extends GenericSchema {
    */
   def get = schema
 
-  override def diffSchema(schema: GenericSchema): Option[GenericSchema] = schema.diffSchema(schema)
+  override def diffSchema(other: GenericSchema): Option[GenericSchema] = schema.diffSchema(other)
   override def columns: Seq[String] = schema.columns
   override def fields: Seq[GenericField] = schema.fields
   override def sql: String = schema.sql

@@ -21,7 +21,7 @@ package io.smartdatalake.util.misc
 import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.spark.SparkSchemaUtil
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.workflow.dataframe.{GenericArrayDataType, GenericStructDataType}
+import io.smartdatalake.workflow.dataframe.{GenericArrayDataType, GenericStructDataType, LazyGenericSchema}
 import org.apache.spark.sql.types._
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -133,6 +133,16 @@ class SchemaUtilTest extends AnyFunSuite {
     val schemaConfig = s"${SchemaProviderType.JsonSchemaFile.toString}#cp:/$jsonSchemaResourceFile;structure/nestedArray"
     val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig)
     assert(schema.columns == Seq("key", "value"))
+  }
+
+  test("lazy schema from file is compared with the parsed schema") {
+    val schemaConfig = s"${SchemaProviderType.JsonSchemaFile.toString}#cp:/$jsonSchemaResourceFile;structure/nestedArray"
+    val schema = SchemaUtil.readSchemaFromConfigValue(schemaConfig, lazyFileReading = true)
+    assert(schema.isInstanceOf[LazyGenericSchema])
+    val parsed = schema.asInstanceOf[LazyGenericSchema].get
+    assert(schema.diffSchema(parsed).isEmpty)
+    // a missing column is found
+    assert(schema.diffSchema(parsed.remove("value")).map(_.columns).contains(Seq("value")))
   }
 
   /*
