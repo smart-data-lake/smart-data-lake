@@ -47,6 +47,7 @@ from sqlglot.optimizer import optimize
 from sqlglot.optimizer.canonicalize import canonicalize
 from sqlglot.optimizer.optimizer import RULES
 from sqlglot.optimizer.qualify import qualify
+from sqlglot.lineage import lineage as sqlglot_lineage
 from sqlglot.schema import MappingSchema
 
 # canonicalize is left out: it rewrites expressions based on the types inferred by SQLGlot, e.g. it removes casts it
@@ -54,6 +55,7 @@ from sqlglot.schema import MappingSchema
 _OPTIMIZER_RULES = tuple(rule for rule in RULES if rule is not canonicalize)
 
 _PLACEHOLDER_PREFIX = "__sdlb_t"
+_INPUT_PLACEHOLDER_PREFIX = "__sdlb_in"
 _ROW_NUMBER_COLUMN = "__sdlb_rn"
 
 _JOIN_TYPES = {
@@ -95,6 +97,11 @@ def _col(name, table=None):
 
 def _parse(sql):
     return sqlglot.parse_one(sql)
+
+
+def _node_name(name):
+    """Name of a lineage node or column without quotes, e.g. `a.x` for `"a"."x"`"""
+    return name.replace('"', "")
 
 
 def _is_simple_identifier(name):
@@ -470,6 +477,122 @@ class Session:
             statements.append(statement.sql(dialect=dialect))
         return statements
 
+    def column_lineage(self, df, inputs, max_description_length=200):
+        """Column level lineage of the DataFrame with respect to the input DataFrames, given as list of
+        [dataObjectId, df]. The output DataFrame contains a copy of the query of each input DataFrame it is created
+        from, which is replaced by a placeholder table per input before following the lineage with SQLGlot.
+
+        Only DIRECT lineage is reported, like the other engines of SDLB: columns used only in a join, filter, group by,
+        sort or window partition condition are not reported as input of a column.
+        Returns an object with `fields` (column, inputs as list of [dataObjectId, column, identity], description of
+        the transformation and expression of a constant), `unresolved` (columns which could not be traced back to an
+        input), `dead_ends` per unresolved column, `inputs` with the columns of the inputs and the ones not used,
+        and the `plan`, i.e. the SQL the lineage was read from."""
+        d = self._df(df)
+        schema = MappingSchema(self._schema.mapping, normalize=False)
+        # placeholder per distinct input query, an input can belong to more than one DataObject
+        input_placeholders = {}
+        placeholder_by_query = []
+        for data_object_id, input_df in inputs:
+            input_expr = self._df(input_df).expr
+            placeholder = next((p for q, p in placeholder_by_query if q == input_expr), None)
+            if placeholder is None:
+                placeholder = f"{_INPUT_PLACEHOLDER_PREFIX}{len(placeholder_by_query)}"
+                placeholder_by_query.append((input_expr, placeholder))
+                schema.add_table(placeholder, {c: exp.DataType.build("UNKNOWN") for c in self._df(input_df).columns})
+            input_placeholders.setdefault(placeholder, []).append(data_object_id)
+        input_columns = {data_object_id: self._df(input_df).columns for data_object_id, input_df in inputs}
+        if not inputs:
+            return {"fields": [], "unresolved": [], "dead_ends": {}, "inputs": [], "plan": []}
+
+        # replace the copies of the input queries by their placeholder
+        root = exp.select("*").from_(d.expr.copy().subquery(exp.to_identifier("_lineage", quoted=True)))
+        for subquery in list(root.find_all(exp.Subquery)):
+            if subquery.parent is None and subquery is not root:
+                continue  # detached by a previous replacement
+            placeholder = next((p for q, p in placeholder_by_query if subquery.this == q), None)
+            if placeholder is not None:
+                alias = subquery.args.get("alias") or exp.to_identifier(placeholder)
+                if not isinstance(alias, exp.TableAlias):
+                    alias = exp.TableAlias(this=alias)
+                subquery.replace(exp.Table(this=exp.to_identifier(placeholder), alias=alias.copy()))
+        expr = optimize(root, schema=schema, rules=_OPTIMIZER_RULES)
+
+        def describe(expression):
+            description = expression.unalias().sql(normalize_functions="lower")
+            if len(description) > max_description_length:
+                description = description[:max_description_length - 3] + "..."
+            return description
+
+        def direct_column_names(expression):
+            # columns of window partitions and orderings are not part of the value, they are INDIRECT lineage
+            expression = expression.copy()
+            for window in list(expression.find_all(exp.Window)):
+                window.set("partition_by", None)
+                window.set("order", None)
+            return {_node_name(c.sql()) for c in expression.find_all(exp.Column)}
+
+        fields, unresolved, dead_ends, used_input_columns = [], [], {}, set()
+        for column in sorted(d.columns):
+            input_fields = {}
+            column_dead_ends = []
+            description = None
+            constant_expression = None
+
+            def walk(node, path, identity):
+                nonlocal description, constant_expression
+                path = path + [node.name]
+                source = node.source
+                if not node.downstream:
+                    if isinstance(source, exp.Table) and source.name in input_placeholders:
+                        input_column = _node_name(node.name).split(".")[-1]
+                        for data_object_id in input_placeholders[source.name]:
+                            key = (data_object_id, input_column)
+                            input_fields[key] = input_fields.get(key, True) and identity
+                            used_input_columns.add(key)
+                    elif isinstance(node.expression, exp.Table) or not isinstance(source, (exp.Select, exp.SetOperation)) \
+                            or next(node.expression.find_all(exp.Column), None) is not None:
+                        # a column of a source which is not an input
+                        column_dead_ends.append({"attribute": node.name, "path": path, "producedBy": type(source).__name__,
+                                                 "producedByNode": source.sql()[:max_description_length]})
+                    elif constant_expression is None:
+                        # an expression without columns, e.g. a constant or count(*)
+                        constant_expression = describe(node.expression)
+                    return
+                expression = node.expression
+                is_identity = isinstance(expression.unalias(), exp.Column)
+                if not is_identity and description is None:
+                    description = describe(expression)
+                direct = direct_column_names(expression) if isinstance(expression, exp.Expression) else set()
+                children = [child for child in node.downstream
+                            # only children for column references are filtered, other children are e.g. the branches of a union
+                            if "." not in child.name or _node_name(child.name) in direct]
+                if not children and constant_expression is None:
+                    # only INDIRECT input columns, e.g. count(*) over a window
+                    constant_expression = describe(expression)
+                for child in children:
+                    walk(child, path, identity and is_identity)
+
+            try:
+                # the column is given as quoted identifier, otherwise SQLGlot normalizes its name to lower case
+                node = sqlglot_lineage(exp.column(exp.to_identifier(column, quoted=True)), expr, schema=schema)
+                walk(node, [], True)
+            except Exception as e:
+                column_dead_ends.append({"attribute": column, "path": [column], "producedBy": type(e).__name__, "producedByNode": str(e)[:max_description_length]})
+            if column_dead_ends:
+                unresolved.append(column)
+                dead_ends[column] = column_dead_ends
+            else:
+                inputs_list = [[k[0], k[1], identity] for k, identity in sorted(input_fields.items())]
+                expression = constant_expression if not inputs_list else None
+                fields.append({"column": column, "inputs": inputs_list,
+                               "description": description if any(not i[2] for i in inputs_list) else None, "expression": expression})
+        inputs_info = [{"dataObjectId": data_object_id, "columns": columns,
+                        "columnsNotInPlan": [c for c in columns if (data_object_id, c) not in used_input_columns]}
+                       for data_object_id, columns in input_columns.items()]
+        return {"fields": fields, "unresolved": unresolved, "dead_ends": dead_ends, "inputs": inputs_info,
+                "plan": expr.sql(pretty=True).splitlines()}
+
     def parse_types(self, types, dialect=None):
         """Convert data types of the database, given as list of [type name, precision, scale], e.g. from JDBC metadata,
         into SQLGlot types. The result has the same format as the types of `schema`."""
@@ -520,6 +643,7 @@ _OPS = {
     "create_table": _session.create_table,
     "alter_table": _session.alter_table,
     "parse_types": _session.parse_types,
+    "column_lineage": _session.column_lineage,
     "transpile": _session.transpile,
 }
 

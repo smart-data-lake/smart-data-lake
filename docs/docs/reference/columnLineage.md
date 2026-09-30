@@ -169,10 +169,11 @@ DataObjects, as there is no way to tell which one it was read from - and both ar
 
 ## Limitations
 
-Column lineage is analyzed for the Spark engine and for the plain-Scala engine. The two use the same format
-and follow the same rules, but they read the lineage from different places: for Spark it is read from the
-expression ids of the analyzed logical plan, while the plain-Scala engine evaluates expressions immediately
-and therefore records with every column it creates which columns its values come from.
+Column lineage is analyzed for the Spark engine, the plain-Scala engine and the SQL engine (sdl-sql). They use
+the same format and follow the same rules, but they read the lineage from different places: for Spark it is read
+from the expression ids of the analyzed logical plan, while the plain-Scala engine evaluates expressions immediately
+and therefore records with every column it creates which columns its values come from. The SQL engine reads it
+from the SQL query it creates, with the lineage module of [SQLGlot](https://github.com/tobymao/sqlglot).
 
 The analysis is best-effort: a column which can not be traced back to an input DataObject is reported as
 unresolved rather than with a wrong source. This is the case for

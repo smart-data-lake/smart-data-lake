@@ -79,6 +79,10 @@ SQLSubFeed.sql("select *, d * 2 as e from test_table_int", DataObjectId("do1"))
 Database tables are registered in SQLGlot under a placeholder name with their schema, and replaced by their real
 name when rendering. Temporary views are replaced by their query when parsing the SQL of a transformer.
 
+Column lineage (see `docs/docs/reference/columnLineage.md`) is extracted with the lineage module of SQLGlot. The
+query of every input DataFrame is replaced by a placeholder table before following the lineage of the output
+columns, so that it works for tables as well as for DataFrames created from values or other transformations.
+
 Known limitations:
 - Expressions given as string (`expr(...)`, filters of execution modes) are parsed in the default SQLGlot dialect,
   only SQL of transformers is parsed in their `sqlDialect`.

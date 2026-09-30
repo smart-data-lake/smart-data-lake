@@ -279,3 +279,27 @@ def test_alter_table():
         "ALTER TABLE db.t MODIFY (c NULL)",
     ]
     assert call("alter_table", table="db.t", changes=changes[2:], dialect="mysql") == ["ALTER TABLE db.t MODIFY COLUMN c INT NULL"]
+
+
+def test_column_lineage():
+    src = table()
+    call("register_view", name="v", df=src["id"])
+    df = call("sql", query="select a as id, upper(c) as c, 'k' as const, count(*) over (partition by b) as cnt from v", dialect="spark")
+    result = call("column_lineage", df=df["id"], inputs=[["src1", src["id"]]])
+    fields = {f["column"]: f for f in result["fields"]}
+    assert fields["id"]["inputs"] == [["src1", "a", True]]
+    assert fields["c"]["inputs"] == [["src1", "c", False]]
+    assert fields["c"]["description"] == 'upper("v"."c")'
+    # a constant and a window aggregation without direct input columns
+    assert fields["const"]["inputs"] == [] and fields["const"]["expression"] == "'k'"
+    assert fields["cnt"]["inputs"] == [] and "count(*)" in fields["cnt"]["expression"]
+    assert result["unresolved"] == []
+    assert result["inputs"] == [{"dataObjectId": "src1", "columns": ["a", "b", "c"], "columnsNotInPlan": ["b"]}]
+
+
+def test_column_lineage_unresolved():
+    src, other = table(), table("other", (("x", "INT"),))
+    df = call("join", df=src["id"], other=other["id"], how="cross")
+    result = call("column_lineage", df=df["id"], inputs=[["src1", src["id"]]])
+    assert result["unresolved"] == ["x"]
+    assert result["dead_ends"]["x"][0]["path"][-1] == result["dead_ends"]["x"][0]["attribute"]

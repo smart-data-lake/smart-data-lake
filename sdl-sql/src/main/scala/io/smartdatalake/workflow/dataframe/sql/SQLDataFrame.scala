@@ -18,10 +18,14 @@
  */
 package io.smartdatalake.workflow.dataframe.sql
 
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.sqlglot.{DataFrameInfo, SqlGlotBridge}
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe._
+
+import org.json4s.{DefaultFormats, Formats}
 
 import java.sql.ResultSet
 import scala.jdk.CollectionConverters._
@@ -120,6 +124,37 @@ class SQLDataFrame private(val info: DataFrameInfo, @transient val bridge: SqlGl
   // caching is left to the database
   override def cache: SQLDataFrame = this
   override def uncache: SQLDataFrame = this
+
+  /**
+   * Column level lineage, extracted with the lineage module of SQLGlot, see `column_lineage` in sdlb_sql/bridge.py.
+   * Like for the other engines only DIRECT lineage is reported.
+   */
+  override def getColumnLineage(inputs: Seq[(DataObjectId, GenericDataFrame)]): Option[ColumnLineage] = {
+    implicit val formats: Formats = DefaultFormats
+    val sqlInputs = inputs.collect { case (dataObjectId, df: SQLDataFrame) => Seq(dataObjectId.id, df.id) }
+    val result = bridge.call("column_lineage", "df" -> id, "inputs" -> sqlInputs)
+    val fields = (result \ "fields").children.map { field =>
+      val description = (field \ "description").extractOpt[String]
+      val inputFields = (field \ "inputs").children.map { input =>
+        val Seq(dataObjectId, column, isIdentity) = input.children
+        ColumnLineageInputField(DataObjectId(dataObjectId.extract[String]), column.extract[String],
+          ColumnTransformation.direct(isIdentity.extract[Boolean], description))
+      }
+      ColumnLineageField((field \ "column").extract[String], inputFields, (field \ "expression").extractOpt[String])
+    }
+    val unresolved = (result \ "unresolved").extract[Seq[String]]
+    val debugInfo = if (unresolved.nonEmpty && Environment.columnLineageDebug) Some(ColumnLineageDebug(
+      engine = "SQL",
+      inputs = (result \ "inputs").children.map(i => ColumnLineageDebugInput(DataObjectId((i \ "dataObjectId").extract[String]),
+        (i \ "columns").extract[Seq[String]], (i \ "columnsNotInPlan").extract[Seq[String]])),
+      unresolvedColumns = unresolved.map(column => ColumnLineageDebugColumn(column, (result \ "dead_ends" \ column).children.map(d =>
+        ColumnLineageDebugDeadEnd((d \ "attribute").extract[String], (d \ "path").extract[Seq[String]],
+          (d \ "producedBy").extractOpt[String], (d \ "producedByNode").extractOpt[String])
+      ))),
+      plan = (result \ "plan").extract[Seq[String]]
+    )) else None
+    Some(ColumnLineage(fields, unresolved, debugInfo))
+  }
 
   override def explainString(options: Map[String, String]): String = toSql(options.get("dialect"), pretty = true)
 

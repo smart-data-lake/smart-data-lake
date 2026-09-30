@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.dataobject
 
+import io.smartdatalake.app.TestMode
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
@@ -250,5 +251,25 @@ class JdbcTableSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
     assert(columns("tgt") == Seq(Seq("id", "BIGINT", "YES"), Seq("name", "VARCHAR", "YES"), Seq("amount", "DECIMAL(10,2)", "YES")))
     assert(query("select comment from duckdb_columns() where table_name = 'tgt' and column_name = 'amount'") == Seq(Seq("the amount")))
     assert(tgtDO.getCurrentSchema.get.columns == Seq("id", "name", "amount"))
+  }
+
+  test("column lineage of an Action is collected for the lineage export") {
+    jdbcDataObject("src")
+    jdbcDataObject("tgt")
+    val action = CopyAction(ActionId("a1"), DataObjectId("src"), DataObjectId("tgt"), engineConnectionId = Some(connectionId),
+      transformers = Seq(SQLDfTransformer(code = Some("select id, upper(name) as name, city as town, 'x' as const from %{inputViewName}"))))
+    instanceRegistry.register(action)
+    val contextInit = context(Some(action))
+    val contextInitExport = contextInit.copy(appConfig = contextInit.appConfig.copy(test = Some(TestMode.DryRunWithLineageExport)))
+    action.init(Seq(SQLSubFeed(None, DataObjectId("src"))))(contextInitExport)
+    val entry = contextInitExport.columnLineageExportRegistry.getColumnLineages.get(DataObjectId("tgt"))
+    assert(entry.isDefined, "no column lineage was collected for export")
+    val lineage = entry.get.lineage
+    def inputsOf(column: String) = lineage.get(column).toSeq.flatMap(_.inputFields).map(f => (f.dataObjectId.id, f.column, f.transformation.subtype))
+    assert(inputsOf("id") == Seq(("src", "id", "IDENTITY")))
+    assert(inputsOf("name") == Seq(("src", "name", "TRANSFORMATION")))
+    assert(inputsOf("town") == Seq(("src", "city", "IDENTITY")))
+    assert(lineage.get("const").exists(_.inputFields.isEmpty))
+    assert(lineage.unresolvedColumns.isEmpty)
   }
 }
