@@ -20,7 +20,7 @@ package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{ProductUtil, ReflectionUtil, ScalaUtil}
+import io.smartdatalake.util.misc.{ProductUtil, ReflectionUtil, ScalaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, SchemaValidation, UserDefinedSchema}
 import io.smartdatalake.workflow.dataobject.DataObject
@@ -30,6 +30,7 @@ import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.Type
 import scala.reflect.runtime.universe.TypeTag
+import scala.util.{Failure, Success, Try}
 
 /**
  * A SubFeed that holds a DataFrame
@@ -304,8 +305,24 @@ trait DataFrameSubFeedCompanion extends SubFeedConverter[DataFrameSubFeed] with 
   }
 }
 
-object DataFrameSubFeed {
+object DataFrameSubFeed extends SmartDataLakeLogger {
   def getCompanion(tpe: Type): DataFrameSubFeedCompanion = ScalaUtil.companionOf[DataFrameSubFeedCompanion](tpe)
+
+  /**
+   * The schema of a SubFeed converted to another subFeedType, to pass it on to an Action with another engine, see
+   * [[SchemaConverter]]. If it can not be converted, e.g. because a data type has no equivalent in the other engine,
+   * None is returned, and the schema is taken from the DataObject where it is needed.
+   */
+  def convertSchema(subFeed: DataFrameSubFeed, toSubFeedType: Type): Option[GenericSchema] = {
+    subFeed.schemaOpt.flatMap { schema =>
+      Try(schema.convert(toSubFeedType)) match {
+        case Success(converted) => Some(converted)
+        case Failure(e) =>
+          logger.info(s"(${subFeed.dataObjectId}) Schema is not passed on from ${subFeed.tpe.typeSymbol.name} to ${toSubFeedType.typeSymbol.name}: ${e.getMessage}")
+          None
+      }
+    }
+  }
   private[smartdatalake] def getCompanion(fullTpeName: String): DataFrameSubFeedCompanion = ScalaUtil.companionOf[DataFrameSubFeedCompanion](fullTpeName)
 
   /**

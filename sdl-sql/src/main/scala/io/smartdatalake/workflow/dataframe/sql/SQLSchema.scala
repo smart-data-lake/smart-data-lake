@@ -142,7 +142,11 @@ case class SQLSimpleDataType(sql: String) extends SQLDataType with GenericSimple
     }
   }
   override def toLowerCase: SQLSimpleDataType = this
-  override def toJson: JValue = JString(sql)
+  /**
+   * The Spark type name, which is the engine-neutral name of simple types in the Json representation of a schema,
+   * see GenericSchema.toJson. Types without Spark equivalent are given by their SQL.
+   */
+  override def toJson: JValue = JString(SQLDataType.sparkTypeName(this).getOrElse(sql))
   // TIMESTAMP of Spark SQL has a time zone, TIMESTAMP of the default SQLGlot dialect has none
   override def sparkSql: String = if (baseType == "TIMESTAMP") "TIMESTAMP_NTZ" + sql.dropWhile(_ != '(') else sql
 }
@@ -240,8 +244,31 @@ object SQLDataType {
   private val sparkTypeNames = Map(
     "string" -> "TEXT", "integer" -> "INT", "int" -> "INT", "long" -> "BIGINT", "short" -> "SMALLINT", "byte" -> "TINYINT",
     "boolean" -> "BOOLEAN", "double" -> "DOUBLE", "float" -> "FLOAT", "date" -> "DATE", "timestamp" -> "TIMESTAMP",
-    "binary" -> "VARBINARY", "decimal" -> "DECIMAL"
+    "binary" -> "VARBINARY", "decimal" -> "DECIMAL", "timestamp_ntz" -> "TIMESTAMP"
   )
+
+  /**
+   * The Spark type name of a simple type, if there is an equivalent, e.g. `integer` for INT or `string` for VARCHAR(20).
+   * TIMESTAMP (without time zone) is translated to `timestamp`, as Spark reads it as such from a database with JDBC.
+   */
+  def sparkTypeName(tpe: SQLSimpleDataType): Option[String] = tpe.baseType match {
+    case "TINYINT" => Some("byte")
+    case "SMALLINT" => Some("short")
+    case "INT" => Some("integer")
+    case "BIGINT" => Some("long")
+    case "DECIMAL" =>
+      val (precision, scale) = tpe.getDecimalSpec.getOrElse((maxDecimalPrecision, 18))
+      Some(s"decimal($precision,$scale)")
+    case "FLOAT" => Some("float")
+    case "DOUBLE" => Some("double")
+    case t if stringTypes.contains(t) || t == "UUID" || t == "JSON" => Some("string")
+    case "BOOLEAN" => Some("boolean")
+    case "DATE" => Some("date")
+    case "TIMESTAMP" | "TIMESTAMPTZ" | "TIMESTAMPLTZ" => Some("timestamp")
+    case "TIMESTAMPNTZ" => Some("timestamp_ntz")
+    case "BINARY" | "VARBINARY" | "BLOB" => Some("binary")
+    case _ => None
+  }
 
   def of(dataType: GenericDataType): SQLDataType = dataType match {
     case d: SQLDataType => d

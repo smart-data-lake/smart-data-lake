@@ -84,6 +84,19 @@ not have an execution mode. Only save mode Overwrite is supported.
 Note that Postgres can not replace a view if existing columns are renamed, removed or change their type; the view
 must then be dropped first. Materialized views are not supported yet.
 
+### Mixed feeds
+
+Actions of a feed can use different engines, e.g. Spark loads a table which the SQL engine transforms, and Spark
+exports the result. The engine is selected per Action, and the DataFrame is read again from the DataObject by the next
+Action. In init phase the schema is passed on to the next Action instead, so that it also works if the DataObject does
+not exist yet, e.g. a view created in exec phase. Schemas are converted between engines through their engine-neutral
+Json representation, see `SchemaConverter` (sdl-core), which uses the Spark type names for simple types
+(`SQLDataType.sparkTypeName`). E.g. `INT` becomes `integer`, string types become `string`, and `TIMESTAMP` becomes
+`timestamp`, as Spark reads it from a database with JDBC. Types without Spark equivalent, e.g. `UNKNOWN` for types
+SQLGlot can not infer, can not be converted: the next Action then gets the schema from the DataObject.
+The same conversion is used to validate a DataFrame of the SQL engine against a `schemaMin`, which is parsed with
+Spark if sdl-spark is on the classpath.
+
 ## Architecture
 
 SQLGlot is a Python library. It runs in a Python interpreter embedded into the JVM with

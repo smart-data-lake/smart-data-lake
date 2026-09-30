@@ -145,6 +145,10 @@ object SQLSubFeed extends DataFrameSubFeedCompanion {
 
   override def fromSubFeed(subFeed: SubFeed)(implicit context: ActionPipelineContext): SQLSubFeed = subFeed match {
     case sqlSubFeed: SQLSubFeed => sqlSubFeed.copy(executionModeResultOptions = Map()) // no executionModeResultOptions are passed between actions. Filters are kept, only propagating filters can be present here.
+    case dataFrameSubFeed: DataFrameSubFeed =>
+      // transport only the schema, the DataFrame is read again from the DataObject where it is needed
+      SQLSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped,
+        keptSchema = DataFrameSubFeed.convertSchema(dataFrameSubFeed, subFeedType))
     case _ => SQLSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
   }
 

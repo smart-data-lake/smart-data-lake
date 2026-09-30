@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataframe
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{GenericSchemaUtil, SQLUtil, SchemaUtil, StringUtil}
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 import org.json4s.JsonAST.{JBool, JObject}
 import org.json4s.jackson.Serialization
 import org.json4s.{Formats, JArray, JNothing, JString, JValue, NoTypeHints}
@@ -376,56 +376,61 @@ trait GenericSchema extends GenericTypedObject {
 object GenericSchema {
 
   /**
-   * Parsing schema export created by DataObjectSchemaExporter
+   * Parsing schema export created by DataObjectSchemaExporter, see [[GenericSchema.toJson]].
+   * The Json is engine-neutral, so it can be parsed for another subFeedType than the one it was created with.
+   * Simple data types are given by their Spark type name, e.g. `string`, `integer` or `decimal(10,2)`,
+   * and are created with `createSimpleDataType` of the companion of the subFeedType.
    */
-   def fromJson(json: JArray, subFeedType: Type): GenericSchema = {
-     implicit val formats: Formats = Serialization.formats(NoTypeHints)
-     val companion = DataFrameSubFeed.getCompanion(subFeedType)
-
-       def createDataType(json: JValue): GenericDataType = json match {
-         // simple type
-         case JString(str) => companion.createSimpleDataType(str)
-         // struct
-         case j: JObject if (j \ "dataType") == JString("struct") =>
-           val fields = j \ "fields" match {
-             case jFields: JArray => jFields.arr.map {
-               case jsonField: JObject => parseField(jsonField)
-               case _ => throw new IllegalArgumentException("Unexpected type for schema field, expected JObject")
-             }
-             case _ =>
-               throw new IllegalArgumentException("Unexpected type for 'fields' in struct schema, expected JArray")
-           }
-           companion.createStructDataType(fields)
-         // array
-         case j: JObject if (j \ "dataType") == JString("array") =>
-           val valueType = createDataType(j \ "elementType")
-           companion.createArrayDataType(valueType)
-         // map
-         case j: JObject if (j \ "dataType") == JString("map") =>
-           val keyType = createDataType(j \ "keyType")
-           val valueType = createDataType(j \ "valueType")
-           companion.createMapDataType(keyType, valueType)
-        case t =>
-          throw new IllegalArgumentException(s"Unexpected data type format $t in schema definition: ${json.toString}")
-      }
-
-     def parseField(json: JObject): GenericField = {
-       companion.createField(
-         (json \ "name").extract[String],
-         createDataType(json \ "dataType"),
-         (json \ "nullable").extract[Boolean],
-         (json \ "comment").toOption.map(_.extract[String])
-       )
-     }
-
-       val fields = json.arr.map {
-         case jsonField: JObject => parseField(jsonField)
-         case t =>
-           throw new IllegalArgumentException(s"Unexpected type $t in schema fields array, expected JObject for each field")
-       }
-       companion.createSchema(fields)
+  def fromJson(json: JArray, subFeedType: Type): GenericSchema = {
+    val companion = DataFrameSubFeed.getCompanion(subFeedType)
+    val fields = json.arr.map {
+      case jsonField: JObject => fieldFromJson(jsonField, companion)
+      case t =>
+        throw new IllegalArgumentException(s"Unexpected type $t in schema fields array, expected JObject for each field")
     }
- }
+    companion.createSchema(fields)
+  }
+
+  /**
+   * Parsing a data type of a schema export, see [[GenericDataType.toJson]] and [[fromJson]].
+   */
+  def dataTypeFromJson(json: JValue, subFeedType: Type): GenericDataType =
+    dataTypeFromJson(json, DataFrameSubFeed.getCompanion(subFeedType))
+
+  private def dataTypeFromJson(json: JValue, companion: DataFrameSubFeedCompanion): GenericDataType = json match {
+    // simple type
+    case JString(str) => companion.createSimpleDataType(str)
+    // struct
+    case j: JObject if (j \ "dataType") == JString("struct") =>
+      val fields = j \ "fields" match {
+        case jFields: JArray => jFields.arr.map {
+          case jsonField: JObject => fieldFromJson(jsonField, companion)
+          case _ => throw new IllegalArgumentException("Unexpected type for schema field, expected JObject")
+        }
+        case _ =>
+          throw new IllegalArgumentException("Unexpected type for 'fields' in struct schema, expected JArray")
+      }
+      companion.createStructDataType(fields)
+    // array
+    case j: JObject if (j \ "dataType") == JString("array") =>
+      companion.createArrayDataType(dataTypeFromJson(j \ "elementType", companion))
+    // map
+    case j: JObject if (j \ "dataType") == JString("map") =>
+      companion.createMapDataType(dataTypeFromJson(j \ "keyType", companion), dataTypeFromJson(j \ "valueType", companion))
+    case t =>
+      throw new IllegalArgumentException(s"Unexpected data type format $t in schema definition: ${json.toString}")
+  }
+
+  private def fieldFromJson(json: JObject, companion: DataFrameSubFeedCompanion): GenericField = {
+    implicit val formats: Formats = Serialization.formats(NoTypeHints)
+    companion.createField(
+      (json \ "name").extract[String],
+      dataTypeFromJson(json \ "dataType", companion),
+      (json \ "nullable").extract[Boolean],
+      (json \ "comment").toOption.map(_.extract[String])
+    )
+  }
+}
 
  /**
   * Interface for the columns of a GenericDataFrame

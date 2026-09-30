@@ -102,6 +102,28 @@
 			<version>${duckdb.version}</version>
 			<scope>test</scope>
 		</dependency>
+		<!-- Spark engine for tests of feeds mixing the SQL and the Spark engine -->
+		<dependency>
+			<groupId>io.smartdatalake</groupId>
+			<artifactId>sdl-spark_${scala.minor.version}</artifactId>
+			<version>${project.parent.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-sql_${scala.minor.version}</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-tags_${scala.minor.version}</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<!-- sdl-core test utils -->
 		<dependency>
 			<groupId>io.smartdatalake</groupId>

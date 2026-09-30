@@ -28,8 +28,10 @@ import scala.reflect.runtime.universe.Type
 /**
  * An interface for to be implementated by schema converters.
  * A schema converter can convert schemas from a specific SubFeedType A to a specific SubFeedType B.
- * As SDLB does not define an own intermediary schema langauge,
- * a schema conversion must be implemented for every pair of SubFeedType SDLB should be able to convert.
+ *
+ * If there is no schema converter for a pair of SubFeedTypes, schemas are converted through their engine-neutral
+ * Json representation, see [[GenericSchema.toJson]] and [[GenericSchema.fromJson]]. It uses the Spark type names
+ * for simple data types, so a schema converter is only needed if an engine does not use these names.
  */
 private[smartdatalake] trait SchemaConverter {
   def fromSubFeedType: Type
@@ -51,20 +53,27 @@ private[smartdatalake] object SchemaConverter {
     .map(o => ((o.fromSubFeedType,o.toSubFeedType), o)).toMap
 
   /**
-   * Get the converter to convert schema from SubFeedType A to SubFeedType B.
-   * If there is no SchemaConverter implementation in the classpath for this combination, an exception is thrown.
+   * Get the converter to convert schema from SubFeedType A to SubFeedType B, if there is a SchemaConverter
+   * implementation in the classpath for this combination.
    */
-  private def getConverter(fromSubFeedType: Type, toSubFeedType:Type): SchemaConverter = {
+  private def getConverter(fromSubFeedType: Type, toSubFeedType:Type): Option[SchemaConverter] = {
     converters.get(fromSubFeedType, toSubFeedType)
-      .getOrElse(throw new IllegalStateException(s"No schema converter found from ${fromSubFeedType.typeSymbol.name} to ${toSubFeedType.typeSymbol.name}"))
   }
 
+  private def conversionException(fromSubFeedType: Type, toSubFeedType: Type, e: Exception) =
+    new IllegalStateException(s"Can not convert schema from ${fromSubFeedType.typeSymbol.name} to ${toSubFeedType.typeSymbol.name}: ${e.getMessage}", e)
+
   /**
-   * Convert a given schema with SubFeedType A to SubFeedType B.
+   * Convert a given schema with SubFeedType A to SubFeedType B, with a SchemaConverter if there is one,
+   * otherwise through its Json representation.
    */
   def convert(schema: GenericSchema, toSubFeedType: Type): GenericSchema = {
     // convert if needed
-    if (schema.subFeedType != toSubFeedType) getConverter(schema.subFeedType, toSubFeedType).convert(schema)
+    if (schema.subFeedType != toSubFeedType) getConverter(schema.subFeedType, toSubFeedType).map(_.convert(schema))
+      .getOrElse {
+        try GenericSchema.fromJson(schema.toJson, toSubFeedType)
+        catch { case e: Exception => throw conversionException(schema.subFeedType, toSubFeedType, e) }
+      }
     else schema match {
       // resolve lazy schema
       case x:LazyGenericSchema => x.get
@@ -77,7 +86,11 @@ private[smartdatalake] object SchemaConverter {
    * Convert a given data type with SubFeedType A to SubFeedType B.
    */
   def convertDatatype(dataType: GenericDataType, toSubFeedType: Type): GenericDataType = {
-    if (dataType.subFeedType != toSubFeedType) getConverter(dataType.subFeedType, toSubFeedType).convertDataType(dataType)
+    if (dataType.subFeedType != toSubFeedType) getConverter(dataType.subFeedType, toSubFeedType).map(_.convertDataType(dataType))
+      .getOrElse {
+        try GenericSchema.dataTypeFromJson(dataType.toJson, toSubFeedType)
+        catch { case e: Exception => throw conversionException(dataType.subFeedType, toSubFeedType, e) }
+      }
     else dataType
   }
 }
