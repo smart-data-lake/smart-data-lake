@@ -65,7 +65,7 @@ sealed trait SQLExpression extends GenericColumn {
 
   // a cast keeps the name of the column, as in Spark
   override def cast(dataType: GenericDataType): SQLColumn =
-    SQLColumn(s"CAST(${column.expr} AS ${SQLDataType.of(dataType).sql})", name = column.name)
+    SQLColumn(s"CAST(${column.expr} AS ${SQLDataType.of(dataType).sparkSql})", name = column.name)
 
   override def exprSql: String = column.expr
 
@@ -81,7 +81,9 @@ sealed trait SQLExpression extends GenericColumn {
 }
 
 /**
- * A column expression of the SQL engine, as SQL text in the default SQLGlot dialect.
+ * A column expression of the SQL engine, as Spark SQL text. It is parsed with the SQLGlot dialect databricks, which is
+ * Spark SQL with ANSI casts. Like in Spark, identifiers are resolved case-insensitively, unless
+ * `Environment.caseSensitive` is set.
  *
  * @param expr      the expression as SQL text, without alias
  * @param name      name of the column if it is a column reference or keeps the name of one (e.g. a cast)
@@ -140,9 +142,23 @@ object SQLColumn {
   }
 
   /**
-   * Quote an identifier for the default SQLGlot dialect
+   * Quote an identifier for Spark SQL with backticks, if it is not a simple identifier.
+   * Quoting does not make an identifier case sensitive in Spark SQL.
    */
-  def quoteIdentifier(name: String): String = "\"" + name.replace("\"", "\"\"") + "\""
+  def quoteIdentifier(name: String): String =
+    if (isSimpleIdentifier(name)) name else "`" + name.replace("`", "``") + "`"
+
+  private def isSimpleIdentifier(name: String): Boolean =
+    name.matches("[A-Za-z_][A-Za-z0-9_]*") && !reservedWords.contains(name.toUpperCase)
+
+  // reserved words of Spark SQL, which can not be used as unquoted identifiers
+  private val reservedWords = Set("ALL", "AND", "ANY", "AS", "AUTHORIZATION", "BOTH", "CASE", "CAST", "CHECK", "COLLATE",
+    "COLUMN", "CONSTRAINT", "CREATE", "CROSS", "CURRENT_DATE", "CURRENT_TIME", "CURRENT_TIMESTAMP", "CURRENT_USER",
+    "DISTINCT", "ELSE", "END", "ESCAPE", "EXCEPT", "FALSE", "FETCH", "FILTER", "FOR", "FOREIGN", "FROM", "FULL", "GRANT",
+    "GROUP", "HAVING", "IN", "INNER", "INTERSECT", "INTERVAL", "INTO", "IS", "JOIN", "LATERAL", "LEADING", "LEFT", "LIKE",
+    "LIMIT", "NATURAL", "NOT", "NULL", "OFFSET", "ON", "ONLY", "OR", "ORDER", "OUTER", "OVERLAPS", "PRIMARY", "REFERENCES",
+    "RIGHT", "SELECT", "SESSION_USER", "SOME", "TABLE", "THEN", "TIME", "TO", "TRAILING", "TRUE", "UNION", "UNIQUE",
+    "UNKNOWN", "USER", "USING", "WHEN", "WHERE", "WINDOW", "WITH")
 
   /**
    * Create a reference to the column with exactly the given name, without interpreting dots or backticks.
@@ -186,7 +202,7 @@ object SQLColumn {
     case null | None => SQLColumn("NULL")
     case Some(v) => literal(v)
     case c: GenericColumn => of(c)
-    case s: String => SQLColumn("'" + s.replace("'", "''") + "'")
+    case s: String => SQLColumn("'" + s.replace("\\", "\\\\").replace("'", "\\'") + "'")
     case b: Boolean => SQLColumn(if (b) "TRUE" else "FALSE")
     case d: Double if d.isNaN || d.isInfinite => SQLColumn(s"CAST('${if (d.isNaN) "NaN" else if (d > 0) "Infinity" else "-Infinity"}' AS DOUBLE)")
     case f: Float if f.isNaN || f.isInfinite => literal(f.toDouble)
@@ -195,8 +211,8 @@ object SQLColumn {
     case d: java.math.BigDecimal => number(d.toPlainString)
     case d: java.sql.Date => SQLColumn(s"CAST('$d' AS DATE)")
     case d: LocalDate => SQLColumn(s"CAST('$d' AS DATE)")
-    case t: java.sql.Timestamp => SQLColumn(s"CAST('$t' AS TIMESTAMP)")
-    case t: LocalDateTime => SQLColumn(s"CAST('${t.toString.replace('T', ' ')}' AS TIMESTAMP)")
+    case t: java.sql.Timestamp => SQLColumn(s"CAST('$t' AS TIMESTAMP_NTZ)")
+    case t: LocalDateTime => SQLColumn(s"CAST('${t.toString.replace('T', ' ')}' AS TIMESTAMP_NTZ)")
     case t: Instant => SQLColumn(s"CAST('$t' AS TIMESTAMPTZ)")
     case x => throw new IllegalArgumentException(s"Unsupported literal value of type ${x.getClass.getName}: $x")
   }

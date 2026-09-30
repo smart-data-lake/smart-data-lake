@@ -43,7 +43,7 @@ case class SQLSchema(fields: Seq[SQLField]) extends GenericSchema {
 
   override def columns: Seq[String] = fields.map(_.name)
 
-  override def sql: String = fields.map(f => s"${SQLColumn.quoteIdentifier(f.name)} ${f.dataType.sql}${if (f.nullable) "" else " NOT NULL"}").mkString(", ")
+  override def sql: String = fields.map(f => s"${SQLDataType.quoteIdentifier(f.name)} ${f.dataType.sql}${if (f.nullable) "" else " NOT NULL"}").mkString(", ")
 
   override def add(colName: String, dataType: GenericDataType): SQLSchema = add(SQLField(colName, SQLDataType.of(dataType)))
 
@@ -104,6 +104,11 @@ object SQLField {
  */
 sealed trait SQLDataType extends GenericDataType {
   override def subFeedType: Type = typeOf[SQLSubFeed]
+
+  /**
+   * The type in Spark SQL, as used in column expressions, see [[SQLColumn]]
+   */
+  def sparkSql: String
   override def isSameType(other: GenericDataType): Boolean = other match {
     case o: SQLDataType => sql.equalsIgnoreCase(o.sql)
     case _ => false
@@ -138,11 +143,14 @@ case class SQLSimpleDataType(sql: String) extends SQLDataType with GenericSimple
   }
   override def toLowerCase: SQLSimpleDataType = this
   override def toJson: JValue = JString(sql)
+  // TIMESTAMP of Spark SQL has a time zone, TIMESTAMP of the default SQLGlot dialect has none
+  override def sparkSql: String = if (baseType == "TIMESTAMP") "TIMESTAMP_NTZ" + sql.dropWhile(_ != '(') else sql
 }
 
 case class SQLStructDataType(fields: Seq[SQLField]) extends SQLDataType with GenericStructDataType {
   override def typeName: String = "struct"
-  override def sql: String = s"STRUCT<${fields.map(f => s"${SQLColumn.quoteIdentifier(f.name)} ${f.dataType.sql}").mkString(", ")}>"
+  override def sql: String = s"STRUCT<${fields.map(f => s"${SQLDataType.quoteIdentifier(f.name)} ${f.dataType.sql}").mkString(", ")}>"
+  override def sparkSql: String = s"STRUCT<${fields.map(f => s"${SQLColumn.quoteIdentifier(f.name)}: ${f.dataType.sparkSql}").mkString(", ")}>"
   override def isSortable: Boolean = false
   override def fieldIndex(fieldName: String): Int = fields.indexWhere(_.name == fieldName)
   override def withOtherFields[T](other: GenericStructDataType with GenericDataType, func: (Seq[GenericField], Seq[GenericField]) => T): T =
@@ -155,6 +163,7 @@ case class SQLStructDataType(fields: Seq[SQLField]) extends SQLDataType with Gen
 case class SQLArrayDataType(elementDataType: SQLDataType) extends SQLDataType with GenericArrayDataType {
   override def typeName: String = "array"
   override def sql: String = s"ARRAY<${elementDataType.sql}>"
+  override def sparkSql: String = s"ARRAY<${elementDataType.sparkSql}>"
   override def isSortable: Boolean = false
   override def containsNull: Boolean = true
   override def withOtherElementType[T](other: GenericArrayDataType with GenericDataType, func: (GenericDataType, GenericDataType) => T): T =
@@ -165,6 +174,7 @@ case class SQLArrayDataType(elementDataType: SQLDataType) extends SQLDataType wi
 case class SQLMapDataType(keyDataType: SQLDataType, valueDataType: SQLDataType) extends SQLDataType with GenericMapDataType {
   override def typeName: String = "map"
   override def sql: String = s"MAP<${keyDataType.sql}, ${valueDataType.sql}>"
+  override def sparkSql: String = s"MAP<${keyDataType.sparkSql}, ${valueDataType.sparkSql}>"
   override def isSortable: Boolean = false
   override def valueContainsNull: Boolean = true
   override def withOtherKeyType[T](other: GenericMapDataType with GenericDataType, func: (GenericDataType, GenericDataType) => T): T =
@@ -175,6 +185,11 @@ case class SQLMapDataType(keyDataType: SQLDataType, valueDataType: SQLDataType) 
 }
 
 object SQLDataType {
+
+  /**
+   * Quote an identifier for the default SQLGlot dialect, as used in data types
+   */
+  private[sql] def quoteIdentifier(name: String): String = "\"" + name.replace("\"", "\"\"") + "\""
 
   private[sql] val integerTypes = Seq("TINYINT", "SMALLINT", "INT", "BIGINT") // ordered by width
   private val integerDigits = Map("TINYINT" -> 3, "SMALLINT" -> 5, "INT" -> 10, "BIGINT" -> 19)

@@ -59,7 +59,7 @@ SQLGlot is a Python library. It runs in a Python interpreter embedded into the J
 | `SqlGlotBridge` | `util/sqlglot/SqlGlotBridge.scala` | The Scala side of the bridge: loads `bridge.py`, calls its operations, throws `SqlGlotException` with the Python traceback on errors, and releases Python DataFrames when their `SQLDataFrame` is garbage collected. |
 | `SQLSubFeed` | `workflow/dataframe/sql/SQLSubFeed.scala` | The SubFeed, plus its companion implementing `DataFrameSubFeedCompanion`/`DataFrameFunctions`. |
 | `SQLDataFrame` | `workflow/dataframe/sql/SQLDataFrame.scala` | Remote-controls a DataFrame of the bridge by its id. `toSql(dialect)` renders the SQL statement. |
-| `SQLColumn` | `workflow/dataframe/sql/SQLColumn.scala` | A column expression as SQL text in the default SQLGlot dialect. Operators and functions compose the SQL text in Scala, no call to Python is needed. |
+| `SQLColumn` | `workflow/dataframe/sql/SQLColumn.scala` | A column expression as Spark SQL text (SQLGlot dialect `databricks`, i.e. Spark SQL with ANSI casts). Operators and functions compose the SQL text in Scala, no call to Python is needed. |
 | `SQLSchema` | `workflow/dataframe/sql/SQLSchema.scala` | Schema, fields and data types. Types of results are inferred by SQLGlot. |
 | `JdbcTableSqlEngine` | `workflow/dataobject/JdbcTableSqlEngine.scala` | SQL engine implementation of the `JdbcTableEngine` SPI of `JdbcTableDataObject` (sdl-core), discovered on the classpath like the Spark implementation in sdl-spark. Reads the table schema from the JDBC metadata, validates that the DataObject uses the engine connection, and executes the writes. |
 
@@ -73,20 +73,41 @@ val df = SQLSubFeed.table("db.test_table", schema) // in the context of an Actio
 df.createOrReplaceTempView("test_table_int")
 SQLSubFeed.sql("select *, d * 2 as e from test_table_int", DataObjectId("do1"))
   .toSql(Some("postgres"))
-// SELECT "test_table"."a" AS "a", ..., "test_table"."a" * 2 AS "d", "test_table"."a" * 4 AS "e" FROM db.test_table AS "test_table"
+// SELECT test_table.a AS a, ..., test_table.a * 2 AS d, test_table.a * 4 AS e FROM db.test_table AS test_table
 ```
 
 Database tables are registered in SQLGlot under a placeholder name with their schema, and replaced by their real
 name when rendering. Temporary views are replaced by their query when parsing the SQL of a transformer.
+
+### Identifiers and case
+
+Identifier names are passed on as they are written, and are resolved case-insensitively, like in Spark:
+
+| Where | Resolution | Rendering in the dialect of the database |
+|-------|------------|------------------------------------------|
+| Names of the Scala API (`col("Name")`, `as("Name")`, `expr(...)`, filters of execution modes) | case-insensitive, backticks only escape special characters | new names unquoted if they are simple identifiers |
+| SQL of transformers in their `sqlDialect` | unquoted: case-insensitive. Quoted: as defined by the dialect, i.e. case-insensitive for spark, tsql and duckdb, case-sensitive for postgres, snowflake and oracle | as above |
+| Columns of database tables | against the schema from the JDBC metadata | spelling of the database, quoted only if the database would not resolve it unquoted, e.g. `"Name"` in postgres, but `NAME` in snowflake |
+
+New names, e.g. aliases or the columns of a table created by `CREATE TABLE ... AS SELECT`, are rendered unquoted if
+possible, so that the database normalizes their case as usual, like the Spark JDBC engine does. DataFrames report
+their columns with the spelling as written, e.g. `df.columns == Seq("TownName")`, or the spelling of the database
+for columns of a table.
+
+Internally, the bridge normalizes all identifiers to lower case for resolution by SQLGlot, and keeps their spelling
+in the meta data of the identifiers. When rendering a statement, every column reference gets the spelling of the
+column it references, see the module documentation of `bridge.py`.
+
+With `Environment.caseSensitive = true`, identifiers are resolved exactly as written and always quoted.
 
 Column lineage (see `docs/docs/reference/columnLineage.md`) is extracted with the lineage module of SQLGlot. The
 query of every input DataFrame is replaced by a placeholder table before following the lineage of the output
 columns, so that it works for tables as well as for DataFrames created from values or other transformations.
 
 Known limitations:
-- Expressions given as string (`expr(...)`, filters of execution modes) are parsed in the default SQLGlot dialect,
-  only SQL of transformers is parsed in their `sqlDialect`.
-- Column names are case-sensitive. Unquoted identifiers in SQL of transformers are normalized to lower case.
+- Expressions given as string (`expr(...)`, filters of execution modes) are Spark SQL, only SQL of transformers is
+  parsed in their `sqlDialect`.
+- Column names differing only in case are ambiguous, unless `Environment.caseSensitive` is set.
 - Data types of written DataFrames are not validated against the table, only column names, as the types inferred
   by SQLGlot are not exact.
 - Schema evolution of nested columns is not supported, jdbc tables have no nested columns.

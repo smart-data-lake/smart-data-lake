@@ -24,12 +24,25 @@ through jep. A DataFrame is an SQLGlot AST (a query) stored in a registry under 
 operation creates a new DataFrame, wrapping its input as subquery. The SQLGlot optimizer merges these subqueries again
 when the SQL statement for the target database is rendered.
 
-Column expressions are passed as SQL text in the default SQLGlot dialect, they are created by the Scala class
-SQLColumn.
+Column expressions are passed as Spark SQL text (SQLGlot dialect databricks, i.e. Spark SQL with ANSI casts), they
+are created by the Scala class SQLColumn.
 
 Tables of the database are registered with their schema under a placeholder name `__sdlb_t<n>`, so that the SQLGlot
 schema needs no nesting of catalogs and databases. The placeholders are replaced by the real table names when
 rendering the SQL statement.
+
+Identifiers are resolved case-insensitively, unless they are quoted in a dialect where quoted identifiers are case
+sensitive, e.g. `"Name"` in postgres. For this, all identifiers of the ASTs are normalized to lower case, and their
+spelling is kept separately:
+- The spelling of an identifier as written is stored in its meta `sdlb_spelling`.
+- The columns of database tables are registered with their spelling in the database.
+- When a statement is rendered, every identifier gets a form `(spelling, kind)` in its meta `sdlb_form`: a column
+  reference gets the form of the column it references, i.e. the spelling of the database for a table column, and a
+  new name, e.g. an alias, gets its spelling. The kind decides how the identifier is quoted, see `_quote`: a column
+  of the database is quoted if the database would not resolve it unquoted, a new name is quoted only if it contains
+  special characters or is a reserved word, so that the database normalizes its case as usual.
+If the session is case sensitive, see `set_case_sensitive`, identifiers are not normalized, resolved exactly and
+always quoted.
 
 There is a single entry point for the JVM: `call(op, args_json)`, taking the name of an operation and its arguments as
 JSON object, and returning a JSON object with either `result` or `error` and `traceback`.
@@ -42,11 +55,13 @@ from dataclasses import dataclass
 
 import sqlglot
 from sqlglot import exp
+from sqlglot.dialects.dialect import Dialect, NormalizationStrategy
 from sqlglot.errors import OptimizeError
 from sqlglot.optimizer import optimize
 from sqlglot.optimizer.canonicalize import canonicalize
 from sqlglot.optimizer.optimizer import RULES
 from sqlglot.optimizer.qualify import qualify
+from sqlglot.optimizer.scope import Scope, traverse_scope
 from sqlglot.lineage import lineage as sqlglot_lineage
 from sqlglot.schema import MappingSchema
 
@@ -54,9 +69,36 @@ from sqlglot.schema import MappingSchema
 # considers redundant, but the database might infer different types (e.g. DECIMAL instead of DOUBLE for 1.5).
 _OPTIMIZER_RULES = tuple(rule for rule in RULES if rule is not canonicalize)
 
+# dialect of the column expressions created by SQLColumn: Spark SQL with ANSI casts. The spark dialect of SQLGlot
+# parses CAST as TRY_CAST.
+_COLUMN_DIALECT = "databricks"
+
 _PLACEHOLDER_PREFIX = "__sdlb_t"
 _INPUT_PLACEHOLDER_PREFIX = "__sdlb_in"
 _ROW_NUMBER_COLUMN = "__sdlb_rn"
+
+# meta keys of identifiers, see module documentation
+_SPELLING = "sdlb_spelling"
+_CASE_SENSITIVE = "sdlb_case_sensitive"
+_FORM = "sdlb_form"
+
+# kinds of identifier forms, see Session._quote
+_KIND_DB = "db"  # a column of the database, with the spelling of the database
+_KIND_NEW = "new"  # a new name, e.g. an alias
+_KIND_EXACT = "exact"  # a new name quoted in a case-sensitive dialect
+
+# reserved words of standard SQL which are no valid unquoted identifiers in most databases
+_RESERVED_WORDS = {
+    "ALL", "ALTER", "AND", "ANY", "AS", "ASC", "BETWEEN", "BY", "CASE", "CAST", "CHECK", "COLUMN", "CONSTRAINT",
+    "CREATE", "CROSS", "CURRENT_DATE", "CURRENT_TIME", "CURRENT_TIMESTAMP", "CURRENT_USER", "DEFAULT", "DELETE",
+    "DESC", "DISTINCT", "DROP", "ELSE", "END", "EXCEPT", "EXISTS", "FALSE", "FETCH", "FOR", "FOREIGN", "FROM", "FULL",
+    "GRANT", "GROUP", "HAVING", "IN", "INNER", "INSERT", "INTERSECT", "INTO", "IS", "JOIN", "LEFT", "LIKE", "LIMIT",
+    "NATURAL", "NOT", "NULL", "OFFSET", "ON", "OR", "ORDER", "OUTER", "PRIMARY", "REFERENCES", "RIGHT", "SELECT",
+    "SESSION_USER", "SET", "SOME", "TABLE", "THEN", "TO", "TRUE", "UNION", "UNIQUE", "UPDATE", "USER", "USING",
+    "VALUES", "WHEN", "WHERE", "WINDOW", "WITH",
+}
+
+_CASE_INSENSITIVE_STRATEGIES = (NormalizationStrategy.CASE_INSENSITIVE, NormalizationStrategy.CASE_INSENSITIVE_UPPERCASE)
 
 _JOIN_TYPES = {
     "inner": "inner",
@@ -83,20 +125,23 @@ _JOIN_TYPES = {
 @dataclass
 class _DataFrame:
     expr: exp.Query
+    # column names with their spelling, as reported to Scala
     columns: list
+    # normalized column names, as used in expr
+    keys: list
+    # normalized alias
     alias: str
     # True if expr is a join whose inputs can still be referenced by their alias, e.g. `"_t1"."id"`.
     # Projections and filters are then applied to expr directly instead of wrapping it into a subquery, see
     # Session._in_join_scope.
     join_scope: bool = False
 
+    def spelling(self, key):
+        return self.columns[self.keys.index(key)]
 
-def _col(name, table=None):
-    return exp.column(name, table=table, quoted=True)
 
-
-def _parse(sql):
-    return sqlglot.parse_one(sql)
+def _col(key, table=None):
+    return exp.column(key, table=table, quoted=True)
 
 
 def _node_name(name):
@@ -108,8 +153,27 @@ def _is_simple_identifier(name):
     return re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) is not None
 
 
-def _parse_ordered(sql):
-    return exp.maybe_parse(sql, into=exp.Ordered)
+def _named_form(ident):
+    """Form of an identifier naming something new, e.g. an alias, with its spelling as written"""
+    return ident.meta.get(_SPELLING, ident.name), _KIND_EXACT if ident.meta.get(_CASE_SENSITIVE) else _KIND_NEW
+
+
+def _is_qualifier(ident):
+    """True if the identifier is a table alias or the table qualifier of a column. They are internal names, which are
+    rendered with their normalized name, so that all references to a table alias are rendered the same way."""
+    parent = ident.parent
+    if isinstance(parent, exp.TableAlias):
+        return parent.this is ident
+    if isinstance(parent, exp.Column):
+        return parent.this is not ident
+    return isinstance(parent, exp.Table)
+
+
+def _output_selects(node):
+    """Projections defining the output columns of a query, i.e. of the leftmost select of a set operation"""
+    while isinstance(node, (exp.SetOperation, exp.Subquery)):
+        node = node.left if isinstance(node, exp.SetOperation) else node.this
+    return node.selects if isinstance(node, exp.Select) else []
 
 
 def _type_json(data_type):
@@ -122,20 +186,164 @@ def _type_json(data_type):
     if data_type.this == exp.DataType.Type.MAP:
         key, value = (data_type.expressions + [None, None])[:2]
         return {"map": [_type_json(key), _type_json(value)]}
+    if data_type.this == exp.DataType.Type.TIMESTAMPNTZ:
+        # TIMESTAMP_NTZ of Spark is TIMESTAMP in the default dialect
+        data_type = exp.DataType(this=exp.DataType.Type.TIMESTAMP, expressions=data_type.expressions)
     return {"type": data_type.sql()}
 
 
 class Session:
     def __init__(self):
+        self._case_sensitive = False
         self.reset()
 
     def reset(self):
         self._counter = 0
         self._dfs = {}
         self._tables = {}
+        self._spellings = {}
         self._views = {}
         self._schema = MappingSchema(normalize=False)
         return None
+
+    def set_case_sensitive(self, case_sensitive):
+        """If true, identifiers are resolved exactly and always quoted, see Environment.caseSensitive"""
+        self._case_sensitive = case_sensitive
+        return None
+
+    # identifiers
+
+    def _key(self, name):
+        """Normalized name of an identifier, used for resolution"""
+        return name if self._case_sensitive else name.lower()
+
+    def _ident(self, name):
+        """Identifier for a new name, e.g. an alias, keeping its spelling"""
+        ident = exp.to_identifier(self._key(name), quoted=True)
+        ident.meta[_SPELLING] = name
+        return ident
+
+    def _alias(self, expression, name):
+        return exp.alias_(expression, self._ident(name))
+
+    def _normalize(self, expression, dialect):
+        """Normalize all identifiers of a parsed expression, and keep their spelling. A quoted identifier of a dialect
+        which resolves quoted identifiers case sensitive is marked as case sensitive."""
+        exact = Dialect.get_or_raise(dialect).normalization_strategy not in _CASE_INSENSITIVE_STRATEGIES
+        for ident in expression.find_all(exp.Identifier):
+            ident.meta[_SPELLING] = ident.this
+            if ident.quoted and exact:
+                ident.meta[_CASE_SENSITIVE] = True
+            ident.set("this", self._key(ident.this))
+            ident.set("quoted", True)
+        return expression
+
+    def _parse(self, sql):
+        return self._normalize(sqlglot.parse_one(sql, read=_COLUMN_DIALECT), _COLUMN_DIALECT)
+
+    def _parse_ordered(self, sql):
+        return self._normalize(exp.maybe_parse(sql, into=exp.Ordered, dialect=_COLUMN_DIALECT), _COLUMN_DIALECT)
+
+    def _schema_columns(self, placeholder, columns):
+        """Register the columns given as list of [name, type] for a placeholder table, and return their keys"""
+        keys = [self._key(c) for c, _ in columns]
+        duplicates = sorted({k for k in keys if keys.count(k) > 1})
+        if duplicates:
+            raise ValueError(f"Column names are ambiguous if resolved case-insensitively: {', '.join(duplicates)}")
+        self._schema.add_table(placeholder, {k: exp.DataType.build(t, udt=True) for k, (_, t) in zip(keys, columns)})
+        self._spellings[placeholder] = {k: c for k, (c, _) in zip(keys, columns)}
+        return keys
+
+    # resolution of spellings
+
+    def _source_form(self, scope, column):
+        """Form of a column reference, taken from the column of the source it references"""
+        key, table = column.name, column.table
+        source = None
+        while scope is not None and source is None:
+            source = scope.sources.get(table) if table else None
+            if not table and isinstance(scope.expression, exp.Select):
+                # a reference to a projection, e.g. in ORDER BY
+                projection = next((p for p in scope.expression.selects if isinstance(p, exp.Alias) and p.alias == key), None)
+                return projection.args["alias"].meta.get(_FORM) if projection is not None else None
+            scope = scope.parent
+        if isinstance(source, exp.Table):
+            spelling = self._spellings.get(source.name, {}).get(key)
+            return (spelling, _KIND_DB) if spelling is not None else None
+        if isinstance(source, Scope):
+            node = source.expression
+            table_alias = node.args.get("alias") if isinstance(node, exp.Values) \
+                else node.parent.args.get("alias") if isinstance(node.parent, (exp.Subquery, exp.CTE)) else None
+            if isinstance(table_alias, exp.TableAlias) and table_alias.columns:
+                ident = next((c for c in table_alias.columns if c.name == key), None)
+                return (ident.meta.get(_FORM) or _named_form(ident)) if ident is not None else None
+            for projection in _output_selects(node):
+                if projection.alias_or_name == key:
+                    ident = projection.args.get("alias") if isinstance(projection, exp.Alias) else projection.find(exp.Identifier)
+                    return ident.meta.get(_FORM) if ident is not None else None
+        return None
+
+    def _resolve(self, expr, check=False):
+        """Set the form of the column references and projection aliases of a qualified expression. If `check` is true,
+        a column reference which is case sensitive must match the spelling of its column exactly.
+        Returns the output columns of the expression as list of (key, spelling)."""
+        for scope in traverse_scope(expr):
+            columns = [c for c in scope.columns if isinstance(c.this, exp.Identifier)]
+            for column in [c for c in columns if c.table]:
+                form = self._source_form(scope, column)
+                ident = column.this
+                if check and not self._case_sensitive and ident.meta.get(_CASE_SENSITIVE) and form is not None \
+                        and form[0] != ident.meta.get(_SPELLING):
+                    raise ValueError(f"Column '{ident.meta.get(_SPELLING)}' could not be resolved, it is quoted and "
+                                     f"therefore case sensitive, but the column is spelled '{form[0]}'")
+                if form is not None:
+                    ident.meta[_FORM] = form
+            if isinstance(scope.expression, exp.Select):
+                for projection in scope.expression.selects:
+                    alias = projection.args.get("alias") if isinstance(projection, exp.Alias) else None
+                    if alias is None or _FORM in alias.meta:
+                        continue
+                    inner = projection.this
+                    if _SPELLING in alias.meta:
+                        alias.meta[_FORM] = _named_form(alias)
+                    elif isinstance(inner, exp.Column) and inner.name == alias.name and _FORM in inner.this.meta:
+                        # a column passed through keeps its form
+                        alias.meta[_FORM] = inner.this.meta[_FORM]
+                    else:
+                        alias.meta[_FORM] = (alias.name, _KIND_NEW)
+            for column in [c for c in columns if not c.table]:
+                form = self._source_form(scope, column)
+                if form is not None:
+                    column.this.meta[_FORM] = form
+        result = []
+        for projection in _output_selects(expr):
+            ident = projection.args.get("alias") if isinstance(projection, exp.Alias) else projection.find(exp.Identifier)
+            form = ident.meta.get(_FORM) if ident is not None else None
+            result.append((projection.alias_or_name, form[0] if form else projection.alias_or_name))
+        return result
+
+    def _quote(self, spelling, kind, dialect):
+        if self._case_sensitive or kind == _KIND_EXACT:
+            return True
+        if not _is_simple_identifier(spelling) or spelling.upper() in _RESERVED_WORDS:
+            return True
+        # a column of the database is quoted if the database would resolve it to a different spelling unquoted
+        return kind == _KIND_DB and dialect.case_sensitive(spelling)
+
+    def _apply_forms(self, expr, dialect):
+        """Set spelling and quoting of all identifiers for rendering in `dialect`"""
+        d = Dialect.get_or_raise(dialect)
+        for ident in list(expr.find_all(exp.Identifier)):
+            form = ident.meta.get(_FORM)
+            if form is None:
+                if _is_qualifier(ident) or isinstance(ident.parent, exp.Column):
+                    form = (ident.name, _KIND_NEW)
+                else:
+                    form = _named_form(ident)
+            spelling, kind = form
+            ident.set("this", spelling)
+            ident.set("quoted", self._quote(spelling, kind, d))
+        return expr
 
     # registry
 
@@ -150,16 +358,23 @@ class Session:
         return df
 
     def _register(self, expr, alias=None, join_scope=False, columns=None):
+        """Register a DataFrame. `columns` are its output columns as list of (key, spelling), they are resolved from
+        `expr` if not given."""
         if columns is None:
-            columns = qualify(expr.copy(), schema=self._schema, validate_qualify_columns=True).named_selects
+            qualified = qualify(expr.copy(), schema=self._schema, validate_qualify_columns=True)
+            columns = self._resolve(qualified, check=True)
         df_id = self._next_id()
-        df = _DataFrame(expr, list(columns), alias or f"_t{df_id}", join_scope)
+        df = _DataFrame(expr, [s for _, s in columns], [k for k, _ in columns], alias or f"_t{df_id}", join_scope)
         self._dfs[df_id] = df
         return {"id": df_id, "columns": df.columns, "alias": df.alias}
 
     def _info(self, df_id):
         df = self._df(df_id)
         return {"id": df_id, "columns": df.columns, "alias": df.alias}
+
+    @staticmethod
+    def _columns(d):
+        return list(zip(d.keys, d.columns))
 
     def _sub(self, df):
         return df.expr.subquery(exp.to_identifier(df.alias, quoted=True))
@@ -183,15 +398,16 @@ class Session:
     # creating DataFrames
 
     def table(self, name, columns, dialect=None):
-        """Create a DataFrame reading the database table `name` with `columns` as list of [name, type]"""
+        """Create a DataFrame reading the database table `name` with `columns` as list of [name, type], with names
+        spelled as in the database"""
         placeholder = f"{_PLACEHOLDER_PREFIX}{self._next_id()}"
         real = exp.to_table(name, dialect=dialect)
         self._tables[placeholder] = real
-        self._schema.add_table(placeholder, {c: exp.DataType.build(t, udt=True) for c, t in columns})
-        source = exp.Table(this=exp.to_identifier(placeholder),
-                           alias=exp.TableAlias(this=exp.to_identifier(real.name, quoted=True)))
-        expr = exp.select(*[_col(c, real.name) for c, _ in columns]).from_(source)
-        return self._register(expr, columns=[c for c, _ in columns])
+        keys = self._schema_columns(placeholder, columns)
+        alias = self._key(real.name)
+        source = exp.Table(this=exp.to_identifier(placeholder), alias=exp.TableAlias(this=exp.to_identifier(alias, quoted=True)))
+        expr = exp.select(*[_col(k, alias) for k in keys]).from_(source)
+        return self._register(expr, columns=list(zip(keys, [c for c, _ in columns])))
 
     def query(self, query, columns, dialect=None, alias="q"):
         """Create a DataFrame reading the result of the SQL query `query` in the dialect of the database, with `columns`
@@ -201,26 +417,26 @@ class Session:
         if not isinstance(parsed, exp.Query):
             raise ValueError(f"SQL statement must be a query, but is {type(parsed).__name__}: {query}")
         self._tables[placeholder] = parsed
-        self._schema.add_table(placeholder, {c: exp.DataType.build(t, udt=True) for c, t in columns})
+        keys = self._schema_columns(placeholder, columns)
+        alias = self._key(alias)
         source = exp.Table(this=exp.to_identifier(placeholder), alias=exp.TableAlias(this=exp.to_identifier(alias, quoted=True)))
-        expr = exp.select(*[_col(c, alias) for c, _ in columns]).from_(source)
-        return self._register(expr, columns=[c for c, _ in columns])
+        expr = exp.select(*[_col(k, alias) for k in keys]).from_(source)
+        return self._register(expr, columns=list(zip(keys, [c for c, _ in columns])))
 
     def empty(self, columns):
         """Create an empty DataFrame with `columns` as list of [name, type]"""
-        projections = [exp.cast(exp.null(), exp.DataType.build(t, udt=True)).as_(c, quoted=True) for c, t in columns]
+        projections = [self._alias(exp.cast(exp.null(), exp.DataType.build(t, udt=True)), c) for c, t in columns]
         expr = exp.select(*projections).where(exp.false())
-        return self._register(expr, columns=[c for c, _ in columns])
+        return self._register(expr, columns=[(self._key(c), c) for c, _ in columns])
 
     def values(self, rows, columns):
         """Create a DataFrame from `rows` given as list of lists of SQL literals, with `columns` as list of [name, type]"""
         if not rows:
             return self.empty(columns)
-        names = [c for c, _ in columns]
-        alias = exp.TableAlias(this=exp.to_identifier("_v", quoted=True), columns=[exp.to_identifier(n, quoted=True) for n in names])
-        source = exp.Values(expressions=[exp.Tuple(expressions=[_parse(v) for v in row]) for row in rows], alias=alias)
-        projections = [exp.cast(_col(n, "_v"), exp.DataType.build(t, udt=True)).as_(n, quoted=True) for n, t in columns]
-        return self._register(exp.select(*projections).from_(source), columns=names)
+        alias = exp.TableAlias(this=exp.to_identifier("_v", quoted=True), columns=[self._ident(c) for c, _ in columns])
+        source = exp.Values(expressions=[exp.Tuple(expressions=[self._parse(v) for v in row]) for row in rows], alias=alias)
+        projections = [self._alias(exp.cast(_col(self._key(c), "_v"), exp.DataType.build(t, udt=True)), c) for c, t in columns]
+        return self._register(exp.select(*projections).from_(source), columns=[(self._key(c), c) for c, _ in columns])
 
     def register_view(self, name, df):
         self._views[name.lower()] = self._df(df)
@@ -231,6 +447,7 @@ class Session:
         parsed = sqlglot.parse_one(query, read=dialect)
         if not isinstance(parsed, exp.Query):
             raise ValueError(f"SQL statement must be a query, but is {type(parsed).__name__}: {query}")
+        parsed = self._normalize(parsed, dialect)
         cte_names = {cte.alias_or_name.lower() for cte in parsed.find_all(exp.CTE)}
         for table in list(parsed.find_all(exp.Table)):
             if not isinstance(table.this, exp.Identifier):
@@ -240,45 +457,46 @@ class Session:
                 alias = table.args.get("alias") or exp.TableAlias(this=table.this.copy())
                 table.replace(exp.Subquery(this=view.expr.copy(), alias=alias.copy()))
             elif table.db or table.name.lower() not in cte_names:
-                raise ValueError(f"Table or view not found: {table.sql()}")
+                raise ValueError(f"Table or view not found: {'.'.join(p.meta.get(_SPELLING, p.name) for p in table.parts)}")
         return self._register(parsed)
 
     # transforming DataFrames
 
     def alias(self, df, alias):
         d = self._df(df)
-        return self._register(d.expr, alias=alias, join_scope=d.join_scope, columns=d.columns)
+        return self._register(d.expr, alias=self._key(alias), join_scope=d.join_scope, columns=self._columns(d))
 
     def select(self, df, columns):
         d = self._df(df)
         return self._in_join_scope(
             d,
-            lambda: self._register(d.expr.copy().select(*[_parse(c) for c in columns], append=False)),
-            lambda: self._register(exp.select(*[_parse(c) for c in columns]).from_(self._sub(d))))
+            lambda: self._register(d.expr.copy().select(*[self._parse(c) for c in columns], append=False)),
+            lambda: self._register(exp.select(*[self._parse(c) for c in columns]).from_(self._sub(d))))
 
     def filter(self, df, condition):
         d = self._df(df)
         return self._in_join_scope(
             d,
-            lambda: self._register(d.expr.copy().where(_parse(condition)), join_scope=True),
-            lambda: self._register(exp.select("*").from_(self._sub(d)).where(_parse(condition)), columns=d.columns))
+            lambda: self._register(d.expr.copy().where(self._parse(condition)), join_scope=True),
+            lambda: self._register(exp.select("*").from_(self._sub(d)).where(self._parse(condition)), columns=self._columns(d)))
 
     def with_column(self, df, name, column):
         d = self._df(df)
+        key = self._key(name)
 
         def direct():
-            projection = _parse(column).as_(name, quoted=True)
+            projection = self._alias(self._parse(column), name)
             existing = d.expr.expressions
-            if name in d.columns:
-                projections = [projection if p.alias_or_name == name else p.copy() for p in existing]
+            if key in d.keys:
+                projections = [projection if p.alias_or_name == key else p.copy() for p in existing]
             else:
                 projections = [p.copy() for p in existing] + [projection]
             return self._register(d.expr.copy().select(*projections, append=False), join_scope=True)
 
         def wrapped():
-            projection = _parse(column).as_(name, quoted=True)
-            projections = [projection if c == name else _col(c) for c in d.columns]
-            if name not in d.columns:
+            projection = self._alias(self._parse(column), name)
+            projections = [projection if k == key else _col(k) for k in d.keys]
+            if key not in d.keys:
                 projections.append(projection)
             return self._register(exp.select(*projections).from_(self._sub(d)))
 
@@ -286,17 +504,19 @@ class Session:
 
     def with_column_renamed(self, df, name, new_name):
         d = self._df(df)
-        if name not in d.columns:
+        key = self._key(name)
+        if key not in d.keys:
             return self._info(df)
-        projections = [_col(c).as_(new_name, quoted=True) if c == name else _col(c) for c in d.columns]
+        projections = [self._alias(_col(k), new_name) if k == key else _col(k) for k in d.keys]
         return self._register(exp.select(*projections).from_(self._sub(d)))
 
     def drop(self, df, names):
         d = self._df(df)
-        remaining = [c for c in d.columns if c not in names]
-        if len(remaining) == len(d.columns):
+        keys = {self._key(n) for n in names}
+        remaining = [(k, s) for k, s in self._columns(d) if k not in keys]
+        if len(remaining) == len(d.keys):
             return self._info(df)
-        return self._register(exp.select(*[_col(c) for c in remaining]).from_(self._sub(d)), columns=remaining)
+        return self._register(exp.select(*[_col(k) for k, _ in remaining]).from_(self._sub(d)), columns=remaining)
 
     def join(self, df, other, how="inner", on=None, condition=None):
         left, right = self._df(df), self._df(other)
@@ -306,80 +526,83 @@ class Session:
         if join_type is None:
             raise ValueError(f"Unsupported join type {how}, supported are {', '.join(_JOIN_TYPES)}")
         if on is not None:
+            on = [self._key(c) for c in on]
             for c in on:
-                if c not in left.columns or c not in right.columns:
+                if c not in left.keys or c not in right.keys:
                     raise ValueError(f"Join column {c} does not exist on both sides of the join")
             cond = exp.and_(*[exp.EQ(this=_col(c, left.alias), expression=_col(c, right.alias)) for c in on]) if on else None
         else:
-            cond = _parse(condition) if condition else None
+            cond = self._parse(condition) if condition else None
         if cond is None and join_type not in ("cross", "inner"):
             raise ValueError(f"Join type {how} needs join columns or a condition")
         if join_type in ("semi", "anti"):
             exists = exp.Exists(this=exp.select("1").from_(self._sub(right)).where(cond))
-            expr = exp.select(*[_col(c, left.alias) for c in left.columns]).from_(self._sub(left)) \
+            expr = exp.select(*[_col(c, left.alias) for c in left.keys]).from_(self._sub(left)) \
                 .where(exists if join_type == "semi" else exp.not_(exists))
-            return self._register(expr, columns=left.columns)
+            return self._register(expr, columns=self._columns(left))
         if on is not None:
-            key_side = {"right": right.alias}.get(join_type, left.alias)
-            keys = [exp.Coalesce(this=_col(c, left.alias), expressions=[_col(c, right.alias)]).as_(c, quoted=True)
-                    if join_type == "full" else _col(c, key_side) for c in on]
-            projections = keys + [_col(c, left.alias) for c in left.columns if c not in on] \
-                + [_col(c, right.alias) for c in right.columns if c not in on]
+            key_side = {"right": right}.get(join_type, left)
+            keys = [self._alias(exp.Coalesce(this=_col(c, left.alias), expressions=[_col(c, right.alias)]), left.spelling(c))
+                    if join_type == "full" else _col(c, key_side.alias) for c in on]
+            projections = keys + [_col(c, left.alias) for c in left.keys if c not in on] \
+                + [_col(c, right.alias) for c in right.keys if c not in on]
+            columns = [(c, key_side.spelling(c)) for c in on] + [(k, s) for k, s in self._columns(left) if k not in on] \
+                + [(k, s) for k, s in self._columns(right) if k not in on]
         else:
-            projections = [_col(c, left.alias) for c in left.columns] + [_col(c, right.alias) for c in right.columns]
+            projections = [_col(c, left.alias) for c in left.keys] + [_col(c, right.alias) for c in right.keys]
+            columns = self._columns(left) + self._columns(right)
         join_type = "cross" if cond is None else join_type
         expr = exp.select(*projections).from_(self._sub(left)).join(self._sub(right), on=cond, join_type=join_type)
-        columns = [p.alias_or_name for p in projections]
         return self._register(expr, join_scope=True, columns=columns)
 
     def group_by_agg(self, df, group_columns, aggregate_columns):
         d = self._df(df)
-        groups = [_parse(c) for c in group_columns]
-        expr = exp.select(*groups, *[_parse(c) for c in aggregate_columns]).from_(self._sub(d))
+        groups = [self._parse(c) for c in group_columns]
+        expr = exp.select(*groups, *[self._parse(c) for c in aggregate_columns]).from_(self._sub(d))
         if groups:
             expr = expr.group_by(*[g.unalias() for g in groups])
         return self._register(expr)
 
     def _select_columns(self, d, columns):
-        return exp.select(*[_col(c) if c in d.columns else exp.null().as_(c, quoted=True) for c in columns]) \
-            .from_(self._sub(d))
+        return exp.select(*[_col(k) if k in d.keys else self._alias(exp.null(), s) for k, s in columns]).from_(self._sub(d))
 
     def union_by_name(self, df, other, allow_missing_columns=False):
         left, right = self._df(df), self._df(other)
-        if not allow_missing_columns and set(left.columns) != set(right.columns):
+        if not allow_missing_columns and set(left.keys) != set(right.keys):
             raise ValueError(f"unionByName needs the same columns on both sides, but got {left.columns} and {right.columns}")
-        columns = left.columns + [c for c in right.columns if c not in left.columns]
+        columns = self._columns(left) + [(k, s) for k, s in self._columns(right) if k not in left.keys]
         expr = exp.union(self._select_columns(left, columns), self._select_columns(right, columns), distinct=False)
         return self._register(expr, columns=columns)
 
     def except_(self, df, other):
         left, right = self._df(df), self._df(other)
-        expr = exp.except_(self._select_columns(left, left.columns), self._select_columns(right, left.columns), distinct=True)
-        return self._register(expr, columns=left.columns)
+        columns = self._columns(left)
+        expr = exp.except_(self._select_columns(left, columns), self._select_columns(right, columns), distinct=True)
+        return self._register(expr, columns=columns)
 
     def distinct(self, df):
         d = self._df(df)
-        return self._register(exp.select("*").from_(self._sub(d)).distinct(), columns=d.columns)
+        return self._register(exp.select("*").from_(self._sub(d)).distinct(), columns=self._columns(d))
 
     def drop_duplicates(self, df, columns):
         d = self._df(df)
         if not columns:
             return self.distinct(df)
-        keys = [_col(c) for c in columns]
+        keys = [_col(self._key(c)) for c in columns]
         row_number = exp.Window(this=exp.RowNumber(), partition_by=keys,
                                 order=exp.Order(expressions=[exp.Ordered(this=k.copy()) for k in keys]))
         inner = exp.select("*", row_number.as_(_ROW_NUMBER_COLUMN, quoted=True)).from_(self._sub(d)) \
             .subquery(exp.to_identifier("_dedup", quoted=True))
-        expr = exp.select(*[_col(c) for c in d.columns]).from_(inner).where(exp.EQ(this=_col(_ROW_NUMBER_COLUMN), expression=exp.Literal.number(1)))
-        return self._register(expr, columns=d.columns)
+        expr = exp.select(*[_col(k) for k in d.keys]).from_(inner).where(exp.EQ(this=_col(_ROW_NUMBER_COLUMN), expression=exp.Literal.number(1)))
+        return self._register(expr, columns=self._columns(d))
 
     def order_by(self, df, columns):
         d = self._df(df)
-        return self._register(exp.select("*").from_(self._sub(d)).order_by(*[_parse_ordered(c) for c in columns]), columns=d.columns)
+        return self._register(exp.select("*").from_(self._sub(d)).order_by(*[self._parse_ordered(c) for c in columns]), columns=self._columns(d))
 
     def limit(self, df, n):
         d = self._df(df)
-        return self._register(exp.select("*").from_(self._sub(d)).limit(n), columns=d.columns)
+        return self._register(exp.select("*").from_(self._sub(d)).limit(n), columns=self._columns(d))
 
     # rendering
 
@@ -395,40 +618,52 @@ class Session:
                     table.set(part, value.copy() if value is not None else None)
         return expr
 
-    def _render(self, expr, optimized=True):
+    def _optimize(self, expr):
+        """Optimize an expression, and resolve the forms of its identifiers. The projection aliases are resolved before
+        optimizing, as the optimizer creates new aliases when merging subqueries."""
+        expr = qualify(expr, schema=self._schema, validate_qualify_columns=False)
+        self._resolve(expr)
+        expr = optimize(expr, schema=self._schema, rules=_OPTIMIZER_RULES)
+        self._resolve(expr)
+        return expr
+
+    def _render(self, expr, dialect, optimized=True):
         if optimized:
-            expr = optimize(expr, schema=self._schema, rules=_OPTIMIZER_RULES)
+            expr = self._optimize(expr)
+        else:
+            self._resolve(expr)
+        self._apply_forms(expr, dialect)
         return self._replace_placeholders(expr)
 
     def schema(self, df):
         """Return the fields of the DataFrame as list of {name, type} with type inferred by SQLGlot"""
-        expr = optimize(self._df(df).expr.copy(), schema=self._schema, rules=_OPTIMIZER_RULES)
-        return [{"name": s.alias_or_name, "type": _type_json(s.type)} for s in expr.selects]
+        d = self._df(df)
+        expr = optimize(d.expr.copy(), schema=self._schema, rules=_OPTIMIZER_RULES)
+        return [{"name": name, "type": _type_json(s.type)} for name, s in zip(d.columns, expr.selects)]
 
     def to_sql(self, df, dialect=None, optimized=True, pretty=False):
-        return self._render(self._df(df).expr.copy(), optimized).sql(dialect=dialect, pretty=pretty)
+        return self._render(self._df(df).expr.copy(), dialect, optimized).sql(dialect=dialect, pretty=pretty)
 
-    def create_table_as(self, df, table, dialect=None, with_data=True, quote_names=False):
+    def create_table_as(self, df, table, dialect=None, with_data=True):
         """Create a `CREATE TABLE <table> AS <query>` statement for the DataFrame. `table` is given in the dialect of the
-        database. If `with_data` is false, the table is created empty. If `quote_names` is false, column names which
-        are valid identifiers are not quoted, so that the database normalizes their case as for unquoted identifiers."""
+        database. If `with_data` is false, the table is created empty. The names of new columns are rendered unquoted if
+        possible, so that the database normalizes their case as for unquoted identifiers, see `_quote`."""
         d = self._df(df)
         expr = d.expr.copy()
         if not with_data:
             expr = exp.select("*").from_(expr.subquery(exp.to_identifier("_ctas", quoted=True))).where(exp.false())
-        expr = self._render(expr)
-        if not quote_names:
-            for projection in expr.selects:
-                alias = projection.args.get("alias")
-                if isinstance(projection, exp.Alias) and alias is not None and _is_simple_identifier(alias.name):
-                    alias.set("quoted", False)
+        expr = self._render(expr, dialect)
         create = exp.Create(this=exp.to_table(table, dialect=dialect), kind="TABLE", expression=expr)
         return create.sql(dialect=dialect)
+
+    def _column_identifier(self, name, kind, dialect, quote_names):
+        quoted = quote_names or self._quote(name, kind, Dialect.get_or_raise(dialect))
+        return exp.to_identifier(name, quoted=quoted)
 
     def create_table(self, table, columns, dialect=None, quote_names=False):
         """Create a `CREATE TABLE` statement with `columns` as list of [name, type, nullable]"""
         column_defs = [
-            exp.ColumnDef(this=exp.to_identifier(name, quoted=quote_names or not _is_simple_identifier(name)),
+            exp.ColumnDef(this=self._column_identifier(name, _KIND_NEW, dialect, quote_names),
                           kind=exp.DataType.build(tpe, udt=True),
                           constraints=[] if nullable else [exp.ColumnConstraint(kind=exp.NotNullColumnConstraint())])
             for name, tpe, nullable in columns
@@ -439,6 +674,7 @@ class Session:
     def alter_table(self, table, changes, dialect=None, quote_names=False):
         """Create `ALTER TABLE` statements for schema changes, given as list of objects with keys `change` (add, type
         or nullable), `column`, `type` (new type for add and type, current type for nullable) and `nullable`.
+        The column of a type or nullable change is an existing column, given with the spelling of the database.
         SQLGlot renders them for most dialects. Changes of nullability are not supported by SQLGlot for some dialects,
         and are created here, as well as type changes for Oracle."""
         dialect_name = (dialect or "").lower()
@@ -446,10 +682,10 @@ class Session:
         statements = []
         for change in changes:
             name = change["column"]
-            identifier = exp.to_identifier(name, quoted=quote_names or not _is_simple_identifier(name))
+            kind = change["change"]
+            identifier = self._column_identifier(name, _KIND_NEW if kind == "add" else _KIND_DB, dialect, quote_names)
             column = identifier.sql(dialect=dialect)
             data_type = exp.DataType.build(change["type"], udt=True) if change.get("type") else None
-            kind = change["change"]
             if kind == "nullable" and dialect_name in ("tsql", "mysql", "oracle"):
                 null_sql = "NULL" if change["nullable"] else "NOT NULL"
                 if dialect_name == "oracle":
@@ -487,7 +723,9 @@ class Session:
         Returns an object with `fields` (column, inputs as list of [dataObjectId, column, identity], description of
         the transformation and expression of a constant), `unresolved` (columns which could not be traced back to an
         input), `dead_ends` per unresolved column, `inputs` with the columns of the inputs and the ones not used,
-        and the `plan`, i.e. the SQL the lineage was read from."""
+        and the `plan`, i.e. the SQL the lineage was read from.
+        Lineage is followed with the normalized column names, the columns reported have the spelling of their
+        DataFrame, while descriptions and the plan use the normalized names."""
         d = self._df(df)
         schema = MappingSchema(self._schema.mapping, normalize=False)
         # placeholder per distinct input query, an input can belong to more than one DataObject
@@ -499,9 +737,9 @@ class Session:
             if placeholder is None:
                 placeholder = f"{_INPUT_PLACEHOLDER_PREFIX}{len(placeholder_by_query)}"
                 placeholder_by_query.append((input_expr, placeholder))
-                schema.add_table(placeholder, {c: exp.DataType.build("UNKNOWN") for c in self._df(input_df).columns})
+                schema.add_table(placeholder, {k: exp.DataType.build("UNKNOWN") for k in self._df(input_df).keys})
             input_placeholders.setdefault(placeholder, []).append(data_object_id)
-        input_columns = {data_object_id: self._df(input_df).columns for data_object_id, input_df in inputs}
+        input_dfs = {data_object_id: self._df(input_df) for data_object_id, input_df in inputs}
         if not inputs:
             return {"fields": [], "unresolved": [], "dead_ends": {}, "inputs": [], "plan": []}
 
@@ -533,7 +771,7 @@ class Session:
             return {_node_name(c.sql()) for c in expression.find_all(exp.Column)}
 
         fields, unresolved, dead_ends, used_input_columns = [], [], {}, set()
-        for column in sorted(d.columns):
+        for key, column in sorted(self._columns(d), key=lambda c: c[1]):
             input_fields = {}
             column_dead_ends = []
             description = None
@@ -545,11 +783,13 @@ class Session:
                 source = node.source
                 if not node.downstream:
                     if isinstance(source, exp.Table) and source.name in input_placeholders:
-                        input_column = _node_name(node.name).split(".")[-1]
+                        input_key = _node_name(node.name).split(".")[-1]
                         for data_object_id in input_placeholders[source.name]:
-                            key = (data_object_id, input_column)
-                            input_fields[key] = input_fields.get(key, True) and identity
-                            used_input_columns.add(key)
+                            input_df = input_dfs[data_object_id]
+                            input_column = input_df.spelling(input_key) if input_key in input_df.keys else input_key
+                            item = (data_object_id, input_column)
+                            input_fields[item] = input_fields.get(item, True) and identity
+                            used_input_columns.add(item)
                     elif isinstance(node.expression, exp.Table) or not isinstance(source, (exp.Select, exp.SetOperation)) \
                             or next(node.expression.find_all(exp.Column), None) is not None:
                         # a column of a source which is not an input
@@ -575,7 +815,7 @@ class Session:
 
             try:
                 # the column is given as quoted identifier, otherwise SQLGlot normalizes its name to lower case
-                node = sqlglot_lineage(exp.column(exp.to_identifier(column, quoted=True)), expr, schema=schema)
+                node = sqlglot_lineage(exp.column(exp.to_identifier(key, quoted=True)), expr, schema=schema)
                 walk(node, [], True)
             except Exception as e:
                 column_dead_ends.append({"attribute": column, "path": [column], "producedBy": type(e).__name__, "producedByNode": str(e)[:max_description_length]})
@@ -587,9 +827,9 @@ class Session:
                 expression = constant_expression if not inputs_list else None
                 fields.append({"column": column, "inputs": inputs_list,
                                "description": description if any(not i[2] for i in inputs_list) else None, "expression": expression})
-        inputs_info = [{"dataObjectId": data_object_id, "columns": columns,
-                        "columnsNotInPlan": [c for c in columns if (data_object_id, c) not in used_input_columns]}
-                       for data_object_id, columns in input_columns.items()]
+        inputs_info = [{"dataObjectId": data_object_id, "columns": input_df.columns,
+                        "columnsNotInPlan": [c for c in input_df.columns if (data_object_id, c) not in used_input_columns]}
+                       for data_object_id, input_df in input_dfs.items()]
         return {"fields": fields, "unresolved": unresolved, "dead_ends": dead_ends, "inputs": inputs_info,
                 "plan": expr.sql(pretty=True).splitlines()}
 
@@ -616,6 +856,7 @@ _session = Session()
 
 _OPS = {
     "reset": _session.reset,
+    "set_case_sensitive": _session.set_case_sensitive,
     "release": _session.release,
     "table": _session.table,
     "empty": _session.empty,

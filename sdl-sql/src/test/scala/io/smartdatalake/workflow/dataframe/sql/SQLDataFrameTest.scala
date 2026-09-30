@@ -82,13 +82,13 @@ class SQLDataFrameTest extends AnyFunSuite {
     assert(dfResult.columns == Seq("a", "b", "c", "d", "e", "x"))
     assert(dfResult.toSql(Some("postgres"), pretty = true) ==
       """SELECT
-        |  "test_table"."a" AS "a",
-        |  "test_table"."b" AS "b",
-        |  "test_table"."c" AS "c",
-        |  "test_table"."a" * 2 AS "d",
-        |  "test_table"."a" * 4 AS "e",
-        |  "test_table"."a" * 8 AS "x"
-        |FROM db.test_table AS "test_table"""".stripMargin)
+        |  test_table.a AS a,
+        |  test_table.b AS b,
+        |  test_table.c AS c,
+        |  test_table.a * 2 AS d,
+        |  test_table.a * 4 AS e,
+        |  test_table.a * 8 AS x
+        |FROM db.test_table AS test_table""".stripMargin)
     assert(dfResult.schema.fields.map(_.dataType.sql).distinct == Seq("INT", "TEXT"))
   }
 
@@ -103,25 +103,26 @@ class SQLDataFrameTest extends AnyFunSuite {
       ))
     assert(df.columns == Seq("x", "y", "w", "b"))
     assert(df.toSql(Some("postgres")) ==
-      """SELECT "test_table"."a" AS "x", ("test_table"."a" + -1) * 2 AS "y", """ +
-        """CASE WHEN "test_table"."a" = 1 THEN 'one' ELSE 'other' END AS "w", CAST("test_table"."b" AS TEXT) AS "b" """ +
-        """FROM db.test_table AS "test_table" WHERE "test_table"."a" > 1 AND "test_table"."c" IN ('x', 'it''s')""")
+      """SELECT test_table.a AS x, (test_table.a + -1) * 2 AS y, """ +
+        """CASE WHEN test_table.a = 1 THEN 'one' ELSE 'other' END AS w, CAST(test_table.b AS TEXT) AS b """ +
+        """FROM db.test_table AS test_table WHERE test_table.a > 1 AND test_table.c IN ('x', 'it''s')""")
     assert(df.schema.fields.map(f => (f.name, f.dataType.sql)) == Seq(("x", "INT"), ("y", "INT"), ("w", "VARCHAR"), ("b", "TEXT")))
   }
 
   test("sql is rendered in the dialect of the database") {
     val df = testTable.orderBy(Seq(col("a").desc)).limit(3)
     assert(df.toSql(Some("tsql")) ==
-      "SELECT TOP 3 [test_table].[a] AS [a], [test_table].[b] AS [b], [test_table].[c] AS [c] FROM db.test_table AS [test_table] ORDER BY [test_table].[a] DESC")
-    assert(df.toSql(Some("snowflake")).endsWith("""ORDER BY "test_table"."a" DESC NULLS LAST LIMIT 3"""))
+      "SELECT TOP 3 test_table.a AS a, test_table.b AS b, test_table.c AS c FROM db.test_table AS test_table ORDER BY test_table.a DESC")
+    // in snowflake, the lower case column of the database must be quoted
+    assert(df.toSql(Some("snowflake")).endsWith("""ORDER BY test_table."a" DESC NULLS LAST LIMIT 3"""))
   }
 
   test("join on columns") {
     val df = testTable.join(otherTable, Seq("a"), "left")
     assert(df.columns == Seq("a", "b", "c", "z"))
     assert(df.toSql() ==
-      """SELECT "test_table"."a" AS "a", "test_table"."b" AS "b", "test_table"."c" AS "c", "other"."z" AS "z" """ +
-        """FROM db.test_table AS "test_table" LEFT JOIN other AS "other" ON "other"."a" = "test_table"."a"""")
+      """SELECT test_table.a AS a, test_table.b AS b, test_table.c AS c, other.z AS z """ +
+        """FROM db.test_table AS test_table LEFT JOIN other AS other ON other.a = test_table.a""")
     assert(df.schema.getDataType("z").sql == "DECIMAL(10, 2)")
   }
 
@@ -133,18 +134,18 @@ class SQLDataFrameTest extends AnyFunSuite {
       .select(Seq(dfLeft("a"), dfRight("z")))
     assert(df.columns == Seq("a", "z"))
     assert(df.toSql() ==
-      """SELECT "test_table"."a" AS "a", "other"."z" AS "z" FROM db.test_table AS "test_table" """ +
+      """SELECT test_table.a AS a, other.z AS z FROM db.test_table AS test_table """ +
         // the optimizer moves the filter into the condition of the inner join
-        """JOIN other AS "other" ON "other"."a" = "test_table"."a" AND "other"."z" > 0""")
+        """JOIN other AS other ON other.a = test_table.a AND other.z > 0""")
   }
 
   test("group by and aggregate") {
     val df = testTable.groupBy(Seq(col("c"))).agg(Seq(count(col("*")).as("cnt"), max(col("a")).as("m")))
     assert(df.toSql() ==
-      """SELECT "test_table"."c" AS "c", COUNT(*) AS "cnt", MAX("test_table"."a") AS "m" FROM db.test_table AS "test_table" GROUP BY "test_table"."c"""")
+      """SELECT test_table.c AS c, COUNT(*) AS cnt, MAX(test_table.a) AS m FROM db.test_table AS test_table GROUP BY test_table.c""")
     assert(df.schema.fields.map(f => (f.name, f.dataType.sql)) == Seq(("c", "TEXT"), ("cnt", "BIGINT"), ("m", "INT")))
     // aggregation over all rows
-    assert(testTable.agg(Seq(min(col("a")).as("m"))).toSql() == """SELECT MIN("test_table"."a") AS "m" FROM db.test_table AS "test_table"""")
+    assert(testTable.agg(Seq(min(col("a")).as("m"))).toSql() == """SELECT MIN(test_table.a) AS m FROM db.test_table AS test_table""")
   }
 
   test("union, except, distinct and drop duplicates") {
@@ -169,13 +170,13 @@ class SQLDataFrameTest extends AnyFunSuite {
     val df = Seq((1, "a"), (2, "it's")).toDF("num", "str").asInstanceOf[SQLDataFrame]
     assert(df.columns == Seq("num", "str"))
     assert(df.toSql(Some("postgres")) ==
-      """SELECT CAST("_v"."num" AS INT) AS "num", CAST("_v"."str" AS TEXT) AS "str" FROM (VALUES (1, 'a'), (2, 'it''s')) AS "_v"("num", "str")""")
+      """SELECT CAST(_v.num AS INT) AS num, CAST(_v.str AS TEXT) AS str FROM (VALUES (1, 'a'), (2, 'it''s')) AS _v(num, str)""")
   }
 
   test("empty DataFrame") {
     val df = schema.getEmptyDataFrame(DataObjectId("do1"))
     assert(df.columns == Seq("a", "b", "c"))
-    assert(df.toSql(Some("postgres")) == """SELECT CAST(NULL AS INT) AS "a", CAST(NULL AS INT) AS "b", CAST(NULL AS TEXT) AS "c" WHERE FALSE""")
+    assert(df.toSql(Some("postgres")) == """SELECT CAST(NULL AS INT) AS a, CAST(NULL AS INT) AS b, CAST(NULL AS TEXT) AS c WHERE FALSE""")
   }
 
   test("SQLDfTransformer translates Spark SQL") {
@@ -184,20 +185,40 @@ class SQLDataFrameTest extends AnyFunSuite {
       .asInstanceOf[SQLDataFrame]
     assert(df.columns == Seq("a", "c2", "b"))
     assert(df.toSql(Some("postgres")) ==
-      """SELECT "test_table"."a" AS "a", COALESCE("test_table"."c", 'x') AS "c2", "test_table"."b" AS "b" """ +
-        """FROM db.test_table AS "test_table" WHERE "test_table"."a" > 1""")
+      """SELECT test_table.a AS a, COALESCE(test_table.c, 'x') AS c2, test_table.b AS b """ +
+        """FROM db.test_table AS test_table WHERE test_table.a > 1""")
   }
 
   test("partition values and filters are applied") {
     val subFeed = getSubFeed(testTable, DataObjectId("do1"), Seq())
       .withFilters(Seq(PartitionValues(Map("c" -> "x")), PartitionValues(Map("c" -> "y"))), Seq())
     val df = subFeed.dataFrame.get.asInstanceOf[SQLDataFrame]
-    assert(df.toSql().endsWith("""WHERE "test_table"."c" IN ('x', 'y')"""))
+    assert(df.toSql().endsWith("""WHERE test_table.c IN ('x', 'y')"""))
   }
 
-  test("expressions are parsed in the default SQLGlot dialect") {
-    val df = testTable.filter(expr("a > 1 and c like 'x%'"))
-    assert(df.toSql().endsWith("""WHERE "test_table"."a" > 1 AND "test_table"."c" LIKE 'x%'"""))
+  test("expressions are Spark SQL") {
+    val df = testTable.filter(expr("A > 1 and `C` like 'x%' and b <=> 1"))
+    assert(df.toSql().endsWith("""WHERE test_table.a > 1 AND test_table.c LIKE 'x%' AND test_table.b IS NOT DISTINCT FROM 1"""))
+  }
+
+  test("identifiers are resolved case-insensitively and keep the spelling of the database") {
+    connection.execJdbcStatement("""create table db.mixed_case ("Name" varchar, "CODE" int, "My Col" int)""")
+    connection.execJdbcStatement("""insert into db.mixed_case values ('x', 1, 10), ('y', 2, 20)""")
+    val dfTable = table("db.mixed_case", SQLSchema(Seq(SQLField("Name", SQLSimpleDataType("TEXT")),
+      SQLField("CODE", SQLSimpleDataType("INT")), SQLField("My Col", SQLSimpleDataType("INT")))))
+    val df = dfTable.filter(col("code") > lit(1)).select(Seq(col("NAME"), col("`my col`"), (col("Code") * lit(2)).as("TownCode")))
+    assert(df.columns == Seq("Name", "My Col", "TownCode"))
+    assert(df.toSql(Some("postgres")) ==
+      """SELECT mixed_case."Name" AS "Name", mixed_case."My Col" AS "My Col", mixed_case."CODE" * 2 AS TownCode """ +
+        """FROM db.mixed_case AS mixed_case WHERE mixed_case."CODE" > 1""")
+    assert(df.toSql(Some("snowflake")) ==
+      """SELECT mixed_case."Name" AS "Name", mixed_case."My Col" AS "My Col", mixed_case.CODE * 2 AS TownCode """ +
+        """FROM db.mixed_case AS mixed_case WHERE mixed_case.CODE > 1""")
+    assert(rows(df) == Seq(Seq("y", 20, 4)))
+    val dfSql = SQLDfTransformer(code = Some("select NAME, `My col` as x from %{inputViewName} where CODE = 1"))
+      .transformWithOptions(ActionId("action1"), Seq(), dfTable, DataObjectId("src1"), Map())
+    assert(dfSql.columns == Seq("Name", "x"))
+    assert(rows(dfSql) == Seq(Seq("x", 10)))
   }
 
   test("column SQL round-trips through SQLGlot") {
@@ -206,6 +227,8 @@ class SQLDataFrameTest extends AnyFunSuite {
       (col("a") + lit(1)) * lit(2),
       col("a") > lit(1) and col("b").isNull or not(col("c") === lit("x")),
       col("a") <=> lit(null),
+      col("my col") + lit("it's a \\ b"),
+      col("a").cast(createSimpleDataType("timestamp")),
       col("a").isin(1, 2),
       when(col("a") === lit(1), lit("one")).otherwise(lit("other")),
       col("a").cast(createSimpleDataType("decimal(10,2)")),
@@ -218,7 +241,7 @@ class SQLDataFrameTest extends AnyFunSuite {
     columns.foreach { c =>
       val sql = SQLColumn.of(c).expr
       // parsing and rendering must not change the expression, apart from redundant parentheses
-      assert(bridge.transpile(sql, None, None).replace("(", "").replace(")", "") == sql.replace("(", "").replace(")", ""), sql)
+      assert(bridge.transpile(sql, Some("databricks"), Some("databricks")).replace("(", "").replace(")", "") == sql.replace("(", "").replace(")", ""), sql)
     }
   }
 
@@ -235,7 +258,7 @@ class SQLDataFrameTest extends AnyFunSuite {
       Future(testTable.withColumn("i", lit(i)).filter(col("a") > lit(i)).toSql())
     }), 60.seconds)
     results.zipWithIndex.foreach { case (sql, idx) =>
-      assert(sql.contains(s"""${idx + 1} AS "i"""") && sql.endsWith(s"""WHERE "test_table"."a" > ${idx + 1}"""))
+      assert(sql.contains(s"""${idx + 1} AS i""") && sql.endsWith(s"""WHERE test_table.a > ${idx + 1}"""))
     }
   }
 

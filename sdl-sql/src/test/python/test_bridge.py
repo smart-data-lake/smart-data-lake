@@ -39,6 +39,7 @@ def call(op, **args):
 
 @pytest.fixture(autouse=True)
 def reset():
+    call("set_case_sensitive", case_sensitive=False)
     call("reset")
 
 
@@ -53,40 +54,40 @@ def to_sql(df, dialect=None, **kwargs):
 def test_table_uses_real_table_name():
     df = table()
     assert df["columns"] == ["a", "b", "c"]
-    assert to_sql(df) == 'SELECT "test_table"."a" AS "a", "test_table"."b" AS "b", "test_table"."c" AS "c" FROM db.test_table AS "test_table"'
+    assert to_sql(df) == 'SELECT test_table.a AS a, test_table.b AS b, test_table.c AS c FROM db.test_table AS test_table'
 
 
 def test_transformations_are_merged_by_optimizer():
     # the example of issue #866 with sqlframe
     df = table()
-    df = call("with_column", df=df["id"], name="d", column='"a" * 2')
+    df = call("with_column", df=df["id"], name="d", column='a * 2')
     call("register_view", name="test_table_int", df=df["id"])
     df = call("sql", query="select *, d * 2 as e from test_table_int", dialect="spark")
-    df = call("with_column", df=df["id"], name="x", column='"e" * 2')
+    df = call("with_column", df=df["id"], name="x", column='e * 2')
     assert df["columns"] == ["a", "b", "c", "d", "e", "x"]
     assert to_sql(df, "postgres") == (
-        'SELECT "test_table"."a" AS "a", "test_table"."b" AS "b", "test_table"."c" AS "c", '
-        '"test_table"."a" * 2 AS "d", "test_table"."a" * 4 AS "e", "test_table"."a" * 8 AS "x" '
-        'FROM db.test_table AS "test_table"')
+        'SELECT test_table.a AS a, test_table.b AS b, test_table.c AS c, '
+        'test_table.a * 2 AS d, test_table.a * 4 AS e, test_table.a * 8 AS x '
+        'FROM db.test_table AS test_table')
 
 
 def test_unoptimized_sql_keeps_subqueries():
-    df = call("filter", df=table()["id"], condition='"a" > 1')
+    df = call("filter", df=table()["id"], condition='a > 1')
     assert to_sql(df, optimized=False) == (
-        'SELECT * FROM (SELECT "test_table"."a", "test_table"."b", "test_table"."c" FROM db.test_table AS "test_table") '
-        'AS "_t2" WHERE "a" > 1')
+        'SELECT * FROM (SELECT test_table.a, test_table.b, test_table.c FROM db.test_table AS test_table) '
+        'AS _t2 WHERE a > 1')
 
 
 def test_dialects():
     df = call("limit", df=table()["id"], n=3)
-    assert to_sql(df, "tsql").startswith("SELECT TOP 3 [test_table].[a] AS [a]")
+    assert to_sql(df, "tsql").startswith("SELECT TOP 3 test_table.a AS a")
     assert to_sql(df, "postgres").endswith("LIMIT 3")
 
 
 def test_sql_translates_dialect():
     call("register_view", name="v", df=table()["id"])
     df = call("sql", query="select top 3 a from v", dialect="tsql")
-    assert to_sql(df, "postgres") == 'SELECT "test_table"."a" AS "a" FROM db.test_table AS "test_table" LIMIT 3'
+    assert to_sql(df, "postgres") == 'SELECT test_table.a AS a FROM db.test_table AS test_table LIMIT 3'
 
 
 def test_sql_unknown_table():
@@ -102,36 +103,36 @@ def test_sql_with_cte():
 
 def test_unknown_column():
     with pytest.raises(BridgeError, match="could not be resolved"):
-        call("select", df=table()["id"], columns=['"unknown"'])
+        call("select", df=table()["id"], columns=['unknown'])
 
 
 def test_select_drop_rename():
     df = table()
-    assert call("select", df=df["id"], columns=['"a"', '"b" + 1 AS "b1"'])["columns"] == ["a", "b1"]
+    assert call("select", df=df["id"], columns=['a', 'b + 1 AS b1'])["columns"] == ["a", "b1"]
     assert call("drop", df=df["id"], names=["b"])["columns"] == ["a", "c"]
     assert call("drop", df=df["id"], names=["x"])["id"] == df["id"]
     assert call("with_column_renamed", df=df["id"], name="a", new_name="z")["columns"] == ["z", "b", "c"]
-    assert call("with_column", df=df["id"], name="a", column='"b"')["columns"] == ["a", "b", "c"]
+    assert call("with_column", df=df["id"], name="a", column='b')["columns"] == ["a", "b", "c"]
 
 
 def test_join_on_columns():
     left, right = table(), table("other", (("a", "INT"), ("z", "INT")))
     df = call("join", df=left["id"], other=right["id"], how="full_outer", on=["a"])
     assert df["columns"] == ["a", "b", "c", "z"]
-    assert 'COALESCE("test_table"."a", "other"."a") AS "a"' in to_sql(df)
+    assert 'COALESCE(test_table.a, other.a) AS a' in to_sql(df)
     assert "FULL JOIN" in to_sql(df)
 
 
 def test_join_condition_and_select_by_alias():
     left = call("alias", df=table()["id"], alias="l")
     right = call("alias", df=table("other", (("a", "INT"), ("z", "INT")))["id"], alias="r")
-    df = call("join", df=left["id"], other=right["id"], how="left", condition='"l"."a" = "r"."a"')
-    df = call("filter", df=df["id"], condition='"r"."z" > 0')
-    df = call("select", df=df["id"], columns=['"l"."a"', '"r"."z"'])
+    df = call("join", df=left["id"], other=right["id"], how="left", condition='l.a = r.a')
+    df = call("filter", df=df["id"], condition='r.z > 0')
+    df = call("select", df=df["id"], columns=['l.a', 'r.z'])
     assert df["columns"] == ["a", "z"]
     assert to_sql(df) == (
-        'SELECT "test_table"."a" AS "a", "other"."z" AS "z" FROM db.test_table AS "test_table" '
-        'LEFT JOIN other AS "other" ON "other"."a" = "test_table"."a" WHERE "other"."z" > 0')
+        'SELECT test_table.a AS a, other.z AS z FROM db.test_table AS test_table '
+        'LEFT JOIN other AS other ON other.a = test_table.a WHERE other.z > 0')
 
 
 def test_join_same_alias_fails():
@@ -147,13 +148,13 @@ def test_semi_join():
 
 
 def test_group_by_and_schema():
-    df = call("group_by_agg", df=table()["id"], group_columns=['"c"'], aggregate_columns=['COUNT(*) AS "cnt"', 'MAX("a") AS "m"'])
+    df = call("group_by_agg", df=table()["id"], group_columns=['c'], aggregate_columns=['COUNT(*) AS cnt', 'MAX(a) AS m'])
     assert call("schema", df=df["id"]) == [
         {"name": "c", "type": {"type": "TEXT"}},
         {"name": "cnt", "type": {"type": "BIGINT"}},
         {"name": "m", "type": {"type": "INT"}},
     ]
-    assert to_sql(df).endswith('GROUP BY "test_table"."c"')
+    assert to_sql(df).endswith('GROUP BY test_table.c')
 
 
 def test_nested_schema():
@@ -170,14 +171,14 @@ def test_union_by_name():
         call("union_by_name", df=left["id"], other=right["id"])
     df = call("union_by_name", df=left["id"], other=right["id"], allow_missing_columns=True)
     assert df["columns"] == ["a", "b", "c"]
-    assert 'UNION ALL SELECT "other"."a" AS "a", "other"."b" AS "b", NULL AS "c"' in to_sql(df)
+    assert 'UNION ALL SELECT other.a AS a, other.b AS b, NULL AS c' in to_sql(df)
 
 
 def test_except_distinct_order_by():
     df = table()
     assert " EXCEPT " in to_sql(call("except", df=df["id"], other=df["id"]))
     assert to_sql(call("distinct", df=df["id"])).startswith("SELECT DISTINCT")
-    assert to_sql(call("order_by", df=df["id"], columns=['"a" DESC'])).endswith('ORDER BY "test_table"."a" DESC')
+    assert to_sql(call("order_by", df=df["id"], columns=['a DESC'])).endswith('ORDER BY test_table.a DESC')
 
 
 def test_drop_duplicates():
@@ -188,7 +189,7 @@ def test_drop_duplicates():
 
 def test_empty():
     df = call("empty", columns=[["a", "INT"]])
-    assert to_sql(df, "postgres") == 'SELECT CAST(NULL AS INT) AS "a" WHERE FALSE'
+    assert to_sql(df, "postgres") == 'SELECT CAST(NULL AS INT) AS a WHERE FALSE'
 
 
 def test_release():
@@ -211,8 +212,8 @@ def test_values():
     df = call("values", rows=[["1", "'a'"], ["2", "NULL"]], columns=[["num", "INT"], ["str", "TEXT"]])
     assert df["columns"] == ["num", "str"]
     assert to_sql(df, "tsql") == (
-        "SELECT CAST([_v].[num] AS INTEGER) AS [num], CAST([_v].[str] AS VARCHAR(MAX)) AS [str] "
-        "FROM (VALUES (1, 'a'), (2, NULL)) AS [_v]([num], [str])")
+        "SELECT CAST(_v.num AS INTEGER) AS num, CAST(_v.str AS VARCHAR(MAX)) AS str "
+        "FROM (VALUES (1, 'a'), (2, NULL)) AS _v(num, str)")
     assert call("schema", df=df["id"]) == [{"name": "num", "type": {"type": "INT"}}, {"name": "str", "type": {"type": "TEXT"}}]
 
 
@@ -225,23 +226,23 @@ def test_values_keep_casts():
 def test_unqualified_join_column_after_join_on_columns():
     left, right = table(), table("other", (("a", "INT"), ("z", "INT")))
     df = call("join", df=left["id"], other=right["id"], how="inner", on=["a"])
-    df = call("filter", df=df["id"], condition='"a" > 1')
-    df = call("select", df=df["id"], columns=['"a"', '"z"'])
+    df = call("filter", df=df["id"], condition='a > 1')
+    df = call("select", df=df["id"], columns=['a', 'z'])
     assert df["columns"] == ["a", "z"]
-    assert to_sql(df).startswith('SELECT "test_table"."a" AS "a", "other"."z" AS "z"')
+    assert to_sql(df).startswith('SELECT test_table.a AS a, other.z AS z')
 
 
 def test_query():
     df = call("query", query="select top 1 a from db.x", columns=[["a", "INT"]], dialect="tsql")
-    df = call("filter", df=df["id"], condition='"a" > 1')
-    assert to_sql(df, "postgres") == 'SELECT "q"."a" AS "a" FROM (SELECT a FROM db.x LIMIT 1) AS "q" WHERE "q"."a" > 1'
+    df = call("filter", df=df["id"], condition='a > 1')
+    assert to_sql(df, "postgres") == 'SELECT q.a AS a FROM (SELECT a FROM db.x LIMIT 1) AS q WHERE q.a > 1'
 
 
 def test_create_table_as():
-    df = call("with_column", df=table()["id"], name="My Col", column='"a" * 2')
+    df = call("with_column", df=table()["id"], name="My Col", column='a * 2')
     assert call("create_table_as", df=df["id"], table="db.tgt", dialect="postgres") == (
-        'CREATE TABLE db.tgt AS SELECT "test_table"."a" AS a, "test_table"."b" AS b, "test_table"."c" AS c, '
-        '"test_table"."a" * 2 AS "My Col" FROM db.test_table AS "test_table"')
+        'CREATE TABLE db.tgt AS SELECT test_table.a AS a, test_table.b AS b, test_table.c AS c, '
+        'test_table.a * 2 AS "My Col" FROM db.test_table AS test_table')
     assert call("create_table_as", df=df["id"], table="db.tgt", dialect="tsql", with_data=False).startswith("SELECT ")
     assert call("create_table_as", df=df["id"], table="db.tgt", dialect="postgres", with_data=False).endswith("WHERE FALSE")
 
@@ -276,7 +277,7 @@ def test_alter_table():
     assert call("alter_table", table="db.t", changes=changes, dialect="oracle") == [
         "ALTER TABLE db.t ADD c NUMBER(10, 2)",
         'ALTER TABLE db.t MODIFY ("My Col" INT)',
-        "ALTER TABLE db.t MODIFY (c NULL)",
+        'ALTER TABLE db.t MODIFY ("c" NULL)',
     ]
     assert call("alter_table", table="db.t", changes=changes[2:], dialect="mysql") == ["ALTER TABLE db.t MODIFY COLUMN c INT NULL"]
 
@@ -303,3 +304,95 @@ def test_column_lineage_unresolved():
     result = call("column_lineage", df=df["id"], inputs=[["src1", src["id"]]])
     assert result["unresolved"] == ["x"]
     assert result["dead_ends"]["x"][0]["path"][-1] == result["dead_ends"]["x"][0]["attribute"]
+
+
+def mixed_case_table():
+    return table("db.Tab", (("Name", "TEXT"), ("CODE", "INT"), ("low", "INT"), ("My Col", "INT")))
+
+
+def test_case_insensitive_resolution():
+    df = mixed_case_table()
+    assert df["columns"] == ["Name", "CODE", "low", "My Col"]
+    # column references resolve case-insensitively, and keep the spelling of the database
+    df = call("select", df=df["id"], columns=["name", "Code", "LOW", "`MY COL`"])
+    assert df["columns"] == ["Name", "CODE", "low", "My Col"]
+    assert call("schema", df=df["id"])[0] == {"name": "Name", "type": {"type": "TEXT"}}
+    assert call("drop", df=df["id"], names=["NAME"])["columns"] == ["CODE", "low", "My Col"]
+    assert call("with_column_renamed", df=df["id"], name="code", new_name="Id")["columns"] == ["Name", "Id", "low", "My Col"]
+
+
+def test_ambiguous_columns():
+    with pytest.raises(BridgeError, match="ambiguous"):
+        table(columns=(("a", "INT"), ("A", "INT")))
+
+
+def test_database_columns_are_quoted_only_if_needed():
+    df = mixed_case_table()
+    assert to_sql(df, "postgres") == \
+        'SELECT tab."Name" AS "Name", tab."CODE" AS "CODE", tab.low AS low, tab."My Col" AS "My Col" FROM db.Tab AS tab'
+    assert to_sql(df, "snowflake") == \
+        'SELECT tab."Name" AS "Name", tab.CODE AS CODE, tab."low" AS "low", tab."My Col" AS "My Col" FROM db.Tab AS tab'
+    assert to_sql(df, "duckdb") == \
+        'SELECT tab.Name AS Name, tab.CODE AS CODE, tab.low AS low, tab."My Col" AS "My Col" FROM db.Tab AS tab'
+    assert to_sql(df, "tsql") == \
+        'SELECT tab.Name AS Name, tab.CODE AS CODE, tab.low AS low, tab.[My Col] AS [My Col] FROM db.Tab AS tab'
+
+
+def test_new_names_are_unquoted_and_keep_spelling():
+    df = call("select", df=mixed_case_table()["id"], columns=["code + 1 AS TownName", "low AS `Order`"])
+    assert df["columns"] == ["TownName", "Order"]
+    assert to_sql(df, "postgres") == 'SELECT tab."CODE" + 1 AS TownName, tab.low AS "Order" FROM db.Tab AS tab'
+    assert to_sql(df, "snowflake") == 'SELECT tab.CODE + 1 AS TownName, tab."low" AS "Order" FROM db.Tab AS tab'
+
+
+def test_spelling_is_kept_through_subqueries():
+    df = call("with_column", df=mixed_case_table()["id"], name="Rank", column="row_number() over (order by name)")
+    df = call("filter", df=df["id"], condition="rank = 1")
+    df = call("select", df=df["id"], columns=["NAME", "RANK", "`my col`"])
+    assert df["columns"] == ["Name", "Rank", "My Col"]
+    # the window function prevents merging the subquery, references to it have the same spelling as its columns
+    assert to_sql(df, "postgres") == (
+        'WITH _t3 AS (SELECT tab."Name" AS "Name", tab."My Col" AS "My Col", ROW_NUMBER() OVER (ORDER BY tab."Name" NULLS FIRST) AS Rank '
+        'FROM db.Tab AS tab) SELECT _t3."Name" AS "Name", _t3.Rank AS Rank, _t3."My Col" AS "My Col" FROM _t3 AS _t3 WHERE _t3.Rank = 1')
+
+
+def test_quoted_identifiers_of_case_sensitive_dialects():
+    call("register_view", name="v", df=mixed_case_table()["id"])
+    # unquoted identifiers are case-insensitive
+    assert call("sql", query="select NAME, code as Id from v", dialect="postgres")["columns"] == ["Name", "Id"]
+    # quoted identifiers are case sensitive in postgres
+    assert call("sql", query='select "Name" as "Big" from v', dialect="postgres")["columns"] == ["Big"]
+    with pytest.raises(BridgeError, match="could not be resolved"):
+        call("sql", query='select "name" from v', dialect="postgres")
+    # but not in spark
+    df = call("sql", query="select `NAME` as `Big` from v", dialect="spark")
+    assert df["columns"] == ["Big"]
+    assert to_sql(df, "postgres") == 'SELECT tab."Name" AS Big FROM db.Tab AS tab'
+    # a quoted alias of a case-sensitive dialect stays quoted
+    df = call("sql", query='select name as "Big" from v', dialect="postgres")
+    assert to_sql(df, "snowflake") == 'SELECT tab."Name" AS "Big" FROM db.Tab AS tab'
+
+
+def test_case_sensitive_session():
+    call("set_case_sensitive", case_sensitive=True)
+    df = mixed_case_table()
+    with pytest.raises(BridgeError, match="could not be resolved"):
+        call("select", df=df["id"], columns=["name"])
+    df = call("select", df=df["id"], columns=["Name", "CODE AS x"])
+    assert df["columns"] == ["Name", "x"]
+    assert to_sql(df, "snowflake") == 'SELECT "Tab"."Name" AS "Name", "Tab"."CODE" AS "x" FROM db.Tab AS "Tab"'
+
+
+def test_create_table_as_with_mixed_case():
+    df = call("with_column", df=mixed_case_table()["id"], name="TownName", column="upper(name)")
+    df = call("drop", df=df["id"], names=["my col", "low"])
+    assert call("create_table_as", df=df["id"], table="db.tgt", dialect="postgres") == (
+        'CREATE TABLE db.tgt AS SELECT tab."Name" AS "Name", tab."CODE" AS "CODE", UPPER(tab."Name") AS TownName FROM db.Tab AS tab')
+
+
+def test_column_lineage_with_spelling():
+    src = mixed_case_table()
+    df = call("select", df=src["id"], columns=["name AS Id", "code"])
+    result = call("column_lineage", df=df["id"], inputs=[["src1", src["id"]]])
+    assert [(f["column"], f["inputs"]) for f in result["fields"]] == [("CODE", [["src1", "CODE", True]]), ("Id", [["src1", "Name", True]])]
+    assert result["inputs"][0]["columnsNotInPlan"] == ["low", "My Col"]

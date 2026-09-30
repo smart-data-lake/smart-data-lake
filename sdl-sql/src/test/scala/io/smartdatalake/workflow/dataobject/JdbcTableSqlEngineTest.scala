@@ -125,6 +125,23 @@ class JdbcTableSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
     assert(query("select id from tgt") == Seq(Seq(3)))
   }
 
+  test("identifiers are resolved case-insensitively and keep their spelling") {
+    connection.execJdbcStatement("""create table mixed ("Name" varchar, "CODE" int)""")
+    connection.execJdbcStatement("""insert into mixed values ('bob', 1), ('ann', 2)""")
+    jdbcDataObject("mixed")
+    jdbcDataObject("tgt", saveMode = SDLSaveMode.Merge, primaryKey = Some(Seq("name")))
+    val action = CopyAction(ActionId("a1"), DataObjectId("mixed"), DataObjectId("tgt"), engineConnectionId = Some(connectionId),
+      transformers = Seq(SQLDfTransformer(code = Some("select NAME, code * 2 as TownCode from %{inputViewName}"))))
+    run(action, Seq("mixed"))
+    // the table is created with the spelling of the DataFrame
+    assert(query("select column_name from information_schema.columns where table_name = 'tgt' order by ordinal_position") == Seq(Seq("Name"), Seq("TownCode")))
+    assert(query("select name, towncode from tgt order by name") == Seq(Seq("ann", 4), Seq("bob", 2)))
+    // merge into the existing table
+    connection.execJdbcStatement("""update mixed set "CODE" = 5 where "Name" = 'bob'""")
+    run(action, Seq("mixed"))
+    assert(query("select name, towncode from tgt order by name") == Seq(Seq("ann", 4), Seq("bob", 10)))
+  }
+
   test("append adds data") {
     jdbcDataObject("src")
     jdbcDataObject("tgt", saveMode = SDLSaveMode.Append)

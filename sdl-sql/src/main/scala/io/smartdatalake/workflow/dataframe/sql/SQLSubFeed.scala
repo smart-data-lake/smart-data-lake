@@ -103,9 +103,10 @@ case class SQLSubFeed(@transient override val dataFrame: Option[SQLDataFrame],
 /**
  * Companion of [[SQLSubFeed]], implementing the DataFrame functions of the SQL engine.
  *
- * Column expressions are SQL text in the default SQLGlot dialect, see [[SQLColumn]]. This also applies to
- * expressions given as string, e.g. `expr("a > 1")`. SQL queries of SQL transformers are parsed in the SQL dialect
- * configured on the transformer instead, default is `spark`.
+ * Column expressions are Spark SQL text, see [[SQLColumn]]. This also applies to expressions given as string, e.g.
+ * `expr("a > 1")`. SQL queries of SQL transformers are parsed in the SQL dialect configured on the transformer
+ * instead, default is `spark`. Identifiers are resolved case-insensitively unless `Environment.caseSensitive` is set,
+ * see the README of sdl-sql.
  */
 object SQLSubFeed extends DataFrameSubFeedCompanion {
 

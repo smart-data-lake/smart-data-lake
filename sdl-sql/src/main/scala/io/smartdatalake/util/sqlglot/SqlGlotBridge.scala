@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.util.sqlglot
 
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.python.JepInterpreter
 import org.json4s.jackson.{JsonMethods, Serialization}
@@ -74,6 +75,20 @@ class SqlGlotBridge private(interpreter: JepInterpreter) extends SmartDataLakeLo
         |_sdlb_call = _sdlb_bridge.call
         |del _sdlb_bridge_source
         |""".stripMargin)
+  }
+
+  // case sensitivity last set in Python, see syncCaseSensitive
+  @volatile private var caseSensitive: Option[Boolean] = None
+
+  /**
+   * Set the case sensitivity of identifiers in Python from `Environment.caseSensitive`, if it changed.
+   */
+  private[sqlglot] def syncCaseSensitive(): Unit = {
+    val current = Environment.caseSensitive
+    if (!caseSensitive.contains(current)) {
+      call("set_case_sensitive", "case_sensitive" -> current)
+      caseSensitive = Some(current)
+    }
   }
 
   /**
@@ -145,15 +160,18 @@ object SqlGlotBridge {
   private var instance: Option[(JepInterpreter, SqlGlotBridge)] = None
 
   /**
-   * Get the bridge of the JepInterpreter of this JVM, see [[JepInterpreter.get]].
+   * Get the bridge of the JepInterpreter of this JVM, see [[JepInterpreter.get]]. The case sensitivity of identifiers
+   * is set from `Environment.caseSensitive`.
    */
   def get(pythonExecutable: Option[String] = None): SqlGlotBridge = synchronized {
     val interpreter = JepInterpreter.get(pythonExecutable)
-    instance.filter(_._1 eq interpreter).map(_._2).getOrElse {
+    val bridge = instance.filter(_._1 eq interpreter).map(_._2).getOrElse {
       val bridge = new SqlGlotBridge(interpreter)
       instance = Some((interpreter, bridge))
       bridge
     }
+    bridge.syncCaseSensitive()
+    bridge
   }
 
   /**
