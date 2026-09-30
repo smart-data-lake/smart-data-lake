@@ -249,6 +249,8 @@ object SparkClassicConnection extends FromConfigFactory[Connection] with SmartDa
       .config("spark.sql.sources.partitionOverwriteMode", "dynamic") // default value for normal operation of SDL; can be overwritten by configuration (sparkOptionsOpt)
       .optionalConfig("deploy-mode", deployModeOpt)
       .optionalConfig("spark.kryo.classesToRegister", kryoClassNamesOpt.map(_.mkString(",")))
+      // Python executable for Python transformations, see Environment.pythonPath; can be overwritten by configuration (sparkOptionsOpt)
+      .optionalConfig("spark.pyspark.python", Environment.pythonPath)
       .optionalConfigs(sparkOptionsOpt)
       .optionalEnableHive(enableHive)
       .optionalExtension(noDataExtension)

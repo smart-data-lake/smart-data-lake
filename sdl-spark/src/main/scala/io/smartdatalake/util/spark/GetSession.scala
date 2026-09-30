@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.util.spark
 
+import io.smartdatalake.definitions.Environment
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 import org.slf4j.{Logger, LoggerFactory}
@@ -96,7 +97,7 @@ object GetSession {
    * @param nCores
    *   how many cores do you want
    */
-  def sessionBuilder(nCores: Int = 1): SparkSession.Builder = SparkSession.builder()
+  def sessionBuilder(nCores: Int = 1): SparkSession.Builder = withPythonPath(SparkSession.builder())
     .appName("UnitTest")
     .master(s"local[$nCores]")
     // performance tuning
@@ -105,6 +106,10 @@ object GetSession {
     // avoid timeout during debugging with breakpoints
     .config("spark.network.timeout", "10000")
     .config("spark.executor.heartbeatInterval", "100s")
+
+  // Python executable for Python transformations, see Environment.pythonPath
+  private def withPythonPath(builder: SparkSession.Builder): SparkSession.Builder =
+    Environment.pythonPath.map(builder.config("spark.pyspark.python", _)).getOrElse(builder)
 
   def createSparkSession(nCores: Int = 4): SparkSession = {
     val newSparkSession = sessionBuilder(nCores).getOrCreate()

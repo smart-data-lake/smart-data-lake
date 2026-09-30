@@ -3,15 +3,16 @@
 #   cd sdl-spark
 #   uv sync
 #
-# SDLB starts the Python interpreter itself, see io.smartdatalake.util.spark.PythonUtil, which goes through Spark's
-# PythonRunner: it takes the interpreter from PYSPARK_DRIVER_PYTHON or PYSPARK_PYTHON and otherwise falls back to
-# `python3` on the PATH. So either activate the environment before running SDLB or a test using Python:
+# SDLB starts the Python interpreter itself, see io.smartdatalake.util.spark.PythonUtil: it takes the interpreter from
+# SDL_PYTHON_PATH (see Environment.pythonPath, set as Spark configuration spark.pyspark.python when SDLB creates the
+# Spark session), otherwise from PYSPARK_DRIVER_PYTHON or PYSPARK_PYTHON, and otherwise falls back to `python3` on
+# the PATH. So either activate the environment before running SDLB or a test using Python:
 #
 #   source .venv/bin/activate       # .venv\Scripts\activate on Windows
 #
 # or point SDLB at it explicitly, which also works from an IDE run configuration:
 #
-#   export PYSPARK_PYTHON=$PWD/.venv/bin/python
+#   export SDL_PYTHON_PATH=$PWD/.venv/bin/python
 #
 # Without this environment the Python transformers and the MLflow Actions fail, and MLflowEndToEndTest and
 # PythonDynamicTransformTest cancel themselves. The rest of the build needs no Python at all.

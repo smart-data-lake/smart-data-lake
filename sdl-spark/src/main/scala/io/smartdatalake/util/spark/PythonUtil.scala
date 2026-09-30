@@ -18,13 +18,15 @@
  */
 package io.smartdatalake.util.spark
 
+import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.apache.spark.python.PythonHelper
 import org.apache.spark.python.PythonHelper.SparkEntryPoint
 import org.apache.spark.sql.SparkSession
 
 import scala.jdk.CollectionConverters._
 
-private[smartdatalake] object PythonUtil {
+private[smartdatalake] object PythonUtil extends SmartDataLakeLogger {
 
   /**
    * Execute python code within a given Spark context/session.
@@ -34,8 +36,21 @@ private[smartdatalake] object PythonUtil {
    * @param entryPointObj py4j gateway entrypoint java object available in python code as gateway.entry_point.
    *                      This is used to transfer SparkContext to python and can hold additional custom parameters.
    *                      entryPointObj must at least implement trait SparkEntryPoint.
+   *
+   * The Python interpreter is taken from the Spark configuration `spark.pyspark.driver.python` or
+   * `spark.pyspark.python`, otherwise from the environment variables PYSPARK_DRIVER_PYTHON or PYSPARK_PYTHON, and
+   * otherwise `python3` is used. `spark.pyspark.python` is set from Environment.pythonPath (environment variable
+   * SDL_PYTHON_PATH) when SDLB creates the Spark session.
    */
   def execPythonSparkCode[T<:PythonSparkEntryPoint](entryPointObj: T, code: String): Unit = {
+    // Environment.pythonPath can only be applied to Spark sessions created by SDLB
+    Environment.pythonPath.foreach { pythonPath =>
+      val conf = entryPointObj.session.sparkContext.getConf
+      val sparkPython = conf.getOption("spark.pyspark.driver.python").orElse(conf.getOption("spark.pyspark.python"))
+      if (!sparkPython.contains(pythonPath)) logger.warn(s"Environment.pythonPath is set to $pythonPath, but the Spark session" +
+        s" uses ${sparkPython.map(p => s"$p as Python interpreter").getOrElse("the environment variables PYSPARK_DRIVER_PYTHON or PYSPARK_PYTHON")}." +
+        " Environment.pythonPath can only be applied to Spark sessions created by SDLB.")
+    }
     PythonHelper.exec(entryPointObj, mainInitCode + sys.props("line.separator") + code)
   }
 

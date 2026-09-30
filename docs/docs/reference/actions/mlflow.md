@@ -26,12 +26,14 @@ transformers just like a CopyAction.
 
   ```bash
   cd sdl-spark && uv sync
-  export PYSPARK_PYTHON=$PWD/.venv/bin/python
+  export SDL_PYTHON_PATH=$PWD/.venv/bin/python
   ```
 
-  SDLB starts the interpreter itself, through Spark's `PythonRunner`, which takes it from `PYSPARK_DRIVER_PYTHON`
-  or `PYSPARK_PYTHON` and otherwise falls back to `python3` on the `PATH`. So either export that variable or
-  activate the environment before running SDLB.
+  SDLB starts the interpreter itself. It takes it from the environment variable `SDL_PYTHON_PATH`, which SDLB sets as
+  Spark configuration `spark.pyspark.python` when it creates the Spark session, otherwise from `PYSPARK_DRIVER_PYTHON`
+  or `PYSPARK_PYTHON`, and otherwise falls back to `python3` on the `PATH`. So either export one of these variables
+  or activate the environment before running SDLB. Note that `SDL_PYTHON_PATH` is not applied to a Spark session
+  provided by the environment, e.g. on Databricks.
 * MLflow **2.9 or newer** - the Actions address models by alias, and MLflow *stages* are deprecated since 2.9 and
   removed in MLflow 3
 * somewhere for MLflow to keep its data. Either a tracking server, e.g. `mlflow server --host 127.0.0.1 --port 5000`,

@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.workflow.action.mlflow
 
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
@@ -47,7 +48,7 @@ import scala.util.Try
  * build needs python. To run it locally:
  * {{{
  *   cd sdl-spark && uv sync && cd ..
- *   export PYSPARK_PYTHON=$PWD/sdl-spark/.venv/bin/python
+ *   export SDL_PYTHON_PATH=$PWD/sdl-spark/.venv/bin/python
  *   mvn -B install -pl sdl-spark -am -DskipTests -Dlicense.skip=true
  *   mvn -B test -pl sdl-spark -Dlicense.skip=true -Dsuites=io.smartdatalake.workflow.action.mlflow.MLflowEndToEndTest
  * }}}
@@ -73,7 +74,8 @@ class MLflowEndToEndTest extends AnyFunSuite {
   private lazy val artifactLocation: Option[String] =
     if (sys.env.contains("MLFLOW_TRACKING_URI")) None else Some(mlflowDir.resolve("artifacts").toUri.toString)
 
-  private def pythonCmd: Option[String] = sys.env.get("PYSPARK_PYTHON")
+  private def pythonCmd: Option[String] = Environment.pythonPath
+    .orElse(sys.env.get("PYSPARK_PYTHON"))
     .orElse(sys.env.get("PYSPARK_DRIVER_PYTHON"))
     .orElse(Seq("python3", "python").find(cmd => Try(Seq(cmd, "--version").! == 0).getOrElse(false)))
 

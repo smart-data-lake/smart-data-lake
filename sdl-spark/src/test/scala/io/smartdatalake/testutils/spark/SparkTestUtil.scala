@@ -66,6 +66,8 @@ object SparkTestUtil extends SmartDataLakeLogger with Equality {
       // .config("spark.ui.enabled", "false") // we use this as webservice to test WebserviceFileDataObject
       // add nodata spark extension
       .withExtensions(new SDLSparkExtension)
+    // Python executable for Python transformations, as in SparkClassicConnection.createSparkSession
+    Environment.pythonPath.foreach(builder.config("spark.pyspark.python", _))
     // Configure hive metastore location
     // Note that "builder.enableHiveSupport()" is not needed to work with hive metastore. In fact enableHiveSupport doesn't work with JDK11+.
     val tmpDirOnFS = Files.createTempDirectory("derby-").toFile

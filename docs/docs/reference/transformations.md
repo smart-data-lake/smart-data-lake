@@ -355,7 +355,8 @@ In this case, `inputDfs` is a dictionary (dict) and `setOutputDf` expects a dict
 ##### Requirements
 Running Python transformations needs some additional setup. 
 In general, Python >= 3.10 is required and PySpark package needs to be installed with a version matching your SDL spark version. 
-Further environment variable PYSPARK_PYTHON needs to be set to the python executable of the corresponding python environment to be used.
+Further the environment variable SDL_PYTHON_PATH needs to be set to the python executable of the corresponding python environment to be used.
+SDLB sets it as Spark configuration `spark.pyspark.python` when it creates the Spark session. For a Spark session provided by the environment, e.g. on Databricks, set PYSPARK_PYTHON instead.
 
 
 ### File transformations

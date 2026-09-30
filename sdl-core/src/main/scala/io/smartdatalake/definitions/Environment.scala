@@ -135,8 +135,10 @@ object Environment extends SmartDataLakeLogger {
 
   /**
    * Path of the Python executable of the Python environment used by SDLB, e.g. `/opt/venv/bin/python`.
-   * It is used by the SQL engine of sdl-sql, which embeds this Python environment into the JVM.
-   * If not set, `python3` (`python` on Windows) is taken from the PATH.
+   * It is used by the SQL engine of sdl-sql, which embeds this Python environment into the JVM, and by the Python
+   * transformations and MLflow Actions of sdl-spark: it is set as Spark configuration `spark.pyspark.python` when SDLB
+   * creates the Spark session, and takes precedence over the environment variable PYSPARK_PYTHON then.
+   * If not set, `python3` (`python` on Windows) is taken from the PATH, respectively PYSPARK_PYTHON for Spark.
    * Set it with the environment variable SDL_PYTHON_PATH, the java property sdl.pythonPath, or in the environment
    * section of the global configuration.
    */
