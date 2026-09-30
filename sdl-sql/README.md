@@ -89,17 +89,18 @@ The Python environment needs sqlglot and jep, and is managed with [uv](https://d
 ```bash
 cd sdl-sql
 uv sync
-export SDLB_PYTHON=$PWD/.venv/bin/python   # .venv\Scripts\python.exe on Windows
+export SDL_PYTHON_PATH=$PWD/.venv/bin/python   # .venv\Scripts\python.exe on Windows
 ```
 
-SDLB finds the environment through the environment variable `SDLB_PYTHON`, and otherwise uses `python3` on the PATH. The version of the jep Maven dependency in `pom.xml` must match the jep Python
+SDLB finds the environment through `Environment.pythonPath`, which is set by the environment variable
+`SDL_PYTHON_PATH` (or the java property `sdl.pythonPath`), and otherwise uses `python3` on the PATH. The version of the jep Maven dependency in `pom.xml` must match the jep Python
 package.
 
 ## Tests
 
 ```bash
 cd sdl-sql && uv run pytest                       # Python side
-mvn -B test -pl sdl-sql -Dlicense.skip=true       # Scala side, needs SDLB_PYTHON
+mvn -B test -pl sdl-sql -Dlicense.skip=true       # Scala side, needs SDL_PYTHON_PATH
 ```
 
 The Scala tests execute SQL on a [DuckDB](https://duckdb.org) database file in `target/duckdb`, see `SQLTestUtil`.

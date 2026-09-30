@@ -19,6 +19,7 @@
 package io.smartdatalake.util.python
 
 import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import jep.{Interpreter, JepConfig, MainInterpreter, PyConfig, SharedInterpreter}
 import org.json4s.jackson.JsonMethods
@@ -72,12 +73,6 @@ final class JepInterpreter private(val environment: PythonEnvironment) extends S
 
 object JepInterpreter extends SmartDataLakeLogger {
 
-  /**
-   * Environment variable with the Python executable of the environment to use. It must have sqlglot and jep installed.
-   * If not set, `python3` (`python` on Windows) is taken from the PATH.
-   */
-  val PythonExecutableEnvVar = "SDLB_PYTHON"
-
   private var instance: Option[JepInterpreter] = None
   private var initializedEnvironment: Option[PythonEnvironment] = None
 
@@ -86,7 +81,8 @@ object JepInterpreter extends SmartDataLakeLogger {
    *
    * @param pythonExecutable Python executable of the environment to use. It is only considered on first use, as the
    *                         Python runtime can only be initialized once per JVM.
-   *                         Default is to use the environment variable SDLB_PYTHON, or python3 on the PATH.
+   *                         Default is Environment.pythonPath (environment variable SDL_PYTHON_PATH), or python3
+   *                         on the PATH.
    */
   def get(pythonExecutable: Option[String] = None): JepInterpreter = synchronized {
     instance.getOrElse {
@@ -134,7 +130,7 @@ object JepInterpreter extends SmartDataLakeLogger {
   private def resolvePythonExecutable(pythonExecutable: Option[String]): String = {
     val isWindows = sys.props.get("os.name").exists(_.toLowerCase.startsWith("windows"))
     pythonExecutable
-      .orElse(sys.env.get(PythonExecutableEnvVar).filter(_.nonEmpty))
+      .orElse(Environment.pythonPath)
       .getOrElse(if (isWindows) "python" else "python3")
   }
 
@@ -195,7 +191,7 @@ object PythonEnvironment {
     val stderr = new StringBuilder
     val exitCode = Try(Process(Seq(executable, "-c", probeCode)).!(ProcessLogger(l => stdout.append(l), l => stderr.append(l).append("\n"))))
     val hint = s"The SQL engine needs a Python environment with sqlglot and jep installed, see sdl-sql/pyproject.toml. " +
-      s"Set the environment variable ${JepInterpreter.PythonExecutableEnvVar} to its Python executable."
+      s"Set the environment variable SDL_PYTHON_PATH to its Python executable, see Environment.pythonPath."
     exitCode match {
       case Success(0) =>
         val json = JsonMethods.parse(stdout.toString)

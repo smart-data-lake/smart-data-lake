@@ -42,7 +42,7 @@ jobs:
       - name: Create the Python environment of sdl-sql
         run: |
           uv sync --frozen --project sdl-sql
-          echo "SDLB_PYTHON=$PWD/sdl-sql/.venv/bin/python" >> $GITHUB_ENV
+          echo "SDL_PYTHON_PATH=$PWD/sdl-sql/.venv/bin/python" >> $GITHUB_ENV
       - name: Run the Python tests
         working-directory: sdl-sql
         run: uv run --frozen pytest

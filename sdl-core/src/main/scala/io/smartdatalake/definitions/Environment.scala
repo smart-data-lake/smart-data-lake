@@ -134,6 +134,21 @@ object Environment extends SmartDataLakeLogger {
   var _hadoopDefaultSchemeAuthority: Option[Option[URI]] = None
 
   /**
+   * Path of the Python executable of the Python environment used by SDLB, e.g. `/opt/venv/bin/python`.
+   * It is used by the SQL engine of sdl-sql, which embeds this Python environment into the JVM.
+   * If not set, `python3` (`python` on Windows) is taken from the PATH.
+   * Set it with the environment variable SDL_PYTHON_PATH, the java property sdl.pythonPath, or in the environment
+   * section of the global configuration.
+   */
+  def pythonPath: Option[String] = {
+    if (_pythonPath.isEmpty) {
+      _pythonPath = Some(EnvironmentUtil.getSdlParameter("pythonPath").filter(_.nonEmpty))
+    }
+    _pythonPath.get
+  }
+  var _pythonPath: Option[Option[String]] = None
+
+  /**
    * Set to true to enable check for duplicate first class object definitions when loading configuration (default=true).
    * The check fails if Connections, DataObjects or Actions are defined in multiple locations.
    */
