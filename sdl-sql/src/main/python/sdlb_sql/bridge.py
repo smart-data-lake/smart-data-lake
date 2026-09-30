@@ -656,6 +656,14 @@ class Session:
         create = exp.Create(this=exp.to_table(table, dialect=dialect), kind="TABLE", expression=expr)
         return create.sql(dialect=dialect)
 
+    def create_view(self, df, view, dialect=None):
+        """Create a `CREATE OR REPLACE VIEW <view> AS <query>` statement for the DataFrame, e.g. `CREATE OR ALTER VIEW`
+        for tsql. `view` is given in the dialect of the database. The names of the columns are rendered as for
+        `create_table_as`."""
+        expr = self._render(self._df(df).expr.copy(), dialect)
+        create = exp.Create(this=exp.to_table(view, dialect=dialect), kind="VIEW", replace=True, expression=expr)
+        return create.sql(dialect=dialect)
+
     def _column_identifier(self, name, kind, dialect, quote_names):
         quoted = quote_names or self._quote(name, kind, Dialect.get_or_raise(dialect))
         return exp.to_identifier(name, quoted=quoted)
@@ -882,6 +890,7 @@ _OPS = {
     "to_sql": _session.to_sql,
     "create_table_as": _session.create_table_as,
     "create_table": _session.create_table,
+    "create_view": _session.create_view,
     "alter_table": _session.alter_table,
     "parse_types": _session.parse_types,
     "column_lineage": _session.column_lineage,

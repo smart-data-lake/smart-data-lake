@@ -47,6 +47,43 @@ As the types inferred by SQLGlot are not exact, a type is only changed if the ne
 e.g. `INT` to `VARCHAR`, fail with a `SchemaEvolutionException`. Schema changes of `CatalogSchemaUpdater` are
 applied the same way.
 
+### Views
+
+A `JdbcViewDataObject` (sdl-core) is a view in the database. Writing a DataFrame to it creates or replaces the view
+with the query of the DataFrame, e.g. `CREATE OR REPLACE VIEW` (`CREATE OR ALTER VIEW` for SQL Server), so the
+Action writing it must use the SQL engine. It is read like a table by all engines of `JdbcTableDataObject`, e.g. by a
+Spark Action in the same feed.
+
+```hocon
+dataObjects {
+  btl-customers-bern {
+    type = JdbcViewDataObject
+    connectionId = dwh
+    table = { db = public, name = customers_bern }
+  }
+}
+actions {
+  create-customers-bern {
+    type = CopyAction
+    inputId = int-customers
+    outputId = btl-customers-bern
+    engineConnectionId = dwh
+    transformers = [{
+      type = SQLDfTransformer
+      code = "select id, name from %{inputViewName} where city = 'Bern'"
+    }]
+  }
+}
+```
+
+The view is created in exec phase on every run. In init phase its query is only validated by executing it without
+fetching rows. As the query of a view is stored in the database, it must not depend on the current run: an Action
+writing a view (see marker trait `ViewDataObject`) ignores the partition values and filters of its inputs, and must
+not have an execution mode. Only save mode Overwrite is supported.
+
+Note that Postgres can not replace a view if existing columns are renamed, removed or change their type; the view
+must then be dropped first. Materialized views are not supported yet.
+
 ## Architecture
 
 SQLGlot is a Python library. It runs in a Python interpreter embedded into the JVM with
@@ -62,6 +99,7 @@ SQLGlot is a Python library. It runs in a Python interpreter embedded into the J
 | `SQLColumn` | `workflow/dataframe/sql/SQLColumn.scala` | A column expression as Spark SQL text (SQLGlot dialect `databricks`, i.e. Spark SQL with ANSI casts). Operators and functions compose the SQL text in Scala, no call to Python is needed. |
 | `SQLSchema` | `workflow/dataframe/sql/SQLSchema.scala` | Schema, fields and data types. Types of results are inferred by SQLGlot. |
 | `JdbcTableSqlEngine` | `workflow/dataobject/JdbcTableSqlEngine.scala` | SQL engine implementation of the `JdbcTableEngine` SPI of `JdbcTableDataObject` (sdl-core), discovered on the classpath like the Spark implementation in sdl-spark. Reads the table schema from the JDBC metadata, validates that the DataObject uses the engine connection, and executes the writes. |
+| `JdbcViewSqlEngine` | `workflow/dataobject/JdbcViewSqlEngine.scala` | SQL engine implementation of the `JdbcViewEngine` SPI of `JdbcViewDataObject` (sdl-core). Creates the view with a `CREATE OR REPLACE VIEW` statement rendered by SQLGlot. Reading the view is done by `JdbcTableSqlEngine`. |
 
 `JdbcTableConnection` (sdl-core) is the engine connection of the SQL engine: its SubFeed type is `SQLSubFeed`.
 

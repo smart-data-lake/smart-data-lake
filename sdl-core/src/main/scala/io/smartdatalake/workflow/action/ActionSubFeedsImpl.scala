@@ -28,7 +28,7 @@ import io.smartdatalake.util.misc.PerformanceUtils
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.generic.transformer.PartitionValueTransformer
 import io.smartdatalake.workflow.dataobject.DataObject
-import io.smartdatalake.workflow.dataobject.generic.CanHandlePartitions
+import io.smartdatalake.workflow.dataobject.generic.{CanHandlePartitions, ViewDataObject}
 
 import java.time.Duration
 import scala.collection.SortedSet
@@ -44,6 +44,12 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
 
   // Hook to ignore filters for specific inputs
   def inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
+
+  /**
+   * True if this Action writes a [[ViewDataObject]]. The query stored by the view must not depend on the current
+   * run, so the filters of all inputs are ignored, and an execution mode is not allowed.
+   */
+  protected lazy val writesView: Boolean = outputs.exists(_.isInstanceOf[ViewDataObject])
 
   /**
    * The input DataObjects whose SubFeeds are handled as SubFeed type S of this Action.
@@ -82,6 +88,9 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     super.validateConfig()
     // check inputIdsToIgnoreFilters
     inputIdsToIgnoreFilter.foreach(inputId => assert((inputs ++ recursiveInputs).exists(_.id == inputId), s"($id) $inputId from inputIdsToIgnoreFilter must be listed in inputIds of the same action."))
+    if (writesView && executionMode.isDefined) throw ConfigurationException(
+      s"($id) executionMode is not supported for Actions writing a view (${outputs.collect { case v: ViewDataObject => v.id }.mkString(", ")})," +
+        " as its filters would become part of the query stored by the view.", Some(s"actions.$id.executionMode"))
   }
 
   // prepare main input / output
@@ -155,7 +164,7 @@ abstract class ActionSubFeedsImpl[S <: SubFeed : TypeTag] extends Action {
     }
     inputSubFeeds = inputSubFeeds.map { subFeed =>
       // prepare input SubFeed
-      val ignoreFilter = inputIdsToIgnoreFilter.contains(subFeed.dataObjectId)
+      val ignoreFilter = writesView || inputIdsToIgnoreFilter.contains(subFeed.dataObjectId)
       val isRecursive = recursiveInputs.exists(_.id == subFeed.dataObjectId)
       // reset potentially skipped SubFeeds to deliver data as well.
       val reactivatedSubFeed = subFeed.clearSkipped().asInstanceOf[S]

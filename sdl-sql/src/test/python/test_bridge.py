@@ -247,6 +247,14 @@ def test_create_table_as():
     assert call("create_table_as", df=df["id"], table="db.tgt", dialect="postgres", with_data=False).endswith("WHERE FALSE")
 
 
+def test_create_view():
+    df = call("with_column", df=table()["id"], name="My Col", column='a * 2')
+    assert call("create_view", df=df["id"], view="db.v", dialect="postgres") == (
+        'CREATE OR REPLACE VIEW db.v AS SELECT test_table.a AS a, test_table.b AS b, test_table.c AS c, '
+        'test_table.a * 2 AS "My Col" FROM db.test_table AS test_table')
+    assert call("create_view", df=df["id"], view="db.v", dialect="tsql").startswith("CREATE OR ALTER VIEW db.v AS SELECT ")
+
+
 def test_create_table():
     assert call("create_table", table="db.tgt", columns=[["a", "INT", False], ["My Col", "TEXT", True]], dialect="tsql") == \
         "CREATE TABLE db.tgt (a INTEGER NOT NULL, [My Col] VARCHAR(MAX))"
