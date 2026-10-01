@@ -20,23 +20,10 @@
 Configuration:
   name: SDLB
 
-  # The maven build sets these system properties in the scalatest-maven-plugin configuration of the root pom:
-  # the complete log of each module goes to its target/test.log, and only warnings to the console, prefixed with the module
-  # name, as the console output of modules built in parallel (mvn -T) is interleaved.
-  # Without them (e.g. in the IDE), everything is logged to the console as usual.
   appenders:
     Console:
       name: STDOUT
       target: SYSTEM_OUT
-      ThresholdFilter:
-        level: "${sys:sdl.test.consoleLevel:-ALL}"
-      PatternLayout:
-        # %equals removes the empty prefix "[] " if no module name is set
-        Pattern: "%equals{[${sys:sdl.test.module:-}] }{[] }{}%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1} - %m [%t]%n"
-    File:
-      name: FILE
-      fileName: "${sys:sdl.test.logFile:-${sys:java.io.tmpdir}/sdl-test.log}"
-      append: false
       PatternLayout:
         Pattern: "%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1} - %m [%t]%n"
 
@@ -47,7 +34,6 @@ Configuration:
       level: WARN
       AppenderRef:
         - ref: STDOUT
-        - ref: FILE
 
     logger:
 

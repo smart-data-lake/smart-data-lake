@@ -60,25 +60,3 @@ jobs:
         run: |
           mvn -B -ntp -Daether.dependencyCollector.impl=bf install -pl sdl-spark -am -DskipTests -Dlicense.skip=true -Dmaven.source.skip=true
           mvn -B -ntp test -pl sdl-sql -Dlicense.skip=true
-
-      - name: Test logs per module
-        # the complete test logs are written to target/test.log of each module instead of the console, see log4j2-test.yml
-        if: ${{ !cancelled() }}
-        run: |
-          for f in $(ls */target/test.log 2>/dev/null); do
-            echo "::group::${f%%/*} ($(wc -l < "$f") lines)"
-            # do not interpret workflow commands contained in the log
-            TOKEN=$(uuidgen)
-            echo "::stop-commands::$TOKEN"
-            cat "$f"
-            echo "::$TOKEN::"
-            echo "::endgroup::"
-          done
-      - name: Upload test logs
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-logs-sql-engine
-          path: '*/target/test.log'
-          retention-days: 7
-          if-no-files-found: ignore
