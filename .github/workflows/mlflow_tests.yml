@@ -7,6 +7,9 @@ name: MLflow Tests
 on:
   # allow running it manually
   workflow_dispatch:
+  push:
+    branches:
+      - 'develop-spark*'
 
 jobs:
   mlflow-tests:

@@ -10,7 +10,9 @@ on:
     paths:
       - 'sdl-sql/**'
       - '.github/workflows/sql_engine_tests.yml'
-
+  push:
+    branches:
+      - 'develop-spark*'
 jobs:
   sql-engine-tests:
     runs-on: ubuntu-latest
