@@ -104,6 +104,28 @@ jobs:
         # -T 3: the modules depending only on sdl-core/sdl-spark (sparkconnect, deltalake, iceberg, kafka, ...) build in parallel
         run: mvn -T 3 -P test-sonar -B -ntp -Daether.dependencyCollector.impl=bf clean compile scoverage:report -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake  -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
 
+      - name: Test logs per module
+        # the complete test logs are written to target/test.log of each module instead of the console, see log4j2-test.yml
+        if: ${{ !cancelled() }}
+        run: |
+          for f in $(ls */target/test.log 2>/dev/null); do
+            echo "::group::${f%%/*} ($(wc -l < "$f") lines)"
+            # do not interpret workflow commands contained in the log
+            TOKEN=$(uuidgen)
+            echo "::stop-commands::$TOKEN"
+            cat "$f"
+            echo "::$TOKEN::"
+            echo "::endgroup::"
+          done
+      - name: Upload test logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-logs
+          path: '*/target/test.log'
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Upload compiled classes for the deploy job
         # The deploy job reuses the classes compiled by phase 'compile' above, instead of compiling everything again.
         # They are not instrumented: scoverage compiles to target/scoverage-classes with its own zinc analysis.

@@ -797,6 +797,10 @@
                         <systemProperties>
                             <!-- shared test logging configuration of all modules, packaged in the sdl-core test-jar -->
                             <log4j2.configurationFile>io/smartdatalake/testutils/log4j2-test.yml</log4j2.configurationFile>
+                            <!-- complete test log per module in target/test.log, only warnings with module prefix on the console, see log4j2-test.yml -->
+                            <sdl.test.module>${project.name}</sdl.test.module>
+                            <sdl.test.logFile>${project.build.directory}/test.log</sdl.test.logFile>
+                            <sdl.test.consoleLevel>WARN</sdl.test.consoleLevel>
                         </systemProperties>
                         <argLine>--add-exports java.base/sun.nio.ch=ALL-UNNAMED
                             --add-opens=java.base/java.lang=ALL-UNNAMED
