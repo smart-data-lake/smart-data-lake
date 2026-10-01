@@ -38,6 +38,7 @@ jobs:
       build: ${{ steps.filter.outputs.build }}
     steps:
       - id: filter
+        name: check build needed
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
