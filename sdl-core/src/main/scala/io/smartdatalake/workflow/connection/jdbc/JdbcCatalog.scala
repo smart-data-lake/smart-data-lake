@@ -132,7 +132,7 @@ abstract class JdbcCatalog(connection: Connection with GenericJdbcExecution, url
   protected def materializedViewDefinitionQuery(db: String, viewName: String): Option[String] = None
 
   /**
-   * The hash of the query of a materialized view as stored by [[viewQueryHashProperties]] or [[setViewQueryHash]],
+   * The hash of the query of a view or materialized view as stored by [[viewQueryHashProperties]] or [[setViewQueryHash]],
    * or None if the database does not support it or it is not set. Comparing it is more reliable than comparing the
    * definition of the view, which databases reformat.
    *
@@ -143,14 +143,16 @@ abstract class JdbcCatalog(connection: Connection with GenericJdbcExecution, url
 
   /**
    * Table properties to create a materialized view with, storing the hash of its query.
+   * Views get it with [[setViewQueryHash]] instead, as an existing view is not always replaced with a CREATE statement.
    */
   def viewQueryHashProperties(hash: String): Map[String, String] = Map()
 
   /**
-   * Store the hash of the query of a materialized view after it was created, if not done by [[viewQueryHashProperties]].
-   * It may fail, e.g. because of missing privileges; the caller must then compare the definition of the view.
+   * Store the hash of the query of a view or materialized view after it was created, if not done by
+   * [[viewQueryHashProperties]]. It may fail, e.g. because of missing privileges; the caller must then compare the
+   * definition of the view.
    */
-  def setViewQueryHash(db: String, viewName: String, hash: String): Unit = ()
+  def setViewQueryHash(db: String, viewName: String, hash: String, materialized: Boolean): Unit = ()
 
   /**
    * The privileges granted on a table or view to other users or roles, or None if they can not be read for this
@@ -223,7 +225,7 @@ object JdbcCatalog {
   // JDBC sub protocols of databases quoting identifiers with backticks
   private val backtickQuotingSubProtocols = Set("mysql", "mariadb", "databricks")
 
-  // table property and tag storing the hash of the query of a materialized view, see JdbcCatalog.getViewQueryHash
+  // table property and tag storing the hash of the query of a view, see JdbcCatalog.getViewQueryHash
   val viewQueryHashProperty = "sdlb.queryHash"
   val viewQueryHashTag = "SDLB_QUERY_HASH"
 
@@ -352,9 +354,10 @@ class SnowflakeJdbcCatalog(connection: Connection with GenericJdbcExecution, url
     connection.execJdbcQuery(query, (rs: ResultSet) => if (rs.next()) Option(rs.getString(1)) else None)
   }
 
-  override def setViewQueryHash(db: String, viewName: String, hash: String): Unit = {
-    connection.execJdbcStatement(s"CREATE TAG IF NOT EXISTS ${queryHashTag(db)} COMMENT = 'hash of the query of a materialized view, set by SDLB'")
-    connection.execJdbcStatement(s"ALTER MATERIALIZED VIEW $db.$viewName SET TAG ${queryHashTag(db)} = '$hash'")
+  override def setViewQueryHash(db: String, viewName: String, hash: String, materialized: Boolean): Unit = {
+    connection.execJdbcStatement(s"CREATE TAG IF NOT EXISTS ${queryHashTag(db)} COMMENT = 'hash of the query of a view, set by SDLB'")
+    val kind = if (materialized) "MATERIALIZED VIEW" else "VIEW"
+    connection.execJdbcStatement(s"ALTER $kind $db.$viewName SET TAG ${queryHashTag(db)} = '$hash'")
   }
 }
 
@@ -383,6 +386,10 @@ class DatabricksJdbcCatalog(connection: Connection with GenericJdbcExecution, ur
   }
 
   override def viewQueryHashProperties(hash: String): Map[String, String] = Map(JdbcCatalog.viewQueryHashProperty -> hash)
+
+  // an existing view is replaced with ALTER VIEW ... AS to keep its grants, so the property is set separately
+  override def setViewQueryHash(db: String, viewName: String, hash: String, materialized: Boolean): Unit =
+    if (!materialized) connection.execJdbcStatement(s"ALTER VIEW $db.$viewName SET TBLPROPERTIES ('${JdbcCatalog.viewQueryHashProperty}' = '$hash')")
 
   override def getViewQueryHash(db: String, viewName: String): Option[String] =
     connection.execJdbcQuery(s"SHOW TBLPROPERTIES $db.$viewName", (rs: ResultSet) =>

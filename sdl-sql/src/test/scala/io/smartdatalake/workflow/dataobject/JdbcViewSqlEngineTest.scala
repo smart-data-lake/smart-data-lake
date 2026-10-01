@@ -276,6 +276,19 @@ class JdbcViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
     assert(query("select id from v order by id") == Seq(Seq(1), Seq(2), Seq(3)))
   }
 
+  test("a run replaces a view only if its query changed") {
+    tableDataObject("src")
+    viewDataObject("v")
+    def viewOid = query("select view_oid from duckdb_views() where view_name = 'v'").head.head
+    run(copyAction("src", "v", "select id from %{inputViewName} where city = 'Bern'"), Seq("src"))
+    val oidBefore = viewOid
+    run(copyAction("src", "v", "select id from %{inputViewName} where city = 'Bern'"), Seq("src"))
+    assert(viewOid == oidBefore)
+    run(copyAction("src", "v", "select id from %{inputViewName}"), Seq("src"))
+    assert(viewOid != oidBefore)
+    assert(query("select id from v order by id") == Seq(Seq(1), Seq(2), Seq(3)))
+  }
+
   test("an Action writing a view can not have an execution mode") {
     tableDataObject("src")
     viewDataObject("v")

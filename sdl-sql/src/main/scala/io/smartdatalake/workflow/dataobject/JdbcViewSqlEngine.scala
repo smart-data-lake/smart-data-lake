@@ -68,12 +68,18 @@ class JdbcViewSqlEngine(dataObject: JdbcViewDataObject) extends JdbcViewEngine w
 
   override def renderQuery(df: GenericDataFrame)(implicit context: ActionPipelineContext): String = sqlDataFrame(df).toDatabaseSql
 
-  override def createOrReplaceView(query: String)(implicit context: ActionPipelineContext): Unit = {
+  override def createOrReplaceView(query: String, queryHash: String)(implicit context: ActionPipelineContext): Unit = {
     // the statement depends on whether the view exists, so that the grants on an existing view are kept
     val stmt = bridge.call("create_view", "query" -> query, "view" -> table.fullName, "dialect" -> connection.sqlGlotDialect,
       "exists" -> dataObject.isTableExisting).extract[String]
     connection.execJdbcStatement(stmt)
+    storeQueryHash(queryHash, materialized = false)
   }
+
+  private def storeQueryHash(queryHash: String, materialized: Boolean): Unit =
+    Try(connection.catalog.setViewQueryHash(table.db.get, table.name, queryHash, materialized)).failed.foreach(e =>
+      logger.warn(s"($id) the hash of the query can not be stored with ${if (materialized) "materialized view" else "view"} ${table.fullName}," +
+        s" its definition is compared to detect changes: ${e.getMessage}"))
 
   override def checkMaterializedViewSupported()(implicit context: ActionPipelineContext): Unit =
     bridge.call("check_materialized_view", "dialect" -> connection.sqlGlotDialect)
@@ -87,9 +93,7 @@ class JdbcViewSqlEngine(dataObject: JdbcViewDataObject) extends JdbcViewEngine w
       case None => connection.execJdbcStatement(create)
       case Some(drop) => recreateMaterializedView(drop, create)
     }
-    if (hashProperties.isEmpty) Try(connection.catalog.setViewQueryHash(table.db.get, table.name, queryHash)).failed.foreach(e =>
-      logger.warn(s"($id) the hash of the query can not be stored with materialized view ${table.fullName}," +
-        s" its definition is compared to detect changes: ${e.getMessage}"))
+    if (hashProperties.isEmpty) storeQueryHash(queryHash, materialized = true)
   }
 
   /**
