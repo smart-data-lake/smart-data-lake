@@ -76,7 +76,8 @@ actions {
 }
 ```
 
-The view is replaced in exec phase on every run, and a missing view is created in init phase, like a missing table.
+The view is replaced in exec phase if its query changed, and a missing view is created in init phase, like a missing
+table. If the query of the existing view can not be compared, it is replaced on every run.
 In init phase the query is also validated by executing it without fetching rows. As the query of a view is stored in the database, it must not depend on the current run: an Action
 writing a view (see marker trait `ViewDataObject`) ignores the partition values and filters of its inputs, and must
 not have an execution mode. Only save mode Overwrite is supported.
@@ -115,14 +116,19 @@ SQLGlot can not parse it, e.g. a `SCHEDULE` clause of Databricks, the query afte
 definition can not be read, e.g. for Redshift, a changed query is not detected and the materialized view is only
 refreshed, with a warning, so that it is never replaced on every run. A refresh on Databricks is incremental where possible.
 
-On Databricks and Snowflake, the SHA-256 hash of the normalized query is also stored with the materialized view, and
-compared instead of its definition when it is set, as it does not depend on how the database returns the definition:
-on Databricks as table property `sdlb.queryHash` (`TBLPROPERTIES` of `CREATE OR REPLACE MATERIALIZED VIEW`, read with
-`SHOW TBLPROPERTIES`), on Snowflake as tag `SDLB_QUERY_HASH` in the schema of the view (`CREATE TAG IF NOT EXISTS` and
-`ALTER MATERIALIZED VIEW ... SET TAG`, read with `SYSTEM$GET_TAG`). Snowflake tags need Enterprise Edition and the
-privilege to create tags; if setting the tag fails, a warning is logged and the definition is compared. The comment of
-the view is not used, as SDLB manages it as table comment. Postgres and Oracle have no table properties, so their
-definition is compared.
+On Databricks and Snowflake, the SHA-256 hash of the normalized query is also stored with the view or materialized
+view, and compared instead of its definition when it is set, as it does not depend on how the database returns the
+definition:
+
+- Databricks: table property `sdlb.queryHash`, read with `SHOW TBLPROPERTIES`. A materialized view gets it in
+  `TBLPROPERTIES` of `CREATE OR REPLACE MATERIALIZED VIEW`, a view with `ALTER VIEW ... SET TBLPROPERTIES`, as an
+  existing view is replaced with `ALTER VIEW ... AS` to keep its grants.
+- Snowflake: tag `SDLB_QUERY_HASH` in the schema of the view, set with `CREATE TAG IF NOT EXISTS` and
+  `ALTER [MATERIALIZED] VIEW ... SET TAG`, read with `SYSTEM$GET_TAG`. Tags need Enterprise Edition and the privilege
+  to create tags; if setting the tag fails, a warning is logged and the definition is compared.
+
+The comment of the view is not used, as SDLB manages it as table comment. Postgres and Oracle have no table
+properties, so their definition is compared.
 
 Snowflake keeps the grants with `CREATE OR REPLACE MATERIALIZED VIEW ... COPY GRANTS`, and Databricks uses
 `CREATE OR REPLACE MATERIALIZED VIEW`. Postgres, Redshift and Oracle can not replace a materialized view, so it is

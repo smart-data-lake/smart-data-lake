@@ -68,7 +68,7 @@ import scala.util.{Failure, Success, Try}
  * The query of an existing materialized view is read from pg_matviews for Postgres, ALL_MVIEWS for Oracle, with
  * SHOW MATERIALIZED VIEWS for Snowflake and SHOW CREATE TABLE for Databricks. If it can not be read, e.g. for Redshift,
  * a change of the query is not detected, and the materialized view is only refreshed.
- * On Databricks and Snowflake, a hash of the query is also stored with the materialized view, as table property
+ * On Databricks and Snowflake, a hash of the query is also stored with the view or materialized view, as table property
  * `sdlb.queryHash` (Databricks) or as tag `SDLB_QUERY_HASH` in the schema of the view (Snowflake, needs Enterprise
  * Edition and the privilege to create tags), and compared instead of the definition if it is set.
  * To switch an existing view between materialized and not materialized, drop it first.
@@ -116,7 +116,7 @@ import scala.util.{Failure, Success, Try}
  * @param incrementalOutputExpr Optional expression to use for creating incremental output with DataObjectStateIncrementalMode.
  *                              The expression is used to get the high-water-mark for the incremental update state.
  *                              Normally this can be just a column name, e.g. an id or updated timestamp which is continually increasing.
- * @param allowSchemaEvolution If true (default), the view is replaced by every run of the Action writing it.
+ * @param allowSchemaEvolution If true (default), the view is replaced by a run of the Action writing it if its query changed.
  *                             If false, an existing view is only replaced by CatalogSchemaUpdater, and a run fails if
  *                             the columns of the view changed.
  *                             For a materialized view, a run then only refreshes it.
@@ -229,7 +229,7 @@ case class JdbcViewDataObject(override val id: DataObjectId,
     validateWrite(df, saveModeOptions)
     if (partitionValues.nonEmpty) logger.info(s"($id) partition values ${partitionValues.mkString(", ")} are not applied to the view, but passed on to the next Action")
     if (materialized) writeMaterializedView(getViewQuery(df))
-    else if (allowSchemaEvolution) createOrReplaceView(getViewQuery(df))
+    else if (allowSchemaEvolution) writeView(getViewQuery(df))
     else logger.info(s"($id) view ${table.fullName} is not replaced as allowSchemaEvolution = false, it is deployed with CatalogSchemaUpdater")
     createdInThisRun = false
     Map()
@@ -269,7 +269,7 @@ case class JdbcViewDataObject(override val id: DataObjectId,
   }
 
   /**
-   * The hash of the normalized query, stored with a materialized view, see [[io.smartdatalake.workflow.connection.jdbc.JdbcCatalog.getViewQueryHash]].
+   * The hash of the normalized query, stored with a view or materialized view, see [[io.smartdatalake.workflow.connection.jdbc.JdbcCatalog.getViewQueryHash]].
    */
   private def queryHash(query: String)(implicit context: ActionPipelineContext): String = {
     val digest = java.security.MessageDigest.getInstance("SHA-256").digest(anyViewEngine.normalizeQuery(query).getBytes("UTF-8"))
@@ -285,8 +285,16 @@ case class JdbcViewDataObject(override val id: DataObjectId,
     }
 
   override def isViewUpToDate(query: String)(implicit context: ActionPipelineContext): Boolean = {
-    if (materialized && isTableExisting) storedQueryHash.map(_ == queryHash(query)).getOrElse(super.isViewUpToDate(query))
-    else super.isViewUpToDate(query)
+    if (isTableExisting) storedQueryHash.map(_ == queryHash(query)).getOrElse(super.isViewUpToDate(query))
+    else false
+  }
+
+  /**
+   * A view is replaced if its query changed, see [[isViewUpToDate]]. If the query can not be compared, it is replaced.
+   */
+  private def writeView(query: String)(implicit context: ActionPipelineContext): Unit = {
+    if (isViewUpToDate(query)) logger.info(s"($id) view ${table.fullName} is not replaced, as its query is unchanged")
+    else createOrReplaceView(query)
   }
 
   private def viewKind: String = if (materialized) "materialized view" else "view"
@@ -314,7 +322,7 @@ case class JdbcViewDataObject(override val id: DataObjectId,
 
   override def createOrReplaceView(query: String)(implicit context: ActionPipelineContext): Unit = {
     if (materialized) anyViewEngine.createOrReplaceMaterializedView(query, queryHash(query))
-    else anyViewEngine.createOrReplaceView(query)
+    else anyViewEngine.createOrReplaceView(query, queryHash(query))
     tableDataObject.resetCachedIsTableExisting()
     tableDataObject.resetCachedSchema()
   }
@@ -365,7 +373,7 @@ trait JdbcViewEngine extends DataObjectEngine {
   /**
    * Create or replace the view with the given query in the SQL dialect of the database.
    */
-  def createOrReplaceView(query: String)(implicit context: ActionPipelineContext): Unit
+  def createOrReplaceView(query: String, queryHash: String)(implicit context: ActionPipelineContext): Unit
 
   /**
    * Normalize the query of a view, to compare an existing view with a new query, see [[ViewDataObject.isSameViewQuery]].

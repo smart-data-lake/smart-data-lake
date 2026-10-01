@@ -82,9 +82,9 @@ class JdbcMaterializedViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterE
     dataObject
   }
 
-  private def materializedViewDataObject(id: String, allowSchemaEvolution: Boolean = true): JdbcViewDataObject = {
+  private def materializedViewDataObject(id: String, allowSchemaEvolution: Boolean = true, materialized: Boolean = true): JdbcViewDataObject = {
     val dataObject = JdbcViewDataObject(DataObjectId(id), table = Table(db = Some(schema), name = id), connectionId = connectionId,
-      allowSchemaEvolution = allowSchemaEvolution, materialized = true)
+      allowSchemaEvolution = allowSchemaEvolution, materialized = materialized)
     instanceRegistry.register(dataObject)
     dataObject
   }
@@ -216,6 +216,20 @@ class JdbcMaterializedViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterE
     assert(planAndApply().nonEmpty)
     assert(query(s"select id from $schema.v order by id") == Seq(Seq(1), Seq(2), Seq(3)))
     assert(grants("v") == Seq(TableGrant("PUBLIC", "SELECT", grantable = false)))
+  }
+
+  test("a run replaces a view only if its query changed, although Postgres rewrites it") {
+    tableDataObject("src")
+    materializedViewDataObject("v", materialized = false)
+    // CREATE OR REPLACE VIEW keeps the oid, but writes a new version of the rule of the view
+    def ruleVersion = query(s"select xmin::text from pg_rewrite where ev_class = '$schema.v'::regclass").head.head
+    run(copyAction("src", "v", bernQuery), Seq("src"))
+    val versionBefore = ruleVersion
+    run(copyAction("src", "v", bernQuery), Seq("src"))
+    assert(ruleVersion == versionBefore)
+    run(copyAction("src", "v", "select id, name from %{inputViewName}"), Seq("src"))
+    assert(ruleVersion != versionBefore)
+    assert(query(s"select id from $schema.v order by id") == Seq(Seq(1), Seq(2), Seq(3)))
   }
 
   test("the materialized view is dropped") {
