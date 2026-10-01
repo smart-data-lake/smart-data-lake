@@ -303,6 +303,23 @@ def test_normalize_query():
     assert call("normalize_query", query='SELECT "Name" FROM t', dialect="postgres") != call("normalize_query", query="SELECT Name FROM t", dialect="postgres")
 
 
+def test_normalize_query_of_materialized_view():
+    query = "SELECT src.id AS id, src.name AS name FROM cat.db.src AS src WHERE src.city = 'Bern'"
+    # as returned by SHOW CREATE TABLE on databricks, with clauses SQLGlot can not parse
+    existing = """CREATE MATERIALIZED VIEW cat.db.bern (
+  id INT,
+  name STRING COMMENT 'the name (AS SELECT)')
+COMMENT 'Bern customers'
+TBLPROPERTIES ('pipelines.pipelineId' = '1234-abcd')
+SCHEDULE EVERY 1 HOUR
+AS SELECT src.id AS id, src.name AS name FROM cat.db.src AS src WHERE src.city = 'Bern'"""
+    assert call("normalize_query", query=existing, dialect="databricks") == call("normalize_query", query=query, dialect="databricks")
+    # as returned by SHOW MATERIALIZED VIEWS on snowflake
+    existing = "CREATE OR REPLACE MATERIALIZED VIEW DB.S.BERN COPY GRANTS AS " + query.replace("cat.db", "db.s")
+    assert call("normalize_query", query=existing, dialect="snowflake") == \
+        call("normalize_query", query=query.replace("cat.db", "db.s"), dialect="snowflake")
+
+
 def test_create_table():
     assert call("create_table", table="db.tgt", columns=[["a", "INT", False], ["My Col", "TEXT", True]], dialect="tsql") == \
         "CREATE TABLE db.tgt (a INTEGER NOT NULL, [My Col] VARCHAR(MAX))"

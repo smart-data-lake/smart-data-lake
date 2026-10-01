@@ -728,11 +728,30 @@ class Session:
         expr = sqlglot.parse_one(query, dialect=dialect)
         if isinstance(expr, exp.Create):
             expr = expr.expression
+        elif isinstance(expr, exp.Command):
+            # a CREATE statement with clauses SQLGlot does not know, e.g. SCHEDULE of a databricks materialized view
+            expr = sqlglot.parse_one(self._query_of_create_statement(query, dialect), dialect=dialect)
         expr = normalize_identifiers(expr, dialect=dialect)
         for identifier in expr.find_all(exp.Identifier):
             if identifier.quoted and d.normalize_identifier(exp.to_identifier(identifier.name)).name == identifier.name:
                 identifier.set("quoted", False)
         return simplify(expr, dialect=dialect).sql(dialect=dialect)
+
+    @staticmethod
+    def _query_of_create_statement(statement, dialect):
+        """The query of a `CREATE ... AS <query>` statement: the text after the first `AS` outside of parentheses which
+        is followed by the start of a query. Tokenizing skips string literals and comments, e.g. a COMMENT clause."""
+        tokens = Dialect.get_or_raise(dialect).tokenize(statement)
+        depth = 0
+        for i, token in enumerate(tokens):
+            if token.token_type == sqlglot.TokenType.L_PAREN:
+                depth += 1
+            elif token.token_type == sqlglot.TokenType.R_PAREN:
+                depth -= 1
+            elif depth == 0 and token.token_type == sqlglot.TokenType.ALIAS and i + 1 < len(tokens) \
+                    and tokens[i + 1].token_type in (sqlglot.TokenType.SELECT, sqlglot.TokenType.WITH, sqlglot.TokenType.L_PAREN):
+                return statement[tokens[i + 1].start:]
+        raise ValueError(f"no query found in statement {statement}")
 
     def _column_identifier(self, name, kind, dialect, quote_names):
         quoted = quote_names or self._quote(name, kind, Dialect.get_or_raise(dialect))

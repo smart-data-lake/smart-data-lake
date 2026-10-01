@@ -65,8 +65,9 @@ import scala.util.{Failure, Success, Try}
  * materialized view, so it is dropped and created again in one transaction (where the database supports
  * transactional DDL), and the privileges granted on it are read before and granted again afterwards (Postgres and
  * Oracle). Note that Postgres can not drop a materialized view while other views depend on it.
- * The query of an existing materialized view is read from pg_matviews for Postgres and from ALL_MVIEWS for Oracle.
- * For other databases it can not be compared, and the materialized view is replaced on every run.
+ * The query of an existing materialized view is read from pg_matviews for Postgres, ALL_MVIEWS for Oracle, with
+ * SHOW MATERIALIZED VIEWS for Snowflake and SHOW CREATE TABLE for Databricks. If it can not be read, e.g. for Redshift,
+ * a change of the query is not detected, and the materialized view is only refreshed.
  * To switch an existing view between materialized and not materialized, drop it first.
  *
  * Example:
@@ -241,11 +242,25 @@ case class JdbcViewDataObject(override val id: DataObjectId,
       createOrReplaceView(query)
     } else if (createdInThisRun) {
       logger.info(s"($id) $viewKind ${table.fullName} is not refreshed, as it was created by this run")
-    } else if (allowSchemaEvolution && !getExistingViewDefinition.exists(isSameViewQuery(_, query))) {
+    } else if (allowSchemaEvolution && isChangedQuery(query)) {
       logger.info(s"($id) replacing $viewKind ${table.fullName}, as its query changed")
       createOrReplaceView(query)
     } else {
       anyViewEngine.refreshMaterializedView()
+    }
+  }
+
+  /**
+   * True if the query of the existing materialized view differs from the given one. If its definition can not be
+   * read, it is not replaced, as this would recompute it on every run, but the change is not detected.
+   */
+  private def isChangedQuery(query: String)(implicit context: ActionPipelineContext): Boolean = {
+    getExistingViewDefinition match {
+      case Some(definition) => !isSameViewQuery(definition, query)
+      case None =>
+        logger.warn(s"($id) the definition of $viewKind ${table.fullName} can not be read, so changes of its query are not detected." +
+          " It is refreshed, deploy changes with CatalogSchemaUpdater.")
+        false
     }
   }
 
