@@ -1983,7 +1983,65 @@
         "title" : "JdbcTableDataObject",
         "required" : [ "type", "table", "connectionId" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type JDBC.  \nProvides details for an action to read and write tables in a database through JDBC.\n\nNote that Sparks distributed processing can not directly write to a JDBC table in one transaction.  \nJdbcTableDataObject implements this in one transaction by writing to a temporary-table with Spark,\nthen using a separate \"insert into ... select\" SQL statement to copy data into the final table.\n\nJdbcTableDataObject implements\n- `CanMergeDataFrame` by writing a temp table and using one SQL merge statement.  \n- `CanEvolveSchema` by generating corresponding alter table DDL statements.  \n- Overwriting partitions is implemented by using SQL delete and insert statement embedded in one transaction.\n\nRequires a `JdbcTableConnection` referenced by `connectionId` , which holds url, driver and credentials. Example:\n```\nconnections = {\n  jdbc-dwh {\n    type = JdbcTableConnection\n    url = \"jdbc:postgresql://dwh:5432/mydb\"\n    driver = org.postgresql.Driver\n  }\n}\ndataObjects = {\n  int-airports {\n    type = JdbcTableDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = airports, primaryKey = [ident] }\n    saveMode = Merge\n  }\n}\n```\n"
+        "description" : "`DataObject` of type JDBC.  \nProvides details for an action to read and write tables in a database through JDBC.\n\nReading and writing data is implemented by engine specific implementations of `JdbcTableEngine`, which are\ndiscovered on the classpath: sdl-spark reads and writes with Spark.\n\nNote that Sparks distributed processing can not directly write to a JDBC table in one transaction.  \nJdbcTableDataObject implements this in one transaction by writing to a temporary-table with Spark,\nthen using a separate \"insert into ... select\" SQL statement to copy data into the final table.\n\nJdbcTableDataObject implements\n- `CanMergeDataFrame` by writing a temp table and using one SQL merge statement.  \n- `CanEvolveSchema` by generating corresponding alter table DDL statements.  \n- Overwriting partitions is implemented by using SQL delete and insert statement embedded in one transaction.\n\nRequires a `JdbcTableConnection` referenced by `connectionId` , which holds url, driver and credentials. Example:\n```\nconnections = {\n  jdbc-dwh {\n    type = JdbcTableConnection\n    url = \"jdbc:postgresql://dwh:5432/mydb\"\n    driver = org.postgresql.Driver\n  }\n}\ndataObjects = {\n  int-airports {\n    type = JdbcTableDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = airports, primaryKey = [ident] }\n    saveMode = Merge\n  }\n}\n```\n"
+      },
+      "JdbcViewDataObject" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "JdbcViewDataObject"
+          },
+          "table" : {
+            "$ref" : "#/definitions/Others/Table",
+            "description" : "The view to be created and read.`query` is not supported."
+          },
+          "connectionId" : {
+            "type" : "string",
+            "description" : "Id of the JdbcTableConnection of the database"
+          },
+          "schemaMin" : {
+            "type" : "string",
+            "description" : "An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.  \nDefine schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING."
+          },
+          "jdbcFetchSize" : {
+            "type" : "integer",
+            "description" : "Number of rows to be fetched together by the Jdbc driver when reading the view"
+          },
+          "jdbcOptions" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Any jdbc options for reading the view according tohttps://spark.apache.org/docs/latest/sql-data-sources-jdbc.html."
+          },
+          "virtualPartitions" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Virtual partition columns, see JdbcTableDataObject. Partition values written to the view are\npassed on to the next Action, and existing partitions are listed with a \"select distinct\" query."
+          },
+          "expectedPartitionsCondition" : {
+            "type" : "string",
+            "description" : "Optional definition of partitions expected to exist.  \nDefine a Spark SQL expression that is evaluated against a`PartitionValues` instance and returns true or false\nDefault is to expect all partitions to exist."
+          },
+          "incrementalOutputExpr" : {
+            "type" : "string",
+            "description" : "Optional expression to use for creating incremental output with DataObjectStateIncrementalMode.  \nThe expression is used to get the high-water-mark for the incremental update state.  \nNormally this can be just a column name, e.g. an id or updated timestamp which is continually increasing."
+          },
+          "allowSchemaEvolution" : {
+            "type" : "boolean",
+            "description" : "If true (default), the view is replaced by every run of the Action writing it.  \nIf false, an existing view is only replaced by CatalogSchemaUpdater, and a run fails if\nthe columns of the view changed."
+          },
+          "metadata" : {
+            "$ref" : "#/definitions/Others/DataObjectMetadata",
+            "description" : "Additional metadata for the DataObject"
+          }
+        },
+        "title" : "JdbcViewDataObject",
+        "required" : [ "type", "table", "connectionId" ],
+        "additionalProperties" : false,
+        "description" : "`DataObject` of a view in a database accessed through JDBC.\n\nWriting a DataFrame creates or replaces the view with the query of the DataFrame, i.e. `CREATE OR REPLACE VIEW ... AS\nSELECT ...` , so no data is written. This needs an engine which can render its DataFrames as SQL, i.e. the SQL\nengine of sdl-sql: the Action writing the view must use the JdbcTableConnection of the view as engine connection\n( `engineConnectionId` ), and all its inputs must be `JdbcTableDataObject` s or `JdbcViewDataObject` s of this\nconnection. The view is replaced in exec phase. In init phase a missing view is created, like a missing table is\ncreated by JdbcTableDataObject, and the query is validated by executing it on the database without fetching any rows.\n\nWith `allowSchemaEvolution = false` , an existing view is not replaced by an SDLB run, and the run fails if the columns\nof the view changed. The view is then deployed with CatalogSchemaUpdater, from its query exported by a dry-run with\nschema export, like the tables are created and migrated.\n\nAs the view is evaluated on every read, its query must not depend on the current run. The Action writing the view\ntherefore ignores the partition values and filters of its inputs, and must not have an execution mode, see `ViewDataObject`.\n\nA view can have `virtualPartitions` , like a JdbcTableDataObject. The partition values of the Action writing the view\nare then not applied to the view, but passed on to the next Action, which reads the view filtered by them.  \nWith `incrementalOutputExpr` , the next Action can read the view incrementally with DataObjectStateIncrementalMode,\nlike a JdbcTableDataObject.\n\nReading a view is the same as reading a table, it is done by all engines supporting `JdbcTableDataObject`, e.g.  \nSpark. So a view created by the SQL engine can be the input of a Spark Action in the same feed. Example:\n```\ndataObjects = {\n  int-airports {\n    type = JdbcTableDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = airports }\n  }\n  btl-swiss-airports {\n    type = JdbcViewDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = swiss_airports }\n  }\n}\nactions = {\n  create-swiss-airports {\n    type = CopyAction\n    inputId = int-airports\n    outputId = btl-swiss-airports\n    engineConnectionId = jdbc-dwh\n    transformers = [{\n      type = SQLDfTransformer\n      code = \"select ident, name from %{inputViewName} where iso_country = 'CH'\"\n    }]\n  }\n}\n```\n"
       },
       "JsonFileDataObject" : {
         "type" : "object",
@@ -5753,6 +5811,10 @@
             "additionalProperties" : false,
             "description" : "fine tuning of the JDBC connection pool used by SDLB, see[[ConnectionPoolConfig]], e.g. idle timeout and\nconnection validation. Default is`ConnectionPoolConfig` with its default values."
           },
+          "dialect" : {
+            "type" : "string",
+            "description" : "SQL dialect of the database as named by SQLGlot, e.g. postgres, tsql, oracle, snowflake or duckdb, see\nhttps://sqlglot.com/sqlglot/dialects.html. It is used by the SQL engine of sdl-sql to create SQL statements for\nthe database. Default is to derive it from the JDBC url."
+          },
           "metadata" : {
             "$ref" : "#/definitions/Others/ConnectionMetadata",
             "description" : "Additional metadata for the Connection"
@@ -6852,6 +6914,10 @@
               "type" : "string"
             },
             "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.  \nThe spark sql expressions are evaluated against an instance of`DefaultExpressionData`."
+          },
+          "sqlDialect" : {
+            "type" : "string",
+            "description" : "SQL dialect the SQL code is written in, default is`spark` . It is used by engines translating the\nSQL code for the database, e.g. the SQL engine of sdl-sql, which parses it with SQLGlot and\nsupports the dialects listed in https://sqlglot.com/sqlglot/dialects.html.  \nSpark engines expect Spark SQL and ignore it."
           }
         },
         "title" : "SQLDfTransformer",
@@ -7481,6 +7547,10 @@
               "type" : "string"
             },
             "description" : "optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.  \nThe spark sql expressions are evaluated against an instance of`DefaultExpressionData`."
+          },
+          "sqlDialect" : {
+            "type" : "string",
+            "description" : "SQL dialect the SQL code is written in, default is`spark` . It is used by engines translating the\nSQL code for the database, e.g. the SQL engine of sdl-sql, which parses it with SQLGlot and\nsupports the dialects listed in https://sqlglot.com/sqlglot/dialects.html.  \nSpark engines expect Spark SQL and ignore it."
           }
         },
         "title" : "SQLDfsTransformer",
@@ -8009,6 +8079,8 @@
           "$ref" : "#/definitions/DataObject/IcebergTableDataObject"
         }, {
           "$ref" : "#/definitions/DataObject/JdbcTableDataObject"
+        }, {
+          "$ref" : "#/definitions/DataObject/JdbcViewDataObject"
         }, {
           "$ref" : "#/definitions/DataObject/JsonFileDataObject"
         }, {
