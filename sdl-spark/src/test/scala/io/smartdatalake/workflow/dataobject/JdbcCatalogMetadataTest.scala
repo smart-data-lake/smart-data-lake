@@ -22,7 +22,7 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.spark.{SparkTestTool, SparkTestUtil}
 import io.smartdatalake.testutils.{CatalogMetadataBehaviour, CatalogMetadataTestParams, DataObjectTestSuite}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 
 /**
@@ -33,7 +33,7 @@ import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 class JdbcCatalogMetadataTest extends DataObjectTestSuite with SparkTestTool with SmartDataLakeLogger
   with CatalogMetadataBehaviour {
 
-  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcCatalogMetadataTest", "org.hsqldb.jdbcDriver")
+  private val jdbcConnection = JdbcConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcCatalogMetadataTest", "org.hsqldb.jdbcDriver")
 
   override def defaultEngineConnection: Connection with EngineConnection = SparkTestUtil.defaultSparkConnection
 

@@ -50,7 +50,7 @@ As an example:
 ```
 connections {
   MyTestSql {
-    type = JdbcTableConnection
+    type = JdbcConnection
     url = "jdbc:sqlserver://mssqlserver:1433;encrypt=true;trustServerCertificate=true;database=testdb"
     driver = com.microsoft.sqlserver.jdbc.SQLServerDriver
     authMode {

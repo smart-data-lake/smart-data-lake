@@ -32,11 +32,11 @@ import java.sql.{SQLException, SQLTransientConnectionException}
 import java.util.Properties
 import scala.collection.mutable
 
-class JdbcTableConnectionTest extends AnyFunSuite with SmartDataLakeLogger {
+class JdbcConnectionTest extends AnyFunSuite with SmartDataLakeLogger {
 
   test("autocommit is disabled by default") {
     // prepare
-    val jdbcConnection = JdbcTableConnection(id = "jdbcCon1", url = "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+    val jdbcConnection = JdbcConnection(id = "jdbcCon1", url = "jdbc:hsqldb:mem:JdbcConnectionTest",
       driver = "org.hsqldb.jdbcDriver")
 
     // run
@@ -48,7 +48,7 @@ class JdbcTableConnectionTest extends AnyFunSuite with SmartDataLakeLogger {
 
   test("JdbcTransaction.commit returns connection back to pool") {
     // prepare
-    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+    val jdbcConnection = JdbcConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcConnectionTest",
       "org.hsqldb.jdbcDriver", maxParallelConnections = 1, connectionPool = ConnectionPoolConfig(maxWaitTimeSec = 10))
 
     // run
@@ -63,7 +63,7 @@ class JdbcTableConnectionTest extends AnyFunSuite with SmartDataLakeLogger {
 
   test("JdbcTransaction.rollback returns connection back to pool") {
     // prepare
-    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+    val jdbcConnection = JdbcConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcConnectionTest",
       "org.hsqldb.jdbcDriver", maxParallelConnections = 1, connectionPool = ConnectionPoolConfig(maxWaitTimeSec = 10))
 
     // run
@@ -78,7 +78,7 @@ class JdbcTableConnectionTest extends AnyFunSuite with SmartDataLakeLogger {
 
   test("maxParallelConnections > 1 allows concurrent transactions") {
     // prepare
-    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+    val jdbcConnection = JdbcConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcConnectionTest",
       "org.hsqldb.jdbcDriver", maxParallelConnections = 2, connectionPool = ConnectionPoolConfig(maxWaitTimeSec = 10))
 
     // run
@@ -93,7 +93,7 @@ class JdbcTableConnectionTest extends AnyFunSuite with SmartDataLakeLogger {
 
   test("rollback after failed statement") {
     // prepare
-    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableConnectionTest",
+    val jdbcConnection = JdbcConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcConnectionTest",
       "org.hsqldb.jdbcDriver")
 
     jdbcConnection.execJdbcStatement("drop table if exists test_rollback")
@@ -126,7 +126,7 @@ class JdbcTableConnectionTest extends AnyFunSuite with SmartDataLakeLogger {
     server.start()
 
     // prepare
-    val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:hsql://localhost:1234/hsqldbtest",
+    val jdbcConnection = JdbcConnection("jdbcCon1", "jdbc:hsqldb:hsql://localhost:1234/hsqldbtest",
       "org.hsqldb.jdbcDriver", connectionPool = ConnectionPoolConfig( maxIdleTimeSec = 10, testOnBorrow = true, testOnReturn = true))
 
     // run something -> success

@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.{Config, ConfigFactory}
 import io.smartdatalake.config.objects.{TestAction, TestConnection, TestDataObject}
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
 import io.smartdatalake.workflow.dataobject.generic.Table
 import io.smartdatalake.testutils.DataObjectTestSuite
 import io.smartdatalake.workflow.action.ActionMetadata
@@ -46,7 +46,7 @@ class ExportMetadataDataObjectTest extends DataObjectTestSuite {
   }
 
   test("Test DataObjects Export of table, primaryKey and partitions") {
-    val jdbcCon = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:ExportMetadataDataObjectTest", "org.hsqldb.jdbcDriver")
+    val jdbcCon = JdbcConnection("jdbcCon1", "jdbc:hsqldb:mem:ExportMetadataDataObjectTest", "org.hsqldb.jdbcDriver")
     instanceRegistry.register(jdbcCon)
     val tableDo = JdbcTableDataObject(id = "tableDo", table = Table(db = Some("public"), name = "tab1", primaryKey = Some(Seq("id1", "id2"))), connectionId = "jdbcCon1")
     instanceRegistry.register(tableDo)

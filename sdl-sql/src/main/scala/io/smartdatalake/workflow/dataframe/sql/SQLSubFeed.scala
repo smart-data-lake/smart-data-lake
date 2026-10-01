@@ -26,7 +26,7 @@ import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.util.sqlglot.SqlGlotBridge
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnectionImpl
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.generic.CanCreateDataFrame
 import io.smartdatalake.workflow.dataobject.{DataObject, JdbcTableDataObject, JdbcViewDataObject}
@@ -39,7 +39,7 @@ import scala.util.Try
 
 /**
  * A SubFeed of the SQL engine. Its DataFrame is an SQLGlot query, which is rendered as SQL statement to be executed
- * on the database. The SQL engine is used by Actions with a [[JdbcTableConnection]] as engine connection.
+ * on the database. The SQL engine is used by Actions with a [[JdbcConnection]] as engine connection.
  */
 case class SQLSubFeed(@transient override val dataFrame: Option[SQLDataFrame],
                       override val dataObjectId: DataObjectId,
@@ -116,21 +116,21 @@ object SQLSubFeed extends DataFrameSubFeedCompanion {
   @transient override protected def subFeedType: Type = typeOf[SQLSubFeed]
 
   /**
-   * The JdbcTableConnection used as engine connection by the current Action, or otherwise the default engine
-   * connection if it is a JdbcTableConnection.
+   * The JdbcConnection used as engine connection by the current Action, or otherwise the default engine
+   * connection if it is a JdbcConnection.
    */
-  def getEngineConnection(implicit context: ActionPipelineContext): Option[JdbcTableConnection] = {
-    context.engineConnection.collect { case c: JdbcTableConnection => c }
+  def getEngineConnection(implicit context: ActionPipelineContext): Option[JdbcConnectionImpl] = {
+    context.engineConnection.collect { case c: JdbcConnectionImpl => c }
       .orElse(context.instanceRegistry.getConnections.collectFirst {
-        case c: JdbcTableConnection if c.id.id == Environment.defaultEngineConnectionId => c
+        case c: JdbcConnectionImpl if c.id.id == Environment.defaultEngineConnectionId => c
       })
   }
 
   /**
    * The engine connection to use for creating DataFrames, see [[getEngineConnection]].
    */
-  def requireEngineConnection(implicit context: ActionPipelineContext): JdbcTableConnection = getEngineConnection
-    .getOrElse(throw new IllegalStateException(s"No JdbcTableConnection found as engine connection, neither for the current action nor with id ${Environment.defaultEngineConnectionId}"))
+  def requireEngineConnection(implicit context: ActionPipelineContext): JdbcConnectionImpl = getEngineConnection
+    .getOrElse(throw new IllegalStateException(s"No JdbcConnection found as engine connection, neither for the current action nor with id ${Environment.defaultEngineConnectionId}"))
 
   /**
    * Create a SQLDataFrame reading a database table. See [[SQLDataFrame.table]].

@@ -22,10 +22,10 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import org.scalatest.funsuite.AnyFunSuite
 
-class JdbcTableConnectionDialectTest extends AnyFunSuite {
+class JdbcConnectionDialectTest extends AnyFunSuite {
 
   private def connection(url: String, dialect: Option[String] = None) =
-    JdbcTableConnection(ConnectionId("c"), url = url, driver = "org.hsqldb.jdbcDriver", dialect = dialect)
+    JdbcConnection(ConnectionId("c"), url = url, driver = "org.hsqldb.jdbcDriver", dialect = dialect)
 
   test("SQLGlot dialect is derived from the JDBC url") {
     assert(connection("jdbc:postgresql://localhost:5432/db").sqlGlotDialect == "postgres")

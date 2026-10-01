@@ -28,7 +28,7 @@ import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -63,7 +63,7 @@ object DebeziumCdcDataObjectMySqlParallelIT extends App with SmartDataLakeLogger
     authMode = BasicAuthMode(user = StringOrSecret(sys.env("MYSQL_USER")), password = StringOrSecret(sys.env("MYSQL_PASSWORD")))
   )
 
-  val jdbcConnection = JdbcTableConnection(
+  val jdbcConnection = JdbcConnection(
     id = "mysqlCon",
     url = s"jdbc:mysql://${sys.env("MYSQL_HOSTNAME")}:${sys.env("MYSQL_PORT").toInt}",
     driver = "com.mysql.cj.jdbc.Driver",
