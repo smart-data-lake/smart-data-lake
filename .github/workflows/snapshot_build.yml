@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - 'develop-spark*'
+    # documentation only changes do not need a build, keep in sync with the job 'changes' below
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.github/workflows/deploy-docs.yml'
+      - '.github/workflows/test-deploy-docs.yml'
   pull_request:
     branches:
       - 'develop-spark*'
@@ -22,9 +28,39 @@ on:
         type: boolean
         default: false
 
+# a new push to a pull request supersedes the running build; builds of develop branches are never cancelled, as they deploy
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Pull requests changing only documentation (e.g. dependabot updates of the docs site) skip the build.
+  # This can not be done with paths-ignore as for push: 'build' is a required check, and a workflow that does not run
+  # leaves it pending, while a skipped job counts as successful.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.filter.outputs.build }}
+    steps:
+      - id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "build=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          FILES=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename')
+          if grep -vqE '^docs/|\.md$|^\.github/workflows/(test-)?deploy-docs\.yml$' <<< "$FILES"; then
+            echo "build=true" >> $GITHUB_OUTPUT
+          else
+            echo "only documentation changed, skipping build"
+            echo "build=false" >> $GITHUB_OUTPUT
+          fi
+
   build:
-    if: ${{ !inputs.skipBuild }}
+    needs: changes
+    if: ${{ !inputs.skipBuild && needs.changes.outputs.build == 'true' }}
 
     runs-on: ubuntu-latest
 
@@ -66,7 +102,8 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         # to avoid running tests twice, phase 'compile' instead of 'test' is used, as tests are also executed by scoverage:report
-        run: mvn -P test-sonar -B -ntp -Daether.dependencyCollector.impl=bf clean compile scoverage:report -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake  -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
+        # -T 3: the modules depending only on sdl-core/sdl-spark (sparkconnect, deltalake, iceberg, kafka, ...) build in parallel
+        run: mvn -T 3 -P test-sonar -B -ntp -Daether.dependencyCollector.impl=bf clean compile scoverage:report -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake  -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
 
   deploy:
     needs: build

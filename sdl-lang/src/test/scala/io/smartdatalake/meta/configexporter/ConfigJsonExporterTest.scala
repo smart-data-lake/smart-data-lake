@@ -57,7 +57,10 @@ class ConfigJsonExporterTest extends AnyFunSuite {
 
   test("test main with default filename") {
     ConfigJsonExporter.main(Array("-c", getClass.getResource("/dagexporter/dagexporterTest.conf").getFile))
-    assert(new File("exportedConfig.json").exists())
+    val defaultFile = new File("exportedConfig.json")
+    assert(defaultFile.exists())
+    // the default filename is relative to the working directory, i.e. outside target - don't leave it behind
+    defaultFile.delete()
   }
 
   test("test main api upload") {

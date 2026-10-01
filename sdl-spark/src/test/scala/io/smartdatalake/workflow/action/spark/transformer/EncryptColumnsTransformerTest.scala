@@ -38,6 +38,7 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 import org.scalatest.funsuite.AnyFunSuite
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.nio.file.Files
 import java.time.LocalDateTime
 import scala.util.{Failure, Success, Try}
 
@@ -213,7 +214,7 @@ class EncryptColumnsTransformerTest extends AnyFunSuite with Quality {
     val cols = Seq("id", "str", "fl", "db", "lo")
     val crypt: EncryptDecrypt = new EncryptDecryptECB(test_key.getBytes())
     val df_enc = crypt.encryptColumns(df, cols)
-    val file = "./test_enc.parquet"
+    val file = Files.createTempDirectory("encryptColumns").resolve("test_enc.parquet").toString
 
     // write/read to CSV file -> would result in String columns, since CSV does not store Metadata
     // df_enc.write.mode(SaveMode.Overwrite).format("csv").option(key = "header", value = true).save(file)

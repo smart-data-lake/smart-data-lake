@@ -794,6 +794,10 @@
                             <SPARK_LOCAL_IP>127.0.0.1
                             </SPARK_LOCAL_IP> <!-- Suppresses Spark IP discovery during tests (when executed with mvn test) -->
                         </environmentVariables>
+                        <systemProperties>
+                            <!-- shared test logging configuration of all modules, packaged in the sdl-core test-jar -->
+                            <log4j2.configurationFile>io/smartdatalake/testutils/log4j2-test.yml</log4j2.configurationFile>
+                        </systemProperties>
                         <argLine>--add-exports java.base/sun.nio.ch=ALL-UNNAMED
                             --add-opens=java.base/java.lang=ALL-UNNAMED
                             --add-opens=java.base/java.lang.invoke=ALL-UNNAMED

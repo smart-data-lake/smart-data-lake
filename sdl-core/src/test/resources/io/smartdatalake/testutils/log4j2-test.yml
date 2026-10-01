@@ -68,6 +68,32 @@ Configuration:
         level: ERROR
       - name: io.smartdatalake.app.BuildVersionInfo
         level: ERROR
+      # Iceberg logs a stack trace on every lookup of a namespace that is not a catalog
+      - name: org.apache.iceberg.spark.Spark3Util
+        level: ERROR
+
+      # WARN:
+      - name: io.smartdatalake.util.misc.MemoryUtils$
+        level: WARN
+
+      # Tests provoking failures inside Spark tasks (failing transformers, expectations) make Spark log the same
+      # stack trace several times with hundreds of lines. ScalaTest reports the exception anyway if a test fails.
+      - name: org.apache.spark.scheduler.TaskSetManager
+        level: ERROR
+      - name: org.apache.spark.util.Utils
+        level: WARN
+        filters:
+          - RegexFilter:
+              regex: "Aborting task.*"
+              onMatch: DENY
+              onMismatch: NEUTRAL
+      - name: org.apache.spark.executor.Executor
+        level: WARN
+        filters:
+          - RegexFilter:
+              regex: "Exception in task .*"
+              onMatch: DENY
+              onMismatch: NEUTRAL
 
       # Filter specific message
       - name: org.apache.spark.sql.execution.datasources.FileFormatWriter
