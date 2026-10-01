@@ -21,7 +21,6 @@ package io.smartdatalake.util.spark.dataset
 import io.smartdatalake.testutils.spark.Collection._
 import io.smartdatalake.testutils.spark.{SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.PrecisionDef
-import io.smartdatalake.util.spark.GetSession.loggEnv
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
@@ -39,8 +38,6 @@ class EqualityTest extends AnyFlatSpec with Matchers with ScalaCheckPropertyChec
   private implicit val spark: SparkSession = SparkTestUtil.session
 
   import spark.implicits._
-
-  loggEnv
 
   "getSymmetricDifference" should "return empty df if generated df is compared with itself" in {
     forAll(genA = genExactFrame) { df =>

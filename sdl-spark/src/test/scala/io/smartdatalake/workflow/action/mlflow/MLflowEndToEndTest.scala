@@ -77,10 +77,10 @@ class MLflowEndToEndTest extends AnyFunSuite {
   private def pythonCmd: Option[String] = Environment.pythonPath
     .orElse(sys.env.get("PYSPARK_PYTHON"))
     .orElse(sys.env.get("PYSPARK_DRIVER_PYTHON"))
-    .orElse(Seq("python3", "python").find(cmd => Try(Seq(cmd, "--version").! == 0).getOrElse(false)))
+    .orElse(Seq("python3", "python").find(cmd => Try(Seq(cmd, "--version").!(ProcessLogger(_ => ())) == 0).getOrElse(false)))
 
   private def hasPythonModules(cmd: String, modules: String*): Boolean =
-    Try(Seq(cmd, "-c", modules.map("import " + _).mkString("; ")).! == 0).getOrElse(false)
+    Try(Seq(cmd, "-c", modules.map("import " + _).mkString("; ")).!(ProcessLogger(_ => ())) == 0).getOrElse(false)
 
   test("train a model and apply it") {
     val python = pythonCmd

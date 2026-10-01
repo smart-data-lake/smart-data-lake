@@ -788,12 +788,16 @@
                         <filereports>
                             ${project.artifactId}.txt
                         </filereports>
-                        <stdout>WFT
-                        </stdout>  <!-- without color, show full stack traces, show reminder of failed and canceled tests with short stack traces see: http://www.scalatest.org/user_guide/using_scalatest_with_sbt-->
+                        <stdout>WGK
+                        </stdout>  <!-- without color, no stack traces inline, but a reminder of the failed tests with full stack traces at the end of each module (canceled tests excluded, their reason is shown inline). See https://www.scalatest.org/user_guide/using_the_runner#configuringReporters -->
                         <environmentVariables>
                             <SPARK_LOCAL_IP>127.0.0.1
                             </SPARK_LOCAL_IP> <!-- Suppresses Spark IP discovery during tests (when executed with mvn test) -->
                         </environmentVariables>
+                        <systemProperties>
+                            <!-- shared test logging configuration of all modules, packaged in the sdl-core test-jar -->
+                            <log4j2.configurationFile>io/smartdatalake/testutils/log4j2-test.yml</log4j2.configurationFile>
+                        </systemProperties>
                         <argLine>--add-exports java.base/sun.nio.ch=ALL-UNNAMED
                             --add-opens=java.base/java.lang=ALL-UNNAMED
                             --add-opens=java.base/java.lang.invoke=ALL-UNNAMED

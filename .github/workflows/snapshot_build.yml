@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - 'develop-spark*'
+    # documentation only changes do not need a build, keep in sync with the job 'changes' below
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.github/workflows/deploy-docs.yml'
+      - '.github/workflows/test-deploy-docs.yml'
   pull_request:
     branches:
       - 'develop-spark*'
@@ -23,8 +29,38 @@ on:
         default: false
 
 jobs:
+  # Pull requests changing only documentation (e.g. dependabot updates of the docs site) skip the build.
+  # This can not be done with paths-ignore as for push: 'build' is a required check, and a workflow that does not run
+  # leaves it pending, while a skipped job counts as successful.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.filter.outputs.build }}
+    steps:
+      - id: filter
+        name: check build needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "build=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          FILES=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename')
+          if grep -vqE '^docs/|\.md$|^\.github/workflows/(test-)?deploy-docs\.yml$' <<< "$FILES"; then
+            echo "build=true" >> $GITHUB_OUTPUT
+          else
+            echo "only documentation changed, skipping build"
+            echo "build=false" >> $GITHUB_OUTPUT
+          fi
+
   build:
-    if: ${{ !inputs.skipBuild }}
+    needs: changes
+    if: ${{ !inputs.skipBuild && needs.changes.outputs.build == 'true' }}
+    # a newer commit supersedes a running build, also on develop branches: the deploy of the newer run publishes anyway
+    concurrency:
+      group: ${{ github.workflow }}-build-${{ github.ref }}
+      cancel-in-progress: true
 
     runs-on: ubuntu-latest
 
@@ -68,8 +104,30 @@ jobs:
         # to avoid running tests twice, phase 'compile' instead of 'test' is used, as tests are also executed by scoverage:report
         run: mvn -P test-sonar -B -ntp -Daether.dependencyCollector.impl=bf clean compile scoverage:report -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake  -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
 
+      - name: Upload compiled classes for the deploy job
+        # The deploy job reuses the classes compiled by phase 'compile' above, instead of compiling everything again.
+        # They are not instrumented: scoverage compiles to target/scoverage-classes with its own zinc analysis.
+        # Test classes are not uploaded, as they are compiled against the instrumented classes and are recompiled anyway.
+        # Zinc detects changes by content hash, so the timestamps lost by the artifact do not trigger a recompilation.
+        if: ${{ startsWith(github.ref_name, 'develop') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: compiled-classes
+          path: |
+            **/target/classes
+            **/target/analysis/compile
+            **/target/maven-status
+          retention-days: 1
+          if-no-files-found: error
+          include-hidden-files: true
+
   deploy:
     needs: build
+    # a running deploy is never cancelled, so that no partial snapshot is published to sonatype;
+    # a newer deploy waits for it instead (and replaces any deploy already waiting)
+    concurrency:
+      group: ${{ github.workflow }}-deploy-${{ github.ref }}
+      cancel-in-progress: false
     if: ${{ !cancelled() && (inputs.skipBuild || (needs.build.result == 'success' && startsWith(github.ref_name, 'develop'))) }}
 
     runs-on: ubuntu-latest
@@ -110,6 +168,14 @@ jobs:
           key: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}
 
+      - name: Download compiled classes of the build job
+        # not available if the build job was skipped (workflow_dispatch with skipBuild), then everything is compiled
+        id: download_classes
+        if: ${{ needs.build.result == 'success' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: compiled-classes
+
       - name: Update version for SNAPSHOT releases from feature/bugfix branches with issue number from branch name
         if: ${{ startsWith(github.ref_name, 'feature') || startsWith(github.ref_name, 'bugfix')}}
         run: |
@@ -122,8 +188,9 @@ jobs:
 
       - name: Maven deploy to sonatype for Scala 2.13
         # scaladoc is skipped for snapshots: nobody consumes it, and the javadoc jars dominate the upload to sonatype central
+        # without 'clean' if the compiled classes of the build job were downloaded, so that they are reused
         timeout-minutes: 60
-        run: mvn -P release-sonatype -B -ntp -Daether.dependencyCollector.impl=bf -Dmaven.scaladoc.skip=true -f pom.xml clean deploy -DskipTests -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
+        run: mvn -P release-sonatype -B -ntp -Daether.dependencyCollector.impl=bf -Dmaven.scaladoc.skip=true -f pom.xml ${{ steps.download_classes.outcome == 'success' && 'deploy' || 'clean deploy' }} -DskipTests -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
         env:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
@@ -147,4 +214,6 @@ jobs:
           mv sdl-lang/target/classes/sdl-schema.json $SCHEMA_DIR/sdl-schema-${MVN_CURRENT_VERSION}.json
           git add $SCHEMA_DIR/sdl-schema-${MVN_CURRENT_VERSION}.json
           git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_CURRENT_VERSION}.json" # only if there is something to commit
+          # rebase onto commits pushed in the meantime; only after committing, as pull refuses to rebase unstaged changes
+          git pull --rebase
           git push

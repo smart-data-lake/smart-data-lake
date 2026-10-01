@@ -38,7 +38,9 @@ SPARK_DIST=spark-${SPARK_VERSION}-bin-hadoop3
 SPARK_MINOR_VERSION=${SPARK_VERSION%.*}
 DELTA_VERSION=4.4.0
 ICEBERG_VERSION=1.11.0
-ICEBERG_WAREHOUSE=$(pwd)/iceberg-warehouse
+# server state (spark-warehouse, metastore_db, derby.log, iceberg-warehouse) is kept under target, out of the project dir
+SERVER_WORK_DIR=$(pwd)/target/spark-connect-server
+ICEBERG_WAREHOUSE=$SERVER_WORK_DIR/iceberg-warehouse
 
 # Mirrors to get the Spark distribution from, in the order they are tried.
 # dlcdn.apache.org is by far the fastest, but only keeps the latest patch release of each minor version.
@@ -98,7 +100,10 @@ fi
 # Remove state of previous server runs, so that the test server starts with a fresh catalog.
 # Note that the default in-memory catalog forgets tables on restart, but their warehouse directories would persist
 # and block creating tables with the same name again.
-rm -rf spark-warehouse metastore_db derby.log "$ICEBERG_WAREHOUSE"
+rm -rf "$SERVER_WORK_DIR"
+mkdir -p "$SERVER_WORK_DIR"
+# the server process inherits this working directory, which is where it creates spark-warehouse and metastore_db
+cd "$SERVER_WORK_DIR"
 
 echo $"starting Spark Connect server"
 "$SPARK_HOME/sbin/start-connect-server.sh" \
@@ -106,7 +111,10 @@ echo $"starting Spark Connect server"
   --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog \
   --conf spark.sql.catalog.iceberg1=org.apache.iceberg.spark.SparkCatalog \
   --conf spark.sql.catalog.iceberg1.type=hadoop \
-  --conf spark.sql.catalog.iceberg1.warehouse="$ICEBERG_WAREHOUSE"
+  --conf spark.sql.catalog.iceberg1.warehouse="$ICEBERG_WAREHOUSE" \
+  --conf spark.sql.shuffle.partitions=2 \
+  --conf spark.databricks.delta.snapshotPartitions=2 \
+  --conf spark.ui.enabled=false
 
 # wait for the server to accept connections
 for i in $(seq 1 60); do

@@ -54,7 +54,7 @@ class MLflowPythonCodeTest extends AnyFunSuite {
   }
 
   test("the python code compiles and its helpers behave as expected") {
-    val pythonCmd = Seq("python3", "python").find(cmd => Try(Seq(cmd, "--version").! == 0).getOrElse(false))
+    val pythonCmd = Seq("python3", "python").find(cmd => Try(Seq(cmd, "--version").!(ProcessLogger(_ => ())) == 0).getOrElse(false))
     assume(pythonCmd.isDefined, "no Python interpreter found")
     // the working directory of the test is the module directory
     assume(new File(scalaSourceFile).exists(), s"$scalaSourceFile not found, working directory is ${new File(".").getAbsolutePath}")

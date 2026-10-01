@@ -23,7 +23,6 @@ import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.WebserviceTestUtil
 import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.misc.ResourceUtil
-import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
@@ -41,8 +40,6 @@ class OpenApiDataObjectTest extends AnyFunSuite {
   val port = 8080 // for some reason, only the default port seems to work
   val httpsPort = 8443
   val host = "127.0.0.1"
-
-  loggEnv
 
   test("read openapi spec from classpath") {
     val do1 = OpenApiDataObject(

@@ -20,7 +20,6 @@ package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.spark.Collection._
 import io.smartdatalake.testutils.spark.SparkTestUtil
-import io.smartdatalake.util.spark.GetSession.loggEnv
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{ArrayType, IntegerType}
@@ -36,8 +35,6 @@ class DsQualityTest extends AnyFlatSpec with Matchers
   private implicit val spark: SparkSession = SparkTestUtil.session
 
   import spark.implicits._
-
-  loggEnv
 
   "countDistinctRows" should "count distinct rows" in {
     val argument = List((0, 0d), (0, 0d), (1, 1d), (1, 1d), (2, 2d), (2, 2d)).toDF("id", "x")

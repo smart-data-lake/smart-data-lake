@@ -11,6 +11,11 @@ on:
     branches:
       - 'develop-spark*'
 
+# a newer run of the same branch supersedes a running one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   mlflow-tests:
     runs-on: ubuntu-latest
@@ -46,6 +51,7 @@ jobs:
           echo "SDL_PYTHON_PATH=$PWD/sdl-spark/.venv/bin/python" >> $GITHUB_ENV
       - name: Run the MLflow and Python transformation tests
         # license headers are already checked by the Snapshot Build
+        # only the dependencies are installed, the tested module is compiled once by the test run itself
         run: |
-          mvn -B -ntp -Daether.dependencyCollector.impl=bf install -pl sdl-core,sdl-spark -am -DskipTests -Dlicense.skip=true
+          mvn -B -ntp -Daether.dependencyCollector.impl=bf install -pl sdl-core -am -DskipTests -Dlicense.skip=true -Dmaven.source.skip=true
           mvn -B -ntp test -pl sdl-spark -Dlicense.skip=true -Dsuites='io.smartdatalake.workflow.action.mlflow.MLflowEndToEndTest,io.smartdatalake.workflow.action.mlflow.MLflowActionTest,io.smartdatalake.util.mlflow.MLflowPythonCodeTest,io.smartdatalake.workflow.action.spark.transformer.PythonDynamicTransformTest'

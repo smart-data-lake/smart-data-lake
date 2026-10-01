@@ -20,7 +20,6 @@ package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.spark.Collection._
 import io.smartdatalake.testutils.spark.{SparkTestTool, SparkTestUtil}
-import io.smartdatalake.util.spark.GetSession.loggEnv
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Row, SparkSession}
@@ -39,8 +38,6 @@ class TransformTest extends AnyFlatSpec with Matchers
   private implicit val spark: SparkSession = SparkTestUtil.session
 
   import spark.implicits._
-
-  loggEnv
 
   "transformCols" should "square column x only" in {
     val argument = List((0, 0d), (1, 1d), (2, 2d), (3, 3d)).toDF("id", "x")
