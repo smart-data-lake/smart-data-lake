@@ -266,6 +266,34 @@ def test_create_view_keeps_grants():
     assert call("create_view", query=query, view="db.v", dialect="postgres", exists=True) == "CREATE OR REPLACE VIEW db.v AS SELECT a FROM db.t"
 
 
+def test_create_materialized_view():
+    query = "SELECT a FROM db.t"
+    # postgres and oracle have no CREATE OR REPLACE, an existing materialized view is dropped first
+    assert call("create_materialized_view", query=query, view="db.v", dialect="postgres", exists=False) == \
+        {"drop": None, "create": "CREATE MATERIALIZED VIEW db.v AS SELECT a FROM db.t"}
+    assert call("create_materialized_view", query=query, view="db.v", dialect="oracle", exists=True) == \
+        {"drop": "DROP MATERIALIZED VIEW db.v", "create": "CREATE MATERIALIZED VIEW db.v AS SELECT a FROM db.t"}
+    # snowflake keeps the grants with COPY GRANTS
+    assert call("create_materialized_view", query=query, view="db.v", dialect="snowflake", exists=True) == \
+        {"drop": None, "create": "CREATE OR REPLACE MATERIALIZED VIEW db.v COPY GRANTS AS SELECT a FROM db.t"}
+    assert call("create_materialized_view", query=query, view="db.v", dialect="databricks", exists=True) == \
+        {"drop": None, "create": "CREATE OR REPLACE MATERIALIZED VIEW db.v AS SELECT a FROM db.t"}
+
+
+def test_refresh_materialized_view():
+    assert call("refresh_materialized_view", view="db.v", dialect="postgres") == "REFRESH MATERIALIZED VIEW db.v"
+    assert call("refresh_materialized_view", view="db.v", dialect="databricks") == "REFRESH MATERIALIZED VIEW db.v"
+    assert call("refresh_materialized_view", view="db.v", dialect="oracle") == "BEGIN DBMS_MVIEW.REFRESH('db.v'); END;"
+    # snowflake refreshes materialized views automatically
+    assert call("refresh_materialized_view", view="db.v", dialect="snowflake") is None
+
+
+def test_materialized_view_unsupported_dialect():
+    assert call("check_materialized_view", dialect="postgres")
+    with pytest.raises(Exception, match="materialized views are not supported for SQL dialect 'duckdb'"):
+        call("check_materialized_view", dialect="duckdb")
+
+
 def test_normalize_query():
     query = "SELECT src.id AS id, UPPER(src.name) AS name FROM main.src AS src WHERE src.city = 'Bern'"
     # as returned by duckdb for the view

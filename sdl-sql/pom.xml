@@ -47,6 +47,8 @@
 		<!-- Keep in sync with jep in sdl-sql/pyproject.toml. The Java and the native part of jep must have the same version. -->
 		<jep.version>4.3.2</jep.version>
 		<duckdb.version>1.5.6.0</duckdb.version>
+		<embedded-postgres.version>2.2.2</embedded-postgres.version>
+		<postgresql.version>42.7.13</postgresql.version>
 	</properties>
 
 	<dependencies>
@@ -100,6 +102,19 @@
 			<groupId>org.duckdb</groupId>
 			<artifactId>duckdb_jdbc</artifactId>
 			<version>${duckdb.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<!-- embedded Postgres for tests of materialized views, which DuckDB does not support -->
+		<dependency>
+			<groupId>io.zonky.test</groupId>
+			<artifactId>embedded-postgres</artifactId>
+			<version>${embedded-postgres.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<version>${postgresql.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<!-- Spark engine for tests of feeds mixing the SQL and the Spark engine -->

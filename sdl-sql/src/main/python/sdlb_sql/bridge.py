@@ -675,6 +675,49 @@ class Session:
         create = exp.Create(this=target, kind="VIEW", replace=True, expression=query_expr, properties=properties)
         return create.sql(dialect=dialect)
 
+    # dialects supporting materialized views, and how an existing one is replaced: "recreate" drops and creates it
+    # again, as the database has no `CREATE OR REPLACE MATERIALIZED VIEW`, "replace" uses the latter.
+    _MATERIALIZED_VIEW_REPLACE = {"postgres": "recreate", "redshift": "recreate", "oracle": "recreate",
+                                  "snowflake": "replace", "databricks": "replace"}
+
+    def _materialized_view_dialect(self, dialect):
+        dialect_name = (dialect or "").lower()
+        if dialect_name not in self._MATERIALIZED_VIEW_REPLACE:
+            raise ValueError(f"materialized views are not supported for SQL dialect '{dialect}', supported dialects are "
+                             f"{', '.join(sorted(self._MATERIALIZED_VIEW_REPLACE))}")
+        return dialect_name
+
+    def check_materialized_view(self, dialect=None):
+        """Raise an error if materialized views are not supported for the dialect"""
+        self._materialized_view_dialect(dialect)
+        return True
+
+    def create_materialized_view(self, query, view, dialect=None, exists=False):
+        """Create the statements creating or replacing a materialized view as {drop, create}. `drop` is None unless an
+        existing materialized view must be dropped first, because the database has no `CREATE OR REPLACE`, e.g.
+        postgres and oracle. The caller must then keep its grants. Snowflake keeps them with `COPY GRANTS`.
+
+        The statement is assembled as text, as SQLGlot drops the schema of a materialized view for snowflake."""
+        dialect_name = self._materialized_view_dialect(dialect)
+        target = exp.to_table(view, dialect=dialect).sql(dialect=dialect)
+        query_sql = sqlglot.parse_one(query, dialect=dialect).sql(dialect=dialect)
+        if self._MATERIALIZED_VIEW_REPLACE[dialect_name] == "replace":
+            copy_grants = " COPY GRANTS" if dialect_name == "snowflake" else ""
+            return {"drop": None, "create": f"CREATE OR REPLACE MATERIALIZED VIEW {target}{copy_grants} AS {query_sql}"}
+        drop = f"DROP MATERIALIZED VIEW {target}" if exists else None
+        return {"drop": drop, "create": f"CREATE MATERIALIZED VIEW {target} AS {query_sql}"}
+
+    def refresh_materialized_view(self, view, dialect=None):
+        """Create the statement refreshing a materialized view, or None if the database refreshes it automatically,
+        i.e. snowflake."""
+        dialect_name = self._materialized_view_dialect(dialect)
+        target = exp.to_table(view, dialect=dialect).sql(dialect=dialect)
+        if dialect_name == "snowflake":
+            return None
+        if dialect_name == "oracle":
+            return f"BEGIN DBMS_MVIEW.REFRESH('{target.replace(chr(39), chr(39) * 2)}'); END;"
+        return f"REFRESH MATERIALIZED VIEW {target}"
+
     def normalize_query(self, query, dialect=None):
         """Normalize the query of a view, to compare the definition of an existing view with a new one. `query` can
         also be a `CREATE VIEW` statement, as some databases return the definition of a view like that. Databases
@@ -919,6 +962,9 @@ _OPS = {
     "create_table": _session.create_table,
     "create_view": _session.create_view,
     "normalize_query": _session.normalize_query,
+    "check_materialized_view": _session.check_materialized_view,
+    "create_materialized_view": _session.create_materialized_view,
+    "refresh_materialized_view": _session.refresh_materialized_view,
     "alter_table": _session.alter_table,
     "parse_types": _session.parse_types,
     "column_lineage": _session.column_lineage,
