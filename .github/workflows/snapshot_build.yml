@@ -28,11 +28,6 @@ on:
         type: boolean
         default: false
 
-# a new push to a pull request supersedes the running build; builds of develop branches are never cancelled, as they deploy
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   # Pull requests changing only documentation (e.g. dependabot updates of the docs site) skip the build.
   # This can not be done with paths-ignore as for push: 'build' is a required check, and a workflow that does not run
@@ -61,6 +56,10 @@ jobs:
   build:
     needs: changes
     if: ${{ !inputs.skipBuild && needs.changes.outputs.build == 'true' }}
+    # a newer commit supersedes a running build, also on develop branches: the deploy of the newer run publishes anyway
+    concurrency:
+      group: ${{ github.workflow }}-build-${{ github.ref }}
+      cancel-in-progress: true
 
     runs-on: ubuntu-latest
 
@@ -107,6 +106,11 @@ jobs:
 
   deploy:
     needs: build
+    # a running deploy is never cancelled, so that no partial snapshot is published to sonatype;
+    # a newer deploy waits for it instead (and replaces any deploy already waiting)
+    concurrency:
+      group: ${{ github.workflow }}-deploy-${{ github.ref }}
+      cancel-in-progress: false
     if: ${{ !cancelled() && (inputs.skipBuild || (needs.build.result == 'success' && startsWith(github.ref_name, 'develop'))) }}
 
     runs-on: ubuntu-latest
@@ -182,7 +186,8 @@ jobs:
           fi
           # note that sdl-schema.json should be available in the location below from the previous maven build.
           mv sdl-lang/target/classes/sdl-schema.json $SCHEMA_DIR/sdl-schema-${MVN_CURRENT_VERSION}.json
-          git pull --rebase
           git add $SCHEMA_DIR/sdl-schema-${MVN_CURRENT_VERSION}.json
           git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_CURRENT_VERSION}.json" # only if there is something to commit
+          # rebase onto commits pushed in the meantime; only after committing, as pull refuses to rebase unstaged changes
+          git pull --rebase
           git push
