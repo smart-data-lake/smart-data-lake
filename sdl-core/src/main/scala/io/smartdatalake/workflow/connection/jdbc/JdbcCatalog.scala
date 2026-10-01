@@ -132,6 +132,27 @@ abstract class JdbcCatalog(connection: Connection with GenericJdbcExecution, url
   protected def materializedViewDefinitionQuery(db: String, viewName: String): Option[String] = None
 
   /**
+   * The hash of the query of a materialized view as stored by [[viewQueryHashProperties]] or [[setViewQueryHash]],
+   * or None if the database does not support it or it is not set. Comparing it is more reliable than comparing the
+   * definition of the view, which databases reformat.
+   *
+   * @param db the db of the view, as configured
+   * @param viewName the name of the view, as configured
+   */
+  def getViewQueryHash(db: String, viewName: String): Option[String] = None
+
+  /**
+   * Table properties to create a materialized view with, storing the hash of its query.
+   */
+  def viewQueryHashProperties(hash: String): Map[String, String] = Map()
+
+  /**
+   * Store the hash of the query of a materialized view after it was created, if not done by [[viewQueryHashProperties]].
+   * It may fail, e.g. because of missing privileges; the caller must then compare the definition of the view.
+   */
+  def setViewQueryHash(db: String, viewName: String, hash: String): Unit = ()
+
+  /**
    * The privileges granted on a table or view to other users or roles, or None if they can not be read for this
    * database. They are needed to grant them again when a materialized view is dropped and created again.
    * Privileges of the owner are not included, as the owner of the new object gets them anyway.
@@ -201,6 +222,10 @@ abstract class JdbcCatalog(connection: Connection with GenericJdbcExecution, url
 object JdbcCatalog {
   // JDBC sub protocols of databases quoting identifiers with backticks
   private val backtickQuotingSubProtocols = Set("mysql", "mariadb", "databricks")
+
+  // table property and tag storing the hash of the query of a materialized view, see JdbcCatalog.getViewQueryHash
+  val viewQueryHashProperty = "sdlb.queryHash"
+  val viewQueryHashTag = "SDLB_QUERY_HASH"
 
   def fromJdbcDriver(driver: String, connection: Connection with GenericJdbcExecution, url: String): JdbcCatalog = {
     driver match {
@@ -317,6 +342,20 @@ class SnowflakeJdbcCatalog(connection: Connection with GenericJdbcExecution, url
       SnowflakeJdbcCatalog.findByName(rows, viewName, isQuotedIdentifier(viewName), removeQuotes)
     })
   }
+
+  // the tag storing the hash of the query, in the schema of the view. Object tagging needs Snowflake Enterprise Edition.
+  private def queryHashTag(db: String): String = s"$db.${JdbcCatalog.viewQueryHashTag}"
+
+  override def getViewQueryHash(db: String, viewName: String): Option[String] = {
+    def literal(s: String) = s"'${SQLUtil.escapeSqlStringLiteral(s)}'"
+    val query = s"SELECT SYSTEM$$GET_TAG(${literal(queryHashTag(db))}, ${literal(s"$db.$viewName")}, 'TABLE')"
+    connection.execJdbcQuery(query, (rs: ResultSet) => if (rs.next()) Option(rs.getString(1)) else None)
+  }
+
+  override def setViewQueryHash(db: String, viewName: String, hash: String): Unit = {
+    connection.execJdbcStatement(s"CREATE TAG IF NOT EXISTS ${queryHashTag(db)} COMMENT = 'hash of the query of a materialized view, set by SDLB'")
+    connection.execJdbcStatement(s"ALTER MATERIALIZED VIEW $db.$viewName SET TAG ${queryHashTag(db)} = '$hash'")
+  }
 }
 
 object SnowflakeJdbcCatalog {
@@ -342,6 +381,14 @@ class DatabricksJdbcCatalog(connection: Connection with GenericJdbcExecution, ur
     if (!isTableExisting(tableName)) None
     else connection.execJdbcQuery(s"SHOW CREATE TABLE $tableName", (rs: ResultSet) => if (rs.next()) Option(rs.getString(1)) else None)
   }
+
+  override def viewQueryHashProperties(hash: String): Map[String, String] = Map(JdbcCatalog.viewQueryHashProperty -> hash)
+
+  override def getViewQueryHash(db: String, viewName: String): Option[String] =
+    connection.execJdbcQuery(s"SHOW TBLPROPERTIES $db.$viewName", (rs: ResultSet) =>
+      Iterator.continually(rs).takeWhile(_.next()).map(r => (r.getString("key"), r.getString("value"))).toList
+        .collectFirst { case (JdbcCatalog.viewQueryHashProperty, value) => value }
+    )
 }
 
 /**

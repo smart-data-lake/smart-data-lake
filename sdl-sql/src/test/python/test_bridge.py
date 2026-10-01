@@ -280,6 +280,14 @@ def test_create_materialized_view():
         {"drop": None, "create": "CREATE OR REPLACE MATERIALIZED VIEW db.v AS SELECT a FROM db.t"}
 
 
+def test_create_materialized_view_with_properties():
+    assert call("create_materialized_view", query="SELECT a FROM db.t", view="db.v", dialect="databricks",
+                properties={"sdlb.queryHash": "abc"}) == \
+        {"drop": None, "create": "CREATE OR REPLACE MATERIALIZED VIEW db.v TBLPROPERTIES ('sdlb.queryHash' = 'abc') AS SELECT a FROM db.t"}
+    with pytest.raises(Exception, match="table properties of a materialized view are not supported"):
+        call("create_materialized_view", query="SELECT a FROM db.t", view="db.v", dialect="postgres", properties={"k": "v"})
+
+
 def test_refresh_materialized_view():
     assert call("refresh_materialized_view", view="db.v", dialect="postgres") == "REFRESH MATERIALIZED VIEW db.v"
     assert call("refresh_materialized_view", view="db.v", dialect="databricks") == "REFRESH MATERIALIZED VIEW db.v"

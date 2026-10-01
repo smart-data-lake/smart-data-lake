@@ -692,18 +692,27 @@ class Session:
         self._materialized_view_dialect(dialect)
         return True
 
-    def create_materialized_view(self, query, view, dialect=None, exists=False):
+    def create_materialized_view(self, query, view, dialect=None, exists=False, properties=None):
         """Create the statements creating or replacing a materialized view as {drop, create}. `drop` is None unless an
         existing materialized view must be dropped first, because the database has no `CREATE OR REPLACE`, e.g.
         postgres and oracle. The caller must then keep its grants. Snowflake keeps them with `COPY GRANTS`.
+
+        `properties` are table properties to create it with, e.g. the hash of the query, only supported for databricks.
 
         The statement is assembled as text, as SQLGlot drops the schema of a materialized view for snowflake."""
         dialect_name = self._materialized_view_dialect(dialect)
         target = exp.to_table(view, dialect=dialect).sql(dialect=dialect)
         query_sql = sqlglot.parse_one(query, dialect=dialect).sql(dialect=dialect)
+        if properties and dialect_name != "databricks":
+            raise ValueError(f"table properties of a materialized view are not supported for SQL dialect '{dialect}'")
         if self._MATERIALIZED_VIEW_REPLACE[dialect_name] == "replace":
             copy_grants = " COPY GRANTS" if dialect_name == "snowflake" else ""
-            return {"drop": None, "create": f"CREATE OR REPLACE MATERIALIZED VIEW {target}{copy_grants} AS {query_sql}"}
+            tbl_properties = ""
+            if properties:
+                values = ", ".join(f"{exp.Literal.string(k).sql(dialect=dialect)} = {exp.Literal.string(v).sql(dialect=dialect)}"
+                                   for k, v in sorted(properties.items()))
+                tbl_properties = f" TBLPROPERTIES ({values})"
+            return {"drop": None, "create": f"CREATE OR REPLACE MATERIALIZED VIEW {target}{copy_grants}{tbl_properties} AS {query_sql}"}
         drop = f"DROP MATERIALIZED VIEW {target}" if exists else None
         return {"drop": drop, "create": f"CREATE MATERIALIZED VIEW {target} AS {query_sql}"}
 
