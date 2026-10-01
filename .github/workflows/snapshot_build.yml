@@ -182,6 +182,7 @@ jobs:
           fi
           # note that sdl-schema.json should be available in the location below from the previous maven build.
           mv sdl-lang/target/classes/sdl-schema.json $SCHEMA_DIR/sdl-schema-${MVN_CURRENT_VERSION}.json
+          git pull --rebase
           git add $SCHEMA_DIR/sdl-schema-${MVN_CURRENT_VERSION}.json
           git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_CURRENT_VERSION}.json" # only if there is something to commit
           git push
