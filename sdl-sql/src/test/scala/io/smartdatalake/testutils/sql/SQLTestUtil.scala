@@ -22,11 +22,13 @@ import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.python.JepInterpreter
 import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
+import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
 
 import java.io.File
 
 /**
- * Utilities for tests of the SQL engine. They run against a DuckDB database file in target/duckdb.
+ * Utilities for tests of the SQL engine. They run against a DuckDB database file in target/duckdb, or against an
+ * embedded Postgres database for features DuckDB does not support, e.g. materialized views.
  */
 object SQLTestUtil {
 
@@ -49,6 +51,26 @@ object SQLTestUtil {
    */
   def createEngineConnection(name: String, id: String = Environment.defaultEngineConnectionId): JdbcConnection =
     JdbcConnection(ConnectionId(id), url = createDuckDbUrl(name), driver = "org.duckdb.DuckDBDriver", db = Some("main"))
+
+  /**
+   * Embedded Postgres server, started on first use and shared by all tests of the JVM.
+   */
+  lazy val embeddedPostgres: EmbeddedPostgres = {
+    val postgres = EmbeddedPostgres.start()
+    sys.addShutdownHook(postgres.close())
+    postgres
+  }
+
+  /**
+   * Create a JdbcConnection to a new, empty schema `name` of the embedded Postgres server.
+   */
+  def createPostgresConnection(name: String, id: String = Environment.defaultEngineConnectionId): JdbcConnection = {
+    val url = embeddedPostgres.getJdbcUrl("postgres", "postgres")
+    val connection = JdbcConnection(ConnectionId(id), url = url, driver = "org.postgresql.Driver", db = Some(name))
+    connection.execJdbcStatement(s"drop schema if exists $name cascade")
+    connection.execJdbcStatement(s"create schema $name")
+    connection
+  }
 
   /**
    * The reason why the tests needing Python must be canceled, see [[JepInterpreter.unavailableReason]].

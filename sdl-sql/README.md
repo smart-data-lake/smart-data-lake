@@ -95,7 +95,32 @@ drops them on replace, so `COPY GRANTS` is added, and Databricks as well, so an 
 `CREATE OR REPLACE VIEW` keeps the grants.
 
 Note that Postgres can not replace a view if existing columns are renamed, removed or change their type; the view
-must then be dropped first, which also drops its grants. Materialized views are not supported yet.
+must then be dropped first, which also drops its grants.
+
+To compare the query of an existing view with a new one, both are normalized with SQLGlot. For Postgres, the new
+query is first rewritten by the database like the definition of a view, e.g. with casts added and aliases removed, by
+creating a temporary view in a transaction which is rolled back (`JdbcCatalog.getViewDefinitionOfQuery`).
+
+### Materialized views
+
+With `materialized = true`, a `JdbcViewDataObject` is a materialized view, supported for the SQLGlot dialects
+postgres, redshift, oracle, snowflake and databricks. Other dialects fail in prepare phase. A missing materialized
+view is created in init phase with data, as Postgres can not read an unpopulated one. On every run the Action writing it
+refreshes it (`REFRESH MATERIALIZED VIEW`, `DBMS_MVIEW.REFRESH` on Oracle), except if it was created by the init
+phase of the same run. Snowflake refreshes materialized views automatically. If the query changed and
+`allowSchemaEvolution = true`, it is replaced instead of refreshed. Its existing query is read from `pg_matviews` (Postgres) and
+`ALL_MVIEWS` (Oracle). For other databases it can not be compared, and it is replaced on every run.
+
+Snowflake keeps the grants with `CREATE OR REPLACE MATERIALIZED VIEW ... COPY GRANTS`, and Databricks uses
+`CREATE OR REPLACE MATERIALIZED VIEW`. Postgres, Redshift and Oracle can not replace a materialized view, so it is
+dropped and created again. The privileges granted on it are read before (`JdbcCatalog.getGrants`, from `pg_class.relacl`
+for Postgres and `ALL_TAB_PRIVS` for Oracle), and are granted again after it is created. Drop, create and grants run in
+one transaction, so that nothing changes if one of them fails, at least on Postgres, where DDL is transactional. For
+Redshift the grants can not be read yet, so a warning says that they are lost. Postgres can not drop a materialized
+view while other views depend on it.
+
+The materialized view tests run on an embedded Postgres (zonky embedded-postgres, `SQLTestUtil.createPostgresConnection`),
+as DuckDB has no materialized views.
 
 ### Mixed feeds
 
@@ -125,7 +150,7 @@ SQLGlot is a Python library. It runs in a Python interpreter embedded into the J
 | `SQLColumn` | `workflow/dataframe/sql/SQLColumn.scala` | A column expression as Spark SQL text (SQLGlot dialect `databricks`, i.e. Spark SQL with ANSI casts). Operators and functions compose the SQL text in Scala, no call to Python is needed. |
 | `SQLSchema` | `workflow/dataframe/sql/SQLSchema.scala` | Schema, fields and data types. Types of results are inferred by SQLGlot. |
 | `JdbcTableSqlEngine` | `workflow/dataobject/JdbcTableSqlEngine.scala` | SQL engine implementation of the `JdbcTableEngine` SPI of `JdbcTableDataObject` (sdl-core), discovered on the classpath like the Spark implementation in sdl-spark. Reads the table schema from the JDBC metadata, validates that the DataObject uses the engine connection, and executes the writes. |
-| `JdbcViewSqlEngine` | `workflow/dataobject/JdbcViewSqlEngine.scala` | SQL engine implementation of the `JdbcViewEngine` SPI of `JdbcViewDataObject` (sdl-core). Creates the view with a `CREATE OR REPLACE VIEW` statement rendered by SQLGlot. Reading the view is done by `JdbcTableSqlEngine`. |
+| `JdbcViewSqlEngine` | `workflow/dataobject/JdbcViewSqlEngine.scala` | SQL engine implementation of the `JdbcViewEngine` SPI of `JdbcViewDataObject` (sdl-core). Creates the view with a `CREATE OR REPLACE VIEW` statement rendered by SQLGlot, and creates, replaces and refreshes materialized views. Reading the view is done by `JdbcTableSqlEngine`. |
 
 `JdbcConnection` (sdl-core) is the engine connection of the SQL engine: its SubFeed type is `SQLSubFeed`.
 

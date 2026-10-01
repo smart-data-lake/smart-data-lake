@@ -113,6 +113,51 @@ abstract class JdbcCatalog(connection: Connection with GenericJdbcExecution, url
   protected def viewDefinitionQuery(db: String, viewName: String): Option[String] =
     Some(s"SELECT VIEW_DEFINITION FROM INFORMATION_SCHEMA.VIEWS WHERE UPPER(TABLE_SCHEMA) = UPPER('$db') AND UPPER(TABLE_NAME) = UPPER('$viewName')")
 
+  /**
+   * The definition the database would store for a view with the given query, or None if not supported.
+   * Databases rewrite the query of a view, e.g. Postgres adds casts and removes aliases, so that the definition of
+   * an existing view can only be compared with a query rewritten the same way.
+   */
+  def getViewDefinitionOfQuery(query: String): Option[String] = None
+
+  /**
+   * The definition of a materialized view as stored by the database, or None if it does not exist or the database
+   * is not supported. Then the definition can not be compared, and the materialized view is replaced.
+   */
+  def getMaterializedViewDefinition(db: String, viewName: String): Option[String] = {
+    materializedViewDefinitionQuery(removeQuotes(db).replace("'", "''"), removeQuotes(viewName).replace("'", "''"))
+      .flatMap(query => connection.execJdbcQuery(query, (rs: ResultSet) => if (rs.next()) Option(rs.getString(1)) else None))
+  }
+
+  protected def materializedViewDefinitionQuery(db: String, viewName: String): Option[String] = None
+
+  /**
+   * The privileges granted on a table or view to other users or roles, or None if they can not be read for this
+   * database. They are needed to grant them again when a materialized view is dropped and created again.
+   * Privileges of the owner are not included, as the owner of the new object gets them anyway.
+   */
+  def getGrants(db: String, tableName: String): Option[Seq[TableGrant]] = {
+    grantsQuery(removeQuotes(db).replace("'", "''"), removeQuotes(tableName).replace("'", "''"))
+      .map(query => connection.execJdbcQuery(query, (rs: ResultSet) =>
+        Iterator.continually(rs).takeWhile(_.next())
+          .map(r => TableGrant(r.getString(1), r.getString(2), Option(r.getString(3)).exists(_.equalsIgnoreCase("YES"))))
+          .toList
+      ))
+  }
+
+  /**
+   * Query returning the columns grantee, privilege and grantable ('YES' or 'NO') of the privileges on a table.
+   */
+  protected def grantsQuery(db: String, tableName: String): Option[String] = None
+
+  /**
+   * Create the statements granting the given privileges on a table or view.
+   */
+  def grantStatements(tableName: String, grants: Seq[TableGrant]): Seq[String] = grants.map { grant =>
+    val grantee = if (grant.grantee.equalsIgnoreCase("PUBLIC")) "PUBLIC" else quoteIdentifier(grant.grantee)
+    s"GRANT ${grant.privilege} ON $tableName TO $grantee${if (grant.grantable) " WITH GRANT OPTION" else ""}"
+  }
+
   protected def evalRecordExists( rs:ResultSet ) : Boolean = {
     rs.next
     rs.getInt(1) == 1
@@ -161,6 +206,7 @@ object JdbcCatalog {
     driver match {
       case d if d.toLowerCase.contains("oracle") => new OracleJdbcCatalog(connection, url)
       case d if d.toLowerCase.contains("com.sap.db") => new SapHanaJdbcCatalog(connection, url)
+      case d if d.toLowerCase.contains("postgresql") => new PostgresJdbcCatalog(connection, url)
       case _ => new DefaultJdbcCatalog(connection, url)
     }
   }
@@ -207,6 +253,49 @@ class OracleJdbcCatalog(connection: Connection with GenericJdbcExecution, url: S
 
   override protected def viewDefinitionQuery(db: String, viewName: String): Option[String] =
     Some(s"SELECT TEXT FROM ALL_VIEWS WHERE UPPER(OWNER) = UPPER('$db') AND UPPER(VIEW_NAME) = UPPER('$viewName')")
+
+  override protected def materializedViewDefinitionQuery(db: String, viewName: String): Option[String] =
+    Some(s"SELECT QUERY FROM ALL_MVIEWS WHERE UPPER(OWNER) = UPPER('$db') AND UPPER(MVIEW_NAME) = UPPER('$viewName')")
+
+  override protected def grantsQuery(db: String, tableName: String): Option[String] =
+    Some(s"SELECT GRANTEE, PRIVILEGE, GRANTABLE FROM ALL_TAB_PRIVS WHERE UPPER(TABLE_SCHEMA) = UPPER('$db') AND UPPER(TABLE_NAME) = UPPER('$tableName')")
+}
+
+/**
+ * PostgreSQL JDBC Catalog query implementation. Materialized views and their privileges are not listed in
+ * INFORMATION_SCHEMA, so they are read from the system catalogs.
+ */
+class PostgresJdbcCatalog(connection: Connection with GenericJdbcExecution, url: String) extends DefaultJdbcCatalog(connection, url) {
+
+  /**
+   * Creates a temporary view with the query in a transaction which is rolled back, and reads its definition.
+   * It is formatted like the definition of every view and materialized view, as all are created by pg_get_viewdef.
+   */
+  override def getViewDefinitionOfQuery(query: String): Option[String] = connection.execWithJdbcConnection { con =>
+    val autoCommit = con.getAutoCommit
+    con.setAutoCommit(false)
+    val stmt = con.createStatement()
+    try {
+      stmt.execute(s"CREATE TEMPORARY VIEW sdlb_view_definition AS $query")
+      val rs = stmt.executeQuery("SELECT pg_get_viewdef('pg_temp.sdlb_view_definition'::regclass)")
+      if (rs.next()) Option(rs.getString(1)) else None
+    } finally {
+      stmt.close()
+      con.rollback()
+      con.setAutoCommit(autoCommit)
+    }
+  }
+
+  override protected def materializedViewDefinitionQuery(db: String, viewName: String): Option[String] =
+    Some(s"SELECT definition FROM pg_matviews WHERE UPPER(schemaname) = UPPER('$db') AND UPPER(matviewname) = UPPER('$viewName')")
+
+  override protected def grantsQuery(db: String, tableName: String): Option[String] =
+    Some(
+      s"""SELECT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END, a.privilege_type,
+         |  CASE WHEN a.is_grantable THEN 'YES' ELSE 'NO' END
+         |FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace CROSS JOIN LATERAL aclexplode(c.relacl) a
+         |WHERE UPPER(n.nspname) = UPPER('$db') AND UPPER(c.relname) = UPPER('$tableName') AND a.grantee <> c.relowner
+         |ORDER BY 1, 2""".stripMargin)
 }
 
 /**
@@ -223,3 +312,12 @@ class SapHanaJdbcCatalog(connection: Connection with GenericJdbcExecution, url: 
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists)
   }
 }
+
+/**
+ * A privilege granted on a table or view, see [[JdbcCatalog.getGrants]].
+ *
+ * @param grantee the user or role, or PUBLIC
+ * @param privilege e.g. SELECT
+ * @param grantable true if the grantee may grant the privilege to others (WITH GRANT OPTION)
+ */
+case class TableGrant(grantee: String, privilege: String, grantable: Boolean)

@@ -313,6 +313,17 @@ class JdbcViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
     assert(viewNames.isEmpty)
   }
 
+  test("a materialized view fails in prepare phase if the database does not support it") {
+    tableDataObject("src")
+    instanceRegistry.register(JdbcViewDataObject(DataObjectId("v"), table = Table(db = Some("main"), name = "v"),
+      connectionId = connectionId, materialized = true))
+    val action = copyAction("src", "v", "select id from %{inputViewName}")
+    val ex = intercept[Exception](init(action, Seq("src"), Seq()))
+    assert(Iterator.iterate[Throwable](ex)(_.getCause).takeWhile(_ != null)
+      .exists(_.getMessage.contains("materialized views are not supported for SQL dialect 'duckdb'")))
+    assert(viewNames.isEmpty)
+  }
+
   test("JdbcViewDataObject is parsable") {
     val config = ConfigFactory.parseString(
       """
