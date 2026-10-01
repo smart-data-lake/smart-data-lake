@@ -28,7 +28,6 @@ import io.smartdatalake.testutils.{SmartDataLakeBuilderBehaviour, TestSDLPlugin,
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, StateUploader}
-import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.workflow.action._
 import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncrementalMode
 import io.smartdatalake.workflow.action.generic.transformer.{ColumnsTransformer, GenericDfTransformer}
@@ -42,8 +41,8 @@ import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.expectation.{CountExpectation, Expectation}
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, Table, TransactionalTableDataObject}
 import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import io.smartdatalake.workflow.dataobject.spark.SparkDataObjectOps._
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{lit, raise_error, udf}
@@ -84,8 +83,6 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter with Smar
 
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
-
-  loggEnv
 
   before {
     sdlb.instanceRegistry.clear()

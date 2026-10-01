@@ -18,10 +18,9 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
 import io.smartdatalake.testutils.HistorizeActionBehaviour
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, SparkTestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.util.spark.dataset.Equality
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataobject.generic.Table
@@ -42,8 +41,6 @@ class IcebergHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with
   private val tempPath = tempDir.toAbsolutePath.toString
 
   override def defaultEngineConnection: Connection with EngineConnection = SparkTestUtil.defaultSparkConnection
-
-  loggEnv(session, logger)
 
   testsFor(historizeWithMergeMode(
       (id, registry) => MockSparkDataObject(id)(registry),

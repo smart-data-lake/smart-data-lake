@@ -25,7 +25,6 @@ import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, Spa
 import io.smartdatalake.testutils.{DataObjectTestSuite, TableDataObjectBehaviour, TableDataObjectTestParams}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, CustomDataFrameAction}
 import io.smartdatalake.workflow.connection.jdbc.{DefaultJdbcCatalog, JdbcTableConnection}
@@ -51,8 +50,6 @@ class JdbcTableDataObjectTest extends DataObjectTestSuite with SparkTestTool
 
   private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:JdbcTableDataObjectTest", "org.hsqldb.jdbcDriver")
   private val tempDir = Files.createTempDirectory("test")
-
-  loggEnv
 
   override def defaultEngineConnection: Connection with EngineConnection = SparkTestUtil.defaultSparkConnection
 

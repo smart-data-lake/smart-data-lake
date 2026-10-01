@@ -27,7 +27,6 @@ import io.smartdatalake.util.LogUtils.debugLog
 import io.smartdatalake.util.dag.TaskFailedException
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.GetSession.loggEnv
 import io.smartdatalake.util.spark.dataset.Quality
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action._
@@ -87,7 +86,6 @@ class SmartDataLakeBuilderStreamingTest extends AnyFunSuite with Quality with Sm
     })
   }
 
-  loggEnv
   debugLog(s"SmartDataLakeBuilderStreamingTest: tempPath = $tempPath")
 
   private val dfSrc2 = Seq(("20190101", "company", "olmo", "-", 10)) // second partition 20190101

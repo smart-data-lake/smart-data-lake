@@ -20,7 +20,6 @@ package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.spark.Collection._
 import io.smartdatalake.testutils.spark.SparkTestUtil
-import io.smartdatalake.util.spark.GetSession.loggEnv
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.lit
 import org.scalatest.flatspec.AnyFlatSpec
@@ -33,8 +32,6 @@ class DsPkTest extends AnyFlatSpec with Matchers
   private implicit val spark: SparkSession = SparkTestUtil.session
 
   import spark.implicits._
-
-  loggEnv
 
   "getNonuniqueStats" should "return empty dataFrame if there are no nLets" in {
     val actual = dfHierarchy.getNonuniqueStats()

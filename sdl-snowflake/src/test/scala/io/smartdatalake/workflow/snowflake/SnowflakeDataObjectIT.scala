@@ -46,7 +46,6 @@ object SnowflakeDataObjectIT extends App with SmartDataLakeLogger {
   implicit val sparkSession: SparkSession = SparkTestUtil.session
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
   implicit val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
-  io.smartdatalake.util.spark.GetSession.loggEnv(sparkSession, logger)
 
   instanceRegistry.register(SnowflakeConnectionConfig.sfConnection)
 

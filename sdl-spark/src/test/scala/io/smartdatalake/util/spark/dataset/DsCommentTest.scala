@@ -19,7 +19,6 @@
 package io.smartdatalake.util.spark.dataset
 
 import io.smartdatalake.testutils.spark.SparkTestUtil
-import io.smartdatalake.util.spark.GetSession.loggEnv
 import org.apache.spark.sql.functions.{coalesce, col, lit}
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.scalatest.flatspec.AnyFlatSpec
@@ -32,8 +31,6 @@ class DsCommentTest extends AnyFlatSpec with Matchers
   private implicit val spark: SparkSession = SparkTestUtil.session
 
   import spark.implicits._
-
-  loggEnv
 
   "setColumnComments" should "preserve type of Dataset" in {
     val ds: Dataset[TestCaseClass] = List(TestCaseClass(1, 1f, TestInnerClass(1, 1))).toDF().as[TestCaseClass]
