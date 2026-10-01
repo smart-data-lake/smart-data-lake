@@ -55,5 +55,22 @@ private[smartdatalake] class SchemaExportRegistry extends SmartDataLakeLogger {
     schemas.toMap
   }
 
+  private val viewQueries = mutable.Map[DataObjectId, String]()
+
+  /**
+   * Init phase: remember the query of a view written to `dataObjectId`, see [[io.smartdatalake.workflow.dataobject.generic.ViewDataObject]].
+   */
+  def registerViewQuery(dataObjectId: DataObjectId, query: String): Unit = synchronized {
+    logger.debug(s"($dataObjectId) registering view query for export")
+    viewQueries.update(dataObjectId, query)
+  }
+
+  /**
+   * All view queries collected so far.
+   */
+  def getViewQueries: Map[DataObjectId, String] = synchronized {
+    viewQueries.toMap
+  }
+
   def isEmpty: Boolean = synchronized(schemas.isEmpty)
 }

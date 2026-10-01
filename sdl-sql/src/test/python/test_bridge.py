@@ -249,10 +249,20 @@ def test_create_table_as():
 
 def test_create_view():
     df = call("with_column", df=table()["id"], name="My Col", column='a * 2')
-    assert call("create_view", df=df["id"], view="db.v", dialect="postgres") == (
+    query = call("to_sql", df=df["id"], dialect="postgres")
+    assert call("create_view", query=query, view="db.v", dialect="postgres") == (
         'CREATE OR REPLACE VIEW db.v AS SELECT test_table.a AS a, test_table.b AS b, test_table.c AS c, '
         'test_table.a * 2 AS "My Col" FROM db.test_table AS test_table')
-    assert call("create_view", df=df["id"], view="db.v", dialect="tsql").startswith("CREATE OR ALTER VIEW db.v AS SELECT ")
+    assert call("create_view", query=query, view="db.v", dialect="tsql").startswith("CREATE OR ALTER VIEW db.v AS SELECT ")
+
+
+def test_normalize_query():
+    query = "SELECT src.id AS id, UPPER(src.name) AS name FROM main.src AS src WHERE src.city = 'Bern'"
+    # as returned by duckdb for the view
+    existing = 'CREATE VIEW v AS SELECT src.id AS id, upper(src."name") AS "name" FROM main.src AS src WHERE (src.city = \'Bern\');'
+    assert call("normalize_query", query=existing, dialect="duckdb") == call("normalize_query", query=query, dialect="duckdb")
+    # quotes of case-sensitive identifiers matter
+    assert call("normalize_query", query='SELECT "Name" FROM t', dialect="postgres") != call("normalize_query", query="SELECT Name FROM t", dialect="postgres")
 
 
 def test_create_table():

@@ -198,6 +198,7 @@ The following changes are applied:
 | table comment, column comments | the DataObject implements `CanHandleCatalogMetadata` |
 | primary key | `table.createAndReplacePrimaryKey = true` |
 | foreign keys | `table.createAndReplaceForeignKeys = true` |
+| create or replace a view | the DataObject is a view, e.g. `JdbcViewDataObject`, and its query was exported and changed |
 
 Columns are never dropped - a column which is not written anymore is made nullable instead, so that existing
 data is kept and new records can be written without it. This is the same behaviour as the schema evolution
@@ -230,6 +231,15 @@ table {
 }
 ```
 
+Views are applied after the tables and before the foreign keys. A dry-run with schema export also exports the
+query of a view, e.g. of a `JdbcViewDataObject` written by the SQL engine, in the SQL dialect of the database.
+`CatalogSchemaUpdater` creates or replaces the view with it if the view is missing or its query changed. As
+databases reformat the query of a view, the existing definition and the exported query are normalized with
+SQLGlot before comparing them. If they can not be compared, e.g. because the database added casts, the view is
+replaced. A view reading another view is applied after it, in the order of the DAG. Deploying views needs sdl-sql
+on the classpath. With `allowSchemaEvolution = false` on a `JdbcViewDataObject`, an SDLB run only creates a
+missing view, and does not replace an existing one, so that its changes are deployed with `CatalogSchemaUpdater`.
+
 The referenced DataObject should be part of the same run: if it is excluded with `--includeRegex` or
 `--excludeRegex`, its table is neither created nor updated here, so it must already exist in the catalog
 with the referenced primary key. This is reported with a warning.
@@ -241,6 +251,7 @@ Support by DataObject:
 | `DeltaLakeTableDataObject` | yes | yes | yes (Databricks) | yes (Databricks) |
 | `IcebergTableDataObject` | yes | yes | - | - |
 | `JdbcTableDataObject` | yes | yes, if the JDBC driver supports `COMMENT ON` | yes | yes |
+| `JdbcViewDataObject` | view, created or replaced with its exported query | - | - | - |
 | `SnowflakeTableDataObject` | - | yes | yes | - |
 
 Other DataObjects are skipped. Note that primary and foreign keys are informational constraints on Databricks

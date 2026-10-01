@@ -88,11 +88,12 @@ object ExportWriter {
    * @param transformSchemaJson optional transformation of the schema Json, e.g. to merge column descriptions,
    *                            see [[ColumnDescriptionParser.mergeIntoSchemaJson]].
    */
-  def formatSchema(schema: Option[GenericSchema], info: Option[String], transformSchemaJson: JArray => JArray = identity): String = {
+  def formatSchema(schema: Option[GenericSchema], info: Option[String], transformSchemaJson: JArray => JArray = identity, viewQuery: Option[String] = None): String = {
     val contentJson = JObject(Seq(
       info.toSeq.map("info" -> JString(_)),
       schema.toSeq.map(s => "schema" -> transformSchemaJson(s.toJson)),
-      schema.toSeq.map(s => "subFeedType" -> JString(s.subFeedType.typeSymbol.name.toString))
+      schema.toSeq.map(s => "subFeedType" -> JString(s.subFeedType.typeSymbol.name.toString)),
+      viewQuery.toSeq.map("viewQuery" -> JString(_))
     ).flatten.toIndexedSeq: _*)
     pretty(contentJson)
   }
@@ -148,6 +149,15 @@ object ExportWriter {
     }
     val plan = if (debug.plan.isEmpty) Seq() else Seq("", "Analyzed plan:") ++ debug.plan
     (header ++ inputs ++ unresolvedColumns ++ plan).mkString(System.lineSeparator) + System.lineSeparator
+  }
+
+  /**
+   * The query of a view exported with its schema, see [[formatSchema]] and
+   * [[io.smartdatalake.workflow.dataobject.generic.ViewDataObject.getViewQuery]].
+   */
+  def parseViewQuery(content: String): Option[String] = JsonMethods.parse(content) \ "viewQuery" match {
+    case JString(query) => Some(query)
+    case _ => None
   }
 
   def parseSchema(content: String): (GenericSchema, Option[String]) = {

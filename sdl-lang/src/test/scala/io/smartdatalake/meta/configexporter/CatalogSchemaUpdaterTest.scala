@@ -18,7 +18,9 @@
  */
 package io.smartdatalake.meta.configexporter
 
-import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.{ConfigToolbox, ConfigurationException}
+import io.smartdatalake.workflow.dataobject.DataObject
 import org.scalatest.funsuite.AnyFunSuite
 
 /**
@@ -37,6 +39,15 @@ class CatalogSchemaUpdaterTest extends AnyFunSuite {
 
   test("plan mode ignores DataObjects without catalog support") {
     CatalogSchemaUpdater.main(Array("-c", configPath, "-i", "dataObjectCsv1"))
+  }
+
+  test("views are applied in the order of the DAG") {
+    val (registry, _) = ConfigToolbox.loadAndParseConfig(Seq(configPath))
+    // dataObjectCsv1 -> dataObjectParquet6 -> dataObjectParquet7 -> dataObjectParquet9 -> dataObjectCsv5
+    val ids = Seq("dataObjectCsv5", "dataObjectParquet9", "dataObjectParquet7", "dataObjectParquet6", "dataObjectCsv1")
+    val elements = ids.map(id => (registry.get[DataObject](DataObjectId(id)), id))
+    val ordered = CatalogSchemaUpdater.orderByDependencies(elements, registry.getActions).map(_._2)
+    assert(ordered == ids.reverse)
   }
 
   test("invalid mode is rejected by the parser") {

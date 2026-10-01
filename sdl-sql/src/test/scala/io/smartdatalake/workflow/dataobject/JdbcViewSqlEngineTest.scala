@@ -19,6 +19,7 @@
 package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.ConfigFactory
+import io.smartdatalake.app.TestMode
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeGenericOptions}
@@ -30,7 +31,7 @@ import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.{Action, CopyAction, DataFrameActionImpl}
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.sql.SQLSubFeed
-import io.smartdatalake.workflow.dataobject.generic.Table
+import io.smartdatalake.workflow.dataobject.generic.{CatalogMetadataApplier, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SubFeed}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.{BeforeAndAfterEach, Outcome}
@@ -85,9 +86,10 @@ class JdbcViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
     dataObject
   }
 
-  private def viewDataObject(id: String, virtualPartitions: Seq[String] = Seq(), incrementalOutputExpr: Option[String] = None): JdbcViewDataObject = {
+  private def viewDataObject(id: String, virtualPartitions: Seq[String] = Seq(), incrementalOutputExpr: Option[String] = None,
+                             allowSchemaEvolution: Boolean = true): JdbcViewDataObject = {
     val dataObject = JdbcViewDataObject(DataObjectId(id), table = Table(db = Some("main"), name = id), connectionId = connectionId,
-      virtualPartitions = virtualPartitions, incrementalOutputExpr = incrementalOutputExpr)
+      virtualPartitions = virtualPartitions, incrementalOutputExpr = incrementalOutputExpr, allowSchemaEvolution = allowSchemaEvolution)
     instanceRegistry.register(dataObject)
     dataObject
   }
@@ -130,9 +132,10 @@ class JdbcViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
     viewDataObject("bern")
     val action = copyAction("src", "bern", "select id, upper(name) as name from %{inputViewName} where city = 'Bern'")
     assert(action.subFeedType =:= typeOf[SQLSubFeed])
-    // init phase does not change the database
+    // init phase creates a missing view, like a missing table. It reads the input table, not an empty DataFrame.
     init(action, Seq("src"), Seq())
-    assert(viewNames.isEmpty)
+    assert(viewNames == Seq("bern"))
+    assert(query("select id, name from bern order by id") == Seq(Seq(1, "BOB"), Seq(3, "JOE")))
     run(action, Seq("src"))
     assert(viewNames == Seq("bern"))
     assert(query("select id, name from bern order by id") == Seq(Seq(1, "BOB"), Seq(3, "JOE")))
@@ -217,6 +220,60 @@ class JdbcViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
     viewDataObject("v", virtualPartitions = Seq("zip"))
     val ex = intercept[Exception](run(copyAction("src", "v", "select * from %{inputViewName}"), Seq("src")))
     assert(Iterator.iterate[Throwable](ex)(_.getCause).takeWhile(_ != null).exists(_.getMessage.contains("zip")))
+  }
+
+  test("an existing view is not replaced with allowSchemaEvolution = false") {
+    tableDataObject("src")
+    viewDataObject("v", allowSchemaEvolution = false)
+    // a missing view is created
+    run(copyAction("src", "v", "select id, name from %{inputViewName} where city = 'Bern'"), Seq("src"))
+    assert(query("select id from v order by id") == Seq(Seq(1), Seq(3)))
+    // a changed query is not applied
+    run(copyAction("src", "v", "select id, name from %{inputViewName}"), Seq("src"))
+    assert(query("select id from v order by id") == Seq(Seq(1), Seq(3)))
+    // changed columns fail
+    val ex = intercept[Exception](run(copyAction("src", "v", "select id, name, city from %{inputViewName}"), Seq("src")))
+    assert(Iterator.iterate[Throwable](ex)(_.getCause).takeWhile(_ != null).exists(_.getMessage.contains("deploy it with CatalogSchemaUpdater")))
+  }
+
+  test("the query of a view is exported by a dry-run with schema export") {
+    tableDataObject("src")
+    viewDataObject("v1")
+    viewDataObject("v2")
+    val actions = Seq(copyAction("src", "v1", "select id, city from %{inputViewName} where city = 'Bern'"),
+      copyAction("v1", "v2", "select city, count(*) as cnt from %{inputViewName} group by city"))
+    val contextDryRun = context().copy(appConfig = context().appConfig.copy(test = Some(TestMode.DryRunWithSchemaExport)))
+    actions.foreach(a => a.prepare(contextDryRun.withAction(a)))
+    actions.foldLeft(Seq[SubFeed](SQLSubFeed(None, DataObjectId("src"), isDAGStart = true)))((subFeeds, a) => a.init(subFeeds)(contextDryRun.withAction(a)))
+    val viewQueries = contextDryRun.schemaExportRegistry.getViewQueries
+    assert(viewQueries.keySet == Set(DataObjectId("v1"), DataObjectId("v2")))
+    // the queries read the tables and views, and not the empty DataFrames of the init phase
+    assert(viewQueries(DataObjectId("v1")).contains("FROM main.src"))
+    assert(viewQueries(DataObjectId("v2")).contains("FROM main.v1"))
+    assert(!viewQueries.values.exists(_.toUpperCase.contains("FALSE")))
+  }
+
+  test("CatalogMetadataApplier creates and replaces a view with its exported query") {
+    tableDataObject("src")
+    val viewDO = viewDataObject("v", allowSchemaEvolution = false)
+    var exportedQuery = "SELECT src.id AS id FROM main.src AS src WHERE src.city = 'Bern'"
+    val applier = new CatalogMetadataApplier(_ => None, viewQueryReader = _ => Some(exportedQuery))
+    implicit val contextInit: ActionPipelineContext = context()
+    def planAndApply(): Option[String] = {
+      val changes = applier.plan(viewDO).get
+      applier.applyView(viewDO, changes)
+      changes.createOrReplaceView
+    }
+    // the view is created
+    assert(planAndApply().contains(exportedQuery))
+    assert(query("select id from v order by id") == Seq(Seq(1), Seq(3)))
+    // it is up to date, although the database reformats the query
+    assert(viewDO.getExistingViewDefinition.exists(_ != exportedQuery))
+    assert(planAndApply().isEmpty)
+    // a changed query replaces the view
+    exportedQuery = "SELECT src.id AS id FROM main.src AS src"
+    assert(planAndApply().contains(exportedQuery))
+    assert(query("select id from v order by id") == Seq(Seq(1), Seq(2), Seq(3)))
   }
 
   test("an Action writing a view can not have an execution mode") {

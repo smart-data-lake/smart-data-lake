@@ -28,11 +28,14 @@ import io.smartdatalake.util.sqlglot.SqlGlotBridge
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe._
+import io.smartdatalake.workflow.dataobject.generic.CanCreateDataFrame
+import io.smartdatalake.workflow.dataobject.{DataObject, JdbcTableDataObject, JdbcViewDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, ColumnFilter, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 
 import java.time.Duration
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.{MethodSymbol, Type, TypeTag, typeOf}
+import scala.util.Try
 
 /**
  * A SubFeed of the SQL engine. Its DataFrame is an SQLGlot query, which is rendered as SQL statement to be executed
@@ -150,6 +153,32 @@ object SQLSubFeed extends DataFrameSubFeedCompanion {
       SQLSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped,
         keptSchema = DataFrameSubFeed.convertSchema(dataFrameSubFeed, subFeedType))
     case _ => SQLSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
+  }
+
+  /**
+   * In init phase, an input which is a JdbcTableDataObject or JdbcViewDataObject of the engine connection is referenced
+   * by its table name, with the schema transported by the SubFeed. Like that the statements rendered in init phase are
+   * the same as in exec phase, e.g. the query of a view exported by a dry-run, see JdbcViewDataObject.
+   * If the schema is not known, the existing table is read, which needs no data access either.
+   */
+  override def getInitDataFrame(dataObject: DataObject with CanCreateDataFrame, schema: Option[GenericSchema])(implicit context: ActionPipelineContext): Option[SQLDataFrame] = {
+    val jdbcDataObject = dataObject match {
+      case d: JdbcTableDataObject => Some(d)
+      case d: JdbcViewDataObject => Some(d.tableDataObject)
+      case _ => None
+    }
+    for {
+      connection <- getEngineConnection
+      jdbcDO <- jdbcDataObject if jdbcDO.connection.id == connection.id
+      df <- schema match {
+        case Some(s) => Try(SQLSchema.of(s.convert(subFeedType))).toOption.map { sqlSchema =>
+          jdbcDO.table.query.map(q => SQLDataFrame.query(connection, q, sqlSchema))
+            .getOrElse(SQLDataFrame.table(connection, jdbcDO.table.fullName, sqlSchema))
+        }
+        case None if jdbcDO.isTableExisting => Some(SQLDataFrame.of(jdbcDO.getDataFrame(Seq(), subFeedType)))
+        case None => None
+      }
+    } yield df
   }
 
   override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SQLDataFrame = schema match {

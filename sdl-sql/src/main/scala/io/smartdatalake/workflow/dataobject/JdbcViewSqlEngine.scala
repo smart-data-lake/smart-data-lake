@@ -22,7 +22,6 @@ import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.sqlglot.SqlGlotBridge
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.sql.{SQLDataFrame, SQLSubFeed}
 import org.json4s.{DefaultFormats, Formats}
@@ -31,7 +30,8 @@ import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
  * SQL engine implementation of creating the view of a [[JdbcViewDataObject]], see [[JdbcViewEngine]].
- * The view is created with a `CREATE OR REPLACE VIEW` statement rendered by SQLGlot in the dialect of the database.
+ * The view is created with a `CREATE OR REPLACE VIEW` statement rendered by SQLGlot in the dialect of the database,
+ * from the query of the DataFrame, or from a query exported by a dry-run when deployed by CatalogSchemaUpdater.
  * Reading the view is done by [[JdbcTableSqlEngine]].
  *
  * It is used by Actions with the JdbcTableConnection of the view as engine connection, see [[JdbcTableSqlEngine]].
@@ -62,10 +62,15 @@ class JdbcViewSqlEngine(dataObject: JdbcViewDataObject) extends JdbcViewEngine w
     connection.execJdbcStatement(sqlDataFrame(df).limit(0).toDatabaseSql)
   }
 
-  override def createOrReplaceView(df: GenericDataFrame)(implicit context: ActionPipelineContext): MetricsMap = {
-    val stmt = SqlGlotBridge.get().call("create_view", "df" -> sqlDataFrame(df).id, "view" -> table.fullName,
-      "dialect" -> connection.sqlGlotDialect).extract[String]
+  override def renderQuery(df: GenericDataFrame)(implicit context: ActionPipelineContext): String = sqlDataFrame(df).toDatabaseSql
+
+  override def createOrReplaceView(query: String)(implicit context: ActionPipelineContext): Unit = {
+    val stmt = bridge.call("create_view", "query" -> query, "view" -> table.fullName, "dialect" -> connection.sqlGlotDialect).extract[String]
     connection.execJdbcStatement(stmt)
-    Map()
   }
+
+  override def normalizeQuery(query: String)(implicit context: ActionPipelineContext): String =
+    bridge.call("normalize_query", "query" -> query, "dialect" -> connection.sqlGlotDialect).extract[String]
+
+  private def bridge: SqlGlotBridge = SqlGlotBridge.get()
 }

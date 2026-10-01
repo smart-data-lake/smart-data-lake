@@ -18,6 +18,8 @@
  */
 package io.smartdatalake.workflow.dataobject.generic
 
+import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataobject.DataObject
 
 /**
@@ -29,4 +31,29 @@ import io.smartdatalake.workflow.dataobject.DataObject
  * Partition values of the main input are still passed on to the output SubFeed of a partitioned ViewDataObject,
  * so that the next Action reads the view filtered by them.
  */
-trait ViewDataObject extends DataObject
+trait ViewDataObject extends DataObject {
+
+  /**
+   * The query of the view for a DataFrame written to it, in the SQL dialect of the database.
+   * It is exported by a dry-run with schema export, so that CatalogSchemaUpdater can create or replace the view at
+   * deployment time, see [[CatalogMetadataApplier]].
+   */
+  def getViewQuery(df: GenericDataFrame)(implicit context: ActionPipelineContext): String
+
+  /**
+   * The definition of the existing view as stored by the database, or None if the view does not exist.
+   * Depending on the database this can also be a whole `CREATE VIEW` statement.
+   */
+  def getExistingViewDefinition(implicit context: ActionPipelineContext): Option[String]
+
+  /**
+   * True if the definition of the existing view has the given query. Databases reformat the query of a view, so
+   * both are normalized before comparing. If they can not be compared, false is returned and the view is replaced.
+   */
+  def isSameViewQuery(existingDefinition: String, query: String)(implicit context: ActionPipelineContext): Boolean
+
+  /**
+   * Create or replace the view with the given query.
+   */
+  def createOrReplaceView(query: String)(implicit context: ActionPipelineContext): Unit
+}

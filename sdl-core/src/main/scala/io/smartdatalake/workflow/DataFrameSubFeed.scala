@@ -246,6 +246,16 @@ trait DataFrameSubFeedCompanion extends SubFeedConverter[DataFrameSubFeed] with 
   }
 
   /**
+   * Create the DataFrame of an input in init phase, where no data must be read.
+   * Default is None, and an empty DataFrame is created from the schema transported by the SubFeed or declared on the
+   * DataObject, see DataFrameActionImpl.enrichSubFeedDataFrame.
+   * An engine which does not process data itself, e.g. the SQL engine, can return a DataFrame referencing the
+   * DataObject instead, so that the statements created in init phase are the same as in exec phase.
+   * @param schema the schema transported by the SubFeed, or None if it is not known, e.g. at the start of the DAG.
+   */
+  def getInitDataFrame(dataObject: DataObject with CanCreateDataFrame, schema: Option[GenericSchema])(implicit context: ActionPipelineContext): Option[GenericDataFrame] = None
+
+  /**
    * Get an empty DataFrame with a defined schema.
    * @param dataObjectId Snowpark implementation needs to get the Snowpark-Session from the DataObject. This should not be used otherwise.
    */

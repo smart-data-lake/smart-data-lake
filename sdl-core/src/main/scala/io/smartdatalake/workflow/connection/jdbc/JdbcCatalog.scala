@@ -100,6 +100,19 @@ abstract class JdbcCatalog(connection: Connection with GenericJdbcExecution, url
     }
   }
 
+  /**
+   * The definition of a view as stored by the database, or None if the view does not exist.
+   * Depending on the database this is the query of the view, or the whole `CREATE VIEW` statement, e.g. for DuckDB.
+   * The default implementation reads INFORMATION_SCHEMA.VIEWS. Identifiers are compared case-insensitively.
+   */
+  def getViewDefinition(db: String, viewName: String): Option[String] = {
+    viewDefinitionQuery(removeQuotes(db).replace("'", "''"), removeQuotes(viewName).replace("'", "''"))
+      .flatMap(query => connection.execJdbcQuery(query, (rs: ResultSet) => if (rs.next()) Option(rs.getString(1)) else None))
+  }
+
+  protected def viewDefinitionQuery(db: String, viewName: String): Option[String] =
+    Some(s"SELECT VIEW_DEFINITION FROM INFORMATION_SCHEMA.VIEWS WHERE UPPER(TABLE_SCHEMA) = UPPER('$db') AND UPPER(TABLE_NAME) = UPPER('$viewName')")
+
   protected def evalRecordExists( rs:ResultSet ) : Boolean = {
     rs.next
     rs.getInt(1) == 1
@@ -191,6 +204,9 @@ class OracleJdbcCatalog(connection: Connection with GenericJdbcExecution, url: S
     }
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists)
   }
+
+  override protected def viewDefinitionQuery(db: String, viewName: String): Option[String] =
+    Some(s"SELECT TEXT FROM ALL_VIEWS WHERE UPPER(OWNER) = UPPER('$db') AND UPPER(VIEW_NAME) = UPPER('$viewName')")
 }
 
 /**

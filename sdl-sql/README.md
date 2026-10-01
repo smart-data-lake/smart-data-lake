@@ -76,10 +76,17 @@ actions {
 }
 ```
 
-The view is created in exec phase on every run. In init phase its query is only validated by executing it without
-fetching rows. As the query of a view is stored in the database, it must not depend on the current run: an Action
+The view is replaced in exec phase on every run, and a missing view is created in init phase, like a missing table.
+In init phase the query is also validated by executing it without fetching rows. As the query of a view is stored in the database, it must not depend on the current run: an Action
 writing a view (see marker trait `ViewDataObject`) ignores the partition values and filters of its inputs, and must
 not have an execution mode. Only save mode Overwrite is supported.
+
+With `allowSchemaEvolution = false`, an existing view is not replaced by a run, and a run fails if the columns of the
+view changed. Changed views are then deployed with `CatalogSchemaUpdater`, from the query exported by a dry-run with
+schema export (`--test dry-run-with-schema-export`), see `docs/docs/reference/schema.md`. A missing view is still
+created in init phase, like a missing table. In init phase the SQL engine references its inputs as tables with the
+schema passed on by the previous Action (`SQLSubFeed.getInitDataFrame`), so that the exported query and a view
+created in init phase read the real tables and views, not empty DataFrames.
 
 Note that Postgres can not replace a view if existing columns are renamed, removed or change their type; the view
 must then be dropped first. Materialized views are not supported yet.

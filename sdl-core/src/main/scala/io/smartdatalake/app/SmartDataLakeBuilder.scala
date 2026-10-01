@@ -641,6 +641,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
       )
     )
     val schemas = context.schemaExportRegistry.getSchemas
+    val viewQueries = context.schemaExportRegistry.getViewQueries
     if (schemas.isEmpty) {
       logger.warn(s"No DataObject schemas collected, nothing to export to '$target'")
     } else {
@@ -662,7 +663,7 @@ abstract class SmartDataLakeBuilder extends SmartDataLakeLogger {
             mergedJson
           case None => schemaJson
         }
-        writer.writeSchema(ExportWriter.formatSchema(Some(schema), None, mergeColumnDescriptions), dataObjectId, version)
+        writer.writeSchema(ExportWriter.formatSchema(Some(schema), None, mergeColumnDescriptions, viewQueries.get(dataObjectId)), dataObjectId, version)
       }
       logger.info(s"Exported ${schemas.size} DataObject schemas to '$target'")
     }

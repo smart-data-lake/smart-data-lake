@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.exporter.{ColumnDescriptionParser, ExportWriter}
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException}
 import io.smartdatalake.util.misc._
-import io.smartdatalake.workflow.action.SDLExecutionId
+import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
 import io.smartdatalake.workflow.dataframe.GenericSchema
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.generic.{CatalogMetadataApplier, CatalogMetadataChanges, TableDataObject}
@@ -32,6 +32,7 @@ import org.apache.hadoop.conf.Configuration
 import scopt.OptionParser
 
 import java.time.LocalDateTime
+import scala.annotation.tailrec
 
 /**
  * What CatalogSchemaUpdater should do.
@@ -46,7 +47,7 @@ object UpdaterMode extends Enumeration {
 
   /**
    * Create or update the tables in the catalog: missing tables, schema changes, comments,
-   * primary and foreign keys.
+   * primary and foreign keys, and the views.
    */
   val Apply: UpdaterMode = Value("apply")
 }
@@ -62,6 +63,7 @@ case class CatalogSchemaUpdaterConfig(configPaths: Seq[String] = null,
 
 /**
  * Create and update the tables defined in the SDLB configuration and in the exported schemas in the catalog.
+ * Views are created or replaced with the query exported by the dry-run, see ViewDataObject.
  *
  * This is the deployment time counterpart of an SDLB run with "--test dry-run-with-schema-export", which
  * exports the schemas this tool reads. Table metadata can only change when the configuration or the code
@@ -83,7 +85,7 @@ object CatalogSchemaUpdater extends SmartDataLakeLogger {
       .action((value, c) => c.copy(mode = UpdaterMode.withName(value)))
       .valueName("<plan|apply>")
       .text("plan: report the changes 'apply' would make, without changing the catalog (default). " +
-        "apply: create and update the tables of the configuration in the catalog, including schema changes, comments, primary and foreign keys.")
+        "apply: create and update the tables of the configuration in the catalog, including schema changes, comments, primary and foreign keys, and create or replace the views.")
     opt[String]("source")
       .action((value, c) => c.copy(source = Some(value)))
       .text("Source URI to read exported schemas from. Defaults to global.dataObjectsSchemaSource.")
@@ -100,7 +102,7 @@ object CatalogSchemaUpdater extends SmartDataLakeLogger {
       .action((value, c) => c.copy(stopOnError = value.toBoolean))
       .text("If true, processing is stopped as soon as there is an error. Otherwise the error is logged and the next DataObject is processed. Default: true")
     help("help").text("Create and update the tables of the SDLB configuration in the catalog: missing tables, " +
-      "schema changes, table and column comments, primary and foreign keys. The schemas are read from the files " +
+      "schema changes, table and column comments, primary and foreign keys, and views. The schemas are read from the files " +
       "exported by an SDLB run with '--test dry-run-with-schema-export'.")
   }
 
@@ -144,6 +146,8 @@ object CatalogSchemaUpdater extends SmartDataLakeLogger {
       " no tables will be created and no schema changes and column comments will be applied")
     def readSchema(dataObjectId: DataObjectId): Option[GenericSchema] =
       schemaWriter.flatMap(_.readLatestSchema(dataObjectId)).map(ExportWriter.parseSchema(_)._1)
+    def readViewQuery(dataObjectId: DataObjectId): Option[String] =
+      schemaWriter.flatMap(_.readLatestSchema(dataObjectId)).flatMap(ExportWriter.parseViewQuery)
 
     // column descriptions from the Markdown description files override the exported schema comments.
     // Note that schemas exported with global.descriptionPath already contain them.
@@ -156,7 +160,7 @@ object CatalogSchemaUpdater extends SmartDataLakeLogger {
           .map { case (name, d) => ColumnDescriptionParser.toColumnPath(name) -> d }
       }
 
-    val applier = new CatalogMetadataApplier(readSchema, columnDescriptions)
+    val applier = new CatalogMetadataApplier(readSchema, columnDescriptions, readViewQuery)
     logger.info(s"${if (isPlan) "Planning" else "Applying"} catalog metadata for ${dataObjects.size} DataObjects")
 
     def onError(dataObject: DataObject)(ex: Exception): Option[Nothing] = {
@@ -184,11 +188,13 @@ object CatalogSchemaUpdater extends SmartDataLakeLogger {
         " exist with the referenced primary key, otherwise creating the foreign keys will fail.")
     }
 
-    // apply in two phases: the tables including their primary keys first, then the foreign keys referencing
-    // them, see CanHandleForeignKeys.
+    // apply in three phases: the tables including their primary keys first, then the views reading them, and then the
+    // foreign keys referencing the tables, see CanHandleForeignKeys. The views are applied in the order of the DAG,
+    // as a view can read another view.
     def applyPhase(describe: CatalogMetadataChanges => Seq[String],
-                   apply: (DataObject, CatalogMetadataChanges) => Unit): Seq[DataObjectId] = {
-      plans.filter { case (_, changes) => describe(changes).nonEmpty }.flatMap { case (dataObject, changes) =>
+                   apply: (DataObject, CatalogMetadataChanges) => Unit,
+                   order: Seq[(DataObject, CatalogMetadataChanges)] => Seq[(DataObject, CatalogMetadataChanges)] = identity): Seq[DataObjectId] = {
+      order(plans.filter { case (_, changes) => describe(changes).nonEmpty }).flatMap { case (dataObject, changes) =>
         try {
           logger.info(s"(${dataObject.id}) ${if (isPlan) "would apply" else "applying"}:\n  ${describe(changes).mkString("\n  ")}")
           if (!isPlan) apply(dataObject, changes)
@@ -199,11 +205,32 @@ object CatalogSchemaUpdater extends SmartDataLakeLogger {
       }
     }
     val changedTables = applyPhase(_.describeTableChanges, applier.applyTableChanges)
+    val changedViews = applyPhase(_.describeView, applier.applyView, orderByDependencies(_, registry.getActions))
     val changedForeignKeys = applyPhase(_.describeForeignKeys, applier.applyForeignKeys)
 
-    val changed = (changedTables ++ changedForeignKeys).distinct
+    val changed = (changedTables ++ changedViews ++ changedForeignKeys).distinct
     if (changed.isEmpty) logger.info("Catalog metadata is up to date, nothing to apply")
     else logger.info(s"${if (isPlan) "Would change" else "Changed"} catalog metadata of ${changed.size} DataObjects: ${changed.map(_.id).mkString(", ")}")
+  }
+
+  /**
+   * Order DataObjects so that each comes after the DataObjects it is created from, i.e. the inputs of the Actions
+   * writing it. This is needed for views reading other views. DataObjects in a cycle keep their order.
+   */
+  private[configexporter] def orderByDependencies[T](elements: Seq[(DataObject, T)], actions: Seq[Action]): Seq[(DataObject, T)] = {
+    val ids = elements.map(_._1.id).toSet
+    val dependencies = elements.map { case (dataObject, _) =>
+      dataObject.id -> actions.filter(_.outputs.exists(_.id == dataObject.id)).flatMap(_.inputs.map(_.id)).filter(ids.contains).toSet
+    }.toMap
+    @tailrec
+    def order(remaining: Seq[(DataObject, T)], done: Seq[(DataObject, T)]): Seq[(DataObject, T)] = {
+      val doneIds = done.map(_._1.id).toSet
+      val (ready, notReady) = remaining.partition { case (dataObject, _) => (dependencies(dataObject.id) - dataObject.id).subsetOf(doneIds) }
+      if (notReady.isEmpty) done ++ ready
+      else if (ready.isEmpty) done ++ notReady // cycle
+      else order(notReady, done ++ ready)
+    }
+    order(elements, Seq())
   }
 
   /**

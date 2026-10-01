@@ -59,9 +59,11 @@ from sqlglot.dialects.dialect import Dialect, NormalizationStrategy
 from sqlglot.errors import OptimizeError
 from sqlglot.optimizer import optimize
 from sqlglot.optimizer.canonicalize import canonicalize
+from sqlglot.optimizer.normalize_identifiers import normalize_identifiers
 from sqlglot.optimizer.optimizer import RULES
 from sqlglot.optimizer.qualify import qualify
 from sqlglot.optimizer.scope import Scope, traverse_scope
+from sqlglot.optimizer.simplify import simplify
 from sqlglot.lineage import lineage as sqlglot_lineage
 from sqlglot.schema import MappingSchema
 
@@ -656,13 +658,29 @@ class Session:
         create = exp.Create(this=exp.to_table(table, dialect=dialect), kind="TABLE", expression=expr)
         return create.sql(dialect=dialect)
 
-    def create_view(self, df, view, dialect=None):
-        """Create a `CREATE OR REPLACE VIEW <view> AS <query>` statement for the DataFrame, e.g. `CREATE OR ALTER VIEW`
-        for tsql. `view` is given in the dialect of the database. The names of the columns are rendered as for
-        `create_table_as`."""
-        expr = self._render(self._df(df).expr.copy(), dialect)
-        create = exp.Create(this=exp.to_table(view, dialect=dialect), kind="VIEW", replace=True, expression=expr)
+    def create_view(self, query, view, dialect=None):
+        """Create a `CREATE OR REPLACE VIEW <view> AS <query>` statement, e.g. `CREATE OR ALTER VIEW` for tsql.
+        `query` and `view` are given in the dialect of the database, e.g. the query rendered by `to_sql` for a
+        DataFrame, which is exported by a dry-run to create the view later with CatalogSchemaUpdater."""
+        query_expr = sqlglot.parse_one(query, dialect=dialect)
+        create = exp.Create(this=exp.to_table(view, dialect=dialect), kind="VIEW", replace=True, expression=query_expr)
         return create.sql(dialect=dialect)
+
+    def normalize_query(self, query, dialect=None):
+        """Normalize the query of a view, to compare the definition of an existing view with a new one. `query` can
+        also be a `CREATE VIEW` statement, as some databases return the definition of a view like that. Databases
+        reformat the query of a view, so identifiers are normalized and unquoted if the quotes don't matter, and the
+        expression is simplified, e.g. to remove superfluous parentheses. Note that some databases rewrite the query
+        more, e.g. add casts, then the definitions are not equal."""
+        d = Dialect.get_or_raise(dialect)
+        expr = sqlglot.parse_one(query, dialect=dialect)
+        if isinstance(expr, exp.Create):
+            expr = expr.expression
+        expr = normalize_identifiers(expr, dialect=dialect)
+        for identifier in expr.find_all(exp.Identifier):
+            if identifier.quoted and d.normalize_identifier(exp.to_identifier(identifier.name)).name == identifier.name:
+                identifier.set("quoted", False)
+        return simplify(expr, dialect=dialect).sql(dialect=dialect)
 
     def _column_identifier(self, name, kind, dialect, quote_names):
         quoted = quote_names or self._quote(name, kind, Dialect.get_or_raise(dialect))
@@ -891,6 +909,7 @@ _OPS = {
     "create_table_as": _session.create_table_as,
     "create_table": _session.create_table,
     "create_view": _session.create_view,
+    "normalize_query": _session.normalize_query,
     "alter_table": _session.alter_table,
     "parse_types": _session.parse_types,
     "column_lineage": _session.column_lineage,

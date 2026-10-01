@@ -27,9 +27,10 @@ import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.generic._
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SchemaViolationException}
 
 import scala.reflect.runtime.universe.Type
+import scala.util.{Failure, Success, Try}
 
 /**
  * [[DataObject]] of a view in a database accessed through JDBC.
@@ -38,8 +39,12 @@ import scala.reflect.runtime.universe.Type
  * SELECT ...`, so no data is written. This needs an engine which can render its DataFrames as SQL, i.e. the SQL
  * engine of sdl-sql: the Action writing the view must use the JdbcTableConnection of the view as engine connection
  * (`engineConnectionId`), and all its inputs must be `JdbcTableDataObject`s or `JdbcViewDataObject`s of this
- * connection. The view is created in exec phase. In init phase the query is only validated by executing it on the
- * database without fetching any rows.
+ * connection. The view is replaced in exec phase. In init phase a missing view is created, like a missing table is
+ * created by JdbcTableDataObject, and the query is validated by executing it on the database without fetching any rows.
+ *
+ * With `allowSchemaEvolution = false`, an existing view is not replaced by an SDLB run, and the run fails if the columns
+ * of the view changed. The view is then deployed with CatalogSchemaUpdater, from its query exported by a dry-run with
+ * schema export, like the tables are created and migrated.
  *
  * As the view is evaluated on every read, its query must not depend on the current run. The Action writing the view
  * therefore ignores the partition values and filters of its inputs, and must not have an execution mode, see
@@ -96,6 +101,9 @@ import scala.reflect.runtime.universe.Type
  * @param incrementalOutputExpr Optional expression to use for creating incremental output with DataObjectStateIncrementalMode.
  *                              The expression is used to get the high-water-mark for the incremental update state.
  *                              Normally this can be just a column name, e.g. an id or updated timestamp which is continually increasing.
+ * @param allowSchemaEvolution If true (default), the view is replaced by every run of the Action writing it.
+ *                             If false, an existing view is only replaced by CatalogSchemaUpdater, and a run fails if
+ *                             the columns of the view changed.
  */
 case class JdbcViewDataObject(override val id: DataObjectId,
                               override var table: Table,
@@ -106,9 +114,10 @@ case class JdbcViewDataObject(override val id: DataObjectId,
                               virtualPartitions: Seq[String] = Seq(),
                               override val expectedPartitionsCondition: Option[String] = None,
                               incrementalOutputExpr: Option[String] = None,
+                              override val allowSchemaEvolution: Boolean = true,
                               override val metadata: Option[DataObjectMetadata] = None
                              )(@transient implicit val instanceRegistry: InstanceRegistry)
-  extends TableDataObject with CanWriteDataFrame with CanHandlePartitions with CanCreateIncrementalOutput with ViewDataObject {
+  extends TableDataObject with CanWriteDataFrame with CanHandlePartitions with CanCreateIncrementalOutput with CanEvolveSchema with ViewDataObject {
 
   /**
    * Connection defines driver, url and db in central location
@@ -139,6 +148,10 @@ case class JdbcViewDataObject(override val id: DataObjectId,
     .getOrElse(throw new IllegalStateException(s"($id) Can not create a view with subFeedType ${subFeedType.typeSymbol.name}." +
       s" Views are created by the SQL engine: add sdl-sql to the classpath, and use the connection $connectionId as engineConnectionId of the Action."))
 
+  // the engine for creating a view from a query, e.g. by CatalogSchemaUpdater, where no Action defines the engine
+  private def anyViewEngine: JdbcViewEngine = viewEngines.headOption
+    .getOrElse(throw new IllegalStateException(s"($id) Can not create a view, as no engine for views is found. Add sdl-sql to the classpath."))
+
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
     // test connection and primary key columns of an existing view
@@ -163,19 +176,57 @@ case class JdbcViewDataObject(override val id: DataObjectId,
       throw ConfigurationException(s"($id) A view is always replaced, saveMode $saveMode is not supported."))
   }
 
+  /**
+   * Validate the DataFrame, and create the view if it does not exist. If it exists and `allowSchemaEvolution = false`,
+   * the columns of the DataFrame must be the same as the columns of the view, as it is not replaced.
+   */
   override def init(df: GenericDataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)(implicit context: ActionPipelineContext): Unit = {
     validateWrite(df, saveModeOptions)
+    if (!isTableExisting) {
+      logger.info(s"($id) creating view ${table.fullName}")
+      createOrReplaceView(getViewQuery(df))
+    } else if (!allowSchemaEvolution) validateColumnsOfView(df)
     viewEngine(df.subFeedType).initDataFrame(df)
+  }
+
+  private def validateColumnsOfView(df: GenericDataFrame)(implicit context: ActionPipelineContext): Unit = {
+    def normalize(columns: Seq[String]) = if (Environment.caseSensitive) columns else columns.map(_.toLowerCase)
+    tableDataObject.getCurrentSchema.map(_.columns).foreach { viewColumns =>
+      if (normalize(viewColumns) != normalize(df.columns)) throw new SchemaViolationException(
+        s"($id) The columns of the DataFrame (${df.columns.mkString(", ")}) differ from the columns of view ${table.fullName} (${viewColumns.mkString(", ")})." +
+          " The view is not replaced as allowSchemaEvolution = false, deploy it with CatalogSchemaUpdater.")
+    }
   }
 
   override def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): MetricsMap = {
     validateWrite(df, saveModeOptions)
     if (partitionValues.nonEmpty) logger.info(s"($id) partition values ${partitionValues.mkString(", ")} are not applied to the view, but passed on to the next Action")
-    val metrics = viewEngine(df.subFeedType).createOrReplaceView(df)
+    if (allowSchemaEvolution) createOrReplaceView(getViewQuery(df))
+    else logger.info(s"($id) view ${table.fullName} is not replaced as allowSchemaEvolution = false, it is deployed with CatalogSchemaUpdater")
+    Map()
+  }
+
+  override def getViewQuery(df: GenericDataFrame)(implicit context: ActionPipelineContext): String =
+    viewEngine(df.subFeedType).renderQuery(df)
+
+  override def getExistingViewDefinition(implicit context: ActionPipelineContext): Option[String] =
+    connection.catalog.getViewDefinition(table.db.get, table.name)
+
+  override def isSameViewQuery(existingDefinition: String, query: String)(implicit context: ActionPipelineContext): Boolean = {
+    val engine = anyViewEngine
+    Try(engine.normalizeQuery(existingDefinition) == engine.normalizeQuery(query)) match {
+      case Success(isSame) => isSame
+      case Failure(e) =>
+        logger.info(s"($id) definition of view ${table.fullName} can not be compared, it is replaced: ${e.getMessage}")
+        false
+    }
+  }
+
+  override def createOrReplaceView(query: String)(implicit context: ActionPipelineContext): Unit = {
+    anyViewEngine.createOrReplaceView(query)
     tableDataObject.resetCachedIsTableExisting()
     tableDataObject.resetCachedSchema()
-    metrics
   }
 
   /**
@@ -217,9 +268,20 @@ trait JdbcViewEngine extends DataObjectEngine {
   def initDataFrame(df: GenericDataFrame)(implicit context: ActionPipelineContext): Unit
 
   /**
-   * Create or replace the view with the query of the DataFrame.
+   * The query of the DataFrame in the SQL dialect of the database.
    */
-  def createOrReplaceView(df: GenericDataFrame)(implicit context: ActionPipelineContext): MetricsMap
+  def renderQuery(df: GenericDataFrame)(implicit context: ActionPipelineContext): String
+
+  /**
+   * Create or replace the view with the given query in the SQL dialect of the database.
+   */
+  def createOrReplaceView(query: String)(implicit context: ActionPipelineContext): Unit
+
+  /**
+   * Normalize the query of a view, to compare an existing view with a new query, see [[ViewDataObject.isSameViewQuery]].
+   * The query can also be a `CREATE VIEW` statement, as some databases return the definition of a view like that.
+   */
+  def normalizeQuery(query: String)(implicit context: ActionPipelineContext): String
 }
 
 object JdbcViewDataObject extends FromConfigFactory[DataObject] {

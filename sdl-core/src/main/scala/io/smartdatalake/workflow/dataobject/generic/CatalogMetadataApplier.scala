@@ -28,9 +28,11 @@ import io.smartdatalake.workflow.dataobject.DataObject
 /**
  * The changes to be applied to the catalog for one DataObject.
  *
- * They are applied in two phases: everything belonging to the table itself in the first phase, and the
- * foreign keys in the second phase, as they can only be created once all referenced tables exist,
- * see [[CanHandleForeignKeys]].
+ * They are applied in three phases: everything belonging to the table itself in the first phase, the views in the
+ * second phase, as they read the tables, and the foreign keys in the third phase, as they can only be created once
+ * all referenced tables exist, see [[CanHandleForeignKeys]].
+ *
+ * @param createOrReplaceView the query to create or replace a view with, see [[ViewDataObject]].
  */
 case class CatalogMetadataChanges(dataObjectId: DataObjectId,
                                   createTable: Option[GenericSchema] = None,
@@ -38,9 +40,15 @@ case class CatalogMetadataChanges(dataObjectId: DataObjectId,
                                   tableComment: Option[String] = None,
                                   columnComments: Map[Seq[String], String] = Map(),
                                   primaryKey: Option[Seq[String]] = None,
-                                  foreignKeys: Seq[ForeignKeyDefinition] = Seq()) {
+                                  foreignKeys: Seq[ForeignKeyDefinition] = Seq(),
+                                  createOrReplaceView: Option[String] = None) {
 
-  def isEmpty: Boolean = !hasTableChanges && !hasForeignKeyChanges
+  def isEmpty: Boolean = !hasTableChanges && !hasViewChanges && !hasForeignKeyChanges
+
+  /**
+   * True if there is a view to create or replace.
+   */
+  def hasViewChanges: Boolean = createOrReplaceView.isDefined
 
   /**
    * True if there is something to apply in the first phase.
@@ -53,7 +61,9 @@ case class CatalogMetadataChanges(dataObjectId: DataObjectId,
    */
   def hasForeignKeyChanges: Boolean = foreignKeys.nonEmpty
 
-  def describe: Seq[String] = describeTableChanges ++ describeForeignKeys
+  def describe: Seq[String] = describeTableChanges ++ describeView ++ describeForeignKeys
+
+  def describeView: Seq[String] = createOrReplaceView.map(query => s"create or replace view as $query").toSeq
 
   def describeTableChanges: Seq[String] = {
     createTable.map(schema => s"create table with columns ${schema.columns.mkString(", ")}").toSeq ++
@@ -81,7 +91,8 @@ case class CatalogMetadataChanges(dataObjectId: DataObjectId,
  * load and races with concurrent write operations.
  */
 class CatalogMetadataApplier(schemaReader: DataObjectId => Option[GenericSchema],
-                             columnDescriptions: Map[DataObjectId, Map[Seq[String], String]] = Map())
+                             columnDescriptions: Map[DataObjectId, Map[Seq[String], String]] = Map(),
+                             viewQueryReader: DataObjectId => Option[String] = _ => None)
   extends SmartDataLakeLogger {
 
   /**
@@ -90,6 +101,7 @@ class CatalogMetadataApplier(schemaReader: DataObjectId => Option[GenericSchema]
    */
   def plan(dataObject: DataObject)(implicit context: ActionPipelineContext): Option[CatalogMetadataChanges] = {
     dataObject match {
+      case viewDo: ViewDataObject => Some(planView(viewDo))
       case tableDo: TableDataObject if isSupported(tableDo) =>
         val exportedSchema = schemaReader(tableDo.id)
         if (tableDo.isTableExisting) Some(planTable(tableDo, exportedSchema, createTable = None))
@@ -98,6 +110,22 @@ class CatalogMetadataApplier(schemaReader: DataObjectId => Option[GenericSchema]
         logger.debug(s"(${dataObject.id}) does not support catalog metadata, skipping")
         None
     }
+  }
+
+  /**
+   * A view is created or replaced with the query exported by a dry-run, if it does not exist or its query changed.
+   */
+  private def planView(dataObject: ViewDataObject)(implicit context: ActionPipelineContext): CatalogMetadataChanges = {
+    val createOrReplaceView = viewQueryReader(dataObject.id) match {
+      case Some(query) =>
+        val isUpToDate = dataObject.getExistingViewDefinition.exists(dataObject.isSameViewQuery(_, query))
+        if (isUpToDate) None else Some(query)
+      case None =>
+        logger.warn(s"(${dataObject.id}) no exported view query found, the view can not be created or replaced." +
+          " Note that view queries are exported for the output DataObjects of a run with '--test dry-run-with-schema-export'.")
+        None
+    }
+    CatalogMetadataChanges(dataObject.id, createOrReplaceView = createOrReplaceView)
   }
 
   private def isSupported(dataObject: TableDataObject): Boolean = {
@@ -278,7 +306,20 @@ class CatalogMetadataApplier(schemaReader: DataObjectId => Option[GenericSchema]
   }
 
   /**
-   * Apply the changes of the second phase to the catalog: create the foreign keys.
+   * Apply the changes of the second phase to the catalog: create or replace the view.
+   * This must be done after [[applyTableChanges]] of the tables it reads, and of the views it reads.
+   */
+  def applyView(dataObject: DataObject, changes: CatalogMetadataChanges)(implicit context: ActionPipelineContext): Unit = {
+    changes.createOrReplaceView.foreach { query =>
+      dataObject match {
+        case viewDo: ViewDataObject => viewDo.createOrReplaceView(query)
+        case _ => logger.warn(s"(${dataObject.id}) view can not be created, DataObject is not a view")
+      }
+    }
+  }
+
+  /**
+   * Apply the changes of the third phase to the catalog: create the foreign keys.
    * This must be done after [[applyTableChanges]] of *all* DataObjects, as a foreign key can only be created
    * once the referenced table exists including its primary key.
    */
@@ -293,11 +334,12 @@ class CatalogMetadataApplier(schemaReader: DataObjectId => Option[GenericSchema]
 
   /**
    * Apply all changes of a DataObject to the catalog.
-   * Note that CatalogSchemaUpdater applies the two phases separately for all DataObjects,
-   * see [[applyTableChanges]] and [[applyForeignKeys]].
+   * Note that CatalogSchemaUpdater applies the three phases separately for all DataObjects,
+   * see [[applyTableChanges]], [[applyView]] and [[applyForeignKeys]].
    */
   def apply(dataObject: DataObject, changes: CatalogMetadataChanges)(implicit context: ActionPipelineContext): Unit = {
     applyTableChanges(dataObject, changes)
+    applyView(dataObject, changes)
     applyForeignKeys(dataObject, changes)
   }
 }

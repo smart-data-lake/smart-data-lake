@@ -274,9 +274,10 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
           if (subFeed.dataFrame.isEmpty) {
             // The Action needs a DataFrame to run its transformations for schema validation, but we are not in exec
             // phase. Create an empty DataFrame from the schema transported by the SubFeed, and only ask the
-            // DataObject if the schema is not yet known (SubFeeds at the start of the DAG).
-            val emptyDf = subFeed.schemaOpt
-              .map(_.getEmptyDataFrame(subFeed.dataObjectId))
+            // DataObject if the schema is not yet known (SubFeeds at the start of the DAG). An engine can create
+            // another DataFrame in init phase, see DataFrameSubFeedCompanion.getInitDataFrame.
+            val emptyDf = subFeedHelper.getInitDataFrame(input, subFeed.schemaOpt)
+              .orElse(subFeed.schemaOpt.map(_.getEmptyDataFrame(subFeed.dataObjectId)))
               .getOrElse(createEmptyDataFrame(input))
             // Note that the filters are not updated here: the empty DataFrame might be created from a declared or
             // fallback schema, and dropping filters based on that could discard a filter which is valid in exec phase.
@@ -394,6 +395,11 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
       // collect the schema to be exported at the end of a dry-run with schema export
       if (context.appConfig.isSchemaExport) {
         context.schemaExportRegistry.register(output.id, commentedSubFeed.dataFrame.get.schema)
+        // the query of a view is exported as well, so that the view can be deployed by CatalogSchemaUpdater
+        output match {
+          case view: ViewDataObject => context.schemaExportRegistry.registerViewQuery(output.id, view.getViewQuery(commentedSubFeed.dataFrame.get))
+          case _ => ()
+        }
       }
       // collect the column level lineage to be exported at the end of a dry-run with lineage export
       if (context.appConfig.isColumnLineageExport) {
