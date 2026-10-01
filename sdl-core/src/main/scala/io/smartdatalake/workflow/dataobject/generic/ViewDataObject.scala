@@ -58,6 +58,12 @@ trait ViewDataObject extends DataObject {
   def isSameViewQuery(existingDefinition: String, query: String)(implicit context: ActionPipelineContext): Boolean
 
   /**
+   * True if the existing view has the given query, see [[isSameViewQuery]]. False if the view does not exist.
+   */
+  def isViewUpToDate(query: String)(implicit context: ActionPipelineContext): Boolean =
+    getExistingViewDefinition.exists(isSameViewQuery(_, query))
+
+  /**
    * Create or replace the view with the given query. A materialized view is populated with the result of the query.
    */
   def createOrReplaceView(query: String)(implicit context: ActionPipelineContext): Unit

@@ -123,8 +123,7 @@ class CatalogMetadataApplier(schemaReader: DataObjectId => Option[GenericSchema]
   private def planView(dataObject: ViewDataObject)(implicit context: ActionPipelineContext): CatalogMetadataChanges = {
     val createOrReplaceView = viewQueryReader(dataObject.id) match {
       case Some(query) =>
-        val isUpToDate = dataObject.getExistingViewDefinition.exists(dataObject.isSameViewQuery(_, query))
-        if (isUpToDate) None else Some(query)
+        if (dataObject.isViewUpToDate(query)) None else Some(query)
       case None =>
         logger.warn(s"(${dataObject.id}) no exported view query found, the view can not be created or replaced." +
           " Note that view queries are exported for the output DataObjects of a run with '--test dry-run-with-schema-export'.")

@@ -68,6 +68,9 @@ import scala.util.{Failure, Success, Try}
  * The query of an existing materialized view is read from pg_matviews for Postgres, ALL_MVIEWS for Oracle, with
  * SHOW MATERIALIZED VIEWS for Snowflake and SHOW CREATE TABLE for Databricks. If it can not be read, e.g. for Redshift,
  * a change of the query is not detected, and the materialized view is only refreshed.
+ * On Databricks and Snowflake, a hash of the query is also stored with the materialized view, as table property
+ * `sdlb.queryHash` (Databricks) or as tag `SDLB_QUERY_HASH` in the schema of the view (Snowflake, needs Enterprise
+ * Edition and the privilege to create tags), and compared instead of the definition if it is set.
  * To switch an existing view between materialized and not materialized, drop it first.
  *
  * Example:
@@ -251,17 +254,39 @@ case class JdbcViewDataObject(override val id: DataObjectId,
   }
 
   /**
-   * True if the query of the existing materialized view differs from the given one. If its definition can not be
-   * read, it is not replaced, as this would recompute it on every run, but the change is not detected.
+   * True if the query of the existing materialized view differs from the given one. The hash of the query stored
+   * with the materialized view is compared if available, otherwise its definition. If neither can be read, it is not
+   * replaced, as this would recompute it on every run, but the change is not detected.
    */
   private def isChangedQuery(query: String)(implicit context: ActionPipelineContext): Boolean = {
-    getExistingViewDefinition match {
+    storedQueryHash.map(_ != queryHash(query)).getOrElse(getExistingViewDefinition match {
       case Some(definition) => !isSameViewQuery(definition, query)
       case None =>
         logger.warn(s"($id) the definition of $viewKind ${table.fullName} can not be read, so changes of its query are not detected." +
           " It is refreshed, deploy changes with CatalogSchemaUpdater.")
         false
+    })
+  }
+
+  /**
+   * The hash of the normalized query, stored with a materialized view, see [[io.smartdatalake.workflow.connection.jdbc.JdbcCatalog.getViewQueryHash]].
+   */
+  private def queryHash(query: String)(implicit context: ActionPipelineContext): String = {
+    val digest = java.security.MessageDigest.getInstance("SHA-256").digest(anyViewEngine.normalizeQuery(query).getBytes("UTF-8"))
+    digest.map("%02x".format(_)).mkString
+  }
+
+  private def storedQueryHash(implicit context: ActionPipelineContext): Option[String] =
+    Try(connection.catalog.getViewQueryHash(table.db.get, table.name)) match {
+      case Success(hash) => hash
+      case Failure(e) =>
+        logger.debug(s"($id) hash of the query of $viewKind ${table.fullName} can not be read: ${e.getMessage}")
+        None
     }
+
+  override def isViewUpToDate(query: String)(implicit context: ActionPipelineContext): Boolean = {
+    if (materialized && isTableExisting) storedQueryHash.map(_ == queryHash(query)).getOrElse(super.isViewUpToDate(query))
+    else super.isViewUpToDate(query)
   }
 
   private def viewKind: String = if (materialized) "materialized view" else "view"
@@ -288,7 +313,7 @@ case class JdbcViewDataObject(override val id: DataObjectId,
   }
 
   override def createOrReplaceView(query: String)(implicit context: ActionPipelineContext): Unit = {
-    if (materialized) anyViewEngine.createOrReplaceMaterializedView(query)
+    if (materialized) anyViewEngine.createOrReplaceMaterializedView(query, queryHash(query))
     else anyViewEngine.createOrReplaceView(query)
     tableDataObject.resetCachedIsTableExisting()
     tableDataObject.resetCachedSchema()
@@ -355,8 +380,9 @@ trait JdbcViewEngine extends DataObjectEngine {
 
   /**
    * Create or replace the materialized view with the given query, keeping the privileges granted on it.
+   * The hash of the query is stored with it where supported, see [[io.smartdatalake.workflow.connection.jdbc.JdbcCatalog.getViewQueryHash]].
    */
-  def createOrReplaceMaterializedView(query: String)(implicit context: ActionPipelineContext): Unit
+  def createOrReplaceMaterializedView(query: String, queryHash: String)(implicit context: ActionPipelineContext): Unit
 
   /**
    * Refresh the materialized view, i.e. store the current result of its query.

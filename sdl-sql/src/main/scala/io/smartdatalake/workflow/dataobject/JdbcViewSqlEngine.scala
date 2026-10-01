@@ -27,6 +27,7 @@ import io.smartdatalake.workflow.dataframe.sql.{SQLDataFrame, SQLSubFeed}
 import org.json4s.{DefaultFormats, Formats}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
+import scala.util.Try
 
 /**
  * SQL engine implementation of creating the view of a [[JdbcViewDataObject]], see [[JdbcViewEngine]].
@@ -77,14 +78,18 @@ class JdbcViewSqlEngine(dataObject: JdbcViewDataObject) extends JdbcViewEngine w
   override def checkMaterializedViewSupported()(implicit context: ActionPipelineContext): Unit =
     bridge.call("check_materialized_view", "dialect" -> connection.sqlGlotDialect)
 
-  override def createOrReplaceMaterializedView(query: String)(implicit context: ActionPipelineContext): Unit = {
+  override def createOrReplaceMaterializedView(query: String, queryHash: String)(implicit context: ActionPipelineContext): Unit = {
+    val hashProperties = connection.catalog.viewQueryHashProperties(queryHash)
     val stmts = bridge.call("create_materialized_view", "query" -> query, "view" -> table.fullName,
-      "dialect" -> connection.sqlGlotDialect, "exists" -> dataObject.isTableExisting)
+      "dialect" -> connection.sqlGlotDialect, "exists" -> dataObject.isTableExisting, "properties" -> hashProperties)
     val create = (stmts \ "create").extract[String]
     (stmts \ "drop").extractOpt[String] match {
       case None => connection.execJdbcStatement(create)
       case Some(drop) => recreateMaterializedView(drop, create)
     }
+    if (hashProperties.isEmpty) Try(connection.catalog.setViewQueryHash(table.db.get, table.name, queryHash)).failed.foreach(e =>
+      logger.warn(s"($id) the hash of the query can not be stored with materialized view ${table.fullName}," +
+        s" its definition is compared to detect changes: ${e.getMessage}"))
   }
 
   /**
