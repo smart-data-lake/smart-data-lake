@@ -88,8 +88,14 @@ created in init phase, like a missing table. In init phase the SQL engine refere
 schema passed on by the previous Action (`SQLSubFeed.getInitDataFrame`), so that the exported query and a view
 created in init phase read the real tables and views, not empty DataFrames.
 
+Replacing a view keeps the grants on it, by an SDLB run as well as by `CatalogSchemaUpdater`: `CREATE OR REPLACE VIEW`
+keeps them for most databases, e.g. Postgres, Oracle and MySQL, and SQL Server uses `CREATE OR ALTER VIEW`. Snowflake
+drops them on replace, so `COPY GRANTS` is added, and Databricks as well, so an existing view is changed with
+`ALTER VIEW ... AS`. A view is never dropped and created again. For other databases check whether
+`CREATE OR REPLACE VIEW` keeps the grants.
+
 Note that Postgres can not replace a view if existing columns are renamed, removed or change their type; the view
-must then be dropped first. Materialized views are not supported yet.
+must then be dropped first, which also drops its grants. Materialized views are not supported yet.
 
 ### Mixed feeds
 

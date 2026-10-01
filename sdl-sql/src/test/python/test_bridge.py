@@ -256,6 +256,16 @@ def test_create_view():
     assert call("create_view", query=query, view="db.v", dialect="tsql").startswith("CREATE OR ALTER VIEW db.v AS SELECT ")
 
 
+def test_create_view_keeps_grants():
+    query = "SELECT a FROM db.t"
+    assert call("create_view", query=query, view="db.v", dialect="snowflake", exists=True) == \
+        "CREATE OR REPLACE VIEW db.v COPY GRANTS AS SELECT a FROM db.t"
+    # databricks replaces the view with alter view if it exists
+    assert call("create_view", query=query, view="db.v", dialect="databricks", exists=True) == "ALTER VIEW db.v AS SELECT a FROM db.t"
+    assert call("create_view", query=query, view="db.v", dialect="databricks", exists=False) == "CREATE OR REPLACE VIEW db.v AS SELECT a FROM db.t"
+    assert call("create_view", query=query, view="db.v", dialect="postgres", exists=True) == "CREATE OR REPLACE VIEW db.v AS SELECT a FROM db.t"
+
+
 def test_normalize_query():
     query = "SELECT src.id AS id, UPPER(src.name) AS name FROM main.src AS src WHERE src.city = 'Bern'"
     # as returned by duckdb for the view

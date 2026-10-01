@@ -65,7 +65,9 @@ class JdbcViewSqlEngine(dataObject: JdbcViewDataObject) extends JdbcViewEngine w
   override def renderQuery(df: GenericDataFrame)(implicit context: ActionPipelineContext): String = sqlDataFrame(df).toDatabaseSql
 
   override def createOrReplaceView(query: String)(implicit context: ActionPipelineContext): Unit = {
-    val stmt = bridge.call("create_view", "query" -> query, "view" -> table.fullName, "dialect" -> connection.sqlGlotDialect).extract[String]
+    // the statement depends on whether the view exists, so that the grants on an existing view are kept
+    val stmt = bridge.call("create_view", "query" -> query, "view" -> table.fullName, "dialect" -> connection.sqlGlotDialect,
+      "exists" -> dataObject.isTableExisting).extract[String]
     connection.execJdbcStatement(stmt)
   }
 

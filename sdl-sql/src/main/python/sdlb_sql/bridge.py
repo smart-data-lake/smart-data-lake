@@ -658,12 +658,21 @@ class Session:
         create = exp.Create(this=exp.to_table(table, dialect=dialect), kind="TABLE", expression=expr)
         return create.sql(dialect=dialect)
 
-    def create_view(self, query, view, dialect=None):
-        """Create a `CREATE OR REPLACE VIEW <view> AS <query>` statement, e.g. `CREATE OR ALTER VIEW` for tsql.
-        `query` and `view` are given in the dialect of the database, e.g. the query rendered by `to_sql` for a
-        DataFrame, which is exported by a dry-run to create the view later with CatalogSchemaUpdater."""
+    def create_view(self, query, view, dialect=None, exists=False):
+        """Create a statement creating or replacing a view, which keeps the grants on an existing view. `query` and
+        `view` are given in the dialect of the database, e.g. the query rendered by `to_sql` for a DataFrame, which is
+        exported by a dry-run to create the view later with CatalogSchemaUpdater.
+
+        `CREATE OR REPLACE VIEW` keeps the grants for most databases, e.g. postgres, oracle and mysql, and tsql uses
+        `CREATE OR ALTER VIEW`. Snowflake drops them unless `COPY GRANTS` is given, and Databricks unless an existing
+        view is changed with `ALTER VIEW ... AS`."""
+        dialect_name = (dialect or "").lower()
+        target = exp.to_table(view, dialect=dialect)
         query_expr = sqlglot.parse_one(query, dialect=dialect)
-        create = exp.Create(this=exp.to_table(view, dialect=dialect), kind="VIEW", replace=True, expression=query_expr)
+        if exists and dialect_name in ("databricks", "spark", "hive"):
+            return f"ALTER VIEW {target.sql(dialect=dialect)} AS {query_expr.sql(dialect=dialect)}"
+        properties = exp.Properties(expressions=[exp.CopyGrantsProperty()]) if dialect_name == "snowflake" else None
+        create = exp.Create(this=target, kind="VIEW", replace=True, expression=query_expr, properties=properties)
         return create.sql(dialect=dialect)
 
     def normalize_query(self, query, dialect=None):

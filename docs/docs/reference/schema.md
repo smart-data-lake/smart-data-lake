@@ -236,7 +236,8 @@ query of a view, e.g. of a `JdbcViewDataObject` written by the SQL engine, in th
 `CatalogSchemaUpdater` creates or replaces the view with it if the view is missing or its query changed. As
 databases reformat the query of a view, the existing definition and the exported query are normalized with
 SQLGlot before comparing them. If they can not be compared, e.g. because the database added casts, the view is
-replaced. A view reading another view is applied after it, in the order of the DAG. Deploying views needs sdl-sql
+replaced. A view reading another view is applied after it, in the order of the DAG. Replacing a view keeps the grants
+on it, e.g. with `COPY GRANTS` on Snowflake and `ALTER VIEW ... AS` on Databricks, see the README of sdl-sql. Deploying views needs sdl-sql
 on the classpath. With `allowSchemaEvolution = false` on a `JdbcViewDataObject`, an SDLB run only creates a
 missing view, and does not replace an existing one, so that its changes are deployed with `CatalogSchemaUpdater`.
 
