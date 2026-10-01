@@ -8,14 +8,14 @@ transformers can be written in Spark SQL and executed on e.g. Postgres, SQL Serv
 
 ## Usage
 
-An Action uses the SQL engine if its `engineConnectionId` references a `JdbcTableConnection`. All its inputs and
+An Action uses the SQL engine if its `engineConnectionId` references a `JdbcConnection`. All its inputs and
 outputs must then be `JdbcTableDataObject`s of this connection. The data is never transferred out of the database:
 the transformations are executed with `INSERT INTO ... SELECT` statements, or a merge statement.
 
 ```hocon
 connections {
   dwh {
-    type = JdbcTableConnection
+    type = JdbcConnection
     url = "jdbc:postgresql://localhost:5432/dwh"
     driver = org.postgresql.Driver
     # dialect = postgres  # SQLGlot dialect of the database, derived from the url by default
@@ -127,7 +127,7 @@ SQLGlot is a Python library. It runs in a Python interpreter embedded into the J
 | `JdbcTableSqlEngine` | `workflow/dataobject/JdbcTableSqlEngine.scala` | SQL engine implementation of the `JdbcTableEngine` SPI of `JdbcTableDataObject` (sdl-core), discovered on the classpath like the Spark implementation in sdl-spark. Reads the table schema from the JDBC metadata, validates that the DataObject uses the engine connection, and executes the writes. |
 | `JdbcViewSqlEngine` | `workflow/dataobject/JdbcViewSqlEngine.scala` | SQL engine implementation of the `JdbcViewEngine` SPI of `JdbcViewDataObject` (sdl-core). Creates the view with a `CREATE OR REPLACE VIEW` statement rendered by SQLGlot. Reading the view is done by `JdbcTableSqlEngine`. |
 
-`JdbcTableConnection` (sdl-core) is the engine connection of the SQL engine: its SubFeed type is `SQLSubFeed`.
+`JdbcConnection` (sdl-core) is the engine connection of the SQL engine: its SubFeed type is `SQLSubFeed`.
 
 Every DataFrame operation wraps its input as subquery. The SQLGlot optimizer merges these subqueries again when
 rendering the statement, e.g.

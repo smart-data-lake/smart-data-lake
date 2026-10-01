@@ -24,7 +24,7 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnectionImpl
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.generic._
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SchemaViolationException}
@@ -37,7 +37,7 @@ import scala.util.{Failure, Success, Try}
  *
  * Writing a DataFrame creates or replaces the view with the query of the DataFrame, i.e. `CREATE OR REPLACE VIEW ... AS
  * SELECT ...`, so no data is written. This needs an engine which can render its DataFrames as SQL, i.e. the SQL
- * engine of sdl-sql: the Action writing the view must use the JdbcTableConnection of the view as engine connection
+ * engine of sdl-sql: the Action writing the view must use the JdbcConnection of the view as engine connection
  * (`engineConnectionId`), and all its inputs must be `JdbcTableDataObject`s or `JdbcViewDataObject`s of this
  * connection. The view is replaced in exec phase. In init phase a missing view is created, like a missing table is
  * created by JdbcTableDataObject, and the query is validated by executing it on the database without fetching any rows.
@@ -88,7 +88,7 @@ import scala.util.{Failure, Success, Try}
  *
  * @param id unique name of this data object
  * @param table The view to be created and read. `query` is not supported.
- * @param connectionId Id of the JdbcTableConnection of the database
+ * @param connectionId Id of the JdbcConnection of the database
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param jdbcFetchSize Number of rows to be fetched together by the Jdbc driver when reading the view
@@ -122,7 +122,7 @@ case class JdbcViewDataObject(override val id: DataObjectId,
   /**
    * Connection defines driver, url and db in central location
    */
-  val connection: JdbcTableConnection = getConnection[JdbcTableConnection](connectionId)
+  val connection: JdbcConnectionImpl = getConnection[JdbcConnectionImpl](connectionId)
 
   if (table.query.isDefined) throw ConfigurationException(s"($id) table.query is not supported for a view, the query of a view is defined by the Action writing it.", Some(s"dataObjects.$id.table.query"))
 

@@ -29,7 +29,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
 import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
@@ -68,7 +68,7 @@ object DebeziumCdcDataObjectOracleIT extends App with SmartDataLakeLogger {
     authMode = BasicAuthMode(user = StringOrSecret(sys.env("ORACLE_USER")), password = StringOrSecret(sys.env("ORACLE_PASSWORD")))
   )
 
-  val jdbcConnection = JdbcTableConnection(
+  val jdbcConnection = JdbcConnection(
     id = "oracleCon",
     url = s"jdbc:oracle:thin:@${sys.env("ORACLE_HOSTNAME")}:${sys.env("ORACLE_PORT").toInt}/${sys.env("ORACLE_DB")}",
     driver = "oracle.jdbc.driver.OracleDriver",

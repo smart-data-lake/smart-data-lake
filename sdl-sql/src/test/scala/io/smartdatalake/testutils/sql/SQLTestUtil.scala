@@ -21,7 +21,7 @@ package io.smartdatalake.testutils.sql
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.python.JepInterpreter
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
 
 import java.io.File
 
@@ -44,11 +44,11 @@ object SQLTestUtil {
   }
 
   /**
-   * Create a JdbcTableConnection to a new DuckDB database, to be used as engine connection of the SQL engine.
+   * Create a JdbcConnection to a new DuckDB database, to be used as engine connection of the SQL engine.
    * Its id is `default-engine` by default, so that it is used by Actions without engineConnectionId.
    */
-  def createEngineConnection(name: String, id: String = Environment.defaultEngineConnectionId): JdbcTableConnection =
-    JdbcTableConnection(ConnectionId(id), url = createDuckDbUrl(name), driver = "org.duckdb.DuckDBDriver", db = Some("main"))
+  def createEngineConnection(name: String, id: String = Environment.defaultEngineConnectionId): JdbcConnection =
+    JdbcConnection(ConnectionId(id), url = createDuckDbUrl(name), driver = "org.duckdb.DuckDBDriver", db = Some("main"))
 
   /**
    * The reason why the tests needing Python must be canceled, see [[JepInterpreter.unavailableReason]].

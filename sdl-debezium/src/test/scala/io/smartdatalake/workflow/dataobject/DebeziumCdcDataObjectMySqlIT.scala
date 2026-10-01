@@ -30,7 +30,7 @@ import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncremental
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
 import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
@@ -55,7 +55,7 @@ object DebeziumCdcDataObjectMySqlIT extends App with SmartDataLakeLogger {
   val COMMIT_TIMESTAMP_COLUMN_NAME = "_commit_timestamp"
   val CHANGE_ORDINAL_COLUMN_NAME = "_change_ordinal"
 
-  val jdbcConnection = JdbcTableConnection(
+  val jdbcConnection = JdbcConnection(
     id = "mysqlCon",
     url = s"jdbc:mysql://${sys.env("MYSQL_HOSTNAME")}:${sys.env("MYSQL_PORT").toInt}",
     driver = "com.mysql.cj.jdbc.Driver",

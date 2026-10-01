@@ -39,7 +39,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * SQL engine implementation of reading and writing a [[JdbcTableDataObject]], see [[JdbcTableEngine]].
  * Schema evolution is implemented with `ALTER TABLE` statements created by SQLGlot, see `evolveTableSchema`.
  *
- * It is used by Actions with the JdbcTableConnection of the DataObject as engine connection. Reading creates an
+ * It is used by Actions with the JdbcConnection of the DataObject as engine connection. Reading creates an
  * SQLGlot query, and writing executes it on the database with an `INSERT INTO ... SELECT` statement, or a merge
  * statement from a temporary table created with `CREATE TABLE ... AS SELECT`. So data is never transferred out of
  * the database.

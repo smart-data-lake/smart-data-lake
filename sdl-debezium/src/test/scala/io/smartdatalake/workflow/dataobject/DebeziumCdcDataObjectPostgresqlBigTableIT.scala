@@ -29,7 +29,7 @@ import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
 import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SparkSession
@@ -70,7 +70,7 @@ object DebeziumCdcDataObjectPostgresqlBigTableIT extends App with SmartDataLakeL
     authMode = BasicAuthMode(user = StringOrSecret(sys.env("PSQL_USER")), password = StringOrSecret(sys.env("PSQL_PASSWORD")))
   )
 
-  val jdbcConnection = JdbcTableConnection(
+  val jdbcConnection = JdbcConnection(
     id = "psqlCon",
     url = s"jdbc:postgresql://${sys.env("PSQL_HOSTNAME")}:${sys.env("PSQL_PORT").toInt}/${sys.env("PSQL_DB")}",
     driver = "org.postgresql.Driver",

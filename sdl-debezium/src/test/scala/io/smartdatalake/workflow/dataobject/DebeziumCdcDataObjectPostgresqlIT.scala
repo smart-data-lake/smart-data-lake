@@ -30,7 +30,7 @@ import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncremental
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction, HistorizeAction}
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
 import io.smartdatalake.workflow.dataobject.generic.Table
 import io.smartdatalake.workflow.dataobject.spark.SparkDataObjectOps._
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -56,7 +56,7 @@ object DebeziumCdcDataObjectPostgresqlIT extends App with SmartDataLakeLogger {
   val COMMIT_TIMESTAMP_COLUMN_NAME = "_commit_timestamp"
   val CHANGE_ORDINAL_COLUMN_NAME = "_change_ordinal"
 
-  val jdbcConnection = JdbcTableConnection(
+  val jdbcConnection = JdbcConnection(
     id = "psqlCon",
     url = s"jdbc:postgresql://${sys.env("PSQL_HOSTNAME")}:${sys.env("PSQL_PORT").toInt}/${sys.env("PSQL_DB")}",
     driver = "org.postgresql.Driver",

@@ -29,7 +29,7 @@ import java.util.Base64
  *
  * For http connection this will create a basic authentication header.
  *
- * This is the most commonly used authentication mode. It is the only AuthMode supported by JdbcTableConnection and
+ * This is the most commonly used authentication mode. It is the only AuthMode supported by JdbcConnection and
  * DebeziumConnection, and one of the supported modes of SFtpFileRefConnection, SnowflakeConnection and HTTP based
  * DataObjects. Note that no connection falls back to it implicitly - authMode has to be configured explicitly.
  * Both user and password support secret providers, so credentials do not have to be stored in clear text in the

@@ -26,7 +26,7 @@ import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeMergeOpti
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc._
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnectionImpl
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
 import io.smartdatalake.workflow.dataobject.generic._
@@ -52,13 +52,13 @@ import scala.util.Try
  * - [[CanEvolveSchema]] by generating corresponding alter table DDL statements.
  * - Overwriting partitions is implemented by using SQL delete and insert statement embedded in one transaction.
  *
- * Requires a [[JdbcTableConnection]] referenced by `connectionId`, which holds url, driver and credentials.
+ * Requires a [[JdbcConnection]] referenced by `connectionId`, which holds url, driver and credentials.
  *
  * Example:
  * {{{
  * connections = {
  *   jdbc-dwh {
- *     type = JdbcTableConnection
+ *     type = JdbcConnection
  *     url = "jdbc:postgresql://dwh:5432/mydb"
  *     driver = org.postgresql.Driver
  *   }
@@ -140,7 +140,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
   /**
    * Connection defines driver, url and db in central location
    */
-  val connection: JdbcTableConnection = getConnection[JdbcTableConnection](connectionId)
+  val connection: JdbcConnectionImpl = getConnection[JdbcConnectionImpl](connectionId)
 
   val options: Map[String, String] = jdbcOptions ++ Map(
     "url" -> connection.url,

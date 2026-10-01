@@ -22,7 +22,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.sqlglot.{DataFrameInfo, SqlGlotBridge}
 import io.smartdatalake.workflow.DataFrameSubFeed
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnectionImpl
 import io.smartdatalake.workflow.dataframe._
 
 import org.json4s.{DefaultFormats, Formats}
@@ -37,9 +37,9 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * it as SQL statement for a database with [[toSql]].
  *
  * Operations that need to read data (collect, count, isEmpty, show) execute the SQL statement on the database of
- * the [[JdbcTableConnection]]. All DataFrames combined, e.g. by a join, must belong to the same connection.
+ * the [[JdbcConnection]]. All DataFrames combined, e.g. by a join, must belong to the same connection.
  */
-class SQLDataFrame private(val info: DataFrameInfo, @transient val bridge: SqlGlotBridge, @transient val connection: JdbcTableConnection) extends GenericDataFrame {
+class SQLDataFrame private(val info: DataFrameInfo, @transient val bridge: SqlGlotBridge, @transient val connection: JdbcConnectionImpl) extends GenericDataFrame {
 
   override def subFeedType: Type = typeOf[SQLSubFeed]
 
@@ -196,7 +196,7 @@ object SQLDataFrame {
    * Create a SQLDataFrame for a DataFrame of the bridge. The DataFrame in Python is released when the SQLDataFrame is
    * garbage collected.
    */
-  private[sql] def apply(info: DataFrameInfo, bridge: SqlGlotBridge, connection: JdbcTableConnection): SQLDataFrame = {
+  private[sql] def apply(info: DataFrameInfo, bridge: SqlGlotBridge, connection: JdbcConnectionImpl): SQLDataFrame = {
     val df = new SQLDataFrame(info, bridge, connection)
     bridge.registerForRelease(df, info.id)
     df
@@ -209,7 +209,7 @@ object SQLDataFrame {
    * @param tableName  name of the table, optionally qualified with database and catalog, in the dialect of the database
    * @param schema     schema of the table
    */
-  def table(connection: JdbcTableConnection, tableName: String, schema: SQLSchema): SQLDataFrame = {
+  def table(connection: JdbcConnectionImpl, tableName: String, schema: SQLSchema): SQLDataFrame = {
     val bridge = SqlGlotBridge.get()
     SQLDataFrame(bridge.callDataFrame("table", "name" -> tableName, "columns" -> schema.toBridge, "dialect" -> connection.sqlGlotDialect), bridge, connection)
   }
@@ -221,7 +221,7 @@ object SQLDataFrame {
    * @param query      the query in the dialect of the database
    * @param schema     schema of the result of the query
    */
-  def query(connection: JdbcTableConnection, query: String, schema: SQLSchema): SQLDataFrame = {
+  def query(connection: JdbcConnectionImpl, query: String, schema: SQLSchema): SQLDataFrame = {
     val bridge = SqlGlotBridge.get()
     SQLDataFrame(bridge.callDataFrame("query", "query" -> query, "columns" -> schema.toBridge, "dialect" -> connection.sqlGlotDialect), bridge, connection)
   }

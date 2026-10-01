@@ -34,7 +34,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * from the query of the DataFrame, or from a query exported by a dry-run when deployed by CatalogSchemaUpdater.
  * Reading the view is done by [[JdbcTableSqlEngine]].
  *
- * It is used by Actions with the JdbcTableConnection of the view as engine connection, see [[JdbcTableSqlEngine]].
+ * It is used by Actions with the JdbcConnection of the view as engine connection, see [[JdbcTableSqlEngine]].
  */
 class JdbcViewSqlEngine(dataObject: JdbcViewDataObject) extends JdbcViewEngine with SmartDataLakeLogger {
   import dataObject.{connection, id, table}
