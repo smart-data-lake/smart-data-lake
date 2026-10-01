@@ -104,6 +104,23 @@ jobs:
         # -T 3: the modules depending only on sdl-core/sdl-spark (sparkconnect, deltalake, iceberg, kafka, ...) build in parallel
         run: mvn -T 3 -P test-sonar -B -ntp -Daether.dependencyCollector.impl=bf clean compile scoverage:report -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake  -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
 
+      - name: Upload compiled classes for the deploy job
+        # The deploy job reuses the classes compiled by phase 'compile' above, instead of compiling everything again.
+        # They are not instrumented: scoverage compiles to target/scoverage-classes with its own zinc analysis.
+        # Test classes are not uploaded, as they are compiled against the instrumented classes and are recompiled anyway.
+        # Zinc detects changes by content hash, so the timestamps lost by the artifact do not trigger a recompilation.
+        if: ${{ startsWith(github.ref_name, 'develop') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: compiled-classes
+          path: |
+            **/target/classes
+            **/target/analysis/compile
+            **/target/maven-status
+          retention-days: 1
+          if-no-files-found: error
+          include-hidden-files: true
+
   deploy:
     needs: build
     # a running deploy is never cancelled, so that no partial snapshot is published to sonatype;
@@ -151,6 +168,14 @@ jobs:
           key: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}
 
+      - name: Download compiled classes of the build job
+        # not available if the build job was skipped (workflow_dispatch with skipBuild), then everything is compiled
+        id: download_classes
+        if: ${{ needs.build.result == 'success' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: compiled-classes
+
       - name: Update version for SNAPSHOT releases from feature/bugfix branches with issue number from branch name
         if: ${{ startsWith(github.ref_name, 'feature') || startsWith(github.ref_name, 'bugfix')}}
         run: |
@@ -163,8 +188,9 @@ jobs:
 
       - name: Maven deploy to sonatype for Scala 2.13
         # scaladoc is skipped for snapshots: nobody consumes it, and the javadoc jars dominate the upload to sonatype central
+        # without 'clean' if the compiled classes of the build job were downloaded, so that they are reused
         timeout-minutes: 60
-        run: mvn -P release-sonatype -B -ntp -Daether.dependencyCollector.impl=bf -Dmaven.scaladoc.skip=true -f pom.xml clean deploy -DskipTests -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
+        run: mvn -P release-sonatype -B -ntp -Daether.dependencyCollector.impl=bf -Dmaven.scaladoc.skip=true -f pom.xml ${{ steps.download_classes.outcome == 'success' && 'deploy' || 'clean deploy' }} -DskipTests -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
         env:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
