@@ -207,6 +207,8 @@ object JdbcCatalog {
       case d if d.toLowerCase.contains("oracle") => new OracleJdbcCatalog(connection, url)
       case d if d.toLowerCase.contains("com.sap.db") => new SapHanaJdbcCatalog(connection, url)
       case d if d.toLowerCase.contains("postgresql") => new PostgresJdbcCatalog(connection, url)
+      case d if d.toLowerCase.contains("snowflake") => new SnowflakeJdbcCatalog(connection, url)
+      case d if d.toLowerCase.contains("databricks") || d.toLowerCase.contains("simba.spark") => new DatabricksJdbcCatalog(connection, url)
       case _ => new DefaultJdbcCatalog(connection, url)
     }
   }
@@ -296,6 +298,50 @@ class PostgresJdbcCatalog(connection: Connection with GenericJdbcExecution, url:
          |FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace CROSS JOIN LATERAL aclexplode(c.relacl) a
          |WHERE UPPER(n.nspname) = UPPER('$db') AND UPPER(c.relname) = UPPER('$tableName') AND a.grantee <> c.relowner
          |ORDER BY 1, 2""".stripMargin)
+}
+
+/**
+ * Snowflake JDBC Catalog query implementation.
+ * Materialized views are not listed in INFORMATION_SCHEMA.VIEWS, their definition is read with SHOW MATERIALIZED VIEWS.
+ */
+class SnowflakeJdbcCatalog(connection: Connection with GenericJdbcExecution, url: String) extends DefaultJdbcCatalog(connection, url) {
+
+  /**
+   * The statement creating the materialized view, i.e. column `text` of SHOW MATERIALIZED VIEWS.
+   */
+  override def getMaterializedViewDefinition(db: String, viewName: String): Option[String] = {
+    // LIKE is case-insensitive, and its wildcards may match other views, so the result is filtered by name
+    val stmt = s"SHOW MATERIALIZED VIEWS LIKE '${removeQuotes(viewName).replace("'", "''")}' IN SCHEMA $db"
+    connection.execJdbcQuery(stmt, (rs: ResultSet) => {
+      val rows = Iterator.continually(rs).takeWhile(_.next()).map(r => (r.getString("name"), r.getString("text"))).toList
+      SnowflakeJdbcCatalog.findByName(rows, viewName, isQuotedIdentifier(viewName), removeQuotes)
+    })
+  }
+}
+
+object SnowflakeJdbcCatalog {
+  /**
+   * Find the value of an object by its name. Snowflake stores unquoted identifiers uppercase, quoted ones as written.
+   */
+  private[jdbc] def findByName(rows: Seq[(String, String)], name: String, isQuoted: Boolean, removeQuotes: String => String): Option[String] = {
+    val expectedName = if (isQuoted) removeQuotes(name) else name.toUpperCase
+    rows.collectFirst { case (n, value) if n == expectedName => value }
+  }
+}
+
+/**
+ * Databricks JDBC Catalog query implementation.
+ * Materialized views are not listed in INFORMATION_SCHEMA.VIEWS, their definition is read with SHOW CREATE TABLE,
+ * which needs Databricks Runtime 14.1 or above for materialized views.
+ */
+class DatabricksJdbcCatalog(connection: Connection with GenericJdbcExecution, url: String) extends DefaultJdbcCatalog(connection, url) {
+
+  override def getMaterializedViewDefinition(db: String, viewName: String): Option[String] = {
+    val tableName = s"$db.$viewName"
+    // SHOW CREATE TABLE fails if the table does not exist
+    if (!isTableExisting(tableName)) None
+    else connection.execJdbcQuery(s"SHOW CREATE TABLE $tableName", (rs: ResultSet) => if (rs.next()) Option(rs.getString(1)) else None)
+  }
 }
 
 /**

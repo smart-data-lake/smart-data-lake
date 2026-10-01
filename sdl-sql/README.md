@@ -108,8 +108,12 @@ postgres, redshift, oracle, snowflake and databricks. Other dialects fail in pre
 view is created in init phase with data, as Postgres can not read an unpopulated one. On every run the Action writing it
 refreshes it (`REFRESH MATERIALIZED VIEW`, `DBMS_MVIEW.REFRESH` on Oracle), except if it was created by the init
 phase of the same run. Snowflake refreshes materialized views automatically. If the query changed and
-`allowSchemaEvolution = true`, it is replaced instead of refreshed. Its existing query is read from `pg_matviews` (Postgres) and
-`ALL_MVIEWS` (Oracle). For other databases it can not be compared, and it is replaced on every run.
+`allowSchemaEvolution = true`, it is replaced instead of refreshed. Its existing query is read from `pg_matviews` (Postgres),
+`ALL_MVIEWS` (Oracle), with `SHOW MATERIALIZED VIEWS` (Snowflake, column `text`) and with `SHOW CREATE TABLE`
+(Databricks, needs Databricks Runtime 14.1 or above). Snowflake and Databricks return the whole `CREATE` statement; if
+SQLGlot can not parse it, e.g. a `SCHEDULE` clause of Databricks, the query after its top-level `AS` is compared. If the
+definition can not be read, e.g. for Redshift, a changed query is not detected and the materialized view is only
+refreshed, with a warning, so that it is never replaced on every run. A refresh on Databricks is incremental where possible.
 
 Snowflake keeps the grants with `CREATE OR REPLACE MATERIALIZED VIEW ... COPY GRANTS`, and Databricks uses
 `CREATE OR REPLACE MATERIALIZED VIEW`. Postgres, Redshift and Oracle can not replace a materialized view, so it is

@@ -40,4 +40,22 @@ class JdbcConnectionDialectTest extends AnyFunSuite {
     assert(connection("jdbc:mariadb://localhost:3306/db").catalog.quoteIdentifier("a") == "`a`")
     assert(connection("jdbc:mysql://localhost:3306/db").catalog.isQuotedIdentifier("`a`"))
   }
+
+  test("the catalog is selected by the JDBC driver") {
+    def catalog(driver: String) = JdbcConnection(ConnectionId("c"), url = "jdbc:x:y", driver = driver).catalog
+    assert(catalog("org.postgresql.Driver").isInstanceOf[PostgresJdbcCatalog])
+    assert(catalog("net.snowflake.client.jdbc.SnowflakeDriver").isInstanceOf[SnowflakeJdbcCatalog])
+    assert(catalog("com.databricks.client.jdbc.Driver").isInstanceOf[DatabricksJdbcCatalog])
+    assert(catalog("com.simba.spark.jdbc.Driver").isInstanceOf[DatabricksJdbcCatalog])
+    assert(catalog("org.hsqldb.jdbcDriver").isInstanceOf[DefaultJdbcCatalog])
+  }
+
+  test("a Snowflake materialized view is found by its name as stored by Snowflake") {
+    val rows = Seq(("BERN_X", "create ... x"), ("BERN", "create ... bern"), ("Bern", "create ... quoted"))
+    val removeQuotes = (s: String) => s.stripPrefix("\"").stripSuffix("\"")
+    // LIKE 'bern' also matches other names, which are filtered out
+    assert(SnowflakeJdbcCatalog.findByName(rows, "bern", isQuoted = false, removeQuotes).contains("create ... bern"))
+    assert(SnowflakeJdbcCatalog.findByName(rows, "\"Bern\"", isQuoted = true, removeQuotes).contains("create ... quoted"))
+    assert(SnowflakeJdbcCatalog.findByName(rows, "other", isQuoted = false, removeQuotes).isEmpty)
+  }
 }
