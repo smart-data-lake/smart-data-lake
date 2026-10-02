@@ -21,21 +21,30 @@ package io.smartdatalake.workflow.connection
 import com.snowflake.snowpark.Session
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.misc.{ConnectionPoolConfig, JdbcExecution, SmartDataLakeLogger}
 import io.smartdatalake.util.webservice.HttpProxyConfig
+import io.smartdatalake.workflow.action.Action
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, BasicAuthMode, OAuthMode}
 import io.smartdatalake.workflow.connection.jdbc.DefaultJdbcCatalog
+import io.smartdatalake.workflow.dataframe.snowflake.SnowparkSubFeed
 import net.snowflake.spark.snowflake.Utils
 import org.apache.commons.pool2.impl.GenericObjectPool
 import org.apache.spark.sql.jdbc.{JdbcDialect, JdbcDialects}
 
 import java.sql.{Connection => SqlConnection}
+import scala.reflect.runtime.universe.{Type, typeOf}
 
 /**
  * Connection information for Snowflake databases.
  * The connection can be used for SnowflakeTableDataObjects
  * If multiple SnowflakeTableDataObjects share a connection, they share the same Snowpark session
+ *
+ * SnowflakeConnection is also the engine connection of the Snowpark engine: an Action with `engineConnectionId`
+ * referencing a SnowflakeConnection transforms its data with Snowpark inside Snowflake. All its inputs and outputs
+ * must then be SnowflakeTableDataObjects of this connection, as Snowpark DataFrames of different sessions can not be
+ * combined. Otherwise, e.g. with a SparkClassicConnection as engine connection, SnowflakeTableDataObjects are read and
+ * written with the Snowflake Spark connector.
  *
  * Beside the Snowpark session it also maintains a JDBC connection pool used for metadata and DDL queries
  * (e.g. checking table existence, pre/postSQL). The schema is not part of the connection - it is taken from
@@ -58,6 +67,19 @@ import java.sql.{Connection => SqlConnection}
  *       password = "###ENV#SNOWFLAKE_PASSWORD###"
  *     }
  *   }
+ *   default-engine {
+ *     type = SparkClassicConnection
+ *     master = "local[*]"
+ *   }
+ * }
+ * actions {
+ *   # transform data inside Snowflake with Snowpark
+ *   copySnowpark {
+ *     type = CopyAction
+ *     inputId = sfTable1
+ *     outputId = sfTable2
+ *     engineConnectionId = sfCon
+ *   }
  * }
  * }}}
  *
@@ -79,7 +101,7 @@ case class SnowflakeConnection(override val id: ConnectionId,
                                proxy: Option[HttpProxyConfig] = None,
                                sparkOptions: Map[String, String] = Map(),
                                override val metadata: Option[ConnectionMetadata] = None
-                              ) extends Connection with JdbcExecution with SmartDataLakeLogger {
+                              ) extends Connection with EngineConnection with JdbcExecution with SmartDataLakeLogger {
 
   private val supportedAuths = Seq(classOf[BasicAuthMode], classOf[OAuthMode])
   private var _snowparkSession: Option[Session] = None
@@ -122,13 +144,24 @@ case class SnowflakeConnection(override val id: ConnectionId,
     connectionOptions ++ authOptions ++ getProxyOptions
   }
 
-  def getSnowparkSession: Session = {
-    _snowparkSession.synchronized {
-      if (_snowparkSession.isEmpty) {
-        _snowparkSession = Some(createSnowparkSession)
-      }
+  override def subFeedType: Type = typeOf[SnowparkSubFeed]
+
+  def getSnowparkSession: Session = synchronized {
+    if (_snowparkSession.isEmpty) {
+      _snowparkSession = Some(createSnowparkSession)
     }
     _snowparkSession.get
+  }
+
+  /**
+   * Close the Snowpark session, if it has been created. It is always created by this connection, see [[getSnowparkSession]].
+   */
+  override def close(): Unit = synchronized {
+    _snowparkSession.foreach { session =>
+      logger.info(s"($id) closing Snowpark session")
+      session.close()
+    }
+    _snowparkSession = None
   }
 
   private def createSnowparkSession: Session = {
@@ -156,5 +189,15 @@ case class SnowflakeConnection(override val id: ConnectionId,
 object SnowflakeConnection extends FromConfigFactory[Connection] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): SnowflakeConnection = {
     extract[SnowflakeConnection](config)
+  }
+
+  /**
+   * The Snowpark session of the engine connection of an Action using the Snowpark engine.
+   */
+  def getSnowparkSession(action: Action)(implicit instanceRegistry: InstanceRegistry): Session = {
+    action.getEngineConnection match {
+      case connection: SnowflakeConnection => connection.getSnowparkSession
+      case connection => throw ConfigurationException(s"(${action.id}) The Snowpark engine needs a SnowflakeConnection as engine connection, but ${connection.id} is a ${connection.getClass.getSimpleName}")
+    }
   }
 }

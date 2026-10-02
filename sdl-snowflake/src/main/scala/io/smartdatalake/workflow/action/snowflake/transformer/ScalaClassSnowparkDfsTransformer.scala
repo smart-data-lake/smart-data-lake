@@ -30,7 +30,7 @@ import io.smartdatalake.workflow.action.snowflake.customlogic.CustomSnowparkDfsT
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSubFeed}
 import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
+import io.smartdatalake.workflow.connection.SnowflakeConnection
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
@@ -55,6 +55,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  *     type = CustomDataFrameAction
  *     inputIds = [sf-airports, sf-departures]
  *     outputIds = [sf-departures-enriched]
+ *     engineConnectionId = sf-con
  *     transformers = [{
  *       type = ScalaClassSnowparkDfsTransformer
  *       className = com.company.transformer.JoinDeparturesSnowparkTransformer
@@ -64,8 +65,9 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * }
  * }}}
  *
- * @note All input and output DataObjects must be of type SnowflakeTableDataObject, as the Snowpark session is taken
- *       from the Action's first input. The returned map must be keyed by the output DataObject ids.
+ * @note The Action must use the Snowpark engine, e.g. its `engineConnectionId` must reference a SnowflakeConnection,
+ *       and all input and output DataObjects must be SnowflakeTableDataObjects of this connection. The Snowpark
+ *       session is taken from the engine connection. The returned map must be keyed by the output DataObject ids.
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param className      class name implementing trait [[CustomSnowparkDfsTransformer]]
@@ -97,7 +99,7 @@ case class ScalaClassSnowparkDfsTransformer(name: String = "snowparkScalaTransfo
   def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], options: Map[String,String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
     assert(dfs.values.forall(_.isInstanceOf[SnowparkDataFrame]), s"($actionId) Unsupported subFeedType(s) ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method transform")
     val action = context.instanceRegistry.get[Action](actionId)
-    val snowparkSession = action.inputs.head.asInstanceOf[SnowflakeTableDataObject].snowparkSession
+    val snowparkSession = SnowflakeConnection.getSnowparkSession(action)(context.instanceRegistry)
     val snowparkDfs = dfs.map {
       case (k, v) => (renamedInputIds.getOrElse(k, k), v.asInstanceOf[SnowparkDataFrame].inner)
     }

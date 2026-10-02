@@ -16,7 +16,7 @@ Currently SDLB supports the following execution engines:
 |Generic DataFrame API|Spark Engine (sdl-spark)|SparkSubFeed|SparkClassicConnection|Transform data with Spark DataFrame API in a Spark session running inside the SDLB process|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction, MLflowTrainAction, MLflowPredictAction|all Hadoop/SparkFileDataObjects (Csv, Json, Parquet, Avro, Xml, Excel, RawFile, ...), AccessTableDataObject, AirbyteDataObject, BigQueryTableDataObject, DebeziumCdcDataObject, DeltaLakeTableDataObject, IcebergTableDataObject, JdbcTableDataObject, JdbcViewDataObject (read only), KafkaTopicDataObject, ODataDataObject, OpenApiDataObject, SnowflakeTableDataObject, DataObjectsExporterDataObject, ActionsExporterDataObject, PKViolatorsDataObject|
 |Generic DataFrame API|Spark Connect Engine (sdl-sparkconnect)|SparkConnectSubFeed|SparkConnectConnection|Transform data with the Spark DataFrame API on a **remote** Spark Connect server, without a Spark session inside the SDLB process|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction|SparkConnectTableDataObject, DeltaLakeTableDataObject, IcebergTableDataObject|
 |Generic DataFrame API|SQL Engine (sdl-sql)|SQLSubFeed|JdbcConnection|Render the transformations as one SQL statement with SQLGlot and execute it in the database (ELT), the data never leaves the database|CopyAction, CustomDataFrameAction|JdbcTableDataObject, JdbcViewDataObject|
-|Generic DataFrame API|Snowflake-Snowpark Engine (sdl-snowflake)|SnowparkSubFeed|-|Transform data within Snowflake with Snowpark DataFrame API|CopyAction, CustomDataFrameAction|SnowflakeTableDataObject|
+|Generic DataFrame API|Snowflake-Snowpark Engine (sdl-snowflake)|SnowparkSubFeed|SnowflakeConnection|Transform data within Snowflake with Snowpark DataFrame API|CopyAction, CustomDataFrameAction|SnowflakeTableDataObject|
 |Generic DataFrame API|Plain Scala Engine (sdl-core)|ScalaSubFeed|ScalaConnection|Lightweight engine without Spark, processing rows in memory, used for unit tests and as expression evaluator without Spark|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction|no DataObjects of its own|
 |Parameter|Parameter Engine|ParameterSubFeed|-|Coordinate work happening outside of SDLB and pass on key/values about it, e.g. script results or the information about an ML training run|CustomScriptAction, and the additional inputs/outputs of a DataFrame Action such as MLflowTrainAction|all DataObjects|
 
@@ -54,7 +54,7 @@ Use `engineConnectionId` on an Action to deviate from the default, e.g. to run o
 There is no implicit default: if no engine connection is configured, DataFrame Actions fail with `default-engine not found in instance registry`.
 :::
 
-Beside `SparkClassicConnection` and `SparkConnectConnection` there is `JdbcConnection`, the engine connection of the [SQL engine](#sql-engine), and `ScalaConnection`, a lightweight Spark-free engine working on `ScalaSubFeed`. The latter is currently used for unit tests and small pipelines and has no DataObjects of its own, so it is not covered further here.
+Beside `SparkClassicConnection` and `SparkConnectConnection` there is `JdbcConnection`, the engine connection of the [SQL engine](#sql-engine), `SnowflakeConnection`, the engine connection of the Snowpark engine, and `ScalaConnection`, a lightweight Spark-free engine working on `ScalaSubFeed`. The latter is currently used for unit tests and small pipelines and has no DataObjects of its own, so it is not covered further here.
 
 ### Spark Connect Engine
 
@@ -223,7 +223,7 @@ To check which execution engine was chosen, look for logs like the following:
 As mentioned in [Architecture](../../docs/architecture), SDLB is first and foremost a Java (Scala) application.
 It can run in any Execution Environment where you can install a JVM, executing Actions with any of its Execution Engines. SDLB chooses the Execution Engines for your data pipeline independently from the Execution Environment that SDLB lives in.
 For example: Let's say you run SDLB in a distributed fashion on a Spark Cluster using spark-submit. 
-If one of your Actions only has SnowflakeTableDataObjects as input and output, SDLB will run it using the Snowpark-Engine.
+If one of your Actions only has SnowflakeTableDataObjects as input and output, and its `engineConnectionId` references their SnowflakeConnection, SDLB will run it using the Snowpark-Engine.
 In practice, this means that SDLB will connect to the Snowflake Environment from inside your Spark-Cluster and then execute your Action from there using Snowpark's Java/Scala Library.
 
 Of course, the Execution Environment you have influences the DataObjects that you have at your disposal: for instance, if you want to connect to Snowflake, you need a Snowflake account and be able to connect to Snowflake.

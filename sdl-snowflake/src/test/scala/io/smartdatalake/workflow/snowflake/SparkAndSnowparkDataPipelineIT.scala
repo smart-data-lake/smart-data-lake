@@ -78,7 +78,7 @@ object SparkAndSnowparkDataPipelineIT extends App {
   val action1 = CopyAction("copySpark", srcDO.id, tgt1DO.id)
   instanceRegistry.register(action1)
   // second action copy with Snowpark from Snowflake to Snowflake
-  val action2 = CopyAction("copySnowpark", tgt1DO.id, tgt2DO.id,
+  val action2 = CopyAction("copySnowpark", tgt1DO.id, tgt2DO.id, engineConnectionId = Some(SnowflakeConnectionConfig.sfConnection.id),
     transformers = Seq(
       // a custom transformer written in Snowpark
       ScalaClassSnowparkDfTransformer(className = classOf[TestOptionsSnowparkDfTransformer].getName, options = Map("test" -> "test"), runtimeOptions = Map("appName" -> "application")),
@@ -92,7 +92,7 @@ object SparkAndSnowparkDataPipelineIT extends App {
     )
   )
   instanceRegistry.register(action2)
-  val action3 = CustomDataFrameAction("customSnowpark", Seq(tgt1DO.id, tgt2DO.id), Seq(tgt3DO.id),
+  val action3 = CustomDataFrameAction("customSnowpark", Seq(tgt1DO.id, tgt2DO.id), Seq(tgt3DO.id), engineConnectionId = Some(SnowflakeConnectionConfig.sfConnection.id),
     transformers = Seq(
       SQLDfsTransformer(code = Map(
         tgt3DO.id.id -> """

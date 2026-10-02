@@ -130,6 +130,10 @@ Review these even if your configuration parses without errors.
 * **Run recovery.** A run is now recovered if *any* Action did not complete, e.g. also if Actions were cancelled.
   A failed run can be accepted by moving its state file to the `succeeded` directory, see [Run State](reference/runState).
 * **enableHive** defaults to false now (see above).
+* **Snowpark is no longer selected automatically.** In 2.x an Action between `SnowflakeTableDataObject`s ran with
+  Snowpark. In 3.x the engine is chosen by the engine connection: set `engineConnectionId` to the `SnowflakeConnection`
+  of the DataObjects to keep using Snowpark. Otherwise the Action runs on the default engine, e.g. Spark with the
+  Snowflake Spark connector. Actions using `ScalaClassSnowparkDf(s)Transformer` fail without it.
 * **Debezium CDC columns** were renamed to their Delta Lake/Iceberg counterparts:
   `__commit_event` → `_change_type` (value `create` → `insert`), `__event_timestamp` → `_commit_timestamp`,
   plus the new `_change_ordinal`. The commit timestamp keeps its milliseconds. `HistorizeAction` detects these
@@ -211,9 +215,10 @@ Custom DataObjects, Actions, transformers and applications embedding SDLB need t
 5. Replace removed/renamed attributes (`persist`, `breakDataFrameLineage`, `transformer`, `foreignKeys.db/table`, `mergeModeEnable`, `filterClause`, `updateColumnComments`, `syncComments`, `CustomMode`, Hive DataObjects).
 6. Check pipelines with Append/Merge to unpartitioned outputs followed by another Action → `cacheOutput = true`?
 7. Adapt consumers of Debezium CDC columns.
-8. Add `dry-run-with-schema-export` + `CatalogSchemaUpdater` to the deployment if you need comments, primary or foreign keys in the catalog.
-9. Custom code: remove `factory`, fix imports, add `override` to 1:1 `transform`, `dataFrameInputs/Outputs`, `RunStatistics`.
-10. Add column `expectations_result` to the metrics log table; adapt consumers of the DataObjectsExporter.
-11. Run `--test config` and `--test dry-run` on all feeds before the first real run.
+8. Snowpark Actions: set `engineConnectionId` to the `SnowflakeConnection`.
+9. Add `dry-run-with-schema-export` + `CatalogSchemaUpdater` to the deployment if you need comments, primary or foreign keys in the catalog.
+10. Custom code: remove `factory`, fix imports, add `override` to 1:1 `transform`, `dataFrameInputs/Outputs`, `RunStatistics`.
+11. Add column `expectations_result` to the metrics log table; adapt consumers of the DataObjectsExporter.
+12. Run `--test config` and `--test dry-run` on all feeds before the first real run.
 
 For the full list of changes, see the [release notes](https://github.com/smart-data-lake/smart-data-lake/releases).
