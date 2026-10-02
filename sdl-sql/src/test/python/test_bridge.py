@@ -20,6 +20,7 @@
 """Tests for the SQLGlot DataFrame bridge of the SDLB SQL engine, run with `uv run pytest` in sdl-sql."""
 
 import json
+import re
 
 import pytest
 
@@ -230,6 +231,55 @@ def test_unqualified_join_column_after_join_on_columns():
     df = call("select", df=df["id"], columns=['a', 'z'])
     assert df["columns"] == ["a", "z"]
     assert to_sql(df).startswith('SELECT test_table.a AS a, other.z AS z')
+
+
+def historize_join():
+    existing = call("alias", df=table("db.tgt", (("id", "INT"), ("ts", "TIMESTAMP"), ("h", "TEXT")))["id"], alias="existing")
+    new = call("alias", df=table("db.src", (("id", "INT"), ("v", "INT"), ("h", "TEXT")))["id"], alias="new")
+    return call("join", df=existing["id"], other=new["id"], how="full", on=["id"])
+
+
+def test_join_keeps_columns_of_the_same_name():
+    df = historize_join()
+    assert df["columns"] == ["id", "ts", "h", "v", "h"]
+    with pytest.raises(BridgeError, match="ambiguous"):
+        call("select", df=df["id"], columns=["h"])
+    with pytest.raises(BridgeError, match="duplicate column names h"):
+        call("create_table_as", df=df["id"], table="t")
+
+
+def test_qualified_references_stay_valid_after_join():
+    # the sequence of operations of IncrementalHistorizeMode.incrementalHistorize
+    df = historize_join()
+    df = call("with_column", df=df["id"], name="ops",
+              column="CASE WHEN existing.h IS NULL THEN ARRAY('insert') ELSE ARRAY('update', 'insert') END")
+    # a reference to a computed column needs the join wrapped as subquery
+    df = call("with_column", df=df["id"], name="op", column="EXPLODE(ops)")
+    df = call("drop", df=df["id"], names=["ops"])
+    # only the column of the qualifier is dropped
+    df = call("drop", df=df["id"], columns=["existing.h"])
+    assert df["columns"] == ["id", "ts", "v", "h", "op"]
+    df = call("with_column", df=df["id"], name="ts",
+              column="CASE WHEN op = 'insert' THEN CAST('2026-01-01' AS TIMESTAMP) ELSE existing.ts END")
+    # the column of existing was replaced already, so there is nothing to drop
+    assert call("drop", df=df["id"], columns=["existing.ts"])["id"] == df["id"]
+    df = call("select", df=df["id"], columns=["id", "v", "h", "op", "ts"])
+    assert df["columns"] == ["id", "v", "h", "op", "ts"]
+    sql = to_sql(df, "duckdb")
+    assert "src.h AS h__sdlb" in sql
+    assert "UNNEST(CASE WHEN tgt.h IS NULL" in sql
+    # the internal key of the column h of new is renamed to its name
+    assert re.search(r"\.h__sdlb\d+ AS h,", sql)
+    assert re.search(r"ELSE _t\d+\.ts END AS ts", sql)
+
+
+def test_unqualified_reference_to_computed_column_of_join():
+    left, right = table(), table("other", (("a", "INT"), ("z", "INT")))
+    df = call("join", df=left["id"], other=right["id"], how="inner", on=["a"])
+    df = call("with_column", df=df["id"], name="z", column="z + 1")
+    df = call("select", df=df["id"], columns=["a", "z"])
+    # z is the computed column, not the column z of the input
+    assert "other.z + 1 AS z" in to_sql(df)
 
 
 def test_query():

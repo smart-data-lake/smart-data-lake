@@ -290,6 +290,19 @@ object SQLSubFeed extends DataFrameSubFeedCompanion {
   override def from_json(column: GenericColumn, dataType: GenericDataType): SQLColumn = notImplemented("from_json")
   override def hash(column: GenericColumn): SQLColumn = notImplemented("hash")
 
+  /**
+   * Comparison expression of columns, e.g. the hash column of HistorizeAction. Neither comparing structs nor HASH is
+   * portable between databases, so the values are concatenated as text instead, and hashed with MD5 if useHash is set.
+   * Values are prefixed with 'V' to distinguish null values from strings.
+   */
+  override def colscomparisonExpr(cols: Seq[GenericColumn], useHash: Boolean): SQLColumn = {
+    assert(cols.forall(_.getName.nonEmpty), "All columns must have a name for colscomparisonExpr, otherwise the generated expression is not deterministic. Please check that all columns used for comparison are named.")
+    val values = cols.sortBy(_.getName.get).map(SQLColumn.of).map(c =>
+      s"CASE WHEN ${c.operand} IS NULL THEN 'N' ELSE CONCAT('V', CAST(${c.expr} AS STRING)) END")
+    val concatenated = s"CONCAT_WS(CHR(31), ${values.mkString(", ")})"
+    SQLColumn(if (useHash) s"MD5($concatenated)" else concatenated)
+  }
+
   override def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): SQLColumn = {
     val partition = if (partitionBy.nonEmpty) s"PARTITION BY ${partitionBy.map(SQLColumn.of(_).expr).mkString(", ")} " else ""
     SQLColumn(s"${SQLColumn.of(aggFunction()).expr} OVER (${partition}ORDER BY ${SQLColumn.of(orderBy).orderSql})")
