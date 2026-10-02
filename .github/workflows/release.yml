@@ -79,7 +79,11 @@ jobs:
 
     - name: Git Commit
       run: |
-        git add -A
+        # Use '-u' (only already-tracked files, e.g. the pom.xml version bumps) instead of '-A':
+        # running the test suite as part of 'mvn deploy' can leave stray build output outside
+        # target/ (e.g. sdl-lang/exportedConfig.json from ConfigJsonExporterTest), and '-A' would
+        # commit such untracked artifacts into the release.
+        git add -u
         git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
     - name: Git Pull, Tag and Push
       run: |
