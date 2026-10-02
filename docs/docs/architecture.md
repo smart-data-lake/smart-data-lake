@@ -9,10 +9,37 @@ It can run in many environments and platforms like a Databricks cluster, Azure S
 Find below an overview of requirements, versions and supported configurations.
 
 ## Basic Requirements
-- Needs Java 8+ to run
+- Needs Java 17+ to run (SDLB 2.x: Java 8+)
 - Uses Hadoop Java library to read local and remote files (S3, ADLS, HDFS, ...)
-- Is programmed in Scala
+- Is programmed in Scala 2.13
 - Uses Maven 3+ as build system
+- Python 3 is needed only for Python transformations, the MLflow Actions and the SQL engine
+
+## Modules
+
+Since SDLB 3.x, the core of SDLB does not depend on Spark anymore. It defines the configuration, the DAG execution
+and an engine independent DataFrame API, and each execution engine is a separate module. Declare the modules you
+need in your Maven project:
+
+| Module | Content | Depends on |
+|---|---|---|
+| `sdl-core` | configuration, DAG execution, run state, generic Actions (Copy, Historize, Upsert, Custom), file Actions, engine independent DataObjects (`JdbcTableDataObject`, `JdbcViewDataObject`, `DeltaLakeTableDataObject`, `IcebergTableDataObject`) and the plain-Scala engine | - |
+| `sdl-spark` | Spark engine (`SparkClassicConnection`, `SparkSubFeed`), file formats, Spark transformers, Python transformations, MLflow Actions | `sdl-core` |
+| `sdl-sparkconnect` | Spark Connect engine (`SparkConnectConnection`, `SparkConnectTableDataObject`) | `sdl-core` |
+| `sdl-sql` | SQL engine executing transformations in the database (SQLGlot, needs Python) | `sdl-core` |
+| `sdl-deltalake`, `sdl-iceberg` | Spark implementations of the Delta Lake and Iceberg DataObjects | `sdl-spark` |
+| `sdl-snowflake` | `SnowflakeTableDataObject` and the Snowpark engine | `sdl-spark` |
+| `sdl-kafka`, `sdl-debezium`, `sdl-azure`, `sdl-gcp` | connectors for Kafka, Debezium CDC, Azure and Google Cloud | `sdl-spark` |
+| `sdl-lang` | meta tools: configuration and schema exporters, `CatalogSchemaUpdater`, schema viewer JSON schema | all of the above |
+
+An engine independent DataObject, e.g. `DeltaLakeTableDataObject`, is implemented per engine by the corresponding
+module, e.g. `sdl-deltalake` for Spark and `sdl-sparkconnect` for Spark Connect. Which engine an Action uses is
+selected by its engine connection, see [Execution Engines](reference/executionEngines).
+
+:::caution
+`sdl-spark` and `sdl-sparkconnect` cannot be used in the same JVM, as the Spark classic and the Spark Connect
+client libraries conflict.
+:::
 
 ## Versions and supported configuration
 SDLB is published as Maven artifacts on Maven Central. 
@@ -28,10 +55,11 @@ In general, Java library versions are held as close as possible to the ones used
 
 SDLB version 3.X uses Apache Spark 4.X and requires Java 17+.
 Scala 2.12 is no longer supported; 3.X is built for Scala 2.13 only.
+See [Upgrading to SDLB 3.x](upgrade-3) for the changes needed when upgrading from 2.X.
 
 | SDL Version | Java/Scala Version        | Hadoop Version | Spark Engine | Log4j  | Snowflake/Snowpark Engine | Delta Lake  | Iceberg |
 |-------------|---------------------------|----------------|--------------|--------|---------------------------|-------------|---------|
-| 3.0.X       | Java 17+, Scala 2.13      | 3.4.2          | 4.1.1        | 2.24.3 | 3.1.8 / 1.18.0            | 4.2.0       | 1.11.0  |
+| 3.0.X       | Java 17+, Scala 2.13      | 3.4.2          | 4.1.3        | 2.24.3 | 3.1.8 / 1.18.0            | 4.4.0       | 1.11.0  |
 
 ### SDLB Version 2.X
 
@@ -46,7 +74,7 @@ Scala 2.12 is no longer supported; 3.X is built for Scala 2.13 only.
 | 2.2.X       | Java 8+, Scala 2.12       | 3.3.1          | 3.2.1        | 1.2.17 | 2.9.2 / 0.11.0            | 1.1.0       | -       |
 | 2.1.X       | Java 8+, Scala 2.12       | 2.7.4          | 3.1.1        | 1.2.17 | 2.8.4                     | 1.0.0       | -       |
 
-(*) Snowpark is not supported for Scala 2.13, see also this [note](https://github.com/snowflakedb/snowpark-java-scala?tab=readme-ov-file#prepare-your-local-environment).
+(*) Snowpark is not supported for Scala 2.13 in SDLB 2.X, see also this [note](https://github.com/snowflakedb/snowpark-java-scala?tab=readme-ov-file#prepare-your-local-environment).
 
 ### SDLB Version 1.X
 SDLB version 1.X used Apache Spark 2.X. 
@@ -55,7 +83,7 @@ To profit from the latest development, please upgrade to a more recent version o
 
 ### Release Notes
 
-See SDBL Release Notes including breaking changes on [Github](https://github.com/smart-data-lake/smart-data-lake/releases)
+See SDLB Release Notes including breaking changes on [Github](https://github.com/smart-data-lake/smart-data-lake/releases)
 
 ## Context
 
@@ -70,7 +98,8 @@ Legend: <img width="60%" style={{verticalAlign: 'top'}} src={require('./structur
 ## Cross cutting concerns
 
 ### Logging
-By default, SDLB uses the logging libraries included in the corresponding Spark version. This is Log4j 1.2.x for Spark 2.4.x up to Spark 3.2.x.
-Starting from Spark 3.3.x it will use Log4j 2.x, see [SPARK-6305](https://issues.apache.org/jira/browse/SPARK-6305).
+By default, SDLB uses the logging libraries included in the corresponding Spark version, see the Log4j column above.
+This is Log4j 2.x for all SDLB 3.X versions (Spark 3.3.x and later, see [SPARK-6305](https://issues.apache.org/jira/browse/SPARK-6305)),
+and Log4j 1.2.x for SDLB versions with Spark 2.4.x up to Spark 3.2.x.
 
 You can customize logging dependencies manually by creating your own maven project.

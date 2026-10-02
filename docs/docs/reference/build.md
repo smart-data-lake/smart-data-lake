@@ -17,36 +17,15 @@ Smart Data Lake Builder is build using [Apache Maven](https://maven.apache.org/)
 Here is an overview of the various versions at play:
 
 ### Build Dependencies
-SDL Version 1.x
-- *Spark 2.4*
-- JDK 8 (Spark 2 doesn't support JDK 9 or higher)
-- Scala 2.11 or 2.12
-- Maven 3.0 (or higher)
-
-SDL Version 2.x
-- *Spark 3.x*
-- JDK >= 8
-- Scala 2.12 (Spark 3 doesn't support scala 2.11 anymore)
-- Maven 3.0 (or higher)
-
-SDL Version 3.x
 - *Spark 4.x*
-- JDK >= 17 (Spark 4 doesn't support JDK 11 anymore)
-- Scala 2.13 (Spark 4 doesn't support scala 2.12 anymore). SDL 3.x publishes `_2.13` artifacts only, there are no `scala-2.12` / `scala-2.13` build profiles anymore.
+- JDK >= 17
+- Scala 2.13. SDLB publishes `_2.13` artifacts only.
 - Maven 3.0 (or higher)
+
+See [Architecture](../architecture.md#versions-and-supported-configuration) for the versions of all dependencies.
 
 :::tip
-Use the latest version of Smart Data Lake Builder if you don't have strong reasons to stay on an older Spark version.
-:::
-
-:::caution Migrating from 2.x
-Beside Scala and JDK, the following changes affect every downstream project:
-- `LocalSmartDataLakeBuilder` and `SparkSmartDataLakeBuilder` were removed. Use `DefaultSmartDataLakeBuilder`,
-  see [Command Line](commandLine.md).
-- Spark support was split out of `sdl-core` into `sdl-spark`. Declare `sdl-spark` if you use Spark
-  DataObjects, Actions or transformers.
-- The Spark session is configured by an engine connection instead of `global.spark-options`,
-  see [Execution Engines](executionEngines.md).
+Coming from SDLB 2.x? See [Upgrading to SDLB 3.x](../upgrade-3.md) for the changes needed in your project.
 :::
 
 ### Releases and snapshots
