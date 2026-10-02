@@ -97,4 +97,23 @@ object StringUtil {
     x.linesIterator.map(prefix + _).mkString(System.lineSeparator())
   }
 
+  /**
+   * Computes the Levenshtein distance between two strings, i.e. the minimal number of single character insertions,
+   * deletions or substitutions needed to change one string into the other.
+   * This can be used to suggest the correct name for a misspelled one.
+   */
+  def levenshteinDistance(a: String, b: String): Int = {
+    var prev = (0 to b.length).toArray
+    a.indices.foreach { i =>
+      val curr = new Array[Int](b.length + 1)
+      curr(0) = i + 1
+      b.indices.foreach { j =>
+        val cost = if (a(i) == b(j)) 0 else 1
+        curr(j + 1) = math.min(math.min(curr(j) + 1, prev(j + 1) + 1), prev(j) + cost)
+      }
+      prev = curr
+    }
+    prev(b.length)
+  }
+
 }

@@ -20,10 +20,10 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.util.misc.StringUtil
+import io.smartdatalake.util.misc.{SmartDataLakeLogger, StringUtil}
 import io.smartdatalake.util.spark.SparkRepartitionDef
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericSchema
@@ -144,6 +144,24 @@ object ExcelFileDataObject extends FromConfigFactory[DataObject] {
  * Options passed to [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]] for
  * reading and writing Microsoft Excel files. Excel support is provided by the spark-excel project (see link below).
  *
+ * The attributes below are options with a specific meaning in SDLB: `sheetName`, `numLinesToSkip`, `startColumn`,
+ * `endColumn` and `rowLimit` are translated into the spark-excel option `dataAddress`, `useHeader` is passed on
+ * as `header` and `inferSchema` is disabled if an explicit schema is defined.
+ * All other options of spark-excel can be set in `additionalOptions` with their spark-excel name, e.g.
+ * {{{
+ * excelOptions {
+ *   sheetName = "airports"
+ *   additionalOptions {
+ *     useNullForErrorCells = true
+ *     locale = "de-CH"
+ *   }
+ * }
+ * }}}
+ *
+ * The keys of `additionalOptions` are validated against the options known by spark-excel, so that a misspelled or
+ * unsupported option is reported as error. Set `allowUnknownOptions = true` to use an option which is not
+ * (yet) known by SDLB, e.g. an option of a newer spark-excel version.
+ *
  * @param sheetName Optional name of the Excel Sheet to read from/write to.
  * @param numLinesToSkip Optional number of rows in the excel spreadsheet to skip before any data is read.
  *                       This option must not be set for writing.
@@ -153,15 +171,28 @@ object ExcelFileDataObject extends FromConfigFactory[DataObject] {
  * @param rowLimit Optional limit of the number of rows being returned on read.
  *                 This is applied after `numLinesToSkip`.
  * @param useHeader If `true`, the first row of the excel sheet specifies the column names (default: true).
+ *                  Corresponds to the spark-excel option `header`.
  * @param treatEmptyValuesAsNulls Empty cells are parsed as `null` values (default: true).
+ *                                Deprecated: this option is not supported anymore by spark-excel v2 and therefore ignored.
+ *                                Use the spark-excel options `useNullForErrorCells` and `nullValue` instead.
  * @param inferSchema Infer the schema of the excel sheet automatically (default: true).
- * @param timestampFormat A format string specifying the format to use when writing timestamps (default: dd-MM-yyyy HH:mm:ss).
- * @param dateFormat A format string specifying the format to use when writing dates.
+ *                    It is ignored if an explicit `schema` is defined on the DataObject.
+ * @param timestampFormat A format string specifying the format to use when reading/writing timestamps (default: dd-MM-yyyy HH:mm:ss).
+ * @param dateFormat A format string specifying the format to use when reading/writing dates.
  * @param maxRowsInMemory The number of rows that are stored in memory.
  *                        If set, a streaming reader is used which can help with big files.
- * @param excerptSize Sample size for schema inference.
- * @see [[https://github.com/crealytics/spark-excel]]
+ * @param excerptSize Sample size (number of rows) for schema inference.
+ * @param additionalOptions Further options passed to the spark-excel data source, using the spark-excel option names,
+ *                          e.g. `dataAddress`, `sheetNameIsRegex`, `useNullForErrorCells` or `locale`.
+ *                          See the spark-excel documentation for the available options.
+ *                          Options which correspond to an attribute above must be set by that attribute.
+ *                          `dataAddress` must not be combined with `sheetName`, `numLinesToSkip`, `startColumn`,
+ *                          `endColumn` or `rowLimit`.
+ * @param allowUnknownOptions If `true`, keys of `additionalOptions` which are not known as spark-excel option only
+ *                            create a warning instead of an error (default: false).
+ * @see [[https://github.com/nightscape/spark-excel]]
  */
+@annotation.nowarn("msg=treatEmptyValuesAsNulls")
 case class ExcelOptions(
                          sheetName: Option[String] = None,
                          numLinesToSkip: Option[Int] = None,
@@ -169,18 +200,28 @@ case class ExcelOptions(
                          endColumn: Option[String] = None,
                          rowLimit: Option[Int] = None,
                          useHeader: Boolean = true,
+                         @Deprecated @deprecated("Not supported by spark-excel v2 anymore. Use useNullForErrorCells and nullValue instead", "3.0.0")
                          treatEmptyValuesAsNulls: Option[Boolean] = Some(true),
                          inferSchema: Option[Boolean] = Some(true),
                          timestampFormat: Option[String] = Some("dd-MM-yyyy HH:mm:ss"),
                          dateFormat: Option[String] = None,
                          maxRowsInMemory: Option[Int] = None,
-                         excerptSize: Option[Int] = None
+                         excerptSize: Option[Int] = None,
+                         additionalOptions: Map[String, String] = Map(),
+                         allowUnknownOptions: Boolean = false
                        ) {
 
   require(!startColumn.exists(_.exists(c => !c.isLetter)), s"ExcelOptions.startColumn must contain only letters (A-Z)+, but is ${startColumn.get}")
   require(!endColumn.exists(_.exists(c => !c.isLetter)), s"ExcelOptions.endColumn must contain only letters (A-Z)+, but is ${endColumn.get}")
+  ExcelOptions.validateAdditionalOptions(additionalOptions, allowUnknownOptions, getDerivedDataAddress.isDefined)
 
-  def getDataAddress: Option[String] = {
+  def getDataAddress: Option[String] = additionalOptions.collectFirst { case (k, v) if k.equalsIgnoreCase("dataAddress") => v }
+    .orElse(getDerivedDataAddress)
+
+  /**
+   * Create the spark-excel `dataAddress` option from sheetName, numLinesToSkip, startColumn, endColumn and rowLimit.
+   */
+  private def getDerivedDataAddress: Option[String] = {
     if (sheetName.isDefined || startColumn.isDefined || endColumn.isDefined || numLinesToSkip.isDefined || rowLimit.isDefined) {
       val startLine = numLinesToSkip.map(_+1)
       val endLine = rowLimit.map(_+startLine.getOrElse(1))
@@ -193,15 +234,69 @@ case class ExcelOptions(
     } else None
   }
 
-  def toMap(schema: Option[GenericSchema]): Map[String, Option[Any]] = Map(
+  def toMap(schema: Option[GenericSchema]): Map[String, Option[Any]] = additionalOptions.view.mapValues(Some(_)).toMap ++ Map(
       "dataAddress" -> getDataAddress,
-      "treatEmptyValuesAsNulls" -> treatEmptyValuesAsNulls,
+      // treatEmptyValuesAsNulls is not passed on, as it is not supported by spark-excel v2 anymore, see deprecation note.
       "header" -> Some(useHeader),
       "inferSchema" -> Some(schema.isEmpty && inferSchema.getOrElse(true)),
-      "treatEmptyValuesAsNulls" -> treatEmptyValuesAsNulls,
       "timestampFormat" -> timestampFormat,
       "dateFormat" -> dateFormat,
       "maxRowsInMemory" -> maxRowsInMemory,
       "excerptSize" -> excerptSize
     )
+}
+
+object ExcelOptions extends SmartDataLakeLogger {
+
+  /**
+   * Options read by the spark-excel data source (see `dev.mauch.spark.excel.v2.ExcelOptionsTrait`), which have no
+   * corresponding attribute in ExcelOptions.
+   * ExcelFileDataObjectTest checks that this list is complete for the spark-excel version SDLB is built with.
+   */
+  private[dataobject] val sparkExcelOptions: Set[String] = Set(
+    "addColorColumns", "columnNameOfCorruptRecord", "columnNameOfRowNumber", "dataAddress", "enforceSchema",
+    "fileExtension", "ignoreAfterHeader", "ignoreLeadingWhiteSpace", "ignoreTrailingWhiteSpace", "keepUndefinedRows",
+    "locale", "maxByteArraySize", "mode", "nanValue", "negativeInf", "nullValue", "positiveInf", "samplingRatio",
+    "sheetNameIsRegex", "tempFileThreshold", "useNullForErrorCells", "usePlainNumberFormat", "workbookPassword"
+  )
+
+  /**
+   * Generic options of Spark file data sources, which are also supported by spark-excel.
+   */
+  private[dataobject] val sparkFileSourceOptions: Set[String] = Set(
+    "timeZone", "ignoreCorruptFiles", "ignoreMissingFiles", "modifiedBefore", "modifiedAfter"
+  )
+
+  /**
+   * spark-excel options which are set through an attribute of ExcelOptions or by ExcelFileDataObject itself,
+   * with a hint what to do instead.
+   */
+  private[dataobject] val reservedOptions: Map[String, String] = Seq("header" -> "useHeader", "inferSchema" -> "inferSchema",
+    "timestampFormat" -> "timestampFormat", "dateFormat" -> "dateFormat", "maxRowsInMemory" -> "maxRowsInMemory", "excerptSize" -> "excerptSize")
+    .map { case (option, attribute) => option -> s"use attribute '$attribute' of ExcelOptions instead" }.toMap +
+    ("pathGlobFilter" -> "it is set by ExcelFileDataObject")
+
+  private lazy val knownOptions: Set[String] = sparkExcelOptions ++ sparkFileSourceOptions ++ reservedOptions.keySet
+
+  /**
+   * Validate the keys of additionalOptions. Spark options are case-insensitive, therefore keys are compared ignoring case.
+   */
+  private def validateAdditionalOptions(additionalOptions: Map[String, String], allowUnknownOptions: Boolean, derivedDataAddressDefined: Boolean): Unit = {
+    def find(names: Iterable[String], key: String) = names.find(_.equalsIgnoreCase(key))
+    additionalOptions.keys.toSeq.sorted.foreach { key =>
+      find(reservedOptions.keys, key).foreach { option =>
+        throw ConfigurationException(s"(ExcelOptions) option '$key' must not be set in additionalOptions, ${reservedOptions(option)}")
+      }
+      if (key.equalsIgnoreCase("dataAddress") && derivedDataAddressDefined) {
+        throw ConfigurationException("(ExcelOptions) option 'dataAddress' in additionalOptions must not be combined with sheetName, numLinesToSkip, startColumn, endColumn or rowLimit")
+      }
+      if (find(knownOptions, key).isEmpty) {
+        val suggestion = knownOptions.map(o => (o, StringUtil.levenshteinDistance(o.toLowerCase, key.toLowerCase)))
+          .filter(_._2 <= 3).toSeq.sortBy(_._2).headOption.map(o => s", did you mean '${o._1}'?").getOrElse("")
+        val msg = s"(ExcelOptions) unknown spark-excel option '$key' in additionalOptions$suggestion"
+        if (allowUnknownOptions) logger.warn(s"$msg - passed on to spark-excel as allowUnknownOptions=true")
+        else throw ConfigurationException(s"$msg. Set allowUnknownOptions=true to pass on options unknown to SDLB, e.g. of a newer spark-excel version.")
+      }
+    }
+  }
 }
