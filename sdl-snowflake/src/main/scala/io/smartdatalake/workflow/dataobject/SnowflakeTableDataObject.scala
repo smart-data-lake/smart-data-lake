@@ -49,7 +49,9 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * [[DataObject]] of type SnowflakeTableDataObject.
  * Provides details to access Snowflake tables via an action
  * Can be used both for interacting with Snowflake through Spark with JDBC,
- * as well as for actions written in the Snowpark API that run directly on Snowflake
+ * as well as for actions written in the Snowpark API that run directly on Snowflake.
+ * An Action uses Snowpark if its `engineConnectionId` references the SnowflakeConnection of its DataObjects,
+ * otherwise the DataObject is read and written with the Snowflake Spark connector.
  *
  * Note 1: Snowflake does not support partitioning.
  * But SDLB emulates partitions through the `virtualPartitions` attribute.
@@ -272,9 +274,22 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   }
 
   /**
+   * Snowpark DataFrames of different sessions can not be combined, so an Action using the Snowpark engine must only
+   * read and write SnowflakeTableDataObjects of its engine connection.
+   */
+  private def validateSnowparkEngineConnection()(implicit context: ActionPipelineContext): Unit = {
+    context.engineConnection.filterNot(_.id == connection.id).foreach { engineConnection =>
+      throw ConfigurationException(s"($id) The Snowpark engine executes on the Snowflake session of its engine connection" +
+        s" ${engineConnection.id.id}, but this SnowflakeTableDataObject uses connection ${connection.id.id}." +
+        " All inputs and outputs of an Action using the Snowpark engine must use its engine connection.")
+    }
+  }
+
+  /**
    * Read the contents of a table as a Snowpark DataFrame
    */
   def getSnowparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): snowpark.DataFrame = {
+    validateSnowparkEngineConnection()
     //val helper: DataFrameSubFeedCompanion = SnowparkSubFeed
     var df = SnowparkDataFrame(snowparkSession.table(table.fullName))
     if (!context.isExecPhase) df = df.limit(1)
@@ -289,6 +304,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    */
   def writeSnowparkDataFrame(df: snowpark.DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)
                             (implicit context: ActionPipelineContext): MetricsMap = {
+    validateSnowparkEngineConnection()
     validateSchemaMin(SnowparkSchema(df.schema), role = "write")
     var finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 

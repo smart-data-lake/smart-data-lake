@@ -29,7 +29,7 @@ import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransforme
 import io.smartdatalake.workflow.action.snowflake.customlogic.CustomSnowparkDfTransformer
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSubFeed}
-import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
+import io.smartdatalake.workflow.connection.SnowflakeConnection
 
 import scala.reflect.runtime.universe.{Type, typeOf}
 
@@ -54,6 +54,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  *     type = CopyAction
  *     inputId = sf-airports-stg
  *     outputId = sf-airports
+ *     engineConnectionId = sf-con
  *     transformers = [{
  *       type = ScalaClassSnowparkDfTransformer
  *       className = com.company.transformer.CleanAirportsSnowparkTransformer
@@ -64,8 +65,9 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * }
  * }}}
  *
- * @note Input and output DataObject must be of type SnowflakeTableDataObject, as the Snowpark session is taken from
- *       the Action's first input. The class given in `className` must be on the classpath of the SDLB job.
+ * @note The Action must use the Snowpark engine, e.g. its `engineConnectionId` must reference a SnowflakeConnection,
+ *       and input and output DataObject must be SnowflakeTableDataObjects of this connection. The Snowpark session is
+ *       taken from the engine connection. The class given in `className` must be on the classpath of the SDLB job.
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
  * @param className      class name implementing trait [[CustomSnowparkDfTransformer]]
@@ -82,7 +84,7 @@ case class ScalaClassSnowparkDfTransformer(override val name: String = "scalaSpa
 
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, options: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
     val action = context.instanceRegistry.get[Action](actionId)
-    val snowparkSession = action.inputs.head.asInstanceOf[SnowflakeTableDataObject].snowparkSession
+    val snowparkSession = SnowflakeConnection.getSnowparkSession(action)(context.instanceRegistry)
     df match {
       case snowparkDf: SnowparkDataFrame => SnowparkDataFrame(customTransformer.transform(snowparkSession, options, snowparkDf.inner, dataObjectId.id))
       case _ => throw new IllegalStateException(s"($actionId) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method transformWithOptions")
