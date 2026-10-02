@@ -175,7 +175,9 @@ object IncrementalHistorizeMode {
     val dfNewHashed = addHashCol(dfNew, historizeWhitelist, historizeBlacklist, useHash = true,
       colsToIgnore = sourceTimestampColName.toSeq)
     val dfExistingHashed = if (addExistingDfHashColumn) {
-      addHashCol(dfExisting, historizeWhitelist, historizeBlacklist, useHash = true,
+      // the hash column might exist already without values, as schema evolution of the output DataObject adds it to
+      // the table in init phase
+      addHashCol(dfExisting.drop(historizeHashColName), historizeWhitelist, historizeBlacklist, useHash = true,
         colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName) ++ sourceTimestampColName)
     } else dfExisting
     // join existing with new and determine operations needed
@@ -200,7 +202,7 @@ object IncrementalHistorizeMode {
           // 4. primary key matched, no attribute changes, but <historizeHashColName> column has been added -> update existing record
           .when(
             (existingHashCol.isNotNull and newHashCol.isNotNull and hashColEqualsExpr) and
-              lit(!dfExisting.columns.contains(historizeHashColName)),
+              lit(addExistingDfHashColumn),
             array(lit(HistorizationRecordOperations.updateExisting))
           )
       )

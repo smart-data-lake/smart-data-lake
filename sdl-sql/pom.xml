@@ -97,6 +97,12 @@
 			<artifactId>scalactic_${scala.minor.version}</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- needed by GenericTestTool of the behaviour traits in the sdl-core test-jar -->
+		<dependency>
+			<groupId>org.scalatestplus</groupId>
+			<artifactId>scalacheck-1-18_${scala.minor.version}</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<!-- database for tests -->
 		<dependency>
 			<groupId>org.duckdb</groupId>

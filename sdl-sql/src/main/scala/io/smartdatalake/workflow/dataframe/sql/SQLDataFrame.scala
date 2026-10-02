@@ -109,8 +109,11 @@ class SQLDataFrame private(val info: DataFrameInfo, @transient val bridge: SqlGl
 
   override def drop(cols: Seq[String]): SQLDataFrame = op("drop", "names" -> cols)
 
-  override def drop(col: GenericColumn): SQLDataFrame = drop(SQLColumn.of(col).getName
-    .getOrElse(throw new IllegalArgumentException(s"Can only drop named columns, but got ${col.exprSql}")))
+  /**
+   * Drop a column. Like in Spark, a column qualified with the alias of an input of a join, e.g. `col("existing.a")`,
+   * only drops the column of this input.
+   */
+  override def drop(col: GenericColumn): SQLDataFrame = op("drop", "columns" -> Seq(SQLColumn.of(col).expr))
 
   override def createOrReplaceTempView(viewName: String): Unit = bridge.registerView(viewName, id)
 
@@ -158,8 +161,16 @@ class SQLDataFrame private(val info: DataFrameInfo, @transient val bridge: SqlGl
 
   override def explainString(options: Map[String, String]): String = toSql(options.get("dialect"), pretty = true)
 
-  override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean): (SQLDataFrame, DataFrameObservation) =
-    (this, GenericCalculatedObservation(this, aggregateColumns: _*))
+  /**
+   * The metrics are calculated with a separate query. In exec phase this is done immediately, i.e. before the DataFrame
+   * is written: calculated afterwards, the query might give a different result if it reads its output DataObject,
+   * e.g. the existing history of HistorizeAction.
+   */
+  override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean): (SQLDataFrame, DataFrameObservation) = {
+    val observation = GenericCalculatedObservation(this, aggregateColumns: _*)
+    if (isExecPhase && aggregateColumns.nonEmpty) (this, SQLCalculatedObservation(observation.waitFor()))
+    else (this, observation)
+  }
 
   override def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): SQLDataFrame = this
 
@@ -250,6 +261,13 @@ object SQLDataFrame {
     case map: java.util.Map[_, _] => map.asScala.map { case (k, v) => (fromJdbcValue(k), fromJdbcValue(v)) }.toMap
     case x => x
   }
+}
+
+/**
+ * Observation with metrics calculated already, see [[SQLDataFrame.setupObservation]]
+ */
+case class SQLCalculatedObservation(metrics: Map[String, _]) extends DataFrameObservation {
+  override def waitFor(timeoutSec: Int): Map[String, _] = metrics
 }
 
 case class SQLGroupedDataFrame(df: SQLDataFrame, groupColumns: Seq[SQLColumn]) extends GenericGroupedDataFrame {

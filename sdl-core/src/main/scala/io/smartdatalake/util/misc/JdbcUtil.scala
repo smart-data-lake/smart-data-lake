@@ -127,6 +127,16 @@ private[smartdatalake] class JdbcClientPoolFactory(factoryFun: () => SqlConnecti
     valid
   }
 
+  /**
+   * End the transaction of a connection returned to the pool. As connections are not in auto-commit mode, reading
+   * metadata, e.g. with `getMetaData.getColumns`, implicitly starts a transaction. With snapshot isolation, e.g. on
+   * DuckDB, the connection would otherwise keep reading an old snapshot of the database when it is used next.
+   * Changes are always committed before a connection is returned, so there is nothing to roll back.
+   */
+  override def passivateObject(p: PooledObject[SqlConnection]): Unit = {
+    if (!p.getObject.getAutoCommit) p.getObject.rollback()
+  }
+
   override def wrap(con: SqlConnection): PooledObject[SqlConnection] = new DefaultPooledObject(con)
   override def destroyObject(p: PooledObject[SqlConnection]): Unit = p.getObject.close()
 }

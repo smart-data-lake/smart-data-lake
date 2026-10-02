@@ -61,7 +61,8 @@ trait UpsertActionBehaviour extends GenericTestTool {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+    val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+    val helper = DataFrameSubFeed.getCompanion(subFeedType)
     import helper.implicits._
 
     // prepare & start 1st load
@@ -83,7 +84,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1))
       )
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getDataFrame()(context1)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context1)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -104,7 +105,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("hans", "muster", 5,  Timestamp.valueOf(refTimestamp1))
       )
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getDataFrame()(context1)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context1)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -141,7 +142,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
     assert(tgtSubFeed.dataObjectId == tgtDO.id)
 
     val r1 = tgtDO
-      .getDataFrame()
+      .getDataFrame(Seq(), subFeedType)
       .select(col("rating"))
       .collect
     assert(r1.size == 1)
@@ -159,7 +160,8 @@ trait UpsertActionBehaviour extends GenericTestTool {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+    val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+    val helper = DataFrameSubFeed.getCompanion(subFeedType)
     import helper.implicits._
 
     // prepare & start 1st load
@@ -185,7 +187,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1))
       )
         .toDF("lastname", "firstname", "Rating", "dl_ts_captured")
-      val actual = tgtDO.getDataFrame()(context1)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context1)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -206,7 +208,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("hans", "muster", 5,  Timestamp.valueOf(refTimestamp1))
       )
         .toDF("lastname", "firstname", "Rating", "dl_ts_captured")
-      val actual = tgtDO.getDataFrame()(context1)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context1)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -267,7 +269,8 @@ trait UpsertActionBehaviour extends GenericTestTool {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+    val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+    val helper = DataFrameSubFeed.getCompanion(subFeedType)
     import helper.implicits._
 
     // prepare & start 1st load
@@ -291,7 +294,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1))
       )
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getDataFrame()(context1)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context1)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -316,7 +319,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("hans", "muster", 5,  Timestamp.valueOf(refTimestamp1))
       )
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getDataFrame()(context2)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context2)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -339,7 +342,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("hans", "muster", 5,  None,     Timestamp.valueOf(refTimestamp1))
       )
         .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
-      val actual = tgtDO.getDataFrame()(context3)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context3)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert load", Seq())(actual)(expected)
       assert(resultat)
@@ -358,7 +361,8 @@ trait UpsertActionBehaviour extends GenericTestTool {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+    val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+    val helper = DataFrameSubFeed.getCompanion(subFeedType)
     import helper.implicits._
 
     // prepare & start 1st load
@@ -386,7 +390,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("hans", "muster", Some(5), Timestamp.valueOf(refTimestamp1))
       )
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getDataFrame()(context1)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context1)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -416,7 +420,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("hans", "muster", Some(5),  Timestamp.valueOf(refTimestamp1))
       )
         .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getDataFrame()(context2)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context2)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -439,7 +443,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("hans", "muster", Some(5),  None,     Timestamp.valueOf(refTimestamp1))
       )
         .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
-      val actual = tgtDO.getDataFrame()(context3)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context3)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert load", Seq())(actual)(expected)
       assert(resultat)
@@ -458,7 +462,8 @@ trait UpsertActionBehaviour extends GenericTestTool {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+    val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+    val helper = DataFrameSubFeed.getCompanion(subFeedType)
     import helper.implicits._
 
     val srcTs1 = ts("2024-01-01 10:00:00")
@@ -486,7 +491,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("nn",  "nobody", Some(5), Timestamp.valueOf(refTimestamp1))
       )
         .toDF("lastname", "firstname", "rating", Environment.capturedColumnName)
-      val actual = tgtDO.getDataFrame()(context1)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context1)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 1st load with sourceTimestampColumn", Seq())(actual)(expected)
       assert(resultat)
@@ -514,7 +519,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("hans", "muster", Some(5),  srcTs2)
       )
         .toDF("lastname", "firstname", "rating", Environment.capturedColumnName)
-      val actual = tgtDO.getDataFrame()(context2)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context2)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 2nd load with sourceTimestampColumn", Seq())(actual)(expected)
       assert(resultat)
@@ -533,7 +538,8 @@ trait UpsertActionBehaviour extends GenericTestTool {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+    val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+    val helper = DataFrameSubFeed.getCompanion(subFeedType)
     import helper.implicits._
 
     val srcTs1 = ts("2024-01-01 10:00:00")
@@ -570,7 +576,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("pan", "peter", 5, srcTs2)
       )
         .toDF("lastname", "firstname", "rating", Environment.capturedColumnName)
-      val actual = tgtDO.getDataFrame()(context2)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context2)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 2nd load with sourceTimestampColumn", Seq())(actual)(expected)
       assert(resultat)
@@ -589,7 +595,8 @@ trait UpsertActionBehaviour extends GenericTestTool {
     // setup DataObjects
     val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
     val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-    val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+    val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+    val helper = DataFrameSubFeed.getCompanion(subFeedType)
     import helper.implicits._
 
     // prepare & start 1st load
@@ -619,7 +626,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1))
       )
         .toDF("lastname", "firstname", "rating2", "dl_ts_captured")
-      val actual = tgtDO.getDataFrame()(context1)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context1)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)
@@ -644,7 +651,7 @@ trait UpsertActionBehaviour extends GenericTestTool {
         ("hans", "muster", 5,  Timestamp.valueOf(refTimestamp1))
       )
         .toDF("lastname", "firstname", "rating2", "dl_ts_captured")
-      val actual = tgtDO.getDataFrame()(context2)
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context2)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
       assert(resultat)

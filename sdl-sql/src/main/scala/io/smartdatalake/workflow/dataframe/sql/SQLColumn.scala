@@ -135,6 +135,11 @@ case class SQLWhenColumn(branches: Seq[(SQLColumn, SQLColumn)], otherwiseValue: 
 
 object SQLColumn {
 
+  /**
+   * SQLGlot dialect of the column expressions, see [[SQLColumn]]
+   */
+  val sqlGlotDialect: String = "databricks"
+
   def of(column: GenericColumn): SQLColumn = column match {
     case c: SQLExpression => c.column
     case SqlExpressionColumn(sql) => SQLColumn(sql, atomic = false)

@@ -78,7 +78,8 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // setup DataObjects
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+      val helper = DataFrameSubFeed.getCompanion(subFeedType)
       import helper.implicits._
 
       // prepare & start 1st load
@@ -98,7 +99,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       {
         val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1), definitions.Environment.historizationUpperHorizonTimestamp))
           .toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
-        val actual = tgtDO.getDataFrame()
+        val actual = tgtDO.getDataFrame(Seq(), subFeedType)
           .drop(Historization.historizeHashColName)
         val resultat = expected.isEqual(actual)
         if (!resultat) printFailedTestResultGdf("historize 1st load mergeModeEnable", Seq())(actual)(expected)
@@ -124,7 +125,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
           ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
           ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp)
         ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
-        val actual = tgtDO.getDataFrame()
+        val actual = tgtDO.getDataFrame(Seq(), subFeedType)
           .drop(Historization.historizeHashColName)
         val resultat = expected.isEqual(actual)
         if (!resultat) printFailedTestResultGdf("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
@@ -152,7 +153,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
           ("doe", "john", 10, null, Timestamp.valueOf(refTimestamp2), Timestamp.valueOf(refTimestamp3.minusNanos(1000000L))),
           ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), definitions.Environment.historizationUpperHorizonTimestamp)
         ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
-        val actual = tgtDO.getDataFrame()
+        val actual = tgtDO.getDataFrame(Seq(), subFeedType)
           .drop(Historization.historizeHashColName)
         val resultat = expected.isEqual(actual)
         if (!resultat) printFailedTestResultGdf("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
@@ -179,7 +180,8 @@ trait HistorizeActionBehaviour extends GenericTestTool {
         // setup DataObjects
         val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
         val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-        val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+        val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+        val helper = DataFrameSubFeed.getCompanion(subFeedType)
         import helper.implicits._
 
         // prepare & start load. Note that runStartTime is *not* the expected captured timestamp here.
@@ -198,7 +200,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
         {
           val expected = Seq(("doe", "john", 5, Timestamp.valueOf(overrideTimestamp), definitions.Environment.historizationUpperHorizonTimestamp))
             .toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
-          val actual = tgtDO.getDataFrame()
+          val actual = tgtDO.getDataFrame(Seq(), subFeedType)
             .drop(Historization.historizeHashColName)
           val resultat = expected.isEqual(actual)
           if (!resultat) printFailedTestResultGdf("historize load with overridden reference timestamp", Seq())(actual)(expected)
@@ -221,7 +223,8 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // setup DataObjects
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+      val helper = DataFrameSubFeed.getCompanion(subFeedType)
       import helper.implicits._
 
       // prepare & start 1st load
@@ -244,7 +247,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
           ("doe", "john", 5, Timestamp.valueOf(refTimestamp1), definitions.Environment.historizationUpperHorizonTimestamp),
           ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1), definitions.Environment.historizationUpperHorizonTimestamp)
         ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
-        val actual = tgtDO.getDataFrame()
+        val actual = tgtDO.getDataFrame(Seq(), subFeedType)
           .drop(Historization.historizeDummyColName)
         val resultat = expected.isEqual(actual)
         if (!resultat) printFailedTestResultGdf("historize 1st load mergeModeEnable", Seq())(actual)(expected)
@@ -272,7 +275,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
           ("doe", "john", 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp),
           ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L)))
         ).toDF("lastname", "firstname", "rating", "dl_ts_captured", "dl_ts_delimited")
-        val actual = tgtDO.getDataFrame()
+        val actual = tgtDO.getDataFrame(Seq(), subFeedType)
           .drop(Historization.historizeDummyColName)
         val resultat = expected.isEqual(actual)
         if (!resultat) printFailedTestResultGdf("historize 2nd load mergeModeEnable", Seq())(actual)(expected)
@@ -301,7 +304,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
           ("doe", "john", 10, "test", Timestamp.valueOf(refTimestamp3), definitions.Environment.historizationUpperHorizonTimestamp),
           ("pan", "peter", 5, null, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L)))
         ).toDF("lastname", "firstname", "rating", "test", "dl_ts_captured", "dl_ts_delimited")
-        val actual = tgtDO.getDataFrame()
+        val actual = tgtDO.getDataFrame(Seq(), subFeedType)
           .drop(Historization.historizeDummyColName)
         val resultat = expected.isEqual(actual)
         if (!resultat) printFailedTestResultGdf("historize 3rd load mergeModeEnable with schema evolution", Seq())(actual)(expected)
@@ -320,7 +323,8 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // setup DataObjects
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("id")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+      val helper = DataFrameSubFeed.getCompanion(subFeedType)
       import helper.implicits._
 
       // prepare & start 1st load
@@ -342,7 +346,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       action1.exec(Seq(srcSubFeed))(context1)
 
       // 1. expectation schema should not have dl_hash column
-      assert(!tgtDO.getDataFrame().columns.map(_.toLowerCase).contains("dl_hash"))
+      assert(!tgtDO.getDataFrame(Seq(), subFeedType).columns.map(_.toLowerCase).contains("dl_hash"))
 
       // prepare & start 2nd load
       val refTimestamp2 = LocalDateTime.now()
@@ -364,7 +368,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       }
 
       // 2. expectation schema should have dl_hash column
-      assert(tgtDO.getDataFrame().columns.map(_.toLowerCase).contains("dl_hash"))
+      assert(tgtDO.getDataFrame(Seq(), subFeedType).columns.map(_.toLowerCase).contains("dl_hash"))
 
     }
 
@@ -380,7 +384,8 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // setup DataObjects
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+      val helper = DataFrameSubFeed.getCompanion(subFeedType)
       import helper.implicits._
 
       // timestamps of the last change of the record in the source system. They are independent of the runs
@@ -395,7 +400,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val doomsday = definitions.Environment.historizationUpperHorizonTimestamp
       def historizeAction(actionId: String) =
         HistorizeAction(actionId, srcDO.id, tgtDO.id, sourceTimestampColumn = Some(sourceTsCol))
-      def actualHistory = tgtDO.getDataFrame().drop(Historization.historizeHashColName)
+      def actualHistory = tgtDO.getDataFrame(Seq(), subFeedType).drop(Historization.historizeHashColName)
 
       // prepare & start 1st load
       val action1 = historizeAction("ha")
@@ -411,7 +416,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
         val resultat = expected.isEqual(actualHistory)
         if (!resultat) printFailedTestResultGdf("historize source timestamp 1st load", Seq())(actualHistory)(expected)
         assert(resultat)
-        assert(!tgtDO.getDataFrame().columns.map(_.toLowerCase).contains(sourceTsCol))
+        assert(!tgtDO.getDataFrame(Seq(), subFeedType).columns.map(_.toLowerCase).contains(sourceTsCol))
       }
 
       // prepare & start 2nd load: the record is updated in the source system
@@ -488,7 +493,8 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // setup DataObjects
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+      val helper = DataFrameSubFeed.getCompanion(subFeedType)
       import helper.implicits._
 
       val srcTs = Timestamp.valueOf(LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS).minusDays(10))
@@ -508,7 +514,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
         val expected = Seq(("doe", "john", 5, srcTs, Timestamp.valueOf(refTimestamp1),
           definitions.Environment.historizationUpperHorizonTimestamp))
           .toDF("lastname", "firstname", "rating", sourceTsCol, "dl_ts_captured", "dl_ts_delimited")
-        val actual = tgtDO.getDataFrame().drop(Historization.historizeHashColName)
+        val actual = tgtDO.getDataFrame(Seq(), subFeedType).drop(Historization.historizeHashColName)
         val resultat = expected.isEqual(actual)
         if (!resultat) printFailedTestResultGdf("historize without source timestamp", Seq())(actual)(expected)
         assert(resultat)
@@ -527,7 +533,8 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // setup DataObjects
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("id")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+      val helper = DataFrameSubFeed.getCompanion(subFeedType)
       import helper.implicits._
 
       // commit timestamps of the change events in the source system. They are independent of the runs reference
@@ -555,7 +562,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
           (1, 5, commitTs1, definitions.Environment.historizationUpperHorizonTimestamp),
           (2, 5, commitTs1, definitions.Environment.historizationUpperHorizonTimestamp)
         ).toDF("id", "rating", "dl_ts_captured", "dl_ts_delimited")
-        val actual = tgtDO.getDataFrame().drop(Historization.historizeDummyColName)
+        val actual = tgtDO.getDataFrame(Seq(), subFeedType).drop(Historization.historizeDummyColName)
         val resultat = expected.isEqual(actual)
         if (!resultat) printFailedTestResultGdf("historize cdc 1st load", Seq())(actual)(expected)
         assert(resultat)
@@ -583,7 +590,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
           (1, 10, commitTs2, definitions.Environment.historizationUpperHorizonTimestamp),
           (2, 5, commitTs1, previousTick(commitTs2))
         ).toDF("id", "rating", "dl_ts_captured", "dl_ts_delimited")
-        val actual = tgtDO.getDataFrame().drop(Historization.historizeDummyColName)
+        val actual = tgtDO.getDataFrame(Seq(), subFeedType).drop(Historization.historizeDummyColName)
         val resultat = expected.isEqual(actual)
         if (!resultat) printFailedTestResultGdf("historize cdc 2nd load", Seq())(actual)(expected)
         assert(resultat)
@@ -610,7 +617,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
           (2, 5, commitTs1, previousTick(commitTs2)),
           (4, 2, commitTs3, definitions.Environment.historizationUpperHorizonTimestamp)
         ).toDF("id", "rating", "dl_ts_captured", "dl_ts_delimited")
-        val actual = tgtDO.getDataFrame().drop(Historization.historizeDummyColName)
+        val actual = tgtDO.getDataFrame(Seq(), subFeedType).drop(Historization.historizeDummyColName)
         val resultat = expected.isEqual(actual)
         if (!resultat) printFailedTestResultGdf("historize cdc 3rd load", Seq())(actual)(expected)
         assert(resultat)
@@ -629,7 +636,8 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // setup DataObjects
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("id")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+      val helper = DataFrameSubFeed.getCompanion(subFeedType)
       import helper.implicits._
 
       val commitTs = Timestamp.valueOf(LocalDateTime.now().minusDays(3))
@@ -660,7 +668,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
           (1, 5, Timestamp.valueOf(refTimestamp1), Timestamp.valueOf(refTimestamp2.minusNanos(1000000L))),
           (1, 10, Timestamp.valueOf(refTimestamp2), definitions.Environment.historizationUpperHorizonTimestamp)
         ).toDF("id", "rating", "dl_ts_captured", "dl_ts_delimited")
-        val actual = tgtDO.getDataFrame().drop(Historization.historizeDummyColName)
+        val actual = tgtDO.getDataFrame(Seq(), subFeedType).drop(Historization.historizeDummyColName)
         val resultat = expected.isEqual(actual)
         if (!resultat) printFailedTestResultGdf("historize cdc with reference timestamp", Seq())(actual)(expected)
         assert(resultat)
@@ -680,7 +688,8 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // setup DataObjects
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("id")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+      val helper = DataFrameSubFeed.getCompanion(subFeedType)
       import helper.implicits._
 
       val commitTs = Timestamp.valueOf(LocalDateTime.now().minusDays(3))
@@ -701,7 +710,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
           definitions.Environment.historizationUpperHorizonTimestamp))
           .toDF("id", "rating", cdcChangeTypeCol, cdcCommitTimestampCol, cdcChangeOrdinalCol, "dl_ts_captured",
             "dl_ts_delimited")
-        val actual = tgtDO.getDataFrame().drop(Historization.historizeHashColName)
+        val actual = tgtDO.getDataFrame(Seq(), subFeedType).drop(Historization.historizeHashColName)
         val resultat = expected.isEqual(actual)
         if (!resultat) printFailedTestResultGdf("historize cdc without auto detection", Seq())(actual)(expected)
         assert(resultat)
@@ -754,7 +763,8 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgt1DO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
       val tgt2DO = registerDataObject(createTgtDataObject("tgt2", Some(Seq("lastname", "firstname")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgt1DO))
+      val subFeedType = getCommonSubFeed(srcDO, tgt1DO)
+      val helper = DataFrameSubFeed.getCompanion(subFeedType)
       import helper.implicits._
 
       // define DAG
@@ -774,9 +784,9 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       dag.init(context1.copy(phase = ExecutionPhase.Init))
       val r1 = dag.exec(context1)
 
-      assert(tgt1DO.getDataFrame().count == 1)
-      assert(!tgt1DO.getDataFrame().columns.map(_.toLowerCase).contains("dl_operation"))
-      assert(!tgt2DO.getDataFrame().columns.map(_.toLowerCase).contains("dl_operation"))
+      assert(tgt1DO.getDataFrame(Seq(), subFeedType).count == 1)
+      assert(!tgt1DO.getDataFrame(Seq(), subFeedType).columns.map(_.toLowerCase).contains("dl_operation"))
+      assert(!tgt2DO.getDataFrame(Seq(), subFeedType).columns.map(_.toLowerCase).contains("dl_operation"))
       assert(!r1.head.isSkipped)
 
       // start second load -> updated record
@@ -787,8 +797,8 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       dag.init(context2.copy(phase = ExecutionPhase.Init))
       val r2 = dag.exec(context2)
 
-      assert(tgt1DO.getDataFrame().count == 2)
-      assert(tgt2DO.getDataFrame().count == 1)
+      assert(tgt1DO.getDataFrame(Seq(), subFeedType).count == 2)
+      assert(tgt2DO.getDataFrame(Seq(), subFeedType).count == 1)
       assert(!r2.head.isSkipped)
 
       // start third load with same record again -> should be skipped, because merge mode should detect that there is no change, so there is no changed record in tgt1
@@ -797,8 +807,8 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       dag.init(context3.copy(phase = ExecutionPhase.Init))
       val r3 = dag.exec(context3)
 
-      assert(tgt1DO.getDataFrame().count == 2)
-      assert(tgt2DO.getDataFrame().count == 1)
+      assert(tgt1DO.getDataFrame(Seq(), subFeedType).count == 2)
+      assert(tgt2DO.getDataFrame(Seq(), subFeedType).count == 1)
       assert(r3.head.isSkipped)
     }
 
@@ -820,7 +830,8 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       // setup DataObjects
       val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
       val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("id")), instanceRegistry))
-      val helper = DataFrameSubFeed.getCompanion(getCommonSubFeed(srcDO, tgtDO))
+      val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+      val helper = DataFrameSubFeed.getCompanion(subFeedType)
       import helper.col
       import helper.implicits._
 
@@ -834,7 +845,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       tgtDO.writeDataFrame(l1)(context1)
 
       // 1. expectation schema should not have dl_hash column
-      assert(!tgtDO.getDataFrame().columns.contains("dl_hash"))
+      assert(!tgtDO.getDataFrame(Seq(), subFeedType).columns.contains("dl_hash"))
 
       // prepare & start load with merge mode and migrate existing data to merge mode
       val refTimestamp2 = LocalDateTime.now()
@@ -851,7 +862,7 @@ trait HistorizeActionBehaviour extends GenericTestTool {
       action2.exec(Seq(srcSubFeed2))(context2)
 
       // expectation dl_hash should not have null values
-      assert(tgtDO.getDataFrame().where(col("dl_hash").isNull).count == 0)
+      assert(tgtDO.getDataFrame(Seq(), subFeedType).where(col("dl_hash").isNull).count == 0)
     }
 
 

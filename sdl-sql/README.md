@@ -38,7 +38,14 @@ actions {
 
 Supported are the save modes Overwrite (delete and insert in one transaction, also for virtual partitions), Append
 and Merge (with a temporary table created by `CREATE TABLE ... AS SELECT`), and incremental output with
-`DataObjectStateIncrementalMode`.
+`DataObjectStateIncrementalMode`. The conditions of a merge, e.g. `updateCondition` of `saveModeOptions` or the
+ones created by UpsertAction, are Spark SQL like all expressions given as string, and are translated to the dialect of
+the database.
+
+HistorizeAction and UpsertAction are supported, including their merge modes. Note that the hash column `dl_hash` of
+HistorizeAction is the MD5 hash of the historized values concatenated as text, as there is no hash function which is
+portable between databases. It differs from the integer hash of the Spark engine, so a history created with Spark
+can not be continued with the SQL engine without recalculating `dl_hash`.
 
 Schema evolution (`allowSchemaEvolution = true`) adds new columns, widens data types, and makes columns missing in
 the DataFrame nullable, with `ALTER TABLE` statements rendered by SQLGlot for the dialect of the database.
@@ -186,6 +193,13 @@ SQLSubFeed.sql("select *, d * 2 as e from test_table_int", DataObjectId("do1"))
 
 Database tables are registered in SQLGlot under a placeholder name with their schema, and replaced by their real
 name when rendering. Temporary views are replaced by their query when parsing the SQL of a transformer.
+
+Joins behave like in Spark: the columns of both inputs are kept, also if their name exists on both sides, and a
+column qualified with the alias of an input, e.g. `col("existing.a")`, stays valid after further operations, e.g.
+`withColumn` or `drop(col("existing.a"))`, as long as the column is passed through unchanged. Internally, a column whose
+name exists already gets a unique key, and is renamed to its name when the statement is rendered. A projection or
+filter is applied directly to the join while it only references its inputs, and otherwise to the join wrapped as
+subquery, see `Session._in_join_scope` in `bridge.py`.
 
 ### Identifiers and case
 
