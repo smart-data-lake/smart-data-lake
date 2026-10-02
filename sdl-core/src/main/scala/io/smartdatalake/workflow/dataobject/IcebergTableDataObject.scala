@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
@@ -80,7 +80,7 @@ import scala.reflect.runtime.universe.Type
  * @param path                   hadoop directory for this table. If it doesn't contain scheme and authority, the connections pathPrefix is applied.
  *                               If pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.
  *                               If Iceberg table is defined on a hadoop catalog, path must be None as it is defined through the catalog directory structure.
- * @param options                Options for Iceberg tables see: [[https://iceberg.apache.org/docs/latest/configuration/]]
+ * @param options                Options for reading and writing Iceberg tables.
  * @param table                  Iceberg table to be written by this output
  * @param saveMode               [[SDLSaveMode]] to use when writing files, default is "Overwrite". Overwrite, Append and Merge are supported for now.
  * @param allowSchemaEvolution   If set to true schema evolution will automatically occur when writing to this DataObject with different schema, otherwise SDL will stop with error.
@@ -105,6 +105,7 @@ import scala.reflect.runtime.universe.Type
 case class IcebergTableDataObject(override val id: DataObjectId,
                                   path: Option[String] = None,
                                   override val partitions: Seq[String] = Seq(),
+                                  @LibraryOptions("https://iceberg.apache.org/docs/latest/spark-configuration/")
                                   options: Map[String, String] = Map(),
                                   override val schemaMin: Option[GenericSchema] = None,
                                   override var table: Table,

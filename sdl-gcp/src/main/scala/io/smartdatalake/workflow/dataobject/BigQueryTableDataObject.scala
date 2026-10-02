@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.{BigQuery, BigQueryFactory, BigQueryOptions, BigQuerySQLException, QueryJobConfiguration, TableId, TableResult}
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -79,8 +79,7 @@ import org.apache.spark.sql.DataFrame
  * @param persistentGcsBucket Persistent Bucket to store data if saving with "indirect" mode.
  * @param persistentGcsPath Temporary GSC Path to store data if saving with "indirect" mode.
  * @param project Defaults to the project of the project Id of the service account being used
- * @param options Additional Spark options provided by the connector.
- *                Please see [[https://github.com/GoogleCloudDataproc/spark-bigquery-connector]] for more information.
+ * @param options Additional Spark options provided by the BigQuery connector.
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
@@ -98,6 +97,7 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
                                    persistentGcsBucket: Option[String] = None,
                                    persistentGcsPath: Option[String] = None,
                                    project: Option[String] = None,
+                                   @LibraryOptions("https://github.com/GoogleCloudDataproc/spark-bigquery-connector#properties")
                                    override val options: Map[String, String] = Map(),
                                    override val schemaMin: Option[GenericSchema] = None,
                                    override val constraints: Seq[Constraint] = Seq(),

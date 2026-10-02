@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.misc.NestedColumnUtil
@@ -61,12 +61,12 @@ import org.apache.spark.sql.DataFrame
  *
  * @see [[org.apache.spark.sql.DataFrameReader]]
  * @see [[org.apache.spark.sql.DataFrameWriter]]
- * @param parquetOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
- *                       [[org.apache.spark.sql.DataFrameWriter]].
+ * @param parquetOptions Options of the Spark Parquet data source for reading and writing.
  */
 case class ParquetFileDataObject( override val id: DataObjectId,
                                   override val path: String,
                                   override val partitions: Seq[String] = Seq(),
+                                  @LibraryOptions("https://spark.apache.org/docs/latest/sql-data-sources-parquet.html#data-source-option", "org.apache.spark.sql.execution.datasources.parquet.ParquetOptions")
                                   parquetOptions: Option[Map[String,String]] = None,
                                   override val schema: Option[GenericSchema] = None,
                                   override val schemaMin: Option[GenericSchema] = None,

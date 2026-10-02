@@ -43,5 +43,14 @@ private[smartdatalake] case class GenericAttributeDef(
                          description: Option[String],
                          isRequired: Boolean,
                          isDeprecated: Boolean,
-                         isOverride: Boolean
+                         isOverride: Boolean,
+                         libraryOptions: Option[LibraryOptionsDef] = None
                        ) extends Serializable
+
+/**
+ * Options of an underlying library an attribute is passed to, see [[io.smartdatalake.config.LibraryOptions]].
+ *
+ * @param docUrl URL of the documentation of the options.
+ * @param optionNames option names known by the options provider, empty if there is no provider.
+ */
+private[smartdatalake] case class LibraryOptionsDef(docUrl: String, optionNames: Seq[String]) extends Serializable

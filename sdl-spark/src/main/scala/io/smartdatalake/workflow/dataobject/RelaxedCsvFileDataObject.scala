@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import com.univocity.parsers.csv.CsvParser
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.DateColumnType.DateColumnType
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
@@ -80,7 +80,7 @@ import scala.reflect.runtime.universe.typeOf
  * If mode is permissive you can retrieve the corrupt input record by adding <options.columnNameOfCorruptRecord> as field to the schema.
  * RelaxCsvFileDataObject also supports getting an error msg by adding "<options.columnNameOfCorruptRecord>_msg" as field to the schema.
  *
- * @param csvOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
+ * @param csvOptions Options of the Spark CSV data source for reading and writing.
  * @param dateColumnType how to convert columns of Spark type date before writing (default: date). With `date` they are
  *                       cast to timestamp, with `string` they are cast to string.
  *                       See [[io.smartdatalake.definitions.DateColumnType]].
@@ -91,6 +91,7 @@ import scala.reflect.runtime.universe.typeOf
  **/
 case class RelaxedCsvFileDataObject(override val id: DataObjectId,
                                     override val path: String,
+                                    @LibraryOptions("https://spark.apache.org/docs/latest/sql-data-sources-csv.html#data-source-option", "org.apache.spark.sql.catalyst.csv.CSVOptions")
                                     csvOptions: Map[String, String] = Map(),
                                     override val partitions: Seq[String] = Seq(),
                                     override val schema: Option[GenericSchema] = None,

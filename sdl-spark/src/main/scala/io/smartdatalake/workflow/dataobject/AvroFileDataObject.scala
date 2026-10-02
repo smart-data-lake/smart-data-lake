@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.misc.NestedColumnUtil
@@ -61,8 +61,7 @@ import org.apache.spark.sql.DataFrame
  * }
  * }}}
  *
- * @param avroOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
- *                    [[org.apache.spark.sql.DataFrameWriter]].
+ * @param avroOptions Options of the Spark Avro data source for reading and writing.
  *
  * @see [[org.apache.spark.sql.DataFrameReader]]
  * @see [[org.apache.spark.sql.DataFrameWriter]]
@@ -70,6 +69,7 @@ import org.apache.spark.sql.DataFrame
 case class AvroFileDataObject( override val id: DataObjectId,
                                override val path: String,
                                override val partitions: Seq[String] = Seq(),
+                               @LibraryOptions("https://spark.apache.org/docs/latest/sql-data-sources-avro.html#data-source-option", "org.apache.spark.sql.avro.AvroOptions")
                                avroOptions: Option[Map[String,String]] = None,
                                override val schema: Option[GenericSchema] = None,
                                override val schemaMin: Option[GenericSchema] = None,

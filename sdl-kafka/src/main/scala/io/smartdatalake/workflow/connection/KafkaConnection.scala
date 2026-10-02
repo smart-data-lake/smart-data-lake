@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.connection
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.workflow.connection.authMode.{AuthMode, SASLSCRAMAuthMode, SSLCertsAuthMode}
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig}
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -63,8 +63,7 @@ import scala.jdk.CollectionConverters._
  * @param schemaRegistry
  *   url of schema registry service, e.g. "https://host2"
  * @param options
- *   Options for the Kafka stream reader (see
- *   https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)
+ *   Options for the Kafka stream reader.
  * @param authMode
  *   optional authentication information. Only SASLSCRAMAuthMode and SSLCertsAuthMode are supported; if not set,
  *   an unauthenticated PLAINTEXT connection is used.
@@ -73,6 +72,7 @@ case class KafkaConnection(
     override val id: ConnectionId,
     brokers: String,
     schemaRegistry: Option[String] = None,
+    @LibraryOptions("https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html")
     options: Map[String, String] = Map(),
     authMode: Option[AuthMode] = None,
     override val metadata: Option[ConnectionMetadata] = None

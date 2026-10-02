@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.hdfs.{HdfsUtil, PartitionValues}
@@ -80,7 +80,7 @@ import scala.util.Try
  *             If it doesn't contain scheme and authority, the connections pathPrefix is applied.
  *             If pathPrefix is not defined or doesn't define scheme and authority, default schema and authority is applied.
  * @param partitions partition columns for this data object
- * @param options Options for Delta Lake tables see: [[https://docs.delta.io/latest/delta-batch.html]] and [[org.apache.spark.sql.delta.DeltaOptions]]
+ * @param options Options for reading and writing Delta Lake tables.
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param table DeltaLake table to be written by this output
@@ -120,6 +120,7 @@ import scala.util.Try
 case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     path: Option[String] = None,
                                     override val partitions: Seq[String] = Seq(),
+                                    @LibraryOptions("https://docs.delta.io/latest/delta-batch.html")
                                     options: Map[String,String] = Map(),
                                     override val schemaMin: Option[GenericSchema] = None,
                                     override var table: Table,
