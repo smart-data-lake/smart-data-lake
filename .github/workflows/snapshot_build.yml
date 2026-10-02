@@ -105,6 +105,8 @@ jobs:
       - name: Create the Python environment of sdl-sql
         # The SQL engine (sdl-sql) runs SQLGlot in an embedded Python interpreter (jep), without it the tests of sdl-sql cancel themselves.
         # jep is compiled against the JDK on installation, it finds it through JAVA_HOME set by setup-java.
+        # uv's --no-build cannot be used: jep publishes no wheel, so it always has to be built from its sdist.
+        # uv.lock pins that sdist by sha256, so the security risk is limited.
         run: |
           uv sync --frozen --project sdl-sql
           echo "SDL_PYTHON_PATH=$PWD/sdl-sql/.venv/bin/python" >> $GITHUB_ENV
