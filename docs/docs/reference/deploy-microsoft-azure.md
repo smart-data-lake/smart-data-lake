@@ -50,7 +50,7 @@ This can hopefully be simplified in the future.
 
      Task: Upload JAR - Choose the smartdatalake-&ltversion&gt-jar-with-dependencies.jar
 
-     Main Class: io.smartdatalake.app.LocalSmartDataLakeBuilder
+     Main Class: io.smartdatalake.app.DefaultSmartDataLakeBuilder
      Arguments: `["-c", "file:///dbfs/conf/", "--feed-sel", "download"]`
 
      The option *--override-jars* is set automatically to the correct value for DatabricksConfigurableApp.

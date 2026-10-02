@@ -12,13 +12,13 @@ To run on a cluster with spark-submit, use **DefaultSmartDataLakeBuilder** appli
 It can be started with the following command line options (for details, see [YARN](deployYarn.md)).
 
 ```bash
-spark-submit --master yarn --deploy-mode client --class io.smartdatalake.app.DefaultSmartDataLakeBuilder target/smartdatalake_2.12-2.5.1-jar-with-dependencies.jar [arguments]
+spark-submit --master yarn --deploy-mode client --class io.smartdatalake.app.DefaultSmartDataLakeBuilder target/my-sdlb-project-1.0-jar-with-dependencies.jar [arguments]
 ```
 and takes the following arguments:
 ```
+DefaultSmartDataLakeBuilder appVersion: develop, sdlbVersion: version=3.0.0 ...
 Usage: DefaultSmartDataLakeBuilder [options]
-SparkSmartDataLakeBuilder appVersion: develop, sdlbVersion: unknown
-Usage:  [options]
+
   -f, --feed-sel <operation?><prefix:?><regex>[,<operation?><prefix:?><regex>...]
                            Select actions to execute by one or multiple expressions separated by comma (,). Results from multiple expressions are combined from left to right.
                            Operations:
@@ -57,20 +57,14 @@ Usage:  [options]
 See [Run State & Recovery](runState.md) for what SDLB writes to `--state-path` and how a failed run is recovered
 or accepted.
 
-The **DefaultSmartDataLakeBuilder** class should be fine in most situations. 
-It tries to use an existing Spark session of the environment, e.g. Databricks Cluster. It will not create a new Spark session. See SparkSmartDataLakeBuilder below to create a new Spark session.
+The **DefaultSmartDataLakeBuilder** class should be fine in most situations.
+Whether it uses an existing Spark session of the environment, e.g. a Databricks cluster, or creates a new one is
+configured by the engine connection: leave `master` unset to use the existing session, or set `master` (and
+optionally `deployMode`) to let SDLB create it, see [Execution Engines](executionEngines.md#engine-connections).
+The former `SparkSmartDataLakeBuilder` / `LocalSmartDataLakeBuilder` and their `--master` / `--deploy-mode`
+arguments were removed in SDLB 3.0, see [Upgrading to SDLB 3.x](../upgrade-3.md).
 
-There are two additional, adapted application versions you can use:
-
-- **SparkSmartDataLakeBuilder** is used to create a new Spark session.
-Allows to explicitly override master and deploy-mode settings of Spark using the command-line.
-It should be used when there is no existing Spark session from the environment where SDLB is running, and you want to create a new Spark session, e. g. when working locally on your laptop or in an isolated container.
-
-SparkSmartDataLakeBuilder has the following additional arguments:
-- `--master <spark-master-url>`: configuration of the Spark sessions master Url, default is `local[*]`
-- `--deploy-mode <client|cluster>`: configuration of the Spark sessions deploy-mode. The default used by Spark is `client`.
-
-See [Submitting Spark Applications](https://spark.apache.org/docs/3.5.3/submitting-applications.html) for details.
+There are additional, adapted application versions you can use:
 
 - **GlueSmartDataLakeBuilder**:
 For running SDLB on AWS Glue.

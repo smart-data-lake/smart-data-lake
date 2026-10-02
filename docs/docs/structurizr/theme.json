@@ -1,0 +1,31 @@
+{
+  "name" : "Default theme",
+  "description" : "Description",
+  "elements" : [ {
+    "tag" : "Boundary:Container",
+    "color" : "#438dd5"
+  }, {
+    "tag" : "Boundary:SoftwareSystem",
+    "color" : "#1168bd"
+  }, {
+    "tag" : "Component",
+    "background" : "#85bbf0",
+    "color" : "#ffffff"
+  }, {
+    "tag" : "Container",
+    "background" : "#438dd5",
+    "color" : "#ffffff"
+  }, {
+    "tag" : "Element",
+    "shape" : "RoundedBox"
+  }, {
+    "tag" : "Person",
+    "background" : "#08427b",
+    "color" : "#ffffff",
+    "shape" : "Person"
+  }, {
+    "tag" : "Software System",
+    "background" : "#1168bd",
+    "color" : "#ffffff"
+  } ]
+}
