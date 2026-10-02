@@ -661,6 +661,8 @@
               }, {
                 "$ref" : "#/definitions/Connection/IcebergTableConnection"
               }, {
+                "$ref" : "#/definitions/Connection/JdbcConnection"
+              }, {
                 "$ref" : "#/definitions/Connection/JdbcTableConnection"
               }, {
                 "$ref" : "#/definitions/Connection/KafkaConnection"
@@ -707,6 +709,8 @@
                 "$ref" : "#/definitions/Connection/HadoopFileConnection"
               }, {
                 "$ref" : "#/definitions/Connection/IcebergTableConnection"
+              }, {
+                "$ref" : "#/definitions/Connection/JdbcConnection"
               }, {
                 "$ref" : "#/definitions/Connection/JdbcTableConnection"
               }, {
@@ -762,6 +766,8 @@
                 "$ref" : "#/definitions/Connection/HadoopFileConnection"
               }, {
                 "$ref" : "#/definitions/Connection/IcebergTableConnection"
+              }, {
+                "$ref" : "#/definitions/Connection/JdbcConnection"
               }, {
                 "$ref" : "#/definitions/Connection/JdbcTableConnection"
               }, {
@@ -1983,7 +1989,7 @@
         "title" : "JdbcTableDataObject",
         "required" : [ "type", "table", "connectionId" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type JDBC.  \nProvides details for an action to read and write tables in a database through JDBC.\n\nReading and writing data is implemented by engine specific implementations of `JdbcTableEngine`, which are\ndiscovered on the classpath: sdl-spark reads and writes with Spark.\n\nNote that Sparks distributed processing can not directly write to a JDBC table in one transaction.  \nJdbcTableDataObject implements this in one transaction by writing to a temporary-table with Spark,\nthen using a separate \"insert into ... select\" SQL statement to copy data into the final table.\n\nJdbcTableDataObject implements\n- `CanMergeDataFrame` by writing a temp table and using one SQL merge statement.  \n- `CanEvolveSchema` by generating corresponding alter table DDL statements.  \n- Overwriting partitions is implemented by using SQL delete and insert statement embedded in one transaction.\n\nRequires a `JdbcTableConnection` referenced by `connectionId` , which holds url, driver and credentials. Example:\n```\nconnections = {\n  jdbc-dwh {\n    type = JdbcTableConnection\n    url = \"jdbc:postgresql://dwh:5432/mydb\"\n    driver = org.postgresql.Driver\n  }\n}\ndataObjects = {\n  int-airports {\n    type = JdbcTableDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = airports, primaryKey = [ident] }\n    saveMode = Merge\n  }\n}\n```\n"
+        "description" : "`DataObject` of type JDBC.  \nProvides details for an action to read and write tables in a database through JDBC.\n\nReading and writing data is implemented by engine specific implementations of `JdbcTableEngine`, which are\ndiscovered on the classpath: sdl-spark reads and writes with Spark.\n\nNote that Sparks distributed processing can not directly write to a JDBC table in one transaction.  \nJdbcTableDataObject implements this in one transaction by writing to a temporary-table with Spark,\nthen using a separate \"insert into ... select\" SQL statement to copy data into the final table.\n\nJdbcTableDataObject implements\n- `CanMergeDataFrame` by writing a temp table and using one SQL merge statement.  \n- `CanEvolveSchema` by generating corresponding alter table DDL statements.  \n- Overwriting partitions is implemented by using SQL delete and insert statement embedded in one transaction.\n\nRequires a `JdbcConnection` referenced by `connectionId` , which holds url, driver and credentials. Example:\n```\nconnections = {\n  jdbc-dwh {\n    type = JdbcConnection\n    url = \"jdbc:postgresql://dwh:5432/mydb\"\n    driver = org.postgresql.Driver\n  }\n}\ndataObjects = {\n  int-airports {\n    type = JdbcTableDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = airports, primaryKey = [ident] }\n    saveMode = Merge\n  }\n}\n```\n"
       },
       "JdbcViewDataObject" : {
         "type" : "object",
@@ -1997,7 +2003,7 @@
           },
           "connectionId" : {
             "type" : "string",
-            "description" : "Id of the JdbcTableConnection of the database"
+            "description" : "Id of the JdbcConnection of the database"
           },
           "schemaMin" : {
             "type" : "string",
@@ -2031,7 +2037,11 @@
           },
           "allowSchemaEvolution" : {
             "type" : "boolean",
-            "description" : "If true (default), the view is replaced by every run of the Action writing it.  \nIf false, an existing view is only replaced by CatalogSchemaUpdater, and a run fails if\nthe columns of the view changed."
+            "description" : "If true (default), the view is replaced by a run of the Action writing it if its query changed.  \nIf false, an existing view is only replaced by CatalogSchemaUpdater, and a run fails if\nthe columns of the view changed.  \nFor a materialized view, a run then only refreshes it."
+          },
+          "materialized" : {
+            "type" : "boolean",
+            "description" : "If true, a materialized view is created and refreshed on every run, see above. Default is false."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
@@ -2041,7 +2051,7 @@
         "title" : "JdbcViewDataObject",
         "required" : [ "type", "table", "connectionId" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of a view in a database accessed through JDBC.\n\nWriting a DataFrame creates or replaces the view with the query of the DataFrame, i.e. `CREATE OR REPLACE VIEW ... AS\nSELECT ...` , so no data is written. This needs an engine which can render its DataFrames as SQL, i.e. the SQL\nengine of sdl-sql: the Action writing the view must use the JdbcTableConnection of the view as engine connection\n( `engineConnectionId` ), and all its inputs must be `JdbcTableDataObject` s or `JdbcViewDataObject` s of this\nconnection. The view is replaced in exec phase. In init phase a missing view is created, like a missing table is\ncreated by JdbcTableDataObject, and the query is validated by executing it on the database without fetching any rows.\n\nWith `allowSchemaEvolution = false` , an existing view is not replaced by an SDLB run, and the run fails if the columns\nof the view changed. The view is then deployed with CatalogSchemaUpdater, from its query exported by a dry-run with\nschema export, like the tables are created and migrated.\n\nAs the view is evaluated on every read, its query must not depend on the current run. The Action writing the view\ntherefore ignores the partition values and filters of its inputs, and must not have an execution mode, see `ViewDataObject`.\n\nA view can have `virtualPartitions` , like a JdbcTableDataObject. The partition values of the Action writing the view\nare then not applied to the view, but passed on to the next Action, which reads the view filtered by them.  \nWith `incrementalOutputExpr` , the next Action can read the view incrementally with DataObjectStateIncrementalMode,\nlike a JdbcTableDataObject.\n\nReading a view is the same as reading a table, it is done by all engines supporting `JdbcTableDataObject`, e.g.  \nSpark. So a view created by the SQL engine can be the input of a Spark Action in the same feed. Example:\n```\ndataObjects = {\n  int-airports {\n    type = JdbcTableDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = airports }\n  }\n  btl-swiss-airports {\n    type = JdbcViewDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = swiss_airports }\n  }\n}\nactions = {\n  create-swiss-airports {\n    type = CopyAction\n    inputId = int-airports\n    outputId = btl-swiss-airports\n    engineConnectionId = jdbc-dwh\n    transformers = [{\n      type = SQLDfTransformer\n      code = \"select ident, name from %{inputViewName} where iso_country = 'CH'\"\n    }]\n  }\n}\n```\n"
+        "description" : "`DataObject` of a view in a database accessed through JDBC.\n\nWriting a DataFrame creates or replaces the view with the query of the DataFrame, i.e. `CREATE OR REPLACE VIEW ... AS\nSELECT ...` , so no data is written. This needs an engine which can render its DataFrames as SQL, i.e. the SQL\nengine of sdl-sql: the Action writing the view must use the JdbcConnection of the view as engine connection\n( `engineConnectionId` ), and all its inputs must be `JdbcTableDataObject` s or `JdbcViewDataObject` s of this\nconnection. The view is replaced in exec phase. In init phase a missing view is created, like a missing table is\ncreated by JdbcTableDataObject, and the query is validated by executing it on the database without fetching any rows.\n\nWith `allowSchemaEvolution = false` , an existing view is not replaced by an SDLB run, and the run fails if the columns\nof the view changed. The view is then deployed with CatalogSchemaUpdater, from its query exported by a dry-run with\nschema export, like the tables are created and migrated.\n\nAs the view is evaluated on every read, its query must not depend on the current run. The Action writing the view\ntherefore ignores the partition values and filters of its inputs, and must not have an execution mode, see `ViewDataObject`.\n\nA view can have `virtualPartitions` , like a JdbcTableDataObject. The partition values of the Action writing the view\nare then not applied to the view, but passed on to the next Action, which reads the view filtered by them.  \nWith `incrementalOutputExpr` , the next Action can read the view incrementally with DataObjectStateIncrementalMode,\nlike a JdbcTableDataObject.\n\nReading a view is the same as reading a table, it is done by all engines supporting `JdbcTableDataObject`, e.g.  \nSpark. So a view created by the SQL engine can be the input of a Spark Action in the same feed.\n\nWith `materialized = true` a materialized view is created, which stores the result of its query in the database.  \nIt is supported for the SQL dialects postgres, redshift, oracle, snowflake and databricks. The Action writing it\nrefreshes it on every run, except Snowflake, which refreshes materialized views automatically. If its query changed\nand `allowSchemaEvolution = true` , it is replaced instead. Postgres, Redshift and Oracle can not replace a\nmaterialized view, so it is dropped and created again in one transaction (where the database supports\ntransactional DDL), and the privileges granted on it are read before and granted again afterwards (Postgres and\nOracle). Note that Postgres can not drop a materialized view while other views depend on it.  \nThe query of an existing materialized view is read from pg_matviews for Postgres, ALL_MVIEWS for Oracle, with\nSHOW MATERIALIZED VIEWS for Snowflake and SHOW CREATE TABLE for Databricks. If it can not be read, e.g. for Redshift,\na change of the query is not detected, and the materialized view is only refreshed.  \nOn Databricks and Snowflake, a hash of the query is also stored with the view or materialized view, as table property `sdlb.queryHash` (Databricks) or as tag `SDLB_QUERY_HASH` in the schema of the view (Snowflake, needs Enterprise\nEdition and the privilege to create tags), and compared instead of the definition if it is set.  \nTo switch an existing view between materialized and not materialized, drop it first. Example:\n```\ndataObjects = {\n  int-airports {\n    type = JdbcTableDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = airports }\n  }\n  btl-swiss-airports {\n    type = JdbcViewDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = swiss_airports }\n  }\n}\nactions = {\n  create-swiss-airports {\n    type = CopyAction\n    inputId = int-airports\n    outputId = btl-swiss-airports\n    engineConnectionId = jdbc-dwh\n    transformers = [{\n      type = SQLDfTransformer\n      code = \"select ident, name from %{inputViewName} where iso_country = 'CH'\"\n    }]\n  }\n}\n```\n"
       },
       "JsonFileDataObject" : {
         "type" : "object",
@@ -3282,7 +3292,7 @@
         "title" : "SnowflakeTableDataObject",
         "required" : [ "type", "table", "connectionId" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type SnowflakeTableDataObject.  \nProvides details to access Snowflake tables via an action\nCan be used both for interacting with Snowflake through Spark with JDBC,\nas well as for actions written in the Snowpark API that run directly on Snowflake\n\nNote 1: Snowflake does not support partitioning.  \nBut SDLB emulates partitions through the `virtualPartitions` attribute.\n\nNote 2: Snowflake is tricky with Datatypes.  \nAs Integral types like Long, Int, Short don't exist in Snowflake, they all become a Decimal(38,0) by default.  \nSDLB improves the default by automatically converting Integral types to Decimals with accurate precision on write, e.g. Int => Decimal(10,0).  \nFor adapting types on read, use the `readTransformer` attribute.\n\nNote 3: case-insensitive column names are all uppercase in Snowflake tables. This is opposite from Spark when Spark is in case-insensitive mode (see also `Environment.caseSensitive` )\nIf `Environment.caseSensitive=false` then SDLB converts all case-insensitive column names to lowercase when reading from Snowflake with Spark Connector. Example:\n```\ndataObjects = {\n  tgt-airports {\n    type = SnowflakeTableDataObject\n    connectionId = sf-con\n    table {\n      db = \"test_schema\"\n      name = \"airports\"\n    }\n    virtualPartitions = [dt]\n    saveMode = Append\n  }\n}\n```\n"
+        "description" : "`DataObject` of type SnowflakeTableDataObject.  \nProvides details to access Snowflake tables via an action\nCan be used both for interacting with Snowflake through Spark with JDBC,\nas well as for actions written in the Snowpark API that run directly on Snowflake.  \nAn Action uses Snowpark if its `engineConnectionId` references the SnowflakeConnection of its DataObjects,\notherwise the DataObject is read and written with the Snowflake Spark connector.\n\nNote 1: Snowflake does not support partitioning.  \nBut SDLB emulates partitions through the `virtualPartitions` attribute.\n\nNote 2: Snowflake is tricky with Datatypes.  \nAs Integral types like Long, Int, Short don't exist in Snowflake, they all become a Decimal(38,0) by default.  \nSDLB improves the default by automatically converting Integral types to Decimals with accurate precision on write, e.g. Int => Decimal(10,0).  \nFor adapting types on read, use the `readTransformer` attribute.\n\nNote 3: case-insensitive column names are all uppercase in Snowflake tables. This is opposite from Spark when Spark is in case-insensitive mode (see also `Environment.caseSensitive` )\nIf `Environment.caseSensitive=false` then SDLB converts all case-insensitive column names to lowercase when reading from Snowflake with Spark Connector. Example:\n```\ndataObjects = {\n  tgt-airports {\n    type = SnowflakeTableDataObject\n    connectionId = sf-con\n    table {\n      db = \"test_schema\"\n      name = \"airports\"\n    }\n    virtualPartitions = [dt]\n    saveMode = Append\n  }\n}\n```\n"
       },
       "SparkConnectTableDataObject" : {
         "type" : "object",
@@ -5395,7 +5405,7 @@
         "title" : "BasicAuthMode",
         "required" : [ "type", "user", "password" ],
         "additionalProperties" : false,
-        "description" : "Authenticate using basic user/pwd authentication.\n\nFor http connection this will create a basic authentication header.\n\nThis is the most commonly used authentication mode. It is the only AuthMode supported by JdbcTableConnection and\nDebeziumConnection, and one of the supported modes of SFtpFileRefConnection, SnowflakeConnection and HTTP based\nDataObjects. Note that no connection falls back to it implicitly - authMode has to be configured explicitly.  \nBoth user and password support secret providers, so credentials do not have to be stored in clear text in the\nconfiguration. Example:\n```\nconnections = {\n  sftp-src {\n    type = SFtpFileRefConnection\n    host = \"sftp.example.com\"\n    authMode = {\n      type = BasicAuthMode\n      user = \"###ENV#SFTP_USER###\"\n      password = \"###ENV#SFTP_PWD###\"\n    }\n  }\n}\n```\n"
+        "description" : "Authenticate using basic user/pwd authentication.\n\nFor http connection this will create a basic authentication header.\n\nThis is the most commonly used authentication mode. It is the only AuthMode supported by JdbcConnection and\nDebeziumConnection, and one of the supported modes of SFtpFileRefConnection, SnowflakeConnection and HTTP based\nDataObjects. Note that no connection falls back to it implicitly - authMode has to be configured explicitly.  \nBoth user and password support secret providers, so credentials do not have to be stored in clear text in the\nconfiguration. Example:\n```\nconnections = {\n  sftp-src {\n    type = SFtpFileRefConnection\n    host = \"sftp.example.com\"\n    authMode = {\n      type = BasicAuthMode\n      user = \"###ENV#SFTP_USER###\"\n      password = \"###ENV#SFTP_PWD###\"\n    }\n  }\n}\n```\n"
       },
       "CustomHttpAuthMode" : {
         "type" : "object",
@@ -5719,11 +5729,11 @@
         "additionalProperties" : false,
         "description" : "Connection information for Iceberg tables.\n\nIt centralizes catalog, database and the base directory of the table files, so that IcebergTableDataObjects\nreferencing it through `connectionId` do not need to repeat them. Catalog and db of the DataObjects `table` are\ntaken from this connection, and the DataObjects `path` is resolved relative to `pathPrefix` . This keeps\nenvironment specific storage locations out of the DataObject definitions. Example:\n```\nconnections {\n  iceberg-int {\n    type = IcebergTableConnection\n    db = \"integration\"\n    pathPrefix = \"~{env.basedir}/iceberg\"\n    addFilesParallelism = 8\n  }\n}\n```\n\n\nNOTE: the database given in `db` must already exist; SDLB does not create it."
       },
-      "JdbcTableConnection" : {
+      "JdbcConnection" : {
         "type" : "object",
         "properties" : {
           "type" : {
-            "const" : "JdbcTableConnection"
+            "const" : "JdbcConnection"
           },
           "url" : {
             "type" : "string",
@@ -5820,10 +5830,109 @@
             "description" : "Additional metadata for the Connection"
           }
         },
+        "title" : "JdbcConnection",
+        "required" : [ "type", "url", "driver" ],
+        "additionalProperties" : false,
+        "description" : "Connection information for a database accessed through JDBC. If authentication is needed, user and password must be\nprovided.\n\nIt holds url, driver and credentials shared by all JdbcTableDataObjects and JdbcViewDataObjects referencing it\nthrough `connectionId` ,\nand maintains a small JDBC connection pool which SDLB uses for metadata and DDL statements (checking table\nexistence, creating tables, pre/postSQL, constraints). Note that Spark opens its own connections for reading\nand writing data, so `maxParallelConnections` limits SDLB's own connections only. A database specific `JdbcCatalog` is derived from `driver` to run catalog queries in the correct dialect. Example:\n```\nconnections {\n  jdbc-dwh {\n    type = JdbcConnection\n    url = \"jdbc:postgresql://dwh.example.com:5432/dwh\"\n    driver = \"org.postgresql.Driver\"\n    db = \"public\"\n    authMode = {\n      type = BasicAuthMode\n      user = \"###ENV#JDBC_USER###\"\n      password = \"###ENV#JDBC_PASSWORD###\"\n    }\n  }\n}\n```\n\n\nNOTE: JdbcConnection was called JdbcTableConnection until version 3.0.0. The old name is deprecated but still works.\n\nNOTE: the JDBC driver named in `driver` must be on the classpath; only BasicAuthMode is supported as authMode."
+      },
+      "JdbcTableConnection" : {
+        "type" : "object",
+        "properties" : {
+          "type" : {
+            "const" : "JdbcTableConnection"
+          },
+          "url" : {
+            "type" : "string"
+          },
+          "driver" : {
+            "type" : "string"
+          },
+          "authMode" : {
+            "oneOf" : [ {
+              "$ref" : "#/definitions/AuthMode/GCPCredentialsKeyAuth"
+            }, {
+              "$ref" : "#/definitions/AuthMode/PublicKeyAuthMode"
+            }, {
+              "$ref" : "#/definitions/AuthMode/SASLSCRAMAuthMode"
+            }, {
+              "$ref" : "#/definitions/AuthMode/SSLCertsAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/AWSUserPwdAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/AuthHeaderMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/AzureADClientGrantAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/BasicAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/CustomHttpAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/OAuthMode"
+            }, {
+              "$ref" : "#/definitions/HttpAuthMode/TokenAuthMode"
+            } ]
+          },
+          "db" : {
+            "type" : "string"
+          },
+          "maxParallelConnections" : {
+            "type" : "integer"
+          },
+          "connectionInitSql" : {
+            "type" : "string"
+          },
+          "directTableOverwrite" : {
+            "type" : "boolean"
+          },
+          "connectionPool" : {
+            "type" : "object",
+            "properties" : {
+              "maxIdleTimeSec" : {
+                "type" : "integer",
+                "description" : "timeout to close unused connections in the pool. Default is 3 seconds."
+              },
+              "maxWaitTimeSec" : {
+                "type" : "integer",
+                "description" : "timeout when waiting for connection in pool to become available. Default is 600 seconds (10 minutes)."
+              },
+              "testOnBorrow" : {
+                "type" : "boolean",
+                "description" : "flag to set the GenericObjectPool's`testOnBorrow` . If true the connection pool will validate the connection before it is lent. Default is false."
+              },
+              "testOnCreate" : {
+                "type" : "boolean",
+                "description" : "flag to set the GenericObjectPool's`testOnCreate` . If true the connection pool will validate the connection when it is created. Default is false."
+              },
+              "testOnReturn" : {
+                "type" : "boolean",
+                "description" : "flag to set the GenericObjectPool's`testOnReturn` . If true the connection pool will validate the connection after it is returned. Default is false."
+              },
+              "testWhileIdle" : {
+                "type" : "boolean",
+                "description" : "flag to set the GenericObjectPool's`testWhileIdle` . If true the connection pool will validate the connection periodically while it is idle. Default is false."
+              },
+              "testTimeoutSec" : {
+                "type" : "integer",
+                "description" : "Timeout in seconds for connection.isValid call."
+              }
+            },
+            "title" : "ConnectionPoolConfig",
+            "additionalProperties" : false,
+            "description" : "Configuration to tune JDBC connection pool settings"
+          },
+          "dialect" : {
+            "type" : "string"
+          },
+          "metadata" : {
+            "$ref" : "#/definitions/Others/ConnectionMetadata",
+            "description" : "Additional metadata for the Connection"
+          }
+        },
         "title" : "JdbcTableConnection",
         "required" : [ "type", "url", "driver" ],
         "additionalProperties" : false,
-        "description" : "Connection information for JDBC tables. If authentication is needed, user and password must be\nprovided.\n\nIt holds url, driver and credentials shared by all JdbcTableDataObjects referencing it through `connectionId` ,\nand maintains a small JDBC connection pool which SDLB uses for metadata and DDL statements (checking table\nexistence, creating tables, pre/postSQL, constraints). Note that Spark opens its own connections for reading\nand writing data, so `maxParallelConnections` limits SDLB's own connections only. A database specific `JdbcCatalog` is derived from `driver` to run catalog queries in the correct dialect. Example:\n```\nconnections {\n  jdbc-dwh {\n    type = JdbcTableConnection\n    url = \"jdbc:postgresql://dwh.example.com:5432/dwh\"\n    driver = \"org.postgresql.Driver\"\n    db = \"public\"\n    authMode = {\n      type = BasicAuthMode\n      user = \"###ENV#JDBC_USER###\"\n      password = \"###ENV#JDBC_PASSWORD###\"\n    }\n  }\n}\n```\n\n\nNOTE: the JDBC driver named in `driver` must be on the classpath; only BasicAuthMode is supported as authMode."
+        "description" : "Former name of `JdbcConnection`, kept for backward compatibility of existing configurations.  \nIt behaves exactly like `JdbcConnection`, see there for a description and the available parameters.\n\nThe name was too narrow: the connection is not only used by JdbcTableDataObject, but also by JdbcViewDataObject,\nand as engine connection of the SQL engine.\n\nDEPRECATED: Renamed to `JdbcConnection` in version 3.0.0. Change `type = JdbcTableConnection` to `type = JdbcConnection` in your configuration, all parameters stay the same.",
+        "deprecated" : true
       },
       "KafkaConnection" : {
         "type" : "object",
@@ -6070,7 +6179,7 @@
         "title" : "SnowflakeConnection",
         "required" : [ "type", "url", "warehouse", "database", "role", "authMode" ],
         "additionalProperties" : false,
-        "description" : "Connection information for Snowflake databases.  \nThe connection can be used for SnowflakeTableDataObjects\nIf multiple SnowflakeTableDataObjects share a connection, they share the same Snowpark session\n\nBeside the Snowpark session it also maintains a JDBC connection pool used for metadata and DDL queries\n(e.g. checking table existence, pre/postSQL). The schema is not part of the connection - it is taken from `table.db` of the referencing SnowflakeTableDataObject, so one connection can serve multiple schemas.  \nAuthentication is supported with BasicAuthMode (user/password) or OAuthMode; any other AuthMode is rejected\non instantiation. Example:\n```\nconnections {\n  sfCon {\n    type = SnowflakeConnection\n    url = \"https://myaccount.snowflakecomputing.com\"\n    warehouse = \"COMPUTE_WH\"\n    database = \"TEST_DB\"\n    role = \"SDLB_ROLE\"\n    authMode = {\n      type = BasicAuthMode\n      user = \"###ENV#SNOWFLAKE_USER###\"\n      password = \"###ENV#SNOWFLAKE_PASSWORD###\"\n    }\n  }\n}\n```\n"
+        "description" : "Connection information for Snowflake databases.  \nThe connection can be used for SnowflakeTableDataObjects\nIf multiple SnowflakeTableDataObjects share a connection, they share the same Snowpark session\n\nSnowflakeConnection is also the engine connection of the Snowpark engine: an Action with `engineConnectionId` referencing a SnowflakeConnection transforms its data with Snowpark inside Snowflake. All its inputs and outputs\nmust then be SnowflakeTableDataObjects of this connection, as Snowpark DataFrames of different sessions can not be\ncombined. Otherwise, e.g. with a SparkClassicConnection as engine connection, SnowflakeTableDataObjects are read and\nwritten with the Snowflake Spark connector.\n\nBeside the Snowpark session it also maintains a JDBC connection pool used for metadata and DDL queries\n(e.g. checking table existence, pre/postSQL). The schema is not part of the connection - it is taken from `table.db` of the referencing SnowflakeTableDataObject, so one connection can serve multiple schemas.  \nAuthentication is supported with BasicAuthMode (user/password) or OAuthMode; any other AuthMode is rejected\non instantiation. Example:\n```\nconnections {\n  sfCon {\n    type = SnowflakeConnection\n    url = \"https://myaccount.snowflakecomputing.com\"\n    warehouse = \"COMPUTE_WH\"\n    database = \"TEST_DB\"\n    role = \"SDLB_ROLE\"\n    authMode = {\n      type = BasicAuthMode\n      user = \"###ENV#SNOWFLAKE_USER###\"\n      password = \"###ENV#SNOWFLAKE_PASSWORD###\"\n    }\n  }\n  default-engine {\n    type = SparkClassicConnection\n    master = \"local[*]\"\n  }\n}\nactions {\n  # transform data inside Snowflake with Snowpark\n  copySnowpark {\n    type = CopyAction\n    inputId = sfTable1\n    outputId = sfTable2\n    engineConnectionId = sfCon\n  }\n}\n```\n"
       },
       "SparkClassicConnection" : {
         "type" : "object",
@@ -6999,7 +7108,7 @@
         "title" : "ScalaClassSnowparkDfTransformer",
         "required" : [ "type", "className" ],
         "additionalProperties" : false,
-        "description" : "Configuration of a custom Snowpark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.  \nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface `CustomSnowparkDfTransformer`.\n\nThe transformation is pushed down to Snowflake and executed by Snowpark, so no data is transferred to the Spark\ndriver or executors. It can be combined in the same `transformers` list with generic transformers like\nSQLDfTransformer or ColumnsTransformer, as long as input and output DataObjects are Snowflake tables.\n\nInstead of overwriting the standard transform function, the class can also implement any transform method using\nparameters of type Session, Map[String,String], DataFrame and any primitive data type. It is then called\ndynamically by looking for the parameter values in the Options, see `CustomSnowparkDfTransformer`.  \nThe id of the input DataObject is passed as option `dataObjectId` . Example:\n```\nactions = {\n  copy-snowpark {\n    type = CopyAction\n    inputId = sf-airports-stg\n    outputId = sf-airports\n    transformers = [{\n      type = ScalaClassSnowparkDfTransformer\n      className = com.company.transformer.CleanAirportsSnowparkTransformer\n      options = { minRating = \"3\" }\n      runtimeOptions = { appName = \"application\" }\n    }]\n  }\n}\n```\n\n\nNOTE: Input and output DataObject must be of type SnowflakeTableDataObject, as the Snowpark session is taken from\nthe Action's first input. The class given in `className` must be on the classpath of the SDLB job."
+        "description" : "Configuration of a custom Snowpark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.  \nDefine a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a\nDataFrame. The Java/Scala class has to implement interface `CustomSnowparkDfTransformer`.\n\nThe transformation is pushed down to Snowflake and executed by Snowpark, so no data is transferred to the Spark\ndriver or executors. It can be combined in the same `transformers` list with generic transformers like\nSQLDfTransformer or ColumnsTransformer, as long as input and output DataObjects are Snowflake tables.\n\nInstead of overwriting the standard transform function, the class can also implement any transform method using\nparameters of type Session, Map[String,String], DataFrame and any primitive data type. It is then called\ndynamically by looking for the parameter values in the Options, see `CustomSnowparkDfTransformer`.  \nThe id of the input DataObject is passed as option `dataObjectId` . Example:\n```\nactions = {\n  copy-snowpark {\n    type = CopyAction\n    inputId = sf-airports-stg\n    outputId = sf-airports\n    engineConnectionId = sf-con\n    transformers = [{\n      type = ScalaClassSnowparkDfTransformer\n      className = com.company.transformer.CleanAirportsSnowparkTransformer\n      options = { minRating = \"3\" }\n      runtimeOptions = { appName = \"application\" }\n    }]\n  }\n}\n```\n\n\nNOTE: The Action must use the Snowpark engine, e.g. its `engineConnectionId` must reference a SnowflakeConnection,\nand input and output DataObject must be SnowflakeTableDataObjects of this connection. The Snowpark session is\ntaken from the engine connection. The class given in `className` must be on the classpath of the SDLB job."
       },
       "ScalaClassSparkDfTransformer" : {
         "type" : "object",
@@ -7668,7 +7777,7 @@
         "title" : "ScalaClassSnowparkDfsTransformer",
         "required" : [ "type", "className" ],
         "additionalProperties" : false,
-        "description" : "Configuration of a custom Snowpark-DataFrame transformation between many inputs and many outputs (n:m) as Java/Scala Class.  \nDefine a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and as\nto return a map of output DataObjectIds with DataFrames, see also trait `CustomSnowparkDfsTransformer`.\n\nUse this transformer to implement joins or splits between several Snowflake tables in Scala/Java code, which is\npushed down to Snowflake and executed by Snowpark. If a single input and output is sufficient, prefer the simpler `ScalaClassSnowparkDfTransformer`.\n\nInstead of overwriting the standard transform function, the class can also implement any transform method using\nparameters of type Session, Map[String,String], DataFrame and any primitive data type. It is then called\ndynamically by looking for the parameter values in the input DataFrames and Options, see `CustomSnowparkDfsTransformer`. Example:\n```\nactions = {\n  join-snowpark {\n    type = CustomDataFrameAction\n    inputIds = [sf-airports, sf-departures]\n    outputIds = [sf-departures-enriched]\n    transformers = [{\n      type = ScalaClassSnowparkDfsTransformer\n      className = com.company.transformer.JoinDeparturesSnowparkTransformer\n      options = { joinType = \"left\" }\n    }]\n  }\n}\n```\n\n\nNOTE: All input and output DataObjects must be of type SnowflakeTableDataObject, as the Snowpark session is taken\nfrom the Action's first input. The returned map must be keyed by the output DataObject ids."
+        "description" : "Configuration of a custom Snowpark-DataFrame transformation between many inputs and many outputs (n:m) as Java/Scala Class.  \nDefine a transform function which receives a map of input DataObjectIds with DataFrames and a map of options and as\nto return a map of output DataObjectIds with DataFrames, see also trait `CustomSnowparkDfsTransformer`.\n\nUse this transformer to implement joins or splits between several Snowflake tables in Scala/Java code, which is\npushed down to Snowflake and executed by Snowpark. If a single input and output is sufficient, prefer the simpler `ScalaClassSnowparkDfTransformer`.\n\nInstead of overwriting the standard transform function, the class can also implement any transform method using\nparameters of type Session, Map[String,String], DataFrame and any primitive data type. It is then called\ndynamically by looking for the parameter values in the input DataFrames and Options, see `CustomSnowparkDfsTransformer`. Example:\n```\nactions = {\n  join-snowpark {\n    type = CustomDataFrameAction\n    inputIds = [sf-airports, sf-departures]\n    outputIds = [sf-departures-enriched]\n    engineConnectionId = sf-con\n    transformers = [{\n      type = ScalaClassSnowparkDfsTransformer\n      className = com.company.transformer.JoinDeparturesSnowparkTransformer\n      options = { joinType = \"left\" }\n    }]\n  }\n}\n```\n\n\nNOTE: The Action must use the Snowpark engine, e.g. its `engineConnectionId` must reference a SnowflakeConnection,\nand all input and output DataObjects must be SnowflakeTableDataObjects of this connection. The Snowpark\nsession is taken from the engine connection. The returned map must be keyed by the output DataObject ids."
       },
       "ScalaClassSparkDfsTransformer" : {
         "type" : "object",
@@ -8008,10 +8117,6 @@
           "type" : "string",
           "description" : "Optional source URI for DataObjects schemas for development.* This is used for development on\nlocal environment without access to data. Schemas can be exported on dev/prod environment using\nthe DataObjectSchemaExporter application, and used on local environment to define DataObject\nschemas for executing dry-run's. Source must be a path like`file:./schema`or`uiBackend`.  \nuiBackend will use global.uiBackend configuration to query UI backend for schemas. Default:`file:./schema` ."
         },
-        "defaultSparkConnectionId" : {
-          "type" : "string",
-          "description" : "Optional default ConnectionId for Spark connections. This is used to avoid having to specify\nthe Spark connection for every Spark Action. Note that the default connection can still be\noverwritten for each Spark Action by specifying the sparkConnectionId in the action's\nconfiguration."
-        },
         "descriptionPath" : {
           "type" : "string",
           "description" : "Optional path of the directory containing the Markdown description files of the DataObjects, Actions and\nConnections, e.g.`dataObjects/myDataObject.md`. The column descriptions defined there are merged into the\nschemas exported by`--test dry-run-with-schema-export`, overriding the comments of the schema, so that they\nare shown in the SDLB UI. It is also the default for the`--descriptionPath` option of CatalogSchemaUpdater."
@@ -8034,6 +8139,8 @@
           "$ref" : "#/definitions/Connection/HadoopFileConnection"
         }, {
           "$ref" : "#/definitions/Connection/IcebergTableConnection"
+        }, {
+          "$ref" : "#/definitions/Connection/JdbcConnection"
         }, {
           "$ref" : "#/definitions/Connection/JdbcTableConnection"
         }, {
