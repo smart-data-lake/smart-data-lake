@@ -21,9 +21,6 @@
     <file url="file://$PROJECT_DIR$/sdl-iceberg" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sdl-iceberg/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sdl-iceberg/src/main/scala" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/sdl-jms" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/sdl-jms/src/main/resources" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/sdl-jms/src/main/scala" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sdl-kafka" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sdl-kafka/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sdl-kafka/src/main/scala" charset="UTF-8" />
@@ -41,9 +38,10 @@
     <file url="file://$PROJECT_DIR$/sdl-sparkconnect" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sdl-sparkconnect/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/sdl-sparkconnect/src/main/scala" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/sdl-splunk" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/sdl-splunk/src/main/resources" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/sdl-splunk/src/main/scala" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sdl-sql" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sdl-sql/src/main/python" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sdl-sql/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/sdl-sql/src/main/scala" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
   </component>
