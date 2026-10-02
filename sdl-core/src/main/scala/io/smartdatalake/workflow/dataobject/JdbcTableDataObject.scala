@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeMergeOptions, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -92,7 +92,7 @@ import scala.util.Try
  * @param table The jdbc table to be read
  * @param jdbcFetchSize Number of rows to be fetched together by the Jdbc driver
  * @param connectionId Id of JdbcConnection configuration
- * @param jdbcOptions Any jdbc options according to [[https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html]].
+ * @param jdbcOptions Any jdbc options of the Spark JDBC data source.
  *                    Note that some options above set and override some of these options explicitly.
  *                    Use "createTableOptions" and "createTableColumnTypes" to control automatic creating of database tables.
  * @param virtualPartitions Virtual partition columns. Note that this doesn't need to be the same as the database partition
@@ -125,6 +125,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val allowSchemaEvolution: Boolean = false,
                                connectionId: ConnectionId,
+                               @LibraryOptions("https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option")
                                jdbcOptions: Map[String, String] = Map(),
                                virtualPartitions: Seq[String] = Seq(),
                                override val expectedPartitionsCondition: Option[String] = None,

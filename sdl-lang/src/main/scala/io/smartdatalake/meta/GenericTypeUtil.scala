@@ -18,6 +18,7 @@
  */
 package io.smartdatalake.meta
 
+import io.smartdatalake.config.{LibraryOptions, LibraryOptionsProvider}
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.misc.ScaladocUtil.{extractScalaDoc, formatScaladocString, formatScaladocWithTags}
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
@@ -37,7 +38,7 @@ import scaladoc.Tag
 
 import scala.jdk.CollectionConverters._
 import scala.reflect.internal.Symbols
-import scala.reflect.runtime.universe.{MethodSymbol, TermSymbol, Type, typeOf}
+import scala.reflect.runtime.universe.{Constant, Literal, MethodSymbol, Symbol, TermSymbol, Type, typeOf}
 
 
 /**
@@ -204,9 +205,46 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
       val tpe = if (isOptional) {
         p.typeSignature.typeArgs.head
       } else p.typeSignature
+      val libraryOptions = getLibraryOptions(p)
       val description = paramDescriptions.get(p.name.toString)
         .orElse(overriddenMethods.map(m => extractScalaDoc(m.annotations).map(formatScaladocWithTags(_))).find(_.isDefined).flatten) // use Scaladoc from first overridden method
-      GenericAttributeDef(p.name.encodedName.toString, tpe, description, isRequired = !isOptional && !hasDefaultValue, isOverride = isOverride, isDeprecated = isDeprecated)
+        .map(d => libraryOptions.map(o => s"$d\n\n${libraryOptionsDescription(o)}").getOrElse(d))
+        .orElse(libraryOptions.map(libraryOptionsDescription))
+      GenericAttributeDef(p.name.encodedName.toString, tpe, description, isRequired = !isOptional && !hasDefaultValue, isOverride = isOverride, isDeprecated = isDeprecated, libraryOptions = libraryOptions)
     })
+  }
+
+  private def libraryOptionsDescription(libraryOptions: LibraryOptionsDef): String =
+    s"Options are passed to the underlying library, see [${libraryOptions.docUrl}](${libraryOptions.docUrl}) for the available options."
+
+  /**
+   * Read the [[LibraryOptions]] annotation of an attribute and resolve the option names of its options provider.
+   */
+  private def getLibraryOptions(attribute: Symbol): Option[LibraryOptionsDef] = {
+    attribute.annotations.find(_.tree.tpe =:= typeOf[LibraryOptions]).map { annotation =>
+      val args = annotation.tree.children.tail.collect { case Literal(Constant(arg: String)) => arg }
+      val docUrl = args.headOption.getOrElse(throw new IllegalStateException(s"LibraryOptions annotation of attribute ${attribute.fullName} must define docUrl as string literal"))
+      val optionNames = args.lift(1).filter(_.nonEmpty).map(getLibraryOptionNames).getOrElse(Seq())
+      LibraryOptionsDef(docUrl, optionNames)
+    }
+  }
+
+  /**
+   * Get the option names from a Scala object, which is either a [[LibraryOptionsProvider]] or a Spark DataSourceOptions object.
+   * Spark is accessed by reflection, so that there is no compile time dependency on a specific Spark version.
+   */
+  private def getLibraryOptionNames(provider: String): Seq[String] = {
+    try {
+      val module = Class.forName(provider + "$").getField("MODULE$").get(null)
+      val optionNames = module match {
+        case p: LibraryOptionsProvider => p.libraryOptionNames
+        case m => m.getClass.getMethod("getAllOptions").invoke(m).asInstanceOf[scala.collection.Set[String]].toSet
+      }
+      optionNames.toSeq.sorted
+    } catch {
+      case e: ReflectiveOperationException =>
+        logger.warn(s"Could not get option names from options provider $provider: ${e.getClass.getSimpleName} ${e.getMessage}")
+        Seq()
+    }
   }
 }

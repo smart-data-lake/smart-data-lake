@@ -18,14 +18,14 @@
  */
 package io.smartdatalake.meta.jsonschema
 
-import io.smartdatalake.config.SdlConfigObject
+import io.smartdatalake.config.{LibraryOptions, SdlConfigObject}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConfigObjectId, ConnectionId, DataObjectId}
 import io.smartdatalake.meta.GenericTypeDef
 import io.smartdatalake.meta.GenericTypeUtil.attributesForCaseClass
 import io.smartdatalake.meta.jsonschema.TestEnum.TestEnum
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
-import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
+import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, ExcelOptions}
 import org.reflections.Reflections
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -173,6 +173,47 @@ class JsonTypeConverterTest extends AnyFunSuite {
 
     assert(jsonTypeDef.properties("options").isInstanceOf[JsonMapDef])
     assert(jsonTypeDef.properties("options").asInstanceOf[JsonMapDef].description.isEmpty)
+  }
+
+  case class TestClassWithLibraryOptions(
+    @LibraryOptions("https://spark.apache.org/docs/latest/sql-data-sources-csv.html", "org.apache.spark.sql.catalyst.csv.CSVOptions")
+    csvOptions: Map[String, String] = Map(),
+    @LibraryOptions("https://example.com/options")
+    otherOptions: Option[Map[String, String]] = None,
+    plainOptions: Map[String, String] = Map()
+  )
+  test("library options get a documentation link and list the option names of the options provider") {
+    val typeDef = getGenericTypeDef(typeOf[TestClassWithLibraryOptions])
+
+    val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
+
+    // with options provider (Spark DataSourceOptions)
+    val csvOptions = jsonTypeDef.properties("csvOptions").asInstanceOf[JsonMapDef]
+    assert(csvOptions.description.exists(_.contains("[https://spark.apache.org/docs/latest/sql-data-sources-csv.html](https://spark.apache.org/docs/latest/sql-data-sources-csv.html)")))
+    assert(csvOptions.properties.keySet.contains("delimiter"))
+    assert(csvOptions.properties.keySet.contains("inferSchema"))
+    // without options provider
+    val otherOptions = jsonTypeDef.properties("otherOptions").asInstanceOf[JsonMapDef]
+    assert(otherOptions.description.exists(_.contains("https://example.com/options")))
+    assert(otherOptions.properties.isEmpty)
+    // without annotation
+    val plainOptions = jsonTypeDef.properties("plainOptions").asInstanceOf[JsonMapDef]
+    assert(plainOptions.description.isEmpty)
+    assert(plainOptions.properties.isEmpty)
+  }
+
+  test("ExcelOptions.additionalOptions lists the spark-excel options") {
+    val typeDef = getGenericTypeDef(typeOf[ExcelOptions])
+
+    val jsonTypeDef = jsonTypeConverter.fromGenericTypeDef(typeDef)
+
+    val additionalOptions = jsonTypeDef.properties("additionalOptions").asInstanceOf[JsonMapDef]
+    assert(additionalOptions.properties.keySet.contains("dataAddress"))
+    assert(!additionalOptions.properties.keySet.contains("header")) // set by attribute useHeader
+    // known option names are listed as properties, but other keys are still allowed
+    val json = org.json4s.jackson.JsonMethods.compact(additionalOptions.toJson)
+    assert(json.contains(""""properties":{"addColorColumns":{"type":"string"}"""))
+    assert(json.contains(""""additionalProperties":{"type":"string"}"""))
   }
 
   private def getGenericTypeDef(tpe: Type, baseType: Option[Type] = None): GenericTypeDef = {

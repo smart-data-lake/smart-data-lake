@@ -22,7 +22,7 @@ import com.typesafe.config.Config
 import io.smartdatalake.app.AppUtil.{MDC_SDLB_PROPERTIES, createMaskedSecretsKVLog}
 import io.smartdatalake.app.ModulePlugin
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{CustomCodeUtil, SmartDataLakeLogger}
 import io.smartdatalake.util.secrets.StringOrSecret
@@ -72,7 +72,7 @@ import scala.util.Try
  * @param enableHive
  *   enable hive for spark session
  * @param sparkOptions
- *   spark options
+ *   Spark configuration properties for the Spark session.
  * @param sparkUDFs
  *   Define UDFs to be registered in spark session. The registered UDFs are available in Spark SQL
  *   transformations and expression evaluation, e.g. configuration of ExecutionModes.
@@ -86,6 +86,7 @@ case class SparkClassicConnection(
     override val id: ConnectionId,
     master: Option[String],
     deployMode: Option[String] = None,
+    @LibraryOptions("https://spark.apache.org/docs/latest/configuration.html#available-properties")
     sparkOptions: Map[String, StringOrSecret] = Map(),
     enableHive: Boolean = false,
     sparkUDFs: Option[Map[String, SparkUDFCreatorConfig]] = None,

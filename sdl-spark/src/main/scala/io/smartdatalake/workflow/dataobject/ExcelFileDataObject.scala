@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, LibraryOptions, LibraryOptionsProvider}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, StringUtil}
@@ -184,7 +184,6 @@ object ExcelFileDataObject extends FromConfigFactory[DataObject] {
  * @param excerptSize Sample size (number of rows) for schema inference.
  * @param additionalOptions Further options passed to the spark-excel data source, using the spark-excel option names,
  *                          e.g. `dataAddress`, `sheetNameIsRegex`, `useNullForErrorCells` or `locale`.
- *                          See the spark-excel documentation for the available options.
  *                          Options which correspond to an attribute above must be set by that attribute.
  *                          `dataAddress` must not be combined with `sheetName`, `numLinesToSkip`, `startColumn`,
  *                          `endColumn` or `rowLimit`.
@@ -207,6 +206,7 @@ case class ExcelOptions(
                          dateFormat: Option[String] = None,
                          maxRowsInMemory: Option[Int] = None,
                          excerptSize: Option[Int] = None,
+                         @LibraryOptions("https://github.com/nightscape/spark-excel", "io.smartdatalake.workflow.dataobject.ExcelOptions")
                          additionalOptions: Map[String, String] = Map(),
                          allowUnknownOptions: Boolean = false
                        ) {
@@ -246,7 +246,7 @@ case class ExcelOptions(
     )
 }
 
-object ExcelOptions extends SmartDataLakeLogger {
+object ExcelOptions extends LibraryOptionsProvider with SmartDataLakeLogger {
 
   /**
    * Options read by the spark-excel data source (see `dev.mauch.spark.excel.v2.ExcelOptionsTrait`), which have no
@@ -277,6 +277,11 @@ object ExcelOptions extends SmartDataLakeLogger {
     ("pathGlobFilter" -> "it is set by ExcelFileDataObject")
 
   private lazy val knownOptions: Set[String] = sparkExcelOptions ++ sparkFileSourceOptions ++ reservedOptions.keySet
+
+  /**
+   * Option names which can be set in additionalOptions, listed in the json schema.
+   */
+  override def libraryOptionNames: Set[String] = sparkExcelOptions ++ sparkFileSourceOptions
 
   /**
    * Validate the keys of additionalOptions. Spark options are case-insensitive, therefore keys are compared ignoring case.

@@ -139,7 +139,12 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
     private val convertedCaseClasses: mutable.Map[ClassSymbol, JsonObjectDef] = mutable.Map()
 
     def convertToJsonType(attr: GenericAttributeDef): JsonTypeDef = {
-      convertToJsonType(attr.tpe, attr.description, if (attr.isDeprecated) Some(true) else None)
+      convertToJsonType(attr.tpe, attr.description, if (attr.isDeprecated) Some(true) else None) match {
+        // list the known option names of an underlying library as properties
+        case m: JsonMapDef if attr.libraryOptions.exists(_.optionNames.nonEmpty) =>
+          m.copy(properties = ListMap(attr.libraryOptions.get.optionNames.map(_ -> m.additionalProperties): _*))
+        case t => t
+      }
     }
 
     @annotation.nowarn("msg=abstract type pattern")

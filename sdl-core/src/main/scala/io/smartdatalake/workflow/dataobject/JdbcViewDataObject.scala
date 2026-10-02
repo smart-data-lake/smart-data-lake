@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
@@ -92,7 +92,7 @@ import scala.util.{Failure, Success, Try}
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param jdbcFetchSize Number of rows to be fetched together by the Jdbc driver when reading the view
- * @param jdbcOptions Any jdbc options for reading the view according to [[https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html]].
+ * @param jdbcOptions Any jdbc options of the Spark JDBC data source for reading the view.
  * @param virtualPartitions Virtual partition columns, see JdbcTableDataObject. Partition values written to the view are
  *                   passed on to the next Action, and existing partitions are listed with a "select distinct" query.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
@@ -110,6 +110,7 @@ case class JdbcViewDataObject(override val id: DataObjectId,
                               connectionId: ConnectionId,
                               override val schemaMin: Option[GenericSchema] = None,
                               jdbcFetchSize: Int = 1000,
+                              @LibraryOptions("https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option")
                               jdbcOptions: Map[String, String] = Map(),
                               virtualPartitions: Seq[String] = Seq(),
                               override val expectedPartitionsCondition: Option[String] = None,
