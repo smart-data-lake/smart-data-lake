@@ -35,3 +35,14 @@ private[smartdatalake] trait ParsableFromConfig[+CO <: ParsableFromConfig[CO]]
  * A marker trait to exclude an SdlConfigObject from the schema export.
  */
 trait ExcludeFromSchemaExport
+
+/**
+ * A marker trait for configuration classes which accept config keys that are not defined as an attribute,
+ * e.g. to pass options through to an underlying library without listing all of them as attribute.
+ *
+ * Such a class must provide its own [[configs.ConfigReader]] collecting the undefined keys, because the default
+ * naming strategy fails on superfluous keys, see [[ConfigImplicits.sdlDefaultNaming]].
+ * The generated json schema sets `additionalProperties=true` for these classes, so that a schema viewer or IDE
+ * does not report the undefined keys as an error.
+ */
+trait AllowAdditionalConfigKeys
