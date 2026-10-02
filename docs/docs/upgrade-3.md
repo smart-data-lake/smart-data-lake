@@ -15,7 +15,7 @@ Work through the sections in order. The [checklist](#checklist) at the end summa
 | | SDLB 2.x | SDLB 3.x |
 |---|---|---|
 | Java | 8+ | **17+** |
-| Scala | 2.12 / 2.13 | **2.13 only** (artifacts `_2.13`) |
+| Scala | 2.12 / 2.13 | **2.13 only** |
 | Apache Spark | 3.x | **4.1** |
 | Hadoop | 3.3 | 3.4 |
 
