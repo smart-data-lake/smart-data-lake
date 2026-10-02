@@ -259,4 +259,4 @@ mvn -B test -pl sdl-sql -Dlicense.skip=true       # Scala side, needs SDL_PYTHON
 
 The Scala tests execute SQL on a [DuckDB](https://duckdb.org) database file in `target/duckdb`, see `SQLTestUtil`.
 The tests needing Python cancel themselves if no environment with jep is found, so the normal build needs no
-Python. They run in the GitHub workflow `sql_engine_tests.yml`.
+Python. In CI they run in the Snapshot Build (`snapshot_build.yml`), which creates the environment with uv.

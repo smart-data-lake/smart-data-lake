@@ -97,6 +97,20 @@ jobs:
         with:
           path: sdl-sparkconnect/spark-${{ steps.get_spark_version.outputs.spark_version }}-bin-hadoop3
           key: ${{ runner.os }}-spark-${{ steps.get_spark_version.outputs.spark_version }}-bin
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: sdl-sql/uv.lock
+      - name: Create the Python environment of sdl-sql
+        # The SQL engine (sdl-sql) runs SQLGlot in an embedded Python interpreter (jep), without it the tests of sdl-sql cancel themselves.
+        # jep is compiled against the JDK on installation, it finds it through JAVA_HOME set by setup-java.
+        run: |
+          uv sync --frozen --project sdl-sql
+          echo "SDL_PYTHON_PATH=$PWD/sdl-sql/.venv/bin/python" >> $GITHUB_ENV
+      - name: Run the Python tests of sdl-sql
+        working-directory: sdl-sql
+        run: uv run --frozen pytest
 
       - name: Build with Maven for Scala 2.13 and Sonar Cloud analysis
         env:
