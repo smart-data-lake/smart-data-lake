@@ -27,7 +27,7 @@ object GenericSchemaUtil {
 
   def columnExists(schema: GenericSchema, colName: String): Boolean = {
     if (Environment.caseSensitive) schema.columns.contains(colName)
-    else schema.columns.contains(colName.toLowerCase)
+    else schema.columns.map(_.toLowerCase).contains(colName.toLowerCase)
   }
 
   /**

@@ -112,13 +112,20 @@ jobs:
       - name: Maven Get Version
         run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.13 -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
 
-      - name: Push new sdl-schema.json to documentation branch
+      - name: Push new sdl-schema.json to documentation site
         if: ${{ contains(github.base_ref, 'develop-spark') || contains(github.ref, 'develop-spark')}}
         run: |
-          git fetch origin documentation
-          git checkout documentation
+          # The documentation site now lives in docs/ on develop-spark4/master-spark4; the
+          # standalone 'documentation' branch this step used to push to no longer exists.
+          # develop-spark3 does not carry the docs site, so skip rather than fail.
+          SCHEMA_DIR=docs/static/json-schema-viewer/schemas
+          if [ ! -d "$SCHEMA_DIR" ]; then
+            echo "$SCHEMA_DIR not present on this branch - skipping schema publication"
+            exit 0
+          fi
           # note that sdl-schema.json should be available in the location below from the previous maven build.
-          mv sdl-lang/target/classes/sdl-schema.json static/json-schema-viewer/schemas/sdl-schema-${MVN_CURRENT_VERSION}.json
-          git add static/json-schema-viewer/schemas/sdl-schema-${MVN_CURRENT_VERSION}.json
+          mv sdl-lang/target/classes/sdl-schema.json $SCHEMA_DIR/sdl-schema-${MVN_CURRENT_VERSION}.json
+          git add $SCHEMA_DIR/sdl-schema-${MVN_CURRENT_VERSION}.json
           git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_CURRENT_VERSION}.json" # only if there is something to commit
+          git pull --rebase
           git push

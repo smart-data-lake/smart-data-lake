@@ -53,6 +53,8 @@ trait CustomFileCreator extends Serializable {
  * }
  * }}}
  */
+@deprecated("2.9.0", "create custom DataObject directly instead")
+@Deprecated
 case class CustomFileCreatorConfig(className: Option[String] = None,
                                    scalaFile: Option[String] = None,
                                    scalaCode: Option[String] = None,

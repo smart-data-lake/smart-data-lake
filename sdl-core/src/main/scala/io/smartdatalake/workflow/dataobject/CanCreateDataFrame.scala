@@ -29,7 +29,7 @@ trait CanCreateDataFrame {
   /**
    * Get a Spark DataFrame for given partition values
    */
-  def getDataFrame(partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext) : GenericDataFrame
+  def getDataFrame(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type = getSubFeedSupportedTypes.head)(implicit context: ActionPipelineContext) : GenericDataFrame
 
   /**
    * Get a GenericDataFrameSubFeed for the given language.

@@ -1,16 +1,17 @@
 package io.smartdatalake.workflow.dataobject
 
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.{Environment, SDLSaveMode}
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.testutils.DataObjectTestSuite
+import io.smartdatalake.testutils.{DataObjectTestSuite, TestTool}
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import org.apache.spark.SparkException
-import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.{DataFrame, SaveMode}
 import org.apache.spark.sql.types.{StringType, StructType}
 
-import java.nio.file.Files
+import java.nio.file.{Files, Path}
 
-class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite {
+class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite with TestTool {
 
   import session.implicits._
 
@@ -235,4 +236,23 @@ class RelaxedCsvFileDataObjectTest extends DataObjectTestSuite {
     assert(dfResult.columns.toSeq == Seq("h1", "h2", "h3"))
     assert(dfResult.count == 0)
   }
+
+  private val testDf = Seq(
+    ("string1",1),
+    ("string2",2),
+    ("string3",3)
+  ).toDF("str","number")
+
+  test("read parquet files mixed with other files in same directory") {
+    val tempDir = Files.createTempDirectory("csv")
+    val srcDO = RelaxedCsvFileDataObject(id = "src1", path = tempDir.toString, filenameColumn = Some("_filename"), schema=Some(SparkSchema(testDf.schema)))
+    val jsonDO = JsonFileDataObject(id = "src2", path = tempDir.toString, filenameColumn = Some("_filename"), saveMode = SDLSaveMode.Append, jsonOptions = Some(Map("multiline" -> "false")))
+    srcDO.writeSparkDataFrame(testDf, Seq())
+    jsonDO.writeSparkDataFrame(testDf, Seq())
+    val resultParquet = srcDO.getSparkDataFrame()(contextExec)
+    assert(resultParquet.select($"_filename").as[String].collect.map(_.split('.').last).toSeq == Seq("csv", "csv", "csv"))
+    val resultJson = jsonDO.getSparkDataFrame()(contextExec)
+    assert(resultJson.select($"_filename").as[String].collect.map(_.split('.').last).toSeq == Seq("json", "json", "json"))
+  }
+
 }

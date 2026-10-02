@@ -168,7 +168,7 @@ class DynamicReturnUnitTestTransformer(isExecExpected: Boolean, optionalBooleanE
   def transform(session: SparkSession, dfTest: DataFrame, dsTest: Dataset[Test], isExec: Boolean, optionalBoolean: Option[Boolean], defaultBoolean: Boolean = true, long: Long, optionalLong: Option[Long], seqString: Seq[String] = Seq()) = {
     assert(session != null)
     assert(dfTest.columns.toSeq == Seq("a", "b"))
-    assert(dsTest.toDF.columns.toSeq == Seq("a", "b"))
+    assert(dsTest.toDF().columns.toSeq == Seq("a", "b"))
     assert(isExec == isExecExpected)
     assert(optionalBoolean == optionalBooleanExpected)
     assert(defaultBoolean == defaultBooleanExpected)

@@ -65,6 +65,8 @@ trait CustomDfCreator extends Serializable {
  * @param scalaCode Optional scala code for creator. The scala code needs to be a function of type [[fnExecType]].
  * @param options Options to pass to the creator
  */
+@deprecated("2.9.0", "create custom DataObject directly instead")
+@Deprecated
 case class CustomDfCreatorConfig(className: Option[String] = None,
                                  scalaFile: Option[String] = None,
                                  scalaCode: Option[String] = None,

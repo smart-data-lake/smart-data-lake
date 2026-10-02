@@ -47,9 +47,9 @@ class ActionDAGKafkaTest extends AnyFunSuite with BeforeAndAfterAll with BeforeA
   import session.implicits._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-  private val contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
-  private val contextExec = contextInit.copy(phase = ExecutionPhase.Exec)
+  val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  val contextPrep: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Prepare)
+  implicit val contextExec: ActionPipelineContext = contextInit.copy(phase = ExecutionPhase.Exec)
 
   KafkaTestUtil.start()
 

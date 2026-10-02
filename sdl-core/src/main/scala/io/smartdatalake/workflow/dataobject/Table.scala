@@ -31,29 +31,33 @@ import org.apache.spark.sql.catalyst.TableIdentifier
  * @param name        table name
  * @param query       optional select query
  * @param primaryKey  optional sequence of primary key columns
- * @param createAndReplacePrimaryKey Parameter to define if the primary key should be created and updated
- *                                   according to the SDLB configuration (=TRUE), or if they are configured just
- *                                   for information purposes (=FALSE). It defaults to false. For the creation / replacement to work,
- *                                   at least one primary Key column must be defined.
- *                                   As of now, this feature is only available for JdbcTableDataObject. Using it in other DataObjects
- *                                   will have no effect.
- * @param primaryKeyConstraintName  This parameter is used in case that createAndReplacePrimaryKey is set to TRUE.
- *                                  In case a constraint name is not given, the default value sdlb_"tableName"_pk will be used
- *                                  when updating the primary key.
+ * @param createAndReplaceReferentialKeys Parameter to define if primary key and foreign key constraints should be
+ *                                        created and updated according to the SDLB configuration (=TRUE), or if they
+ *                                        are configured just for information / catalog purposes (=FALSE). Defaults to
+ *                                        false. For creation/replacement to work, at least one primary key column or
+ *                                        foreign key must be defined.
+ *                                        Supported DataObjects: JdbcTableDataObject, DeltaLakeTableDataObject
+ *                                        (requires Databricks Unity Catalog), IcebergTableDataObject (requires
+ *                                        Databricks Unity Catalog), and SnowflakeTableDataObject.
+ * @param primaryKeyConstraintName  This parameter is used in case that createAndReplaceReferentialKeys is set to TRUE.
+ *                                  In case a constraint name is not given, the default value sdlb_"tableName"_pk will
+ *                                  be used when updating the primary key.
  * @param foreignKeys optional sequence of foreign key definitions.
- *                    This is used as metadata for a data catalog.
- * Each foreign key in the .conf files is an object with the following properties: 
- * {db: string, table: string , name: string map: Map[String]}, whereas a Map[String] is simply 
- * a further object of the type {<local_column_name>:string, <external_column_name>:string}. For example: 
+ *                    This is used as metadata for a data catalog. When createAndReplaceReferentialKeys is set to
+ *                    TRUE, foreign key constraints are actively provisioned to the target catalog.
+ * Each foreign key in the .conf files is an object with the following properties:
+ * {catalog: string, db: string, table: string, name: string, columns: Map[String,String]}.
+ * For example:
  *   foreignKeys = [
  *       {
- *         db = "OPTIONAL_DB_name" 
- *         table = "table_id" 
- *         columns = { 
- *           "local_column_name": "external_column_name" 
- *           } 
- *         name = "OPTIONAL_key_name" 
- *       } 
+ *         catalog = "OPTIONAL_CATALOG_name"
+ *         db = "OPTIONAL_DB_name"
+ *         table = "table_id"
+ *         columns = {
+ *           "local_column_name": "external_column_name"
+ *           }
+ *         name = "OPTIONAL_key_name"
+ *       }
  *     ]
  */
 case class Table(
@@ -61,7 +65,7 @@ case class Table(
                   name: String,
                   query: Option[String] = None,
                   primaryKey: Option[Seq[String]] = None,
-                  createAndReplacePrimaryKey: Boolean = false,
+                  createAndReplaceReferentialKeys: Boolean = false,
                   primaryKeyConstraintName: Option[String] = None,
                   foreignKeys: Option[Seq[ForeignKey]] = None,
                   catalog: Option[String] = None
@@ -86,17 +90,21 @@ case class Table(
 /**
  * Foreign key definition.
  *
- * @param db target database, if not defined it is assumed to be the same as the table owning the foreign key
+ * @param catalog optional target catalog. If not defined, the catalog of the owning table is used.
+ *                Required for cross-catalog foreign key references (e.g. Unity Catalog 3-part names).
+ * @param db target database/schema. If not defined it is assumed to be the same as the table owning the foreign key.
  * @param table referenced target table name
  * @param columns mapping of source column(s) to referenced target table column(s). The map is given
- * as a list of objects with the following syntax: {"local_column_name" : "external_column_name"}
- * @param name optional name for foreign key, e.g to depict it's role.
- * 
- * 
- * Foreign keys in .conf files are to be defined like the following example 
- * (here two foreign key objects): 
+ * as a list of objects with the following syntax: {"local_column_name" : "external_column_name"}.
+ * Note: for multi-column foreign keys, columns are sorted alphabetically by local name when generating DDL.
+ * @param name optional name for the foreign key constraint. Required when multiple foreign keys on the same table
+ *             reference the same target table, to avoid default name collisions.
+ *
+ * Foreign keys in .conf files are to be defined like the following example
+ * (here two foreign key objects):
  *   foreignKeys = [
  *       {
+ *         catalog = "OPTIONAL_CATALOG_name"
  *         db = "OPTIONAL_DB_name"
  *         table = "table_id"
  *         columns = {
@@ -114,9 +122,10 @@ case class Table(
  *     ]
  */
 case class ForeignKey(
-                       db: Option[String],
+                       catalog: Option[String] = None,
+                       db: Option[String] = None,
                        table: String,
                        columns: Map[String,String],
-                       name: Option[String]
+                       name: Option[String] = None
                      )
 

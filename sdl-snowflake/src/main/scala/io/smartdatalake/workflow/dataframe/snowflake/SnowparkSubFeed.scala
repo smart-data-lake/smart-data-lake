@@ -30,8 +30,9 @@ import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe.{Type, typeOf}
+import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 
 case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDataFrame],
                            override val dataObjectId: DataObjectId,
@@ -129,16 +130,26 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
+  override def first(column: GenericColumn): GenericColumn = {
+    throw new NotImplementedError("function first/first_value is not implemented in Snowpark")
+  }
+  override def abs(column: GenericColumn): GenericColumn = {
+    column match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.abs(snowparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
   override def count(column: GenericColumn): SnowparkColumn = {
     column match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.count(snowparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
-  override def countDistinct(columns: GenericColumn*): SnowparkColumn = {
-    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
-    val innerColumns = columns.map(_.asInstanceOf[SnowparkColumn].inner)
-    SnowparkColumn(functions.count_distinct(innerColumns.head, innerColumns.tail:_*))
+  override def countDistinct(column: GenericColumn): SnowparkColumn = {
+    column match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.countDistinct(snowparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
   }
   override def approxCountDistinct(column: GenericColumn, rsd: Option[Double] = None): SnowparkColumn = {
     column match {
@@ -153,6 +164,14 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
       case sparkColumn: SnowparkColumn => SnowparkColumn(functions.array_size(sparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
+  }
+  override def least(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SnowparkColumn(functions.least(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
+  }
+  override def greatest(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SnowparkColumn(functions.greatest(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
   }
   override def explode(column: GenericColumn): SnowparkColumn = {
     // TODO: check if this can be done by a udf?
@@ -351,6 +370,14 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
 
   override def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType = {
     SnowparkMapDataType(MapType(keyTpe.asInstanceOf[SnowparkDataType].inner, valueTpe.asInstanceOf[SnowparkDataType].inner))
+  }
+
+  override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A])(implicit context: ActionPipelineContext): GenericDataFrame = {
+    throw new NotImplementedError("createDataFrame from rows is not implemented in Snowpark")
+  }
+
+  override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+    throw new NotImplementedError("createDataFrame from rows is not implemented in Snowpark")
   }
 }
 

@@ -23,7 +23,13 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters._
 import scala.util.Using
 
-case class ConfigJsonExporterConfig(configPaths: Seq[String] = null, targets: Seq[String] = Seq("./exportedConfig.json"), enrichOrigin: Boolean = true, descriptionPath: Option[String] = None, uploadDescriptions: Boolean = false)
+case class ConfigJsonExporterConfig(
+                                     configPaths: Seq[String] = null,
+                                     targets: Seq[String] = Seq("localfile:./exportedConfig.json"),
+                                     enrichOrigin: Boolean = true,
+                                     descriptionPath: Option[String] = None,
+                                     uploadDescriptions: Boolean = false
+                                   )
 
 object ConfigJsonExporter extends SmartDataLakeLogger {
 
@@ -40,7 +46,7 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
       .text("Deprecated: Use target instead. File to export configuration to.")
     opt[String]('t', "target")
       .action((value, c) => c.copy(targets = value.split(",").map(_.trim).toSeq))
-      .text("Target URI to export configuration to. Can be './xyz.json', 'uiBackend', or any http/https URL. 'uiBackend will use global.uiBackend configuration to upload to UI backend. Default: ./exportedConfig.json")
+      .text("Target URI to export configuration to. Can be 'localfile:./xyz.json', 'uiBackend', http/https URL, or any hadoop path. 'uiBackend' will use global.uiBackend configuration to upload to UI backend. Default: 'localfile:./exportedConfig.json'. Multiple targets can be set separated by comma, e.g. '--target ./,uiBackend'")
     opt[Boolean]("enrichOrigin")
       .action((value, c) => c.copy(enrichOrigin = value))
       .text("Whether to add an additional property 'origin' including source filename and line number to first class configuration objects.")
@@ -86,9 +92,9 @@ object ConfigJsonExporter extends SmartDataLakeLogger {
    *                                         io.smartdatalake.meta.configexporter.ConfigJsonExporter
    *                                     </argument>
    *                                     <argument>--config</argument>
-   * <argument>./config,./envConfig/dev.conf</argument>
-   * <argument>--target</argument>
-   * <argument>file:./viz/exportedConfig.json</argument>
+   *                                     <argument>./config,./envConfig/dev.conf</argument>
+   *                                     <argument>--target</argument>
+   *                                     <argument>localfile:./viz/exportedConfig.json</argument>
    *                                     <argument>--descriptionPath</argument>
    *                                     <argument>./description</argument>
    *                                 </arguments>

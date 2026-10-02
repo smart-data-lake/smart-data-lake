@@ -18,178 +18,52 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.spark.dataset.TestToolDataset
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
-import io.smartdatalake.util.spark.dataset.Equality
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
+import io.smartdatalake.testutils.{DeduplicateActionBehaviour, MockSparkDataObject}
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils, Table}
-import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
-import org.slf4j.{Logger, LoggerFactory}
 
 import java.nio.file.Files
-import java.sql.Timestamp
-import java.time.LocalDateTime
 
 class IcebergDeduplicateWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
-  with TestToolDataset with Equality {
-  private implicit val logger: Logger = LoggerFactory.getLogger(getClass.getName)
+    with SmartDataLakeLogger with DeduplicateActionBehaviour {
 
-  // set additional spark options for delta lake
+  // set additional spark options for iceberg
   protected implicit val session: SparkSession = IcebergTestUtils.session
-
-  import session.implicits._
 
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString
 
-  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
-
-  before {
-    instanceRegistry.clear()
-  }
-
   test("deduplicate load mergeModeEnable") {
-
-    // setup DataObjects
-    val srcDO = MockSparkDataObject("src1").register
-    val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "deduplicate_output", primaryKey = Some(Seq("lastname", "firstname")))
-    val tgtDO = IcebergTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable)
-    tgtDO.dropTable
-    instanceRegistry.register(tgtDO)
-
-    // prepare & start 1st load
-    val refTimestamp1 = LocalDateTime.now()
-    val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
-    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, mergeModeEnable = true)
-    val l1 = Seq(("doe", "john", 5), ("pan", "peter", 5), ("hans", "muster", 5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l1, Seq())(context1)
-    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
-    action1.exec(Seq(srcSubFeed))(context1).head
-
-    {
-      val expected = Seq(("doe", "john", 5, Timestamp.valueOf(refTimestamp1)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
-        .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()(context1)
-      val resultat = expected.equal(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
-      assert(resultat)
-    }
-
-    // prepare & start 2nd load
-    val refTimestamp2 = LocalDateTime.now()
-    val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
-    val l2 = Seq(("doe", "john", 10), ("pan", "peter", 5)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l2, Seq())(context2)
-    action1.init(Seq(srcSubFeed))(context2.copy(phase = ExecutionPhase.Init)).head
-    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context2)
-
-    {
-      // note that we expect pan/peter/5 with updated refTimestamp even though all attributes stay the same
-      val expected = Seq(("doe", "john", 10, Timestamp.valueOf(refTimestamp2)), ("pan", "peter", 5, Timestamp.valueOf(refTimestamp2)), ("hans", "muster", 5, Timestamp.valueOf(refTimestamp1)))
-        .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()(context2)
-      val resultat = expected.equal(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
-      assert(resultat)
-    }
-
-    // prepare & start 3rd load with schema evolution
-    // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt.insertExpr is not properly supported.
-    // See also last two tests in IcebergTableDataObjectTest.
-    val refTimestamp3 = LocalDateTime.now()
-    val context3 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
-    val tgtDOwithSchemaEvolution = tgtDO.copy(id = "tgt3", allowSchemaEvolution = true) // table remains the same...
-    instanceRegistry.register(tgtDOwithSchemaEvolution)
-    val action3 = action1.copy(outputId = tgtDOwithSchemaEvolution.id)
-    val l3 = Seq(("doe", "john", 11)).toDF("lastname", "firstname", "rating2")
-    srcDO.writeSparkDataFrame(l3, Seq())(context3)
-    action3.init(Seq(srcSubFeed))(context3.copy(phase = ExecutionPhase.Init))
-    action3.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context3)
-
-    {
-      val expected = Seq(("doe", "john", 10, Some(11), Timestamp.valueOf(refTimestamp3)), ("pan", "peter", 5, None, Timestamp.valueOf(refTimestamp2)), ("hans", "muster", 5, None, Timestamp.valueOf(refTimestamp1)))
-        .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()(context3)
-      val resultat = expected.equal(actual)
-      if (!resultat) printFailedTestResult("deduplicate load", Seq())(actual)(expected)
-      assert(resultat)
-    }
+    testDeduplicateWithMergeMode(
+      (id, registry) => MockSparkDataObject(id),
+      (id, pks, registry) => {
+        val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
+        IcebergTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
+      }
+    )
   }
 
   test("deduplicate load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
-
-    // setup DataObjects
-    val srcDO = MockSparkDataObject("src1").register
-    instanceRegistry.register(srcDO)
-    val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "deduplicate_output", primaryKey = Some(Seq("lastname", "firstname")))
-    val tgtDO = IcebergTableDataObject("tgt1", Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable)
-    tgtDO.dropTable
-    instanceRegistry.register(tgtDO)
-
-
-    // prepare & start 1st load
-    val refTimestamp1 = LocalDateTime.now()
-    val context1 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp1), phase = ExecutionPhase.Exec)
-    val action1 = DeduplicateAction("dda", srcDO.id, tgtDO.id, mergeModeEnable = true, updateCapturedColumnOnlyWhenChanged = true)
-    val l1 = Seq(("doe", "john", Some(5)), ("pan", "peter", Some(5)), ("pan", "peter2", None), ("pan", "peter3", None), ("hans", "muster", Some(5))).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l1, Seq())(context1)
-    val srcSubFeed = SparkSubFeed(None, "src1", Seq())
-    action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
-    action1.exec(Seq(srcSubFeed))(context1).head
-
-    {
-      val expected = Seq(("doe", "john", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", None, Timestamp.valueOf(refTimestamp1)), ("pan", "peter3", None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), Timestamp.valueOf(refTimestamp1)))
-        .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()(context1)
-      val resultat = expected.equal(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
-      assert(resultat)
-    }
-
-    // prepare & start 2nd load
-    val refTimestamp2 = LocalDateTime.now()
-    val context2 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp2), phase = ExecutionPhase.Exec)
-    val l2 = Seq(("doe", "john", Some(10)), ("pan", "peter", Some(5)), ("pan", "peter2", Some(3)), ("pan", "peter3", None)).toDF("lastname", "firstname", "rating")
-    srcDO.writeSparkDataFrame(l2, Seq())(context2)
-    action1.init(Seq(srcSubFeed))(context2.copy(phase = ExecutionPhase.Init))
-    action1.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context2)
-
-    {
-      // note that we expect pan/peter/5, pan/peter2/3 and pan/peter3/null with old refTimestamp because all attributes stay the same
-      val expected = Seq(("doe", "john", Some(10), Timestamp.valueOf(refTimestamp2)), ("pan", "peter", Some(5), Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", Some(3), Timestamp.valueOf(refTimestamp2)), ("pan", "peter3", None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), Timestamp.valueOf(refTimestamp1)))
-        .toDF("lastname", "firstname", "rating", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()(context2)
-      val resultat = expected.equal(actual)
-      if (!resultat) printFailedTestResult("deduplicate 1st 2nd load", Seq())(actual)(expected)
-      assert(resultat)
-    }
-
-    // prepare & start 3rd load with schema evolution
-    // Note that this is not possible with DeltaLake 1.x, as schema evolution with mergeStmt.insertExpr is not properly supported.
-    // See also last two tests in IcebergTableDataObjectTest.
-    val refTimestamp3 = LocalDateTime.now()
-    val context3 = TestUtil.getDefaultActionPipelineContext.copy(referenceTimestamp = Some(refTimestamp3), phase = ExecutionPhase.Exec)
-    val tgtDOwithSchemaEvolution = tgtDO.copy(id = "tgt3", allowSchemaEvolution = true)
-    instanceRegistry.register(tgtDOwithSchemaEvolution)
-    val action3 = action1.copy(outputId = tgtDOwithSchemaEvolution.id)
-    val l3 = Seq(("doe", "john", 11)).toDF("lastname", "firstname", "rating2")
-    srcDO.writeSparkDataFrame(l3, Seq())(context3)
-    action3.init(Seq(srcSubFeed))(context3.copy(phase = ExecutionPhase.Init))
-    action3.exec(Seq(SparkSubFeed(None, "src1", Seq())))(context3)
-
-    {
-      val expected = Seq(("doe", "john", Some(10), Some(11), Timestamp.valueOf(refTimestamp3)), ("pan", "peter", Some(5), None, Timestamp.valueOf(refTimestamp1)), ("pan", "peter2", Some(3), None, Timestamp.valueOf(refTimestamp2)), ("pan", "peter3", None, None, Timestamp.valueOf(refTimestamp1)), ("hans", "muster", Some(5), None, Timestamp.valueOf(refTimestamp1)))
-        .toDF("lastname", "firstname", "rating", "rating2", "dl_ts_captured")
-      val actual = tgtDO.getSparkDataFrame()(context3)
-      val resultat = expected.equal(actual)
-      if (!resultat) printFailedTestResult("deduplicate load", Seq())(actual)(expected)
-      assert(resultat)
-    }
+    testDeduplicateWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
+      (id, registry) => MockSparkDataObject(id),
+      (id, pks, registry) => {
+        val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
+        IcebergTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
+      }
+    )
   }
+
+  test("deduplicate 1st 2nd load with transformer changing schema") {
+    testDeduplicateWithTransformerChangingSchema(
+      (id, registry) => MockSparkDataObject(id),
+      (id, pks, registry) => {
+        val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
+        IcebergTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
+      }
+    )
+  }
+
 }

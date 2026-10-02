@@ -35,7 +35,7 @@ case class HadoopExportWriter(path: HadoopPath, hadoopConfig: Configuration = ne
   private implicit val filesystem: FileSystem = path.getFileSystem(hadoopConfig)
 
   override def writeConfig(document: String, version: Option[String]): Unit = {
-    writeFile(document, "config.json")
+    writeFile(document, "exportedConfig.json")
   }
 
   override def writeSchema(document: String, dataObjectId: DataObjectId, version: Long): Unit = {

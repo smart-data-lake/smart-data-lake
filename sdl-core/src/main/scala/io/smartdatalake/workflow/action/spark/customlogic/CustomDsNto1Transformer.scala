@@ -32,6 +32,7 @@ import io.smartdatalake.workflow.action.spark.transformer.ParameterResolution.Pa
  * The transformer will use reflection to search the "transform" method, and fill in the parameters dynamically.
  * It can match parameters by name or by order, see [[ParameterResolution]].
  */
+@deprecated ("Datasets can now be used directly as parameters of custom transform function in CustomDfsTransformer, so this interface is not needed anymore")
 trait CustomDsNto1Transformer extends Serializable with SmartDataLakeLogger {
 
   /**

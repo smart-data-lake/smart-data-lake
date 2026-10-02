@@ -38,7 +38,7 @@ trait CanCreateSparkDataFrame extends CanCreateDataFrame { this: DataObject =>
 
   def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext) : DataFrame
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext) : GenericDataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type = SparkSubFeed.subFeedType)(implicit context: ActionPipelineContext) : GenericDataFrame = {
     if (subFeedType =:= typeOf[SparkSubFeed]) SparkDataFrame(getSparkDataFrame(partitionValues))
     else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
   }

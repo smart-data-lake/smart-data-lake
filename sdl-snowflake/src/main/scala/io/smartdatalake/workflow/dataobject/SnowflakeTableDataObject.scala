@@ -100,7 +100,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
-    with CanHandlePartitions with ExpectationValidation with CanHandleConstraints {
+    with CanHandlePartitions with ExpectationValidation with JdbcCatalogReferentialKeys {
 
   val connection: SnowflakeConnection = getConnection[SnowflakeConnection](connectionId)
 
@@ -354,22 +354,17 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     else column
   }
 
-  def getExistingPKConstraint(catalog: Option[String], schema: Option[String], tableName: String)(implicit context: ActionPipelineContext): Option[PrimaryKeyDefinition] =
-    connection.catalog.getPrimaryKey(catalog, schema, tableName)
-
-  def dropPrimaryKeyConstraint(tableName: String, constraintName: String)(implicit context: ActionPipelineContext): Unit =
-    connection.catalog.dropPrimaryKeyConstraint(tableName, constraintName)
-
-  def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit =
-    connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
-
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
-    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint
+    if (table.createAndReplaceReferentialKeys) createOrReplaceReferentialKeys
     if (syncComments) {
       columnComments.foreach(columnComment => connection.execJdbcStatement(s"comment on column ${table.fullName}.${columnComment._1} is '${columnComment._2}';"))
     }
   }
+
+  // ── JdbcCatalogReferentialKeys hook ──────────────────────────────────
+
+  override protected def jCatalog = connection.catalog
 }
 
 object SnowflakeTableDataObject extends FromConfigFactory[DataObject] {

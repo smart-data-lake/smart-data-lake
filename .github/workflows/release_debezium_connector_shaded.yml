@@ -45,7 +45,7 @@ jobs:
           restore-keys: ${{ runner.os }}-maven-
 
       - name: Maven deploy to sonatype
-        run: mvn -P release-sonatype -B -f pom.xml clean deploy -pl 'sdl-debezium/debezium-connector-mysql-shaded,sdl-debezium/debezium-connector-mariadb-shaded'
+        run: mvn -P release-sonatype -B -ntp -Daether.dependencyCollector.impl=bf -f pom.xml clean deploy -pl 'sdl-debezium/debezium-connector-mysql-shaded,sdl-debezium/debezium-connector-mariadb-shaded'
         env:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}

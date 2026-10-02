@@ -37,8 +37,12 @@ object IcebergTestUtils {
     "spark.sql.catalog.iceberg_hadoop.type" -> "hadoop",
     "spark.sql.catalog.iceberg_hadoop.warehouse" -> "target/icebergHadoopWarehouse",
   )
-  def session : SparkSession = additionalSparkProperties
-    .foldLeft(TestUtil.sparkSessionBuilder()) {
-      case (builder, config) => builder.config(config._1, config._2)
-    }.getOrCreate()
+  def session : SparkSession = {
+    val session = additionalSparkProperties
+      .foldLeft(TestUtil.sparkSessionBuilder()) {
+        case (builder, config) => builder.config(config._1, config._2)
+      }.getOrCreate()
+    session.sql("CREATE DATABASE IF NOT EXISTS iceberg1.default")
+    session
+  }
 }

@@ -22,6 +22,7 @@ package io.smartdatalake.util.spark.dataset
 import io.smartdatalake.util.LogUtils.{debLogFun, debugLog}
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.NamedExpression
+import org.apache.spark.sql.catalyst.expressions.objects.AssertNotNull
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
@@ -46,7 +47,28 @@ trait Quality extends Transform {
         s" as it is not a NamedExpression." +
         s" use withComment(colName: String, column: Column, commentText: String) instead.")
     }
-    withComment(colName, commentText)
+    // strip the qualifier, e.g. col("t.src") -> "src", consistent with withComment(colName, commentText)
+    withComment(colName.split('.').last, column, commentText)
+  }
+
+  implicit class DsColComment(column: Column) {
+
+    /**
+     * Fluent alternative to withComment(column, commentText): col("abc").withComment("my description")
+     */
+    def withComment(commentText: String): Column = Quality.this.withComment(column, commentText)
+
+    /**
+     * Marks this column as not-nullable.
+     * The check is enforced at runtime: an actual null value in the underlying data throws a NullPointerException.
+     */
+    def makeNotNullable: Column = {
+      val asserted = new Column(AssertNotNull(column.expr))
+      column.expr match {
+        case named: NamedExpression => asserted.as(named.name)
+        case _ => asserted
+      }
+    }
   }
 
   /**

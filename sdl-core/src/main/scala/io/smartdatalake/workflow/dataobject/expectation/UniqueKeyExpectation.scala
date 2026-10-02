@@ -76,7 +76,7 @@ case class UniqueKeyExpectation(
     val colsToCheck = (if (key.isEmpty) getPrimaryKeyCols(dataObjectId) else key).map(functions.col)
     // if (scope == ExpectationScope.Job && functions.requestSubFeedType() == typeOf[SparkSubFeed])
     val countDistinctCol = if (approximate) functions.approxCountDistinct(functions.struct(colsToCheck:_*), approximateRsd).as(countDistinctName)
-    else functions.countDistinct(colsToCheck:_*).as(countDistinctName)
+    else functions.countDistinct(functions.struct(colsToCheck:_*)).as(countDistinctName)
     val countCol = if (scope == ExpectationScope.All) Some(functions.count(functions.col("*")).as(countName)) else None
     Seq(Some(countDistinctCol), countCol).flatten
   }

@@ -21,18 +21,28 @@ package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.workflow.dataframe.GenericRow
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 
-case class ScalaRow(values: IndexedSeq[Any]) extends GenericRow {
-  def apply(ix: Int) = values(ix)
+/**
+ * A row in a ScalaDataFrame.
+ * The data is stored as an IndexedSeq.
+ */
+case class ScalaRow(values: IndexedSeq[Option[Any]]) extends GenericRow {
+  def apply(ix: Int): Option[Any] = values(ix)
 
-  override def get(index: Int): Any = values(index)
+  override def get(index: Int): Option[Any] = values(index)
 
-  override def getStruct(index: Int): GenericRow = this //not relevant for our tests
+  override def getStruct(index: Int): GenericRow = throw new NotImplementedError("getStruct is not implemented for ScalaRow")
 
-  override def getAs[T](index: Int): T = values(index).asInstanceOf[T]
+  override def getAs[T: ClassTag](index: Int): T = {
+    val v = values(index)
+    val cls = implicitly[ClassTag[T]].runtimeClass
+    if (cls.isAssignableFrom(classOf[Option[_]])) v.asInstanceOf[T]
+    else v.orNull.asInstanceOf[T]
+  }
 
-  override def toSeq: Seq[Any] = values
+  override def toSeq: Seq[Option[Any]] = values
 
   override def subFeedType: universe.Type =  universe.typeOf[ScalaSubFeed]
 }
