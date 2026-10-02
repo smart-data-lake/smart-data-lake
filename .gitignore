@@ -3,6 +3,9 @@ data/output
 lib
 target
 venv
+# default output of ConfigJsonExporter/DataObjectSchemaExporter when run via tests;
+# written outside target/ so 'mvn clean' doesn't remove it
+/sdl-lang/exportedConfig.json
 /.externalToolBuilders/
 *.html
 *.js
