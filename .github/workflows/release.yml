@@ -141,7 +141,10 @@ jobs:
 
     - name: Develop Get Next Version
       id: bump_version
-      uses: christian-draeger/increment-semantic-version@1.0.1
+      # 1.0.1 emits its result via the `::set-output` command, which GitHub has disabled.
+      # next-version came back empty and `versions:set -DnewVersion=-SNAPSHOT` failed, so
+      # develop was left on the released version. 1.2.3 writes to $GITHUB_OUTPUT.
+      uses: christian-draeger/increment-semantic-version@1.2.3
       with:
         current-version: ${{ env.MVN_RELEASE_VERSION }}
         version-fragment: bug
