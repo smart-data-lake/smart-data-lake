@@ -19,8 +19,13 @@
 package io.smartdatalake.config.exporter
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.exporter.ExportType.ExportType
 import io.smartdatalake.util.misc.{SmartDataLakeLogger, URIUtil}
-import io.smartdatalake.util.webservice.SttpWebserviceClient
+import io.smartdatalake.util.webservice.{HttpRequestError, SttpWebserviceClient}
+import org.json4s.jackson.JsonMethods
+import org.json4s.{DefaultFormats, Formats}
+
+import scala.util.{Failure, Success}
 
 
 case class HttpExportWriter(baseUrl: String) extends ExportWriter with SmartDataLakeLogger {
@@ -45,9 +50,36 @@ case class HttpExportWriter(baseUrl: String) extends ExportWriter with SmartData
     upload(content, "descriptions", Seq(Some("filename" -> filename), version.map("version" -> _)).flatten.toMap)
   }
 
+  override def listVersions(tpe: ExportType, dataObjectId: DataObjectId): Seq[Long] = {
+    implicit val formats: Formats = DefaultFormats
+    download(s"dataobject/$tpe/${dataObjectId.id}/tstamps")
+      .map(JsonMethods.parse(_).extract[Seq[Long]])
+      .getOrElse(Seq())
+  }
+
+  override def readVersion(tpe: ExportType, dataObjectId: DataObjectId, version: Long): Option[String] = {
+    download(s"dataobject/$tpe/${dataObjectId.id}", Map("tstamp" -> version.toString))
+      .map(ExportWriter.unwrapDownloadedDocument(tpe, _))
+  }
+
   private def upload(content: Array[Byte], subPath: String, additionalParams: Map[String, String] = Map()): Unit = {
     logger.info(s"Uploading $subPath " + additionalParams.map { case (k, v) => s"$k=$v" }.mkString(" "))
-    val wsClient = SttpWebserviceClient(url = URIUtil.appendPath(baseUrl, subPath), additionalHeaders = Map(), timeouts = None, authMode = None, proxy = None, followRedirects = true, retries = 1, sttpBackendOption = None)
-    wsClient.put(content, "application/json", additionalParams).get
+    getClient(subPath).put(content, "application/json", additionalParams).get
+  }
+
+  /**
+   * @return None if the document does not exist (HTTP 404)
+   */
+  private def download(subPath: String, additionalParams: Map[String, String] = Map()): Option[String] = {
+    logger.info(s"Downloading $subPath " + additionalParams.map { case (k, v) => s"$k=$v" }.mkString(" "))
+    getClient(subPath).get(additionalParams) match {
+      case Success(content) => Some(new String(content, "UTF-8")).filter(_.nonEmpty)
+      case Failure(HttpRequestError(_, 404, _)) => None
+      case Failure(ex) => throw ex
+    }
+  }
+
+  private def getClient(subPath: String) = {
+    SttpWebserviceClient(url = URIUtil.appendPath(baseUrl, subPath), additionalHeaders = Map(), timeouts = None, authMode = None, proxy = None, followRedirects = true, retries = 1, sttpBackendOption = None)
   }
 }

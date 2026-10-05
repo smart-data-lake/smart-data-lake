@@ -19,11 +19,13 @@
 package io.smartdatalake.config.exporter
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.exporter.ExportType.ExportType
 import io.smartdatalake.util.misc.FileUtil.readFile
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 
 import java.nio.file.{Files, Path, StandardOpenOption}
 import scala.io.Source
+import scala.jdk.CollectionConverters._
 import scala.util.Using
 
 
@@ -80,9 +82,40 @@ case class FileExportWriter(path: Path) extends ExportWriter with SmartDataLakeL
   }
 
   def getLatestData(dataObjectId: DataObjectId, tpe: String): Option[String] = {
+    // the index is sorted by version, see writeVersion
     val lastIndexEntry = readIndex(dataObjectId, tpe).lastOption
     val latestFile = lastIndexEntry.map(path.resolve).map(_.toFile)
     latestFile.map(readFile)
+  }
+
+  override def listVersions(tpe: ExportType, dataObjectId: DataObjectId): Seq[Long] = {
+    readIndex(dataObjectId, tpe.toString).flatMap(parseVersion(dataObjectId, tpe.toString, _)).sorted
+  }
+
+  override def readVersion(tpe: ExportType, dataObjectId: DataObjectId, version: Long): Option[String] = {
+    val (filename, file) = getDataPath(dataObjectId, tpe.toString, version)
+    if (readIndex(dataObjectId, tpe.toString).contains(filename) && Files.exists(file)) Some(readFile(file.toFile))
+    else None
+  }
+
+  /**
+   * Write a given version idempotently: nothing is written if this version exists already.
+   * The version might be older than the latest version, so the index is rewritten sorted by version.
+   */
+  override def writeVersion(tpe: ExportType, document: String, dataObjectId: DataObjectId, version: Long): Unit = {
+    val index = readIndex(dataObjectId, tpe.toString)
+    val (newFilename, newFile) = getDataPath(dataObjectId, tpe.toString, version)
+    if (!index.contains(newFilename)) {
+      Files.createDirectories(path)
+      logger.info(s"Writing $tpe for $dataObjectId version $version to file $newFile and updating index")
+      Files.write(newFile, document.getBytes("UTF-8"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+      val newIndex = (index :+ newFilename).sortBy(f => parseVersion(dataObjectId, tpe.toString, f).getOrElse(Long.MinValue))
+      Files.write(getIndexPath(dataObjectId, tpe.toString), newIndex.map(_ + System.lineSeparator).asJava, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+    }
+  }
+
+  private def parseVersion(dataObjectId: DataObjectId, tpe: String, filename: String): Option[Long] = {
+    filename.stripPrefix(s"${dataObjectId.id}.$tpe.").stripSuffix(".json").toLongOption
   }
 
   def readIndex(dataObjectId: DataObjectId, tpe: String): Seq[String] = {

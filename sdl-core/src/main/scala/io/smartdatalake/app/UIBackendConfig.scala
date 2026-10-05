@@ -23,7 +23,6 @@ import io.smartdatalake.util.webservice.SttpUtil.{createDefaultBackendOptions, g
 import io.smartdatalake.util.webservice.{HttpProxyConfig, HttpTimeoutConfig}
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
 import sttp.client3.{BasicRequestBody, HttpClientSyncBackend, Identity, SttpBackend, basicRequest}
-import sttp.model.Uri.PathSegment
 import sttp.model._
 
 import java.util.concurrent.TimeUnit
@@ -100,8 +99,10 @@ case class UIBackendConfig(
       override def sendBytes(operation: String, body: Option[Array[Byte]] = None, multipartBody: Option[Seq[Part[BasicRequestBody]]] = None, method: Method = Method.POST, additionalParams: Map[String, String] = Map(), mediaType: MediaType = MediaType.ApplicationJson): Option[String] = {
         assert(body.isEmpty || multipartBody.isEmpty, "Only body or multipartBody can be set.")
         logger.debug(s"operation=$operation method=$method params=$params additionalParams=$additionalParams mediaType=$mediaType bodyLength=${body.map(_.length).getOrElse(0)}")
+        // the operation can consist of several path segments, e.g. dataobject/schema/<id>. They are added one by one,
+        // as a slash within a segment would be sent encoded as %2F, which the UI backend does not route.
         var request = basicRequest
-          .method(method, Uri.unsafeParse(baseUrl).addPathSegment(PathSegment(operation)).addParams(params ++ additionalParams))
+          .method(method, Uri.unsafeParse(baseUrl).addPath(operation.split('/').toSeq).addParams(params ++ additionalParams))
           .header(Header.contentType(mediaType))
           .headers(authMode.map(_.getHeaders).getOrElse(Map()))
           .readTimeout(FiniteDuration(timeouts.readTimeoutMs, TimeUnit.MILLISECONDS))
