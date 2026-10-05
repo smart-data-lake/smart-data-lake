@@ -8,14 +8,14 @@ transformers can be written in Spark SQL and executed on e.g. Postgres, SQL Serv
 
 ## Usage
 
-An Action uses the SQL engine if its `engineConnectionId` references a `JdbcTableConnection`. All its inputs and
+An Action uses the SQL engine if its `engineConnectionId` references a `JdbcConnection`. All its inputs and
 outputs must then be `JdbcTableDataObject`s of this connection. The data is never transferred out of the database:
 the transformations are executed with `INSERT INTO ... SELECT` statements, or a merge statement.
 
 ```hocon
 connections {
   dwh {
-    type = JdbcTableConnection
+    type = JdbcConnection
     url = "jdbc:postgresql://localhost:5432/dwh"
     driver = org.postgresql.Driver
     # dialect = postgres  # SQLGlot dialect of the database, derived from the url by default
@@ -38,7 +38,14 @@ actions {
 
 Supported are the save modes Overwrite (delete and insert in one transaction, also for virtual partitions), Append
 and Merge (with a temporary table created by `CREATE TABLE ... AS SELECT`), and incremental output with
-`DataObjectStateIncrementalMode`.
+`DataObjectStateIncrementalMode`. The conditions of a merge, e.g. `updateCondition` of `saveModeOptions` or the
+ones created by UpsertAction, are Spark SQL like all expressions given as string, and are translated to the dialect of
+the database.
+
+HistorizeAction and UpsertAction are supported, including their merge modes. Note that the hash column `dl_hash` of
+HistorizeAction is the MD5 hash of the historized values concatenated as text, as there is no hash function which is
+portable between databases. It differs from the integer hash of the Spark engine, so a history created with Spark
+can not be continued with the SQL engine without recalculating `dl_hash`.
 
 Schema evolution (`allowSchemaEvolution = true`) adds new columns, widens data types, and makes columns missing in
 the DataFrame nullable, with `ALTER TABLE` statements rendered by SQLGlot for the dialect of the database.
@@ -76,7 +83,8 @@ actions {
 }
 ```
 
-The view is replaced in exec phase on every run, and a missing view is created in init phase, like a missing table.
+The view is replaced in exec phase if its query changed, and a missing view is created in init phase, like a missing
+table. If the query of the existing view can not be compared, it is replaced on every run.
 In init phase the query is also validated by executing it without fetching rows. As the query of a view is stored in the database, it must not depend on the current run: an Action
 writing a view (see marker trait `ViewDataObject`) ignores the partition values and filters of its inputs, and must
 not have an execution mode. Only save mode Overwrite is supported.
@@ -95,7 +103,50 @@ drops them on replace, so `COPY GRANTS` is added, and Databricks as well, so an 
 `CREATE OR REPLACE VIEW` keeps the grants.
 
 Note that Postgres can not replace a view if existing columns are renamed, removed or change their type; the view
-must then be dropped first, which also drops its grants. Materialized views are not supported yet.
+must then be dropped first, which also drops its grants.
+
+To compare the query of an existing view with a new one, both are normalized with SQLGlot. For Postgres, the new
+query is first rewritten by the database like the definition of a view, e.g. with casts added and aliases removed, by
+creating a temporary view in a transaction which is rolled back (`JdbcCatalog.getViewDefinitionOfQuery`).
+
+### Materialized views
+
+With `materialized = true`, a `JdbcViewDataObject` is a materialized view, supported for the SQLGlot dialects
+postgres, redshift, oracle, snowflake and databricks. Other dialects fail in prepare phase. A missing materialized
+view is created in init phase with data, as Postgres can not read an unpopulated one. On every run the Action writing it
+refreshes it (`REFRESH MATERIALIZED VIEW`, `DBMS_MVIEW.REFRESH` on Oracle), except if it was created by the init
+phase of the same run. Snowflake refreshes materialized views automatically. If the query changed and
+`allowSchemaEvolution = true`, it is replaced instead of refreshed. Its existing query is read from `pg_matviews` (Postgres),
+`ALL_MVIEWS` (Oracle), with `SHOW MATERIALIZED VIEWS` (Snowflake, column `text`) and with `SHOW CREATE TABLE`
+(Databricks, needs Databricks Runtime 14.1 or above). Snowflake and Databricks return the whole `CREATE` statement; if
+SQLGlot can not parse it, e.g. a `SCHEDULE` clause of Databricks, the query after its top-level `AS` is compared. If the
+definition can not be read, e.g. for Redshift, a changed query is not detected and the materialized view is only
+refreshed, with a warning, so that it is never replaced on every run. A refresh on Databricks is incremental where possible.
+
+On Databricks and Snowflake, the SHA-256 hash of the normalized query is also stored with the view or materialized
+view, and compared instead of its definition when it is set, as it does not depend on how the database returns the
+definition:
+
+- Databricks: table property `sdlb.queryHash`, read with `SHOW TBLPROPERTIES`. A materialized view gets it in
+  `TBLPROPERTIES` of `CREATE OR REPLACE MATERIALIZED VIEW`, a view with `ALTER VIEW ... SET TBLPROPERTIES`, as an
+  existing view is replaced with `ALTER VIEW ... AS` to keep its grants.
+- Snowflake: tag `SDLB_QUERY_HASH` in the schema of the view, set with `CREATE TAG IF NOT EXISTS` and
+  `ALTER [MATERIALIZED] VIEW ... SET TAG`, read with `SYSTEM$GET_TAG`. Tags need Enterprise Edition and the privilege
+  to create tags; if setting the tag fails, a warning is logged and the definition is compared.
+
+The comment of the view is not used, as SDLB manages it as table comment. Postgres and Oracle have no table
+properties, so their definition is compared.
+
+Snowflake keeps the grants with `CREATE OR REPLACE MATERIALIZED VIEW ... COPY GRANTS`, and Databricks uses
+`CREATE OR REPLACE MATERIALIZED VIEW`. Postgres, Redshift and Oracle can not replace a materialized view, so it is
+dropped and created again. The privileges granted on it are read before (`JdbcCatalog.getGrants`, from `pg_class.relacl`
+for Postgres and `ALL_TAB_PRIVS` for Oracle), and are granted again after it is created. Drop, create and grants run in
+one transaction, so that nothing changes if one of them fails, at least on Postgres, where DDL is transactional. For
+Redshift the grants can not be read yet, so a warning says that they are lost. Postgres can not drop a materialized
+view while other views depend on it.
+
+The materialized view tests run on an embedded Postgres (zonky embedded-postgres, `SQLTestUtil.createPostgresConnection`),
+as DuckDB has no materialized views.
 
 ### Mixed feeds
 
@@ -125,9 +176,9 @@ SQLGlot is a Python library. It runs in a Python interpreter embedded into the J
 | `SQLColumn` | `workflow/dataframe/sql/SQLColumn.scala` | A column expression as Spark SQL text (SQLGlot dialect `databricks`, i.e. Spark SQL with ANSI casts). Operators and functions compose the SQL text in Scala, no call to Python is needed. |
 | `SQLSchema` | `workflow/dataframe/sql/SQLSchema.scala` | Schema, fields and data types. Types of results are inferred by SQLGlot. |
 | `JdbcTableSqlEngine` | `workflow/dataobject/JdbcTableSqlEngine.scala` | SQL engine implementation of the `JdbcTableEngine` SPI of `JdbcTableDataObject` (sdl-core), discovered on the classpath like the Spark implementation in sdl-spark. Reads the table schema from the JDBC metadata, validates that the DataObject uses the engine connection, and executes the writes. |
-| `JdbcViewSqlEngine` | `workflow/dataobject/JdbcViewSqlEngine.scala` | SQL engine implementation of the `JdbcViewEngine` SPI of `JdbcViewDataObject` (sdl-core). Creates the view with a `CREATE OR REPLACE VIEW` statement rendered by SQLGlot. Reading the view is done by `JdbcTableSqlEngine`. |
+| `JdbcViewSqlEngine` | `workflow/dataobject/JdbcViewSqlEngine.scala` | SQL engine implementation of the `JdbcViewEngine` SPI of `JdbcViewDataObject` (sdl-core). Creates the view with a `CREATE OR REPLACE VIEW` statement rendered by SQLGlot, and creates, replaces and refreshes materialized views. Reading the view is done by `JdbcTableSqlEngine`. |
 
-`JdbcTableConnection` (sdl-core) is the engine connection of the SQL engine: its SubFeed type is `SQLSubFeed`.
+`JdbcConnection` (sdl-core) is the engine connection of the SQL engine: its SubFeed type is `SQLSubFeed`.
 
 Every DataFrame operation wraps its input as subquery. The SQLGlot optimizer merges these subqueries again when
 rendering the statement, e.g.
@@ -142,6 +193,13 @@ SQLSubFeed.sql("select *, d * 2 as e from test_table_int", DataObjectId("do1"))
 
 Database tables are registered in SQLGlot under a placeholder name with their schema, and replaced by their real
 name when rendering. Temporary views are replaced by their query when parsing the SQL of a transformer.
+
+Joins behave like in Spark: the columns of both inputs are kept, also if their name exists on both sides, and a
+column qualified with the alias of an input, e.g. `col("existing.a")`, stays valid after further operations, e.g.
+`withColumn` or `drop(col("existing.a"))`, as long as the column is passed through unchanged. Internally, a column whose
+name exists already gets a unique key, and is renamed to its name when the statement is rendered. A projection or
+filter is applied directly to the join while it only references its inputs, and otherwise to the join wrapped as
+subquery, see `Session._in_join_scope` in `bridge.py`.
 
 ### Identifiers and case
 
@@ -201,4 +259,4 @@ mvn -B test -pl sdl-sql -Dlicense.skip=true       # Scala side, needs SDL_PYTHON
 
 The Scala tests execute SQL on a [DuckDB](https://duckdb.org) database file in `target/duckdb`, see `SQLTestUtil`.
 The tests needing Python cancel themselves if no environment with jep is found, so the normal build needs no
-Python. They run in the GitHub workflow `sql_engine_tests.yml`.
+Python. In CI they run in the Snapshot Build (`snapshot_build.yml`), which creates the environment with uv.

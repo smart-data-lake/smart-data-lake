@@ -65,7 +65,7 @@ object SQLUtil extends SmartDataLakeLogger {
    * Create a SQL merge statement for given saveModeOptions
    */
   def createMergeStatement(targetTable: Table, columns: Seq[String], tmpTableName: String, saveModeOptions: SaveModeMergeOptions, quoteCaseSensitiveColumn: String => String): String = {
-    val additionalMergePredicateStr = saveModeOptions.additionalMergePredicate.map(p => s" AND $p").getOrElse("")
+    val additionalMergePredicateStr = saveModeOptions.additionalMergePredicate.map(p => s" AND ($p)").getOrElse("")
     val joinConditionStr = targetTable.primaryKey.get.map(quoteCaseSensitiveColumn).map(colName => s"new.$colName = existing.$colName").reduce(_+" AND "+_)
     val deleteClauseStr = saveModeOptions.deleteCondition.map(c => s"\nWHEN MATCHED AND $c THEN DELETE").getOrElse("")
     val updateConditionStr = saveModeOptions.updateCondition.map(c => s" AND $c").getOrElse("")
@@ -87,7 +87,7 @@ object SQLUtil extends SmartDataLakeLogger {
   def createUpdateExistingStatement(targetTable: Table, columns: Seq[String], tmpTableName: String, saveModeOptions: SaveModeMergeOptions, quoteCaseSensitiveColumn: String => String): Option[String] = {
 
     if (saveModeOptions.updateExistingCondition.isDefined) {
-      val additionalMergePredicateStr = saveModeOptions.additionalMergePredicate.map(p => s" AND $p").getOrElse("")
+      val additionalMergePredicateStr = saveModeOptions.additionalMergePredicate.map(p => s" AND ($p)").getOrElse("")
       val joinConditionStr = targetTable.primaryKey.get.map(quoteCaseSensitiveColumn).map(colName => s"new.$colName = existing.$colName").reduce(_ + " AND " + _)
       val updateExistingConditionStr = saveModeOptions.updateExistingCondition.map(c => s" AND $c").getOrElse("")
       // columns which are not inserted into the target table do not exist there and can not be updated either

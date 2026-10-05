@@ -51,7 +51,7 @@ JSON object, and returning a JSON object with either `result` or `error` and `tr
 import json
 import re
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import sqlglot
 from sqlglot import exp
@@ -137,6 +137,10 @@ class _DataFrame:
     # Projections and filters are then applied to expr directly instead of wrapping it into a subquery, see
     # Session._in_join_scope.
     join_scope: bool = False
+    # columns which can be referenced qualified with the alias of an input of a join, e.g. `existing.id`, as
+    # {(qualifier, key): key of the column}. Like in Spark, such references stay valid after further operations, e.g.
+    # when the join is wrapped into a subquery, as long as the column is passed through unchanged.
+    qualified: dict = field(default_factory=dict)
 
     def spelling(self, key):
         return self.columns[self.keys.index(key)]
@@ -206,6 +210,8 @@ class Session:
         self._spellings = {}
         self._views = {}
         self._schema = MappingSchema(normalize=False)
+        # spelling of internal keys, see `_internal_key`
+        self._internal_spellings = {}
         return None
 
     def set_case_sensitive(self, case_sensitive):
@@ -359,14 +365,16 @@ class Session:
             raise ValueError(f"DataFrame {df_id} not found, it might have been released already")
         return df
 
-    def _register(self, expr, alias=None, join_scope=False, columns=None):
+    def _register(self, expr, alias=None, join_scope=False, columns=None, qualified=None):
         """Register a DataFrame. `columns` are its output columns as list of (key, spelling), they are resolved from
-        `expr` if not given."""
+        `expr` if not given. `qualified` are the qualified references of its columns, see `_DataFrame.qualified`."""
         if columns is None:
-            qualified = qualify(expr.copy(), schema=self._schema, validate_qualify_columns=True)
-            columns = self._resolve(qualified, check=True)
+            qualified_expr = qualify(expr.copy(), schema=self._schema, validate_qualify_columns=True)
+            columns = [(k, self._internal_spellings.get(k, s)) for k, s in self._resolve(qualified_expr, check=True)]
         df_id = self._next_id()
-        df = _DataFrame(expr, [s for _, s in columns], [k for k, _ in columns], alias or f"_t{df_id}", join_scope)
+        keys = [k for k, _ in columns]
+        qualified = {q: k for q, k in (qualified or {}).items() if k in keys}
+        df = _DataFrame(expr, [s for _, s in columns], keys, alias or f"_t{df_id}", join_scope, qualified)
         self._dfs[df_id] = df
         return {"id": df_id, "columns": df.columns, "alias": df.alias}
 
@@ -381,16 +389,104 @@ class Session:
     def _sub(self, df):
         return df.expr.subquery(exp.to_identifier(df.alias, quoted=True))
 
-    def _in_join_scope(self, df, direct, wrapped):
+    def _internal_key(self, key, spelling):
+        """Create a unique key for a column whose name exists already in a DataFrame, e.g. for a column existing on both
+        sides of a join. The column keeps its name for Scala, and is renamed to it when the DataFrame is rendered, see
+        `_output_expr`."""
+        internal = f"{key}__sdlb{self._next_id()}"
+        self._internal_spellings[internal] = spelling
+        return internal
+
+    def _keys_named(self, d, key):
+        """Keys of the columns of the DataFrame with the normalized name `key`. There are several if a name exists more
+        than once, e.g. after a join of DataFrames with columns of the same name."""
+        return [k for k, s in self._columns(d) if self._key(s) == key]
+
+    def _key_named(self, d, key):
+        keys = self._keys_named(d, key)
+        if len(keys) > 1:
+            raise ValueError(f"Column '{d.spelling(keys[0])}' is ambiguous, it exists {len(keys)} times. "
+                             f"Qualify it with the alias of the input of the join.")
+        return keys[0] if keys else None
+
+    def _referenced_key(self, d, column):
+        """Key of the column of the DataFrame referenced by a parsed column reference, or None if it does not reference
+        one, e.g. a field of a struct, or a column which can not be resolved."""
+        if column.args.get("db") is not None or not isinstance(column.this, exp.Identifier):
+            return None
+        if column.table:
+            key = d.qualified.get((column.table, column.name))
+            if key is None and column.table == d.alias:
+                key = self._key_named(d, column.name)
+            return key
+        return self._key_named(d, column.name)
+
+    def _rewrite(self, d, expr):
+        """Rewrite the column references of a parsed expression to be applied to the DataFrame wrapped as subquery with
+        its alias: qualified references to an input of a join, e.g. `existing.a`, and references to columns with an
+        internal key, see `_internal_key`, are replaced by a reference to the key."""
+        for column in list(expr.find_all(exp.Column)):
+            key = self._referenced_key(d, column)
+            if key is not None and (key != column.name or column.table not in ("", d.alias)):
+                ident = exp.to_identifier(key, quoted=True)
+                ident.meta.update(column.this.meta)
+                reference = exp.column(ident, table=exp.to_identifier(column.table, quoted=True) if column.table == d.alias else None)
+                if column is expr:
+                    return reference
+                column.replace(reference)
+        return expr
+
+    def _direct_possible(self, d, expressions):
+        """True if expressions can be resolved directly on the join of the DataFrame without changing their meaning:
+        an unqualified reference to a column computed by a previous operation would be resolved to a column of an
+        input of the join of the same name, e.g. in `with_column("a", "a + 1")` followed by `select("a")`."""
+        projections = {p.alias_or_name: p for p in d.expr.selects}
+        for expression in expressions:
+            for column in expression.find_all(exp.Column):
+                if column.table or not isinstance(column.this, exp.Identifier):
+                    continue
+                keys = self._keys_named(d, column.name)
+                if len(keys) > 1:
+                    return False
+                projection = projections.get(keys[0]) if keys else None
+                if keys and not (isinstance(projection, exp.Column) and projection.name == column.name):
+                    return False
+        return True
+
+    def _in_join_scope(self, df, direct, wrapped, expressions=()):
         """Apply an operation directly to a join if its columns can be resolved there, so that they can reference the
         inputs of the join by their alias. Otherwise, e.g. for the join column of a join on columns which exists on
         both sides, apply it to the join wrapped as subquery, where the output columns of the join are referenced."""
-        if df.join_scope:
+        if df.join_scope and self._direct_possible(df, expressions):
             try:
                 return direct()
             except OptimizeError:
                 pass
         return wrapped()
+
+    @staticmethod
+    def _qualified_of(expr):
+        """Qualified references of the columns of a select directly applied to a join, see `_DataFrame.qualified`"""
+        result = {}
+        for projection in expr.selects:
+            inner = projection.this if isinstance(projection, exp.Alias) else projection
+            if isinstance(inner, exp.Column) and inner.table and isinstance(inner.this, exp.Identifier):
+                result.setdefault((inner.table, inner.name), projection.alias_or_name)
+        return result
+
+    @staticmethod
+    def _qualified_without(d, keys):
+        return {q: k for q, k in d.qualified.items() if k not in keys}
+
+    def _output_expr(self, d):
+        """The query of the DataFrame, with columns having an internal key renamed to their name, see `_internal_key`.
+        A column keeps its internal key if its name is not unique."""
+        if not any(k in self._internal_spellings for k in d.keys):
+            return d.expr.copy()
+        names = [self._key(s) for s in d.columns]
+        projections = [self._alias(_col(k), s) if k in self._internal_spellings and names.count(self._key(s)) == 1 else _col(k)
+                       for k, s in self._columns(d)]
+        return exp.select(*projections).from_(self._sub(d))
 
     def release(self, ids):
         for df_id in ids:
@@ -470,55 +566,90 @@ class Session:
 
     def select(self, df, columns):
         d = self._df(df)
-        return self._in_join_scope(
-            d,
-            lambda: self._register(d.expr.copy().select(*[self._parse(c) for c in columns], append=False)),
-            lambda: self._register(exp.select(*[self._parse(c) for c in columns]).from_(self._sub(d))))
+        parsed = [self._parse(c) for c in columns]
+
+        def direct():
+            expr = d.expr.copy().select(*[p.copy() for p in parsed], append=False)
+            return self._register(expr, qualified=self._qualified_of(expr))
+
+        def wrapped():
+            projections = [self._rewrite(d, p.copy()) for p in parsed]
+            # columns passed through keep their qualified references
+            passed = {p.name for p in projections if isinstance(p, exp.Column) and p.table in ("", d.alias)}
+            return self._register(exp.select(*projections).from_(self._sub(d)),
+                                  qualified={q: k for q, k in d.qualified.items() if k in passed})
+
+        return self._in_join_scope(d, direct, wrapped, parsed)
 
     def filter(self, df, condition):
         d = self._df(df)
+        parsed = self._parse(condition)
         return self._in_join_scope(
             d,
-            lambda: self._register(d.expr.copy().where(self._parse(condition)), join_scope=True),
-            lambda: self._register(exp.select("*").from_(self._sub(d)).where(self._parse(condition)), columns=self._columns(d)))
+            lambda: self._register(d.expr.copy().where(parsed.copy()), join_scope=True, qualified=d.qualified),
+            lambda: self._register(exp.select("*").from_(self._sub(d)).where(self._rewrite(d, parsed.copy())),
+                                   columns=self._columns(d), qualified=d.qualified),
+            [parsed])
 
     def with_column(self, df, name, column):
         d = self._df(df)
-        key = self._key(name)
+        # the column replaced, if one exists with the name
+        target = self._key_named(d, self._key(name))
+        parsed = self._parse(column)
+        qualified = self._qualified_without(d, {target})
 
         def direct():
-            projection = self._alias(self._parse(column), name)
+            projection = self._alias(parsed.copy(), name)
             existing = d.expr.expressions
-            if key in d.keys:
-                projections = [projection if p.alias_or_name == key else p.copy() for p in existing]
+            if target is not None:
+                projections = [projection if p.alias_or_name == target else p.copy() for p in existing]
             else:
                 projections = [p.copy() for p in existing] + [projection]
-            return self._register(d.expr.copy().select(*projections, append=False), join_scope=True)
+            return self._register(d.expr.copy().select(*projections, append=False), join_scope=True, qualified=qualified)
 
         def wrapped():
-            projection = self._alias(self._parse(column), name)
-            projections = [projection if k == key else _col(k) for k in d.keys]
-            if key not in d.keys:
+            projection = self._alias(self._rewrite(d, parsed.copy()), name)
+            projections = [projection if k == target else _col(k) for k in d.keys]
+            if target is None:
                 projections.append(projection)
-            return self._register(exp.select(*projections).from_(self._sub(d)))
+            return self._register(exp.select(*projections).from_(self._sub(d)), qualified=qualified)
 
-        return self._in_join_scope(d, direct, wrapped)
+        return self._in_join_scope(d, direct, wrapped, [parsed])
 
     def with_column_renamed(self, df, name, new_name):
         d = self._df(df)
-        key = self._key(name)
-        if key not in d.keys:
+        keys = self._keys_named(d, self._key(name))
+        if not keys:
             return self._info(df)
-        projections = [self._alias(_col(k), new_name) if k == key else _col(k) for k in d.keys]
-        return self._register(exp.select(*projections).from_(self._sub(d)))
+        projections = [self._alias(_col(k), new_name) if k in keys else _col(k) for k in d.keys]
+        return self._register(exp.select(*projections).from_(self._sub(d)), qualified=self._qualified_without(d, keys))
 
-    def drop(self, df, names):
+    def drop(self, df, names=(), columns=()):
+        """Drop the columns with the given `names`, and the columns referenced by the column expressions `columns`.
+        Like in Spark, a column expression qualified with the alias of an input of a join, e.g. `existing.a`, only drops
+        the column of this input, while a name drops all columns of this name."""
         d = self._df(df)
-        keys = {self._key(n) for n in names}
+        keys = {k for n in names for k in self._keys_named(d, self._key(n))}
+        for column in columns:
+            parsed = self._parse(column)
+            if not isinstance(parsed, exp.Column):
+                raise ValueError(f"Can only drop column references, but got {column}")
+            if parsed.table:
+                key = self._referenced_key(d, parsed)
+                keys.update([key] if key is not None else [])
+            else:
+                keys.update(self._keys_named(d, parsed.name))
         remaining = [(k, s) for k, s in self._columns(d) if k not in keys]
         if len(remaining) == len(d.keys):
             return self._info(df)
-        return self._register(exp.select(*[_col(k) for k, _ in remaining]).from_(self._sub(d)), columns=remaining)
+        qualified = self._qualified_without(d, keys)
+        if d.join_scope:
+            # projections are removed from the join, so that its inputs can still be referenced by their alias
+            projections = [p.copy() for p in d.expr.selects if p.alias_or_name not in keys]
+            return self._register(d.expr.copy().select(*projections, append=False), join_scope=True, columns=remaining,
+                                  qualified=qualified)
+        return self._register(exp.select(*[_col(k) for k, _ in remaining]).from_(self._sub(d)), columns=remaining,
+                              qualified=qualified)
 
     def join(self, df, other, how="inner", on=None, condition=None):
         left, right = self._df(df), self._df(other)
@@ -529,11 +660,13 @@ class Session:
             raise ValueError(f"Unsupported join type {how}, supported are {', '.join(_JOIN_TYPES)}")
         if on is not None:
             on = [self._key(c) for c in on]
-            for c in on:
-                if c not in left.keys or c not in right.keys:
+            on_keys = [(self._key_named(left, c), self._key_named(right, c)) for c in on]
+            for c, (left_key, right_key) in zip(on, on_keys):
+                if left_key is None or right_key is None:
                     raise ValueError(f"Join column {c} does not exist on both sides of the join")
-            cond = exp.and_(*[exp.EQ(this=_col(c, left.alias), expression=_col(c, right.alias)) for c in on]) if on else None
+            cond = exp.and_(*[exp.EQ(this=_col(lk, left.alias), expression=_col(rk, right.alias)) for lk, rk in on_keys]) if on else None
         else:
+            on_keys = []
             cond = self._parse(condition) if condition else None
         if cond is None and join_type not in ("cross", "inner"):
             raise ValueError(f"Join type {how} needs join columns or a condition")
@@ -541,26 +674,47 @@ class Session:
             exists = exp.Exists(this=exp.select("1").from_(self._sub(right)).where(cond))
             expr = exp.select(*[_col(c, left.alias) for c in left.keys]).from_(self._sub(left)) \
                 .where(exists if join_type == "semi" else exp.not_(exists))
-            return self._register(expr, columns=self._columns(left))
+            qualified = {**left.qualified, **{(left.alias, self._key(s)): k for k, s in self._columns(left)}}
+            return self._register(expr, columns=self._columns(left), qualified=qualified)
+
+        projections, columns, qualified = [], [], {}
+
+        def add(expression, key, spelling, references):
+            # a column whose name exists already gets an internal key, see _internal_key
+            if key in [k for k, _ in columns]:
+                key = self._internal_key(self._key(spelling), spelling)
+                expression = exp.alias_(expression, exp.to_identifier(key, quoted=True))
+            projections.append(expression)
+            columns.append((key, spelling))
+            for reference in references:
+                qualified.setdefault(reference, key)
+
+        def references(d, key, spelling):
+            return [(d.alias, self._key(spelling))] + [q for q, k in d.qualified.items() if k == key]
+
         if on is not None:
             key_side = {"right": right}.get(join_type, left)
-            keys = [self._alias(exp.Coalesce(this=_col(c, left.alias), expressions=[_col(c, right.alias)]), left.spelling(c))
-                    if join_type == "full" else _col(c, key_side.alias) for c in on]
-            projections = keys + [_col(c, left.alias) for c in left.keys if c not in on] \
-                + [_col(c, right.alias) for c in right.keys if c not in on]
-            columns = [(c, key_side.spelling(c)) for c in on] + [(k, s) for k, s in self._columns(left) if k not in on] \
-                + [(k, s) for k, s in self._columns(right) if k not in on]
-        else:
-            projections = [_col(c, left.alias) for c in left.keys] + [_col(c, right.alias) for c in right.keys]
-            columns = self._columns(left) + self._columns(right)
+            for c, (lk, rk) in zip(on, on_keys):
+                side_key = rk if key_side is right else lk
+                if join_type == "full":
+                    add(self._alias(exp.Coalesce(this=_col(lk, left.alias), expressions=[_col(rk, right.alias)]), left.spelling(lk)),
+                        c, left.spelling(lk), [])
+                else:
+                    add(_col(side_key, key_side.alias), side_key, key_side.spelling(side_key),
+                        references(key_side, side_key, key_side.spelling(side_key)))
+        join_keys = {lk for lk, _ in on_keys}, {rk for _, rk in on_keys}
+        for d, skip in ((left, join_keys[0]), (right, join_keys[1])):
+            for k, s in self._columns(d):
+                if k not in skip:
+                    add(_col(k, d.alias), k, s, references(d, k, s))
         join_type = "cross" if cond is None else join_type
         expr = exp.select(*projections).from_(self._sub(left)).join(self._sub(right), on=cond, join_type=join_type)
-        return self._register(expr, join_scope=True, columns=columns)
+        return self._register(expr, join_scope=True, columns=columns, qualified=qualified)
 
     def group_by_agg(self, df, group_columns, aggregate_columns):
         d = self._df(df)
-        groups = [self._parse(c) for c in group_columns]
-        expr = exp.select(*groups, *[self._parse(c) for c in aggregate_columns]).from_(self._sub(d))
+        groups = [self._rewrite(d, self._parse(c)) for c in group_columns]
+        expr = exp.select(*groups, *[self._rewrite(d, self._parse(c)) for c in aggregate_columns]).from_(self._sub(d))
         if groups:
             expr = expr.group_by(*[g.unalias() for g in groups])
         return self._register(expr)
@@ -584,27 +738,28 @@ class Session:
 
     def distinct(self, df):
         d = self._df(df)
-        return self._register(exp.select("*").from_(self._sub(d)).distinct(), columns=self._columns(d))
+        return self._register(exp.select("*").from_(self._sub(d)).distinct(), columns=self._columns(d), qualified=d.qualified)
 
     def drop_duplicates(self, df, columns):
         d = self._df(df)
         if not columns:
             return self.distinct(df)
-        keys = [_col(self._key(c)) for c in columns]
+        keys = [_col(self._key_named(d, self._key(c)) or self._key(c)) for c in columns]
         row_number = exp.Window(this=exp.RowNumber(), partition_by=keys,
                                 order=exp.Order(expressions=[exp.Ordered(this=k.copy()) for k in keys]))
         inner = exp.select("*", row_number.as_(_ROW_NUMBER_COLUMN, quoted=True)).from_(self._sub(d)) \
             .subquery(exp.to_identifier("_dedup", quoted=True))
         expr = exp.select(*[_col(k) for k in d.keys]).from_(inner).where(exp.EQ(this=_col(_ROW_NUMBER_COLUMN), expression=exp.Literal.number(1)))
-        return self._register(expr, columns=self._columns(d))
+        return self._register(expr, columns=self._columns(d), qualified=d.qualified)
 
     def order_by(self, df, columns):
         d = self._df(df)
-        return self._register(exp.select("*").from_(self._sub(d)).order_by(*[self._parse_ordered(c) for c in columns]), columns=self._columns(d))
+        order = [self._rewrite(d, self._parse_ordered(c)) for c in columns]
+        return self._register(exp.select("*").from_(self._sub(d)).order_by(*order), columns=self._columns(d), qualified=d.qualified)
 
     def limit(self, df, n):
         d = self._df(df)
-        return self._register(exp.select("*").from_(self._sub(d)).limit(n), columns=self._columns(d))
+        return self._register(exp.select("*").from_(self._sub(d)).limit(n), columns=self._columns(d), qualified=d.qualified)
 
     # rendering
 
@@ -644,14 +799,18 @@ class Session:
         return [{"name": name, "type": _type_json(s.type)} for name, s in zip(d.columns, expr.selects)]
 
     def to_sql(self, df, dialect=None, optimized=True, pretty=False):
-        return self._render(self._df(df).expr.copy(), dialect, optimized).sql(dialect=dialect, pretty=pretty)
+        return self._render(self._output_expr(self._df(df)), dialect, optimized).sql(dialect=dialect, pretty=pretty)
 
     def create_table_as(self, df, table, dialect=None, with_data=True):
         """Create a `CREATE TABLE <table> AS <query>` statement for the DataFrame. `table` is given in the dialect of the
         database. If `with_data` is false, the table is created empty. The names of new columns are rendered unquoted if
         possible, so that the database normalizes their case as for unquoted identifiers, see `_quote`."""
         d = self._df(df)
-        expr = d.expr.copy()
+        names = [self._key(s) for s in d.columns]
+        duplicates = sorted({s for n, s in zip(names, d.columns) if names.count(n) > 1})
+        if duplicates:
+            raise ValueError(f"Can not create a table with duplicate column names {', '.join(duplicates)}")
+        expr = self._output_expr(d)
         if not with_data:
             expr = exp.select("*").from_(expr.subquery(exp.to_identifier("_ctas", quoted=True))).where(exp.false())
         expr = self._render(expr, dialect)
@@ -675,6 +834,58 @@ class Session:
         create = exp.Create(this=target, kind="VIEW", replace=True, expression=query_expr, properties=properties)
         return create.sql(dialect=dialect)
 
+    # dialects supporting materialized views, and how an existing one is replaced: "recreate" drops and creates it
+    # again, as the database has no `CREATE OR REPLACE MATERIALIZED VIEW`, "replace" uses the latter.
+    _MATERIALIZED_VIEW_REPLACE = {"postgres": "recreate", "redshift": "recreate", "oracle": "recreate",
+                                  "snowflake": "replace", "databricks": "replace"}
+
+    def _materialized_view_dialect(self, dialect):
+        dialect_name = (dialect or "").lower()
+        if dialect_name not in self._MATERIALIZED_VIEW_REPLACE:
+            raise ValueError(f"materialized views are not supported for SQL dialect '{dialect}', supported dialects are "
+                             f"{', '.join(sorted(self._MATERIALIZED_VIEW_REPLACE))}")
+        return dialect_name
+
+    def check_materialized_view(self, dialect=None):
+        """Raise an error if materialized views are not supported for the dialect"""
+        self._materialized_view_dialect(dialect)
+        return True
+
+    def create_materialized_view(self, query, view, dialect=None, exists=False, properties=None):
+        """Create the statements creating or replacing a materialized view as {drop, create}. `drop` is None unless an
+        existing materialized view must be dropped first, because the database has no `CREATE OR REPLACE`, e.g.
+        postgres and oracle. The caller must then keep its grants. Snowflake keeps them with `COPY GRANTS`.
+
+        `properties` are table properties to create it with, e.g. the hash of the query, only supported for databricks.
+
+        The statement is assembled as text, as SQLGlot drops the schema of a materialized view for snowflake."""
+        dialect_name = self._materialized_view_dialect(dialect)
+        target = exp.to_table(view, dialect=dialect).sql(dialect=dialect)
+        query_sql = sqlglot.parse_one(query, dialect=dialect).sql(dialect=dialect)
+        if properties and dialect_name != "databricks":
+            raise ValueError(f"table properties of a materialized view are not supported for SQL dialect '{dialect}'")
+        if self._MATERIALIZED_VIEW_REPLACE[dialect_name] == "replace":
+            copy_grants = " COPY GRANTS" if dialect_name == "snowflake" else ""
+            tbl_properties = ""
+            if properties:
+                values = ", ".join(f"{exp.Literal.string(k).sql(dialect=dialect)} = {exp.Literal.string(v).sql(dialect=dialect)}"
+                                   for k, v in sorted(properties.items()))
+                tbl_properties = f" TBLPROPERTIES ({values})"
+            return {"drop": None, "create": f"CREATE OR REPLACE MATERIALIZED VIEW {target}{copy_grants}{tbl_properties} AS {query_sql}"}
+        drop = f"DROP MATERIALIZED VIEW {target}" if exists else None
+        return {"drop": drop, "create": f"CREATE MATERIALIZED VIEW {target} AS {query_sql}"}
+
+    def refresh_materialized_view(self, view, dialect=None):
+        """Create the statement refreshing a materialized view, or None if the database refreshes it automatically,
+        i.e. snowflake."""
+        dialect_name = self._materialized_view_dialect(dialect)
+        target = exp.to_table(view, dialect=dialect).sql(dialect=dialect)
+        if dialect_name == "snowflake":
+            return None
+        if dialect_name == "oracle":
+            return f"BEGIN DBMS_MVIEW.REFRESH('{target.replace(chr(39), chr(39) * 2)}'); END;"
+        return f"REFRESH MATERIALIZED VIEW {target}"
+
     def normalize_query(self, query, dialect=None):
         """Normalize the query of a view, to compare the definition of an existing view with a new one. `query` can
         also be a `CREATE VIEW` statement, as some databases return the definition of a view like that. Databases
@@ -685,11 +896,30 @@ class Session:
         expr = sqlglot.parse_one(query, dialect=dialect)
         if isinstance(expr, exp.Create):
             expr = expr.expression
+        elif isinstance(expr, exp.Command):
+            # a CREATE statement with clauses SQLGlot does not know, e.g. SCHEDULE of a databricks materialized view
+            expr = sqlglot.parse_one(self._query_of_create_statement(query, dialect), dialect=dialect)
         expr = normalize_identifiers(expr, dialect=dialect)
         for identifier in expr.find_all(exp.Identifier):
             if identifier.quoted and d.normalize_identifier(exp.to_identifier(identifier.name)).name == identifier.name:
                 identifier.set("quoted", False)
         return simplify(expr, dialect=dialect).sql(dialect=dialect)
+
+    @staticmethod
+    def _query_of_create_statement(statement, dialect):
+        """The query of a `CREATE ... AS <query>` statement: the text after the first `AS` outside of parentheses which
+        is followed by the start of a query. Tokenizing skips string literals and comments, e.g. a COMMENT clause."""
+        tokens = Dialect.get_or_raise(dialect).tokenize(statement)
+        depth = 0
+        for i, token in enumerate(tokens):
+            if token.token_type == sqlglot.TokenType.L_PAREN:
+                depth += 1
+            elif token.token_type == sqlglot.TokenType.R_PAREN:
+                depth -= 1
+            elif depth == 0 and token.token_type == sqlglot.TokenType.ALIAS and i + 1 < len(tokens) \
+                    and tokens[i + 1].token_type in (sqlglot.TokenType.SELECT, sqlglot.TokenType.WITH, sqlglot.TokenType.L_PAREN):
+                return statement[tokens[i + 1].start:]
+        raise ValueError(f"no query found in statement {statement}")
 
     def _column_identifier(self, name, kind, dialect, quote_names):
         quoted = quote_names or self._quote(name, kind, Dialect.get_or_raise(dialect))
@@ -919,6 +1149,9 @@ _OPS = {
     "create_table": _session.create_table,
     "create_view": _session.create_view,
     "normalize_query": _session.normalize_query,
+    "check_materialized_view": _session.check_materialized_view,
+    "create_materialized_view": _session.create_materialized_view,
+    "refresh_materialized_view": _session.refresh_materialized_view,
     "alter_table": _session.alter_table,
     "parse_types": _session.parse_types,
     "column_lineage": _session.column_lineage,

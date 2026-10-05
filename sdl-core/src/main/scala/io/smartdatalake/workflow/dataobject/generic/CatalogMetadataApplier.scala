@@ -33,6 +33,7 @@ import io.smartdatalake.workflow.dataobject.DataObject
  * all referenced tables exist, see [[CanHandleForeignKeys]].
  *
  * @param createOrReplaceView the query to create or replace a view with, see [[ViewDataObject]].
+ * @param materializedView true if the view to create or replace is materialized.
  */
 case class CatalogMetadataChanges(dataObjectId: DataObjectId,
                                   createTable: Option[GenericSchema] = None,
@@ -41,7 +42,8 @@ case class CatalogMetadataChanges(dataObjectId: DataObjectId,
                                   columnComments: Map[Seq[String], String] = Map(),
                                   primaryKey: Option[Seq[String]] = None,
                                   foreignKeys: Seq[ForeignKeyDefinition] = Seq(),
-                                  createOrReplaceView: Option[String] = None) {
+                                  createOrReplaceView: Option[String] = None,
+                                  materializedView: Boolean = false) {
 
   def isEmpty: Boolean = !hasTableChanges && !hasViewChanges && !hasForeignKeyChanges
 
@@ -63,7 +65,10 @@ case class CatalogMetadataChanges(dataObjectId: DataObjectId,
 
   def describe: Seq[String] = describeTableChanges ++ describeView ++ describeForeignKeys
 
-  def describeView: Seq[String] = createOrReplaceView.map(query => s"create or replace view as $query").toSeq
+  def describeView: Seq[String] = {
+    val kind = if (materializedView) "materialized view" else "view"
+    createOrReplaceView.map(query => s"create or replace $kind as $query").toSeq
+  }
 
   def describeTableChanges: Seq[String] = {
     createTable.map(schema => s"create table with columns ${schema.columns.mkString(", ")}").toSeq ++
@@ -118,14 +123,13 @@ class CatalogMetadataApplier(schemaReader: DataObjectId => Option[GenericSchema]
   private def planView(dataObject: ViewDataObject)(implicit context: ActionPipelineContext): CatalogMetadataChanges = {
     val createOrReplaceView = viewQueryReader(dataObject.id) match {
       case Some(query) =>
-        val isUpToDate = dataObject.getExistingViewDefinition.exists(dataObject.isSameViewQuery(_, query))
-        if (isUpToDate) None else Some(query)
+        if (dataObject.isViewUpToDate(query)) None else Some(query)
       case None =>
         logger.warn(s"(${dataObject.id}) no exported view query found, the view can not be created or replaced." +
           " Note that view queries are exported for the output DataObjects of a run with '--test dry-run-with-schema-export'.")
         None
     }
-    CatalogMetadataChanges(dataObject.id, createOrReplaceView = createOrReplaceView)
+    CatalogMetadataChanges(dataObject.id, createOrReplaceView = createOrReplaceView, materializedView = dataObject.isMaterialized)
   }
 
   private def isSupported(dataObject: TableDataObject): Boolean = {

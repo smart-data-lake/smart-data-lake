@@ -22,7 +22,7 @@ import com.typesafe.config.Config
 import configs.ConfigReader
 import configs.syntax._
 import io.smartdatalake.config.ConfigImplicits
-import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.exporter.ExportWriter
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.{MemoryUtils, SmartDataLakeLogger}
@@ -84,11 +84,6 @@ import org.apache.hadoop.conf.Configuration
  *   schemas for executing dry-run's. Source must be a path like `file:./schema` or `uiBackend`.
  *   uiBackend will use global.uiBackend configuration to query UI backend for schemas. Default:
  *   `file:./schema`.
- * @param defaultSparkConnectionId
- *   Optional default ConnectionId for Spark connections. This is used to avoid having to specify
- *   the Spark connection for every Spark Action. Note that the default connection can still be
- *   overwritten for each Spark Action by specifying the sparkConnectionId in the action's
- *   configuration.
  * @param descriptionPath
  *   Optional path of the directory containing the Markdown description files of the DataObjects, Actions and
  *   Connections, e.g. `dataObjects/myDataObject.md`. The column descriptions defined there are merged into the
@@ -109,7 +104,6 @@ case class GlobalConfig(
     pluginOptions: Map[String, StringOrSecret] = Map(),
     uiBackend: Option[UIBackendConfig] = None,
     dataObjectsSchemaSource: Option[String] = None,
-    defaultSparkConnectionId: Option[ConnectionId] = None,
     descriptionPath: Option[String] = None
 ) extends SmartDataLakeLogger {
 

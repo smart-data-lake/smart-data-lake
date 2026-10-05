@@ -101,9 +101,8 @@ object SparkTestUtil extends SmartDataLakeLogger with Equality {
   }
 
   def getDefaultActionPipelineContext(implicit instanceRegistry: InstanceRegistry): ActionPipelineContext = {
-    // set a default spark connection in global config, to easily get spark engine connection in unit tests
     // note that also context.currentAction needs to be set; this is done in the unit test through sdlb.prepare/init/exec.
-    val globalConfig = GlobalConfig(defaultSparkConnectionId = Some("default-spark"))
+    val globalConfig = GlobalConfig()
     // create context
     ActionPipelineContext(
       feed = "feedTest",

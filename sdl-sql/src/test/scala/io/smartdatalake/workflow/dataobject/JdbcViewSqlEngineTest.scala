@@ -29,7 +29,7 @@ import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncrementalMode
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.workflow.action.{Action, CopyAction, DataFrameActionImpl}
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.{JdbcConnection, JdbcConnectionImpl}
 import io.smartdatalake.workflow.dataframe.sql.SQLSubFeed
 import io.smartdatalake.workflow.dataobject.generic.{CatalogMetadataApplier, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase, SubFeed}
@@ -48,7 +48,7 @@ import scala.reflect.runtime.universe.typeOf
 class JdbcViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
 
   implicit var instanceRegistry: InstanceRegistry = _
-  private var connection: JdbcTableConnection = _
+  private var connection: JdbcConnection = _
   private val connectionId = ConnectionId("duckdb")
 
   override def withFixture(test: NoArgTest): Outcome = {
@@ -71,7 +71,7 @@ class JdbcViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
   }
 
   override def afterEach(): Unit = {
-    instanceRegistry.getConnections.collect { case c: JdbcTableConnection => c.pool.close() }
+    instanceRegistry.getConnections.collect { case c: JdbcConnectionImpl => c.pool.close() }
   }
 
   private def context(action: Option[Action] = None, phase: ExecutionPhase.ExecutionPhase = ExecutionPhase.Init): ActionPipelineContext = {
@@ -276,6 +276,19 @@ class JdbcViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
     assert(query("select id from v order by id") == Seq(Seq(1), Seq(2), Seq(3)))
   }
 
+  test("a run replaces a view only if its query changed") {
+    tableDataObject("src")
+    viewDataObject("v")
+    def viewOid = query("select view_oid from duckdb_views() where view_name = 'v'").head.head
+    run(copyAction("src", "v", "select id from %{inputViewName} where city = 'Bern'"), Seq("src"))
+    val oidBefore = viewOid
+    run(copyAction("src", "v", "select id from %{inputViewName} where city = 'Bern'"), Seq("src"))
+    assert(viewOid == oidBefore)
+    run(copyAction("src", "v", "select id from %{inputViewName}"), Seq("src"))
+    assert(viewOid != oidBefore)
+    assert(query("select id from v order by id") == Seq(Seq(1), Seq(2), Seq(3)))
+  }
+
   test("an Action writing a view can not have an execution mode") {
     tableDataObject("src")
     viewDataObject("v")
@@ -310,6 +323,17 @@ class JdbcViewSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
     assert(viewDO.isTableExisting(contextInit))
     viewDO.dropTable(contextInit)
     assert(!viewDO.isTableExisting(contextInit))
+    assert(viewNames.isEmpty)
+  }
+
+  test("a materialized view fails in prepare phase if the database does not support it") {
+    tableDataObject("src")
+    instanceRegistry.register(JdbcViewDataObject(DataObjectId("v"), table = Table(db = Some("main"), name = "v"),
+      connectionId = connectionId, materialized = true))
+    val action = copyAction("src", "v", "select id from %{inputViewName}")
+    val ex = intercept[Exception](init(action, Seq("src"), Seq()))
+    assert(Iterator.iterate[Throwable](ex)(_.getCause).takeWhile(_ != null)
+      .exists(_.getMessage.contains("materialized views are not supported for SQL dialect 'duckdb'")))
     assert(viewNames.isEmpty)
   }
 

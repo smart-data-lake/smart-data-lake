@@ -28,7 +28,7 @@ import io.smartdatalake.testutils.sql.SQLTestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.generic.transformer.{SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.{Action, CopyAction, CustomDataFrameAction, DataFrameActionImpl}
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.{JdbcConnection, JdbcConnectionImpl}
 import io.smartdatalake.workflow.dataframe.sql.{SQLDataFrame, SQLSimpleDataType, SQLSubFeed}
 import io.smartdatalake.workflow.dataobject.generic.{AddColumn, ChangeColumnNullable, ChangeColumnType, Table}
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
@@ -48,7 +48,7 @@ import scala.reflect.runtime.universe.typeOf
 class JdbcTableSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
 
   implicit var instanceRegistry: InstanceRegistry = _
-  private var connection: JdbcTableConnection = _
+  private var connection: JdbcConnection = _
   private val connectionId = ConnectionId("duckdb")
 
   override def withFixture(test: NoArgTest): Outcome = {
@@ -71,7 +71,7 @@ class JdbcTableSqlEngineTest extends AnyFunSuite with BeforeAndAfterEach {
   }
 
   override def afterEach(): Unit = {
-    instanceRegistry.getConnections.collect { case c: JdbcTableConnection => c.pool.close() }
+    instanceRegistry.getConnections.collect { case c: JdbcConnectionImpl => c.pool.close() }
   }
 
   private def context(action: Option[Action] = None, phase: ExecutionPhase.ExecutionPhase = ExecutionPhase.Init): ActionPipelineContext = {

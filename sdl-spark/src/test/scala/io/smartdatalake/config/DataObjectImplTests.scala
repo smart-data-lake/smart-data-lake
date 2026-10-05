@@ -23,7 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
 import io.smartdatalake.util.secrets.StringOrSecret
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.generic.Table
@@ -172,7 +172,7 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
       """
         |connections = {
         | jdbc1 = {
-        |   type = JdbcTableConnection
+        |   type = JdbcConnection
         |   url = "jdbc://example.test"
         |   driver = com.example.Driver
         | }
@@ -195,7 +195,7 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
 
     implicit val registry: InstanceRegistry = ConfigParser.parse(config)
     val registry2: InstanceRegistry = new InstanceRegistry()
-    val jdbcCon = JdbcTableConnection("jdbc1", url = "jdbc://example.test", driver = "com.example.Driver")
+    val jdbcCon = JdbcConnection("jdbc1", url = "jdbc://example.test", driver = "com.example.Driver")
     registry2.register(jdbcCon)
     registry.instances(DataObjectId("123")) shouldBe JdbcTableDataObject(
       id = "123",
@@ -350,7 +350,7 @@ class DataObjectImplTests extends AnyFlatSpec with Matchers {
       """
         |connections = {
         | con1 = {
-        |  type = JdbcTableConnection
+        |  type = JdbcConnection
         |  url = "abc"
         |  driver = "my.little.jdbcDriver"
         | }

@@ -113,6 +113,74 @@ abstract class JdbcCatalog(connection: Connection with GenericJdbcExecution, url
   protected def viewDefinitionQuery(db: String, viewName: String): Option[String] =
     Some(s"SELECT VIEW_DEFINITION FROM INFORMATION_SCHEMA.VIEWS WHERE UPPER(TABLE_SCHEMA) = UPPER('$db') AND UPPER(TABLE_NAME) = UPPER('$viewName')")
 
+  /**
+   * The definition the database would store for a view with the given query, or None if not supported.
+   * Databases rewrite the query of a view, e.g. Postgres adds casts and removes aliases, so that the definition of
+   * an existing view can only be compared with a query rewritten the same way.
+   */
+  def getViewDefinitionOfQuery(query: String): Option[String] = None
+
+  /**
+   * The definition of a materialized view as stored by the database, or None if it does not exist or the database
+   * is not supported. Then the definition can not be compared, and the materialized view is replaced.
+   */
+  def getMaterializedViewDefinition(db: String, viewName: String): Option[String] = {
+    materializedViewDefinitionQuery(removeQuotes(db).replace("'", "''"), removeQuotes(viewName).replace("'", "''"))
+      .flatMap(query => connection.execJdbcQuery(query, (rs: ResultSet) => if (rs.next()) Option(rs.getString(1)) else None))
+  }
+
+  protected def materializedViewDefinitionQuery(db: String, viewName: String): Option[String] = None
+
+  /**
+   * The hash of the query of a view or materialized view as stored by [[viewQueryHashProperties]] or [[setViewQueryHash]],
+   * or None if the database does not support it or it is not set. Comparing it is more reliable than comparing the
+   * definition of the view, which databases reformat.
+   *
+   * @param db the db of the view, as configured
+   * @param viewName the name of the view, as configured
+   */
+  def getViewQueryHash(db: String, viewName: String): Option[String] = None
+
+  /**
+   * Table properties to create a materialized view with, storing the hash of its query.
+   * Views get it with [[setViewQueryHash]] instead, as an existing view is not always replaced with a CREATE statement.
+   */
+  def viewQueryHashProperties(hash: String): Map[String, String] = Map()
+
+  /**
+   * Store the hash of the query of a view or materialized view after it was created, if not done by
+   * [[viewQueryHashProperties]]. It may fail, e.g. because of missing privileges; the caller must then compare the
+   * definition of the view.
+   */
+  def setViewQueryHash(db: String, viewName: String, hash: String, materialized: Boolean): Unit = ()
+
+  /**
+   * The privileges granted on a table or view to other users or roles, or None if they can not be read for this
+   * database. They are needed to grant them again when a materialized view is dropped and created again.
+   * Privileges of the owner are not included, as the owner of the new object gets them anyway.
+   */
+  def getGrants(db: String, tableName: String): Option[Seq[TableGrant]] = {
+    grantsQuery(removeQuotes(db).replace("'", "''"), removeQuotes(tableName).replace("'", "''"))
+      .map(query => connection.execJdbcQuery(query, (rs: ResultSet) =>
+        Iterator.continually(rs).takeWhile(_.next())
+          .map(r => TableGrant(r.getString(1), r.getString(2), Option(r.getString(3)).exists(_.equalsIgnoreCase("YES"))))
+          .toList
+      ))
+  }
+
+  /**
+   * Query returning the columns grantee, privilege and grantable ('YES' or 'NO') of the privileges on a table.
+   */
+  protected def grantsQuery(db: String, tableName: String): Option[String] = None
+
+  /**
+   * Create the statements granting the given privileges on a table or view.
+   */
+  def grantStatements(tableName: String, grants: Seq[TableGrant]): Seq[String] = grants.map { grant =>
+    val grantee = if (grant.grantee.equalsIgnoreCase("PUBLIC")) "PUBLIC" else quoteIdentifier(grant.grantee)
+    s"GRANT ${grant.privilege} ON $tableName TO $grantee${if (grant.grantable) " WITH GRANT OPTION" else ""}"
+  }
+
   protected def evalRecordExists( rs:ResultSet ) : Boolean = {
     rs.next
     rs.getInt(1) == 1
@@ -157,10 +225,17 @@ object JdbcCatalog {
   // JDBC sub protocols of databases quoting identifiers with backticks
   private val backtickQuotingSubProtocols = Set("mysql", "mariadb", "databricks")
 
+  // table property and tag storing the hash of the query of a view, see JdbcCatalog.getViewQueryHash
+  val viewQueryHashProperty = "sdlb.queryHash"
+  val viewQueryHashTag = "SDLB_QUERY_HASH"
+
   def fromJdbcDriver(driver: String, connection: Connection with GenericJdbcExecution, url: String): JdbcCatalog = {
     driver match {
       case d if d.toLowerCase.contains("oracle") => new OracleJdbcCatalog(connection, url)
       case d if d.toLowerCase.contains("com.sap.db") => new SapHanaJdbcCatalog(connection, url)
+      case d if d.toLowerCase.contains("postgresql") => new PostgresJdbcCatalog(connection, url)
+      case d if d.toLowerCase.contains("snowflake") => new SnowflakeJdbcCatalog(connection, url)
+      case d if d.toLowerCase.contains("databricks") || d.toLowerCase.contains("simba.spark") => new DatabricksJdbcCatalog(connection, url)
       case _ => new DefaultJdbcCatalog(connection, url)
     }
   }
@@ -207,6 +282,120 @@ class OracleJdbcCatalog(connection: Connection with GenericJdbcExecution, url: S
 
   override protected def viewDefinitionQuery(db: String, viewName: String): Option[String] =
     Some(s"SELECT TEXT FROM ALL_VIEWS WHERE UPPER(OWNER) = UPPER('$db') AND UPPER(VIEW_NAME) = UPPER('$viewName')")
+
+  override protected def materializedViewDefinitionQuery(db: String, viewName: String): Option[String] =
+    Some(s"SELECT QUERY FROM ALL_MVIEWS WHERE UPPER(OWNER) = UPPER('$db') AND UPPER(MVIEW_NAME) = UPPER('$viewName')")
+
+  override protected def grantsQuery(db: String, tableName: String): Option[String] =
+    Some(s"SELECT GRANTEE, PRIVILEGE, GRANTABLE FROM ALL_TAB_PRIVS WHERE UPPER(TABLE_SCHEMA) = UPPER('$db') AND UPPER(TABLE_NAME) = UPPER('$tableName')")
+}
+
+/**
+ * PostgreSQL JDBC Catalog query implementation. Materialized views and their privileges are not listed in
+ * INFORMATION_SCHEMA, so they are read from the system catalogs.
+ */
+class PostgresJdbcCatalog(connection: Connection with GenericJdbcExecution, url: String) extends DefaultJdbcCatalog(connection, url) {
+
+  /**
+   * Creates a temporary view with the query in a transaction which is rolled back, and reads its definition.
+   * It is formatted like the definition of every view and materialized view, as all are created by pg_get_viewdef.
+   */
+  override def getViewDefinitionOfQuery(query: String): Option[String] = connection.execWithJdbcConnection { con =>
+    val autoCommit = con.getAutoCommit
+    con.setAutoCommit(false)
+    val stmt = con.createStatement()
+    try {
+      stmt.execute(s"CREATE TEMPORARY VIEW sdlb_view_definition AS $query")
+      val rs = stmt.executeQuery("SELECT pg_get_viewdef('pg_temp.sdlb_view_definition'::regclass)")
+      if (rs.next()) Option(rs.getString(1)) else None
+    } finally {
+      stmt.close()
+      con.rollback()
+      con.setAutoCommit(autoCommit)
+    }
+  }
+
+  override protected def materializedViewDefinitionQuery(db: String, viewName: String): Option[String] =
+    Some(s"SELECT definition FROM pg_matviews WHERE UPPER(schemaname) = UPPER('$db') AND UPPER(matviewname) = UPPER('$viewName')")
+
+  override protected def grantsQuery(db: String, tableName: String): Option[String] =
+    Some(
+      s"""SELECT CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END, a.privilege_type,
+         |  CASE WHEN a.is_grantable THEN 'YES' ELSE 'NO' END
+         |FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace CROSS JOIN LATERAL aclexplode(c.relacl) a
+         |WHERE UPPER(n.nspname) = UPPER('$db') AND UPPER(c.relname) = UPPER('$tableName') AND a.grantee <> c.relowner
+         |ORDER BY 1, 2""".stripMargin)
+}
+
+/**
+ * Snowflake JDBC Catalog query implementation.
+ * Materialized views are not listed in INFORMATION_SCHEMA.VIEWS, their definition is read with SHOW MATERIALIZED VIEWS.
+ */
+class SnowflakeJdbcCatalog(connection: Connection with GenericJdbcExecution, url: String) extends DefaultJdbcCatalog(connection, url) {
+
+  /**
+   * The statement creating the materialized view, i.e. column `text` of SHOW MATERIALIZED VIEWS.
+   */
+  override def getMaterializedViewDefinition(db: String, viewName: String): Option[String] = {
+    // LIKE is case-insensitive, and its wildcards may match other views, so the result is filtered by name
+    val stmt = s"SHOW MATERIALIZED VIEWS LIKE '${removeQuotes(viewName).replace("'", "''")}' IN SCHEMA $db"
+    connection.execJdbcQuery(stmt, (rs: ResultSet) => {
+      val rows = Iterator.continually(rs).takeWhile(_.next()).map(r => (r.getString("name"), r.getString("text"))).toList
+      SnowflakeJdbcCatalog.findByName(rows, viewName, isQuotedIdentifier(viewName), removeQuotes)
+    })
+  }
+
+  // the tag storing the hash of the query, in the schema of the view. Object tagging needs Snowflake Enterprise Edition.
+  private def queryHashTag(db: String): String = s"$db.${JdbcCatalog.viewQueryHashTag}"
+
+  override def getViewQueryHash(db: String, viewName: String): Option[String] = {
+    def literal(s: String) = s"'${SQLUtil.escapeSqlStringLiteral(s)}'"
+    val query = s"SELECT SYSTEM$$GET_TAG(${literal(queryHashTag(db))}, ${literal(s"$db.$viewName")}, 'TABLE')"
+    connection.execJdbcQuery(query, (rs: ResultSet) => if (rs.next()) Option(rs.getString(1)) else None)
+  }
+
+  override def setViewQueryHash(db: String, viewName: String, hash: String, materialized: Boolean): Unit = {
+    connection.execJdbcStatement(s"CREATE TAG IF NOT EXISTS ${queryHashTag(db)} COMMENT = 'hash of the query of a view, set by SDLB'")
+    val kind = if (materialized) "MATERIALIZED VIEW" else "VIEW"
+    connection.execJdbcStatement(s"ALTER $kind $db.$viewName SET TAG ${queryHashTag(db)} = '$hash'")
+  }
+}
+
+object SnowflakeJdbcCatalog {
+  /**
+   * Find the value of an object by its name. Snowflake stores unquoted identifiers uppercase, quoted ones as written.
+   */
+  private[jdbc] def findByName(rows: Seq[(String, String)], name: String, isQuoted: Boolean, removeQuotes: String => String): Option[String] = {
+    val expectedName = if (isQuoted) removeQuotes(name) else name.toUpperCase
+    rows.collectFirst { case (n, value) if n == expectedName => value }
+  }
+}
+
+/**
+ * Databricks JDBC Catalog query implementation.
+ * Materialized views are not listed in INFORMATION_SCHEMA.VIEWS, their definition is read with SHOW CREATE TABLE,
+ * which needs Databricks Runtime 14.1 or above for materialized views.
+ */
+class DatabricksJdbcCatalog(connection: Connection with GenericJdbcExecution, url: String) extends DefaultJdbcCatalog(connection, url) {
+
+  override def getMaterializedViewDefinition(db: String, viewName: String): Option[String] = {
+    val tableName = s"$db.$viewName"
+    // SHOW CREATE TABLE fails if the table does not exist
+    if (!isTableExisting(tableName)) None
+    else connection.execJdbcQuery(s"SHOW CREATE TABLE $tableName", (rs: ResultSet) => if (rs.next()) Option(rs.getString(1)) else None)
+  }
+
+  override def viewQueryHashProperties(hash: String): Map[String, String] = Map(JdbcCatalog.viewQueryHashProperty -> hash)
+
+  // an existing view is replaced with ALTER VIEW ... AS to keep its grants, so the property is set separately
+  override def setViewQueryHash(db: String, viewName: String, hash: String, materialized: Boolean): Unit =
+    if (!materialized) connection.execJdbcStatement(s"ALTER VIEW $db.$viewName SET TBLPROPERTIES ('${JdbcCatalog.viewQueryHashProperty}' = '$hash')")
+
+  override def getViewQueryHash(db: String, viewName: String): Option[String] =
+    connection.execJdbcQuery(s"SHOW TBLPROPERTIES $db.$viewName", (rs: ResultSet) =>
+      Iterator.continually(rs).takeWhile(_.next()).map(r => (r.getString("key"), r.getString("value"))).toList
+        .collectFirst { case (JdbcCatalog.viewQueryHashProperty, value) => value }
+    )
 }
 
 /**
@@ -223,3 +412,12 @@ class SapHanaJdbcCatalog(connection: Connection with GenericJdbcExecution, url: 
     connection.execJdbcQuery(cntTableInCatalog, evalRecordExists)
   }
 }
+
+/**
+ * A privilege granted on a table or view, see [[JdbcCatalog.getGrants]].
+ *
+ * @param grantee the user or role, or PUBLIC
+ * @param privilege e.g. SELECT
+ * @param grantable true if the grantee may grant the privilege to others (WITH GRANT OPTION)
+ */
+case class TableGrant(grantee: String, privilege: String, grantable: Boolean)

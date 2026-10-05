@@ -33,7 +33,7 @@ import io.smartdatalake.workflow.action.executionMode.DataObjectStateIncremental
 import io.smartdatalake.workflow.action.generic.transformer.{ColumnsTransformer, GenericDfTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.{CustomDfTransformer, SparkUDFCreator}
 import io.smartdatalake.workflow.action.spark.transformer.{ScalaClassSparkDfTransformer, ScalaClassSparkDfsTransformer}
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed.getSparkSession
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
@@ -79,7 +79,7 @@ class SmartDataLakeBuilderTest extends AnyFunSuite with BeforeAndAfter with Smar
   override def testCountExpectation: Expectation =
     CountExpectation(name = "testCount", expectation = Some("= 0"))
 
-  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:SmartDataLakeBuilderTest", "org.hsqldb.jdbcDriver")
+  private val jdbcConnection = JdbcConnection("jdbcCon1", "jdbc:hsqldb:mem:SmartDataLakeBuilderTest", "org.hsqldb.jdbcDriver")
 
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString

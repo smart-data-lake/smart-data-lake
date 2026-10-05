@@ -22,7 +22,7 @@ import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestTool, Spa
 import io.smartdatalake.testutils.HistorizeActionBehaviour
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.spark.dataset.Equality
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataobject.JdbcTableDataObject
 import io.smartdatalake.workflow.dataobject.generic.Table
@@ -32,7 +32,7 @@ import org.scalatest.matchers.should.Matchers
 class JdbcHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with SmartDataLakeLogger
   with SparkTestTool with Equality with HistorizeActionBehaviour {
 
-  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:HistorizeWithMergeActionTest", "org.hsqldb.jdbcDriver")
+  private val jdbcConnection = JdbcConnection("jdbcCon1", "jdbc:hsqldb:mem:HistorizeWithMergeActionTest", "org.hsqldb.jdbcDriver")
 
   override def defaultEngineConnection: Connection with EngineConnection = SparkTestUtil.defaultSparkConnection
 

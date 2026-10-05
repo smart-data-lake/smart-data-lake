@@ -21,7 +21,8 @@ const sidebars = {
     {'Smart Data Lake' : [
       'intro',
       'features',
-      'architecture'
+      'architecture',
+      'upgrade-3'
     ]},
     {'Getting Started' : [
       'getting-started/setup',

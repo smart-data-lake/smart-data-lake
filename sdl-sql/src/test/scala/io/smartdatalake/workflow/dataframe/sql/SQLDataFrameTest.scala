@@ -27,7 +27,7 @@ import io.smartdatalake.util.sqlglot.SqlGlotException
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer
 import io.smartdatalake.util.sqlglot.SqlGlotBridge
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import org.scalatest.Outcome
 import org.scalatest.funsuite.AnyFunSuite
@@ -47,7 +47,7 @@ class SQLDataFrameTest extends AnyFunSuite {
   import SQLSubFeed._
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  private val connection: JdbcTableConnection = SQLTestUtil.createEngineConnection("SQLDataFrameTest")
+  private val connection: JdbcConnection = SQLTestUtil.createEngineConnection("SQLDataFrameTest")
   instanceRegistry.register(connection)
   implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
 

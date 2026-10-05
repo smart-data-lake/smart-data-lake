@@ -31,7 +31,7 @@ import io.smartdatalake.workflow.action.executionMode._
 import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, SQLDfTransformer, SQLDfsTransformer}
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformer
 import io.smartdatalake.workflow.action.spark.transformer.ScalaClassSparkDfsTransformer
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema}
 import io.smartdatalake.workflow.dataobject._
 import io.smartdatalake.workflow.dataobject.generic.Table
@@ -53,7 +53,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
 
   import session.implicits._
 
-  private val jdbcConnection = JdbcTableConnection("jdbcCon1", "jdbc:hsqldb:mem:ActionDAGTest", "org.hsqldb.jdbcDriver")
+  private val jdbcConnection = JdbcConnection("jdbcCon1", "jdbc:hsqldb:mem:ActionDAGTest", "org.hsqldb.jdbcDriver")
 
   private val tempDir = Files.createTempDirectory("test")
   private val tempPath = tempDir.toAbsolutePath.toString

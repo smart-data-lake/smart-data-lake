@@ -27,6 +27,7 @@ import io.smartdatalake.workflow.dataframe.sql.{SQLDataFrame, SQLSubFeed}
 import org.json4s.{DefaultFormats, Formats}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
+import scala.util.Try
 
 /**
  * SQL engine implementation of creating the view of a [[JdbcViewDataObject]], see [[JdbcViewEngine]].
@@ -34,7 +35,10 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * from the query of the DataFrame, or from a query exported by a dry-run when deployed by CatalogSchemaUpdater.
  * Reading the view is done by [[JdbcTableSqlEngine]].
  *
- * It is used by Actions with the JdbcTableConnection of the view as engine connection, see [[JdbcTableSqlEngine]].
+ * A materialized view which can not be replaced by the database, e.g. on Postgres, is dropped and created again in
+ * one transaction, and the privileges granted on it are granted again, see [[io.smartdatalake.workflow.connection.jdbc.JdbcCatalog.getGrants]].
+ *
+ * It is used by Actions with the JdbcConnection of the view as engine connection, see [[JdbcTableSqlEngine]].
  */
 class JdbcViewSqlEngine(dataObject: JdbcViewDataObject) extends JdbcViewEngine with SmartDataLakeLogger {
   import dataObject.{connection, id, table}
@@ -64,12 +68,60 @@ class JdbcViewSqlEngine(dataObject: JdbcViewDataObject) extends JdbcViewEngine w
 
   override def renderQuery(df: GenericDataFrame)(implicit context: ActionPipelineContext): String = sqlDataFrame(df).toDatabaseSql
 
-  override def createOrReplaceView(query: String)(implicit context: ActionPipelineContext): Unit = {
+  override def createOrReplaceView(query: String, queryHash: String)(implicit context: ActionPipelineContext): Unit = {
     // the statement depends on whether the view exists, so that the grants on an existing view are kept
     val stmt = bridge.call("create_view", "query" -> query, "view" -> table.fullName, "dialect" -> connection.sqlGlotDialect,
       "exists" -> dataObject.isTableExisting).extract[String]
     connection.execJdbcStatement(stmt)
+    storeQueryHash(queryHash, materialized = false)
   }
+
+  private def storeQueryHash(queryHash: String, materialized: Boolean): Unit =
+    Try(connection.catalog.setViewQueryHash(table.db.get, table.name, queryHash, materialized)).failed.foreach(e =>
+      logger.warn(s"($id) the hash of the query can not be stored with ${if (materialized) "materialized view" else "view"} ${table.fullName}," +
+        s" its definition is compared to detect changes: ${e.getMessage}"))
+
+  override def checkMaterializedViewSupported()(implicit context: ActionPipelineContext): Unit =
+    bridge.call("check_materialized_view", "dialect" -> connection.sqlGlotDialect)
+
+  override def createOrReplaceMaterializedView(query: String, queryHash: String)(implicit context: ActionPipelineContext): Unit = {
+    val hashProperties = connection.catalog.viewQueryHashProperties(queryHash)
+    val stmts = bridge.call("create_materialized_view", "query" -> query, "view" -> table.fullName,
+      "dialect" -> connection.sqlGlotDialect, "exists" -> dataObject.isTableExisting, "properties" -> hashProperties)
+    val create = (stmts \ "create").extract[String]
+    (stmts \ "drop").extractOpt[String] match {
+      case None => connection.execJdbcStatement(create)
+      case Some(drop) => recreateMaterializedView(drop, create)
+    }
+    if (hashProperties.isEmpty) storeQueryHash(queryHash, materialized = true)
+  }
+
+  /**
+   * Drop and create the materialized view, and grant the privileges on it again, all in one transaction.
+   */
+  private def recreateMaterializedView(drop: String, create: String): Unit = {
+    val grants = connection.catalog.getGrants(table.db.get, table.name)
+    if (grants.isEmpty) logger.warn(s"($id) the privileges granted on materialized view ${table.fullName} can not be read" +
+      s" for this database, they are lost as it is dropped and created again")
+    val grantStmts = grants.map(connection.catalog.grantStatements(table.fullName, _)).getOrElse(Seq())
+    val transaction = connection.beginTransaction()
+    try {
+      (Seq(drop, create) ++ grantStmts).foreach(transaction.execJdbcStatement(_))
+      transaction.commit()
+    } catch {
+      case e: Exception =>
+        transaction.rollback()
+        throw e
+    }
+    if (grantStmts.nonEmpty) logger.info(s"($id) granted privileges on materialized view ${table.fullName} again: " +
+      grants.get.map(g => s"${g.privilege} to ${g.grantee}").mkString(", "))
+  }
+
+  override def refreshMaterializedView()(implicit context: ActionPipelineContext): Unit =
+    bridge.call("refresh_materialized_view", "view" -> table.fullName, "dialect" -> connection.sqlGlotDialect).extractOpt[String] match {
+      case Some(stmt) => connection.execJdbcStatement(stmt)
+      case None => logger.info(s"($id) materialized view ${table.fullName} is refreshed automatically by the database")
+    }
 
   override def normalizeQuery(query: String)(implicit context: ActionPipelineContext): String =
     bridge.call("normalize_query", "query" -> query, "dialect" -> connection.sqlGlotDialect).extract[String]

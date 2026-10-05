@@ -20,6 +20,7 @@
 """Tests for the SQLGlot DataFrame bridge of the SDLB SQL engine, run with `uv run pytest` in sdl-sql."""
 
 import json
+import re
 
 import pytest
 
@@ -232,6 +233,55 @@ def test_unqualified_join_column_after_join_on_columns():
     assert to_sql(df).startswith('SELECT test_table.a AS a, other.z AS z')
 
 
+def historize_join():
+    existing = call("alias", df=table("db.tgt", (("id", "INT"), ("ts", "TIMESTAMP"), ("h", "TEXT")))["id"], alias="existing")
+    new = call("alias", df=table("db.src", (("id", "INT"), ("v", "INT"), ("h", "TEXT")))["id"], alias="new")
+    return call("join", df=existing["id"], other=new["id"], how="full", on=["id"])
+
+
+def test_join_keeps_columns_of_the_same_name():
+    df = historize_join()
+    assert df["columns"] == ["id", "ts", "h", "v", "h"]
+    with pytest.raises(BridgeError, match="ambiguous"):
+        call("select", df=df["id"], columns=["h"])
+    with pytest.raises(BridgeError, match="duplicate column names h"):
+        call("create_table_as", df=df["id"], table="t")
+
+
+def test_qualified_references_stay_valid_after_join():
+    # the sequence of operations of IncrementalHistorizeMode.incrementalHistorize
+    df = historize_join()
+    df = call("with_column", df=df["id"], name="ops",
+              column="CASE WHEN existing.h IS NULL THEN ARRAY('insert') ELSE ARRAY('update', 'insert') END")
+    # a reference to a computed column needs the join wrapped as subquery
+    df = call("with_column", df=df["id"], name="op", column="EXPLODE(ops)")
+    df = call("drop", df=df["id"], names=["ops"])
+    # only the column of the qualifier is dropped
+    df = call("drop", df=df["id"], columns=["existing.h"])
+    assert df["columns"] == ["id", "ts", "v", "h", "op"]
+    df = call("with_column", df=df["id"], name="ts",
+              column="CASE WHEN op = 'insert' THEN CAST('2026-01-01' AS TIMESTAMP) ELSE existing.ts END")
+    # the column of existing was replaced already, so there is nothing to drop
+    assert call("drop", df=df["id"], columns=["existing.ts"])["id"] == df["id"]
+    df = call("select", df=df["id"], columns=["id", "v", "h", "op", "ts"])
+    assert df["columns"] == ["id", "v", "h", "op", "ts"]
+    sql = to_sql(df, "duckdb")
+    assert "src.h AS h__sdlb" in sql
+    assert "UNNEST(CASE WHEN tgt.h IS NULL" in sql
+    # the internal key of the column h of new is renamed to its name
+    assert re.search(r"\.h__sdlb\d+ AS h,", sql)
+    assert re.search(r"ELSE _t\d+\.ts END AS ts", sql)
+
+
+def test_unqualified_reference_to_computed_column_of_join():
+    left, right = table(), table("other", (("a", "INT"), ("z", "INT")))
+    df = call("join", df=left["id"], other=right["id"], how="inner", on=["a"])
+    df = call("with_column", df=df["id"], name="z", column="z + 1")
+    df = call("select", df=df["id"], columns=["a", "z"])
+    # z is the computed column, not the column z of the input
+    assert "other.z + 1 AS z" in to_sql(df)
+
+
 def test_query():
     df = call("query", query="select top 1 a from db.x", columns=[["a", "INT"]], dialect="tsql")
     df = call("filter", df=df["id"], condition='a > 1')
@@ -266,6 +316,42 @@ def test_create_view_keeps_grants():
     assert call("create_view", query=query, view="db.v", dialect="postgres", exists=True) == "CREATE OR REPLACE VIEW db.v AS SELECT a FROM db.t"
 
 
+def test_create_materialized_view():
+    query = "SELECT a FROM db.t"
+    # postgres and oracle have no CREATE OR REPLACE, an existing materialized view is dropped first
+    assert call("create_materialized_view", query=query, view="db.v", dialect="postgres", exists=False) == \
+        {"drop": None, "create": "CREATE MATERIALIZED VIEW db.v AS SELECT a FROM db.t"}
+    assert call("create_materialized_view", query=query, view="db.v", dialect="oracle", exists=True) == \
+        {"drop": "DROP MATERIALIZED VIEW db.v", "create": "CREATE MATERIALIZED VIEW db.v AS SELECT a FROM db.t"}
+    # snowflake keeps the grants with COPY GRANTS
+    assert call("create_materialized_view", query=query, view="db.v", dialect="snowflake", exists=True) == \
+        {"drop": None, "create": "CREATE OR REPLACE MATERIALIZED VIEW db.v COPY GRANTS AS SELECT a FROM db.t"}
+    assert call("create_materialized_view", query=query, view="db.v", dialect="databricks", exists=True) == \
+        {"drop": None, "create": "CREATE OR REPLACE MATERIALIZED VIEW db.v AS SELECT a FROM db.t"}
+
+
+def test_create_materialized_view_with_properties():
+    assert call("create_materialized_view", query="SELECT a FROM db.t", view="db.v", dialect="databricks",
+                properties={"sdlb.queryHash": "abc"}) == \
+        {"drop": None, "create": "CREATE OR REPLACE MATERIALIZED VIEW db.v TBLPROPERTIES ('sdlb.queryHash' = 'abc') AS SELECT a FROM db.t"}
+    with pytest.raises(Exception, match="table properties of a materialized view are not supported"):
+        call("create_materialized_view", query="SELECT a FROM db.t", view="db.v", dialect="postgres", properties={"k": "v"})
+
+
+def test_refresh_materialized_view():
+    assert call("refresh_materialized_view", view="db.v", dialect="postgres") == "REFRESH MATERIALIZED VIEW db.v"
+    assert call("refresh_materialized_view", view="db.v", dialect="databricks") == "REFRESH MATERIALIZED VIEW db.v"
+    assert call("refresh_materialized_view", view="db.v", dialect="oracle") == "BEGIN DBMS_MVIEW.REFRESH('db.v'); END;"
+    # snowflake refreshes materialized views automatically
+    assert call("refresh_materialized_view", view="db.v", dialect="snowflake") is None
+
+
+def test_materialized_view_unsupported_dialect():
+    assert call("check_materialized_view", dialect="postgres")
+    with pytest.raises(Exception, match="materialized views are not supported for SQL dialect 'duckdb'"):
+        call("check_materialized_view", dialect="duckdb")
+
+
 def test_normalize_query():
     query = "SELECT src.id AS id, UPPER(src.name) AS name FROM main.src AS src WHERE src.city = 'Bern'"
     # as returned by duckdb for the view
@@ -273,6 +359,23 @@ def test_normalize_query():
     assert call("normalize_query", query=existing, dialect="duckdb") == call("normalize_query", query=query, dialect="duckdb")
     # quotes of case-sensitive identifiers matter
     assert call("normalize_query", query='SELECT "Name" FROM t', dialect="postgres") != call("normalize_query", query="SELECT Name FROM t", dialect="postgres")
+
+
+def test_normalize_query_of_materialized_view():
+    query = "SELECT src.id AS id, src.name AS name FROM cat.db.src AS src WHERE src.city = 'Bern'"
+    # as returned by SHOW CREATE TABLE on databricks, with clauses SQLGlot can not parse
+    existing = """CREATE MATERIALIZED VIEW cat.db.bern (
+  id INT,
+  name STRING COMMENT 'the name (AS SELECT)')
+COMMENT 'Bern customers'
+TBLPROPERTIES ('pipelines.pipelineId' = '1234-abcd')
+SCHEDULE EVERY 1 HOUR
+AS SELECT src.id AS id, src.name AS name FROM cat.db.src AS src WHERE src.city = 'Bern'"""
+    assert call("normalize_query", query=existing, dialect="databricks") == call("normalize_query", query=query, dialect="databricks")
+    # as returned by SHOW MATERIALIZED VIEWS on snowflake
+    existing = "CREATE OR REPLACE MATERIALIZED VIEW DB.S.BERN COPY GRANTS AS " + query.replace("cat.db", "db.s")
+    assert call("normalize_query", query=existing, dialect="snowflake") == \
+        call("normalize_query", query=query.replace("cat.db", "db.s"), dialect="snowflake")
 
 
 def test_create_table():

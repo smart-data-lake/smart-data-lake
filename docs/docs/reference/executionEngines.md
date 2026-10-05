@@ -12,11 +12,18 @@ Currently SDLB supports the following execution engines:
 
 |Category|Execution Engine|SubFeed Name|Engine Connection|Description|Supported Actions|Supported DataObjects|
 | ------ | -------------- | ---------- | --------------- | --------- | --------------- | ------------------- |
-|Java-Byte-Stream|File Engine|FileSubFeed|-|Transfer Byte-Streams without further knowledge about their content|FileTransferAction, CustomFileAction|all HadoopFileDataObjects, WebserviceFileDataObject, SFtpFileDataObject|
-|Generic DataFrame API|Spark Engine|SparkSubFeed|SparkClassicConnection|Transform data with Spark DataFrame API in a Spark session running inside the SDLB process|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction|all Hadoop/SparkFileDataObject, AccessTableDataObject, AirbyteDataObject, CustomDfDataObject, DeltaLakeTableDataObject, HiveTableDataObject, IcebergTableDataObject, JdbcTableDataObject, JmsDataObject, KafkaTopicDataObject, SnowflakeTableDataObject, SplunkDataObject, TickTockHiveTableDataObject|
-|Generic DataFrame API|Spark Connect Engine|SparkConnectSubFeed|SparkConnectConnection|Transform data with the Spark DataFrame API on a **remote** Spark Connect server, without a Spark session inside the SDLB process|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction|SparkConnectTableDataObject, DeltaLakeTableDataObject, IcebergTableDataObject|
-|Generic DataFrame API|Snowflake-Snowpark Engine|SnowparkSubFeed|-|Transform data within Snowflake with Snowpark DataFrame API|CopyAction, CustomDataFrameAction|SnowflakeTableDataObject|
+|Java-Byte-Stream|File Engine|FileSubFeed|-|Transfer Byte-Streams without further knowledge about their content, optionally transformed by a file transformer|FileTransferAction, CustomFileAction|all HadoopFileDataObjects, WebserviceFileDataObject, SFtpFileRefDataObject|
+|Generic DataFrame API|Spark Engine (sdl-spark)|SparkSubFeed|SparkClassicConnection|Transform data with Spark DataFrame API in a Spark session running inside the SDLB process|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction, MLflowTrainAction, MLflowPredictAction|all Hadoop/SparkFileDataObjects (Csv, Json, Parquet, Avro, Xml, Excel, RawFile, ...), AccessTableDataObject, AirbyteDataObject, BigQueryTableDataObject, DebeziumCdcDataObject, DeltaLakeTableDataObject, IcebergTableDataObject, JdbcTableDataObject, JdbcViewDataObject (read only), KafkaTopicDataObject, ODataDataObject, OpenApiDataObject, SnowflakeTableDataObject, DataObjectsExporterDataObject, ActionsExporterDataObject, PKViolatorsDataObject|
+|Generic DataFrame API|Spark Connect Engine (sdl-sparkconnect)|SparkConnectSubFeed|SparkConnectConnection|Transform data with the Spark DataFrame API on a **remote** Spark Connect server, without a Spark session inside the SDLB process|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction|SparkConnectTableDataObject, DeltaLakeTableDataObject, IcebergTableDataObject|
+|Generic DataFrame API|SQL Engine (sdl-sql)|SQLSubFeed|JdbcConnection|Render the transformations as one SQL statement with SQLGlot and execute it in the database (ELT), the data never leaves the database|CopyAction, CustomDataFrameAction|JdbcTableDataObject, JdbcViewDataObject|
+|Generic DataFrame API|Snowflake-Snowpark Engine (sdl-snowflake)|SnowparkSubFeed|SnowflakeConnection|Transform data within Snowflake with Snowpark DataFrame API|CopyAction, CustomDataFrameAction|SnowflakeTableDataObject|
+|Generic DataFrame API|Plain Scala Engine (sdl-core)|ScalaSubFeed|ScalaConnection|Lightweight engine without Spark, processing rows in memory, used for unit tests and as expression evaluator without Spark|CopyAction, CustomDataFrameAction, UpsertAction, HistorizeAction|no DataObjects of its own|
 |Parameter|Parameter Engine|ParameterSubFeed|-|Coordinate work happening outside of SDLB and pass on key/values about it, e.g. script results or the information about an ML training run|CustomScriptAction, and the additional inputs/outputs of a DataFrame Action such as MLflowTrainAction|all DataObjects|
+
+Engine independent DataObjects like `DeltaLakeTableDataObject`, `IcebergTableDataObject`, `JdbcTableDataObject` and
+`JdbcViewDataObject` are defined in sdl-core and implemented per engine by the corresponding module. They support an
+engine only if its module is on the classpath, e.g. `DeltaLakeTableDataObject` needs `sdl-deltalake` for the Spark
+engine and `sdl-sparkconnect` for the Spark Connect engine.
 
 ### Engine connections
 
@@ -38,7 +45,7 @@ connections {
 ```
 
 Leave `master` unset to attach to an existing Spark session provided by the environment, e.g. Databricks, EMR or spark-submit. Set it (e.g. `local[*]`, `yarn`) to let SDLB create the session itself.
-The id `default-engine` can be changed with the SDLB parameter `defaultEngineConnectionId`.
+The id `default-engine` can be changed with the SDLB parameter `defaultEngineConnectionId`, e.g. `global.environment.defaultEngineConnectionId = my-engine`, the java property `sdl.defaultEngineConnectionId` or the environment variable `SDL_DEFAULT_ENGINE_CONNECTION_ID`.
 
 Switching the whole job to another engine is a matter of changing the type of that connection, see [Spark Connect Engine](#spark-connect-engine) below.
 Use `engineConnectionId` on an Action to deviate from the default, e.g. to run one Action against a different Spark cluster than the rest of the job.
@@ -47,7 +54,7 @@ Use `engineConnectionId` on an Action to deviate from the default, e.g. to run o
 There is no implicit default: if no engine connection is configured, DataFrame Actions fail with `default-engine not found in instance registry`.
 :::
 
-Beside `SparkClassicConnection` and `SparkConnectConnection` there is `ScalaConnection`, a lightweight Spark-free engine working on `ScalaSubFeed`. It is currently used for unit tests and small pipelines and has no DataObjects of its own, so it is not covered further here.
+Beside `SparkClassicConnection` and `SparkConnectConnection` there is `JdbcConnection`, the engine connection of the [SQL engine](#sql-engine), `SnowflakeConnection`, the engine connection of the Snowpark engine, and `ScalaConnection`, a lightweight Spark-free engine working on `ScalaSubFeed`. The latter is currently used for unit tests and small pipelines and has no DataObjects of its own, so it is not covered further here.
 
 ### Spark Connect Engine
 
@@ -113,11 +120,80 @@ A classic Spark session and a Spark Connect session cannot coexist in the same J
 Build a job for one of the two engines: `sdl-spark` for classic Spark, `sdl-sparkconnect` for Spark Connect. Consequently a single SDLB job cannot combine the Spark and the Spark Connect engine.
 :::
 
+### SQL Engine
+
+The SQL engine of module `sdl-sql` does not process data itself: it builds the transformations of an Action as an
+[SQLGlot](https://github.com/tobymao/sqlglot) query, lets SQLGlot optimize it, and renders it as one SQL statement
+in the dialect of the target database (ELT). The statement is executed by the database with `INSERT INTO ... SELECT`
+or a merge statement, so the data never leaves the database. As SQLGlot translates between dialects, SQL
+transformers can be written in Spark SQL and executed on e.g. Postgres, SQL Server, Oracle, Snowflake or Databricks.
+
+An Action uses the SQL engine if its `engineConnectionId` references a `JdbcConnection`. All its inputs and outputs
+must then be `JdbcTableDataObject`s or `JdbcViewDataObject`s of this connection:
+
+```
+connections {
+  dwh {
+    type = JdbcConnection
+    url = "jdbc:postgresql://localhost:5432/dwh"
+    driver = org.postgresql.Driver
+    # dialect = postgres  # SQLGlot dialect of the database, derived from the url by default
+  }
+}
+actions {
+  load-customers {
+    type = CopyAction
+    inputId = stg-customers
+    outputId = int-customers
+    engineConnectionId = dwh
+    transformers = [{
+      type = SQLDfTransformer
+      code = "select id, upper(name) as name, nvl(city, 'unknown') as city from %{inputViewName}"
+      # sqlDialect = spark  # SQLGlot dialect of the SQL code, default is spark
+    }]
+  }
+}
+```
+
+Supported features:
+
+* save modes Overwrite (delete and insert in one transaction, also for virtual partitions), Append and Merge
+* incremental output with `DataObjectStateIncrementalMode`
+* schema evolution (`allowSchemaEvolution = true`): new columns are added, data types are widened and columns missing
+  in the DataFrame are made nullable, with `ALTER TABLE` statements rendered for the dialect of the database
+* views and materialized views with `JdbcViewDataObject`: writing a DataFrame to it creates or replaces the view with
+  the query of the DataFrame, see [Schema](schema#managing-tables-in-the-catalog-at-deploy-time) for deploying views.
+  A view is read like a table by all engines of `JdbcTableDataObject`, e.g. by a Spark Action in the same feed.
+* [column lineage](columnLineage) with the lineage module of SQLGlot
+* identifiers are resolved case-insensitively, like in Spark, and rendered with the spelling of the database
+
+Limitations:
+
+* only transformers which are engine independent can be used, e.g. `SQLDfTransformer`, `SQLDfsTransformer` and the
+  predefined transformers. Expressions given as string, e.g. filters of execution modes, are Spark SQL.
+* data types of written DataFrames are not validated against the table, as the types inferred by SQLGlot are not exact.
+* not implemented: UDFs and some functions, e.g. `hash` and `from_json`.
+
+SQLGlot is a Python library, embedded into the JVM with [jep](https://github.com/ninia/jep). The Python
+environment needs the packages `sqlglot` and `jep`, see `sdl-sql/pyproject.toml`, and is found through the
+environment variable `SDL_PYTHON_PATH` (or java property `sdl.pythonPath`), otherwise `python3` on the PATH is used.
+jep is compiled against the local JDK on installation, so `JAVA_HOME` must be set:
+
+```bash
+cd sdl-sql
+uv sync
+export SDL_PYTHON_PATH=$PWD/.venv/bin/python
+```
+
+See the [README of sdl-sql](https://github.com/smart-data-lake/smart-data-lake/tree/develop-spark4/sdl-sql) for
+details about materialized views, grants, identifier handling and the architecture of the engine.
+
 ### Connecting different execution engines
 
 In order to build a data pipeline using different execution engines, you need a DataObject that supports both execution engines as interface, so that one execution engine can write the data in the DataObject and the other one can read from it.
 - from FileSubFeed to SparkSubFeed (and vice-versa): any Hadoop/SparkFileDataObject like ParquetFileDataObject
 - from SparkSubFeed to SnowparkSubFeed (and vice-versa): SnowflakeTableDataObject
+- from SparkSubFeed to SQLSubFeed (and vice-versa): JdbcTableDataObject, and JdbcViewDataObject in direction SQLSubFeed to SparkSubFeed
 - from ParameterSubFeed to any (and vice-versa): every DataObject is suitable
 
 SparkSubFeed and SparkConnectSubFeed are the exception: they cannot be combined in the same job at all, as their sessions cannot coexist in one JVM, see [above](#spark-connect-engine). Hand data over through a table read by a separate job instead.
@@ -126,7 +202,8 @@ SparkSubFeed and SparkConnectSubFeed are the exception: they cannot be combined 
 
 Note that a schema can only be propagated within a data pipeline for consecutive actions running with an execution engine of category "Generic DataFrame API". Whenever such an Action has an input from a different category, the schema is read again from the DataObject.
 
-SDLB is able to convert schemas between different execution engines of category "Generic DataFrame API", e.g. Spark and Snowpark.
+SDLB is able to convert schemas between different execution engines of category "Generic DataFrame API", e.g. Spark and Snowpark, through their engine neutral Json representation.
+Spark type names are used for simple types. A schema which can not be converted, e.g. because of a type without Spark equivalent, is read again from the DataObject by the next Action.
 
 ### Determining execution engine to use in "Generic DataFrame API" Actions
 
@@ -146,7 +223,7 @@ To check which execution engine was chosen, look for logs like the following:
 As mentioned in [Architecture](../../docs/architecture), SDLB is first and foremost a Java (Scala) application.
 It can run in any Execution Environment where you can install a JVM, executing Actions with any of its Execution Engines. SDLB chooses the Execution Engines for your data pipeline independently from the Execution Environment that SDLB lives in.
 For example: Let's say you run SDLB in a distributed fashion on a Spark Cluster using spark-submit. 
-If one of your Actions only has SnowflakeTableDataObjects as input and output, SDLB will run it using the Snowpark-Engine.
+If one of your Actions only has SnowflakeTableDataObjects as input and output, and its `engineConnectionId` references their SnowflakeConnection, SDLB will run it using the Snowpark-Engine.
 In practice, this means that SDLB will connect to the Snowflake Environment from inside your Spark-Cluster and then execute your Action from there using Snowpark's Java/Scala Library.
 
 Of course, the Execution Environment you have influences the DataObjects that you have at your disposal: for instance, if you want to connect to Snowflake, you need a Snowflake account and be able to connect to Snowflake.

@@ -21,10 +21,11 @@ package io.smartdatalake.testutils.plainScala
 import com.typesafe.config.ConfigFactory
 import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.{ConfigParser, InstanceRegistry}
+import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.SDLExecutionId
-import io.smartdatalake.workflow.connection.{Connection, ScalaConnection}
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection, ScalaConnection}
 import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.file.FileRefDataObject
 import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame, TableDataObject}
@@ -32,6 +33,7 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 
 import java.time.LocalDateTime
 import scala.reflect.runtime.universe.Type
+import scala.util.Try
 
 /**
  * Engine-agnostic subset of [[TestUtil]], usable without a Spark dependency.
@@ -73,7 +75,13 @@ object ScalaTestUtil extends SmartDataLakeLogger {
     dataObject
   }
 
-  def getCommonSubFeed(srcDO: DataObject with CanCreateDataFrame, tgtDO: DataObject with CanWriteDataFrame): Type = {
-    srcDO.getSubFeedSupportedTypes.toSet.intersect(tgtDO.writeSubFeedSupportedTypes.toSet).head
+  /**
+   * The subFeed type supported by both DataObjects. If there are several, e.g. for DataObjects with an engine
+   * implementation for Spark and the SQL engine, the type of the default engine connection is preferred.
+   */
+  def getCommonSubFeed(srcDO: DataObject with CanCreateDataFrame, tgtDO: DataObject with CanWriteDataFrame)(implicit instanceRegistry: InstanceRegistry): Type = {
+    val commonTypes = srcDO.getSubFeedSupportedTypes.filter(tpe => tgtDO.writeSubFeedSupportedTypes.exists(_ =:= tpe))
+    val engineType = Try(instanceRegistry.get[Connection with EngineConnection](ConnectionId(Environment.defaultEngineConnectionId))).toOption.map(_.subFeedType)
+    engineType.flatMap(tpe => commonTypes.find(_ =:= tpe)).getOrElse(commonTypes.head)
   }
 }

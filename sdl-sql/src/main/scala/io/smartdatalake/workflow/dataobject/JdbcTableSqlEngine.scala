@@ -39,7 +39,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * SQL engine implementation of reading and writing a [[JdbcTableDataObject]], see [[JdbcTableEngine]].
  * Schema evolution is implemented with `ALTER TABLE` statements created by SQLGlot, see `evolveTableSchema`.
  *
- * It is used by Actions with the JdbcTableConnection of the DataObject as engine connection. Reading creates an
+ * It is used by Actions with the JdbcConnection of the DataObject as engine connection. Reading creates an
  * SQLGlot query, and writing executes it on the database with an `INSERT INTO ... SELECT` statement, or a merge
  * statement from a temporary table created with `CREATE TABLE ... AS SELECT`. So data is never transferred out of
  * the database.
@@ -113,12 +113,16 @@ class JdbcTableSqlEngine(dataObject: JdbcTableDataObject) extends JdbcTableEngin
     if (dataObject.isTableExisting) {
       if (dataObject.allowSchemaEvolution) evolveTableSchema(SQLSchema.of(targetDf.schema))
       else validateColumnsOnWrite(targetDf)
-    } else {
-      // create an empty table with the schema of the DataFrame
-      connection.execJdbcStatement(createTableAsStatement(sqlDataFrame(targetDf), table.fullName, withData = false))
-      dataObject.resetCachedIsTableExisting()
-      require(dataObject.isTableExisting, s"($id) Strangely table ${table.fullName} doesn't exist even though we tried to create it")
-    }
+    } else createTableFromDataFrame(sqlDataFrame(targetDf))
+  }
+
+  /**
+   * Create an empty table with the schema of the DataFrame
+   */
+  private def createTableFromDataFrame(df: SQLDataFrame)(implicit context: ActionPipelineContext): Unit = {
+    connection.execJdbcStatement(createTableAsStatement(df, table.fullName, withData = false))
+    dataObject.resetCachedIsTableExisting()
+    require(dataObject.isTableExisting, s"($id) Strangely table ${table.fullName} doesn't exist even though we tried to create it")
   }
 
   private def validate(df: GenericDataFrame): Unit = {
@@ -150,7 +154,9 @@ class JdbcTableSqlEngine(dataObject: JdbcTableDataObject) extends JdbcTableEngin
     validateEngineConnection
     val targetDf = sqlDataFrame(saveModeOptions.map(_.convertToTargetSchema(df)).getOrElse(df))
     validate(targetDf)
-    if (!dataObject.allowSchemaEvolution) validateColumnsOnWrite(targetDf)
+    // like with Spark, a missing table is created, e.g. if the DataFrame is written without initializing the DataObject
+    if (!dataObject.isTableExisting) createTableFromDataFrame(targetDf)
+    else if (!dataObject.allowSchemaEvolution) validateColumnsOnWrite(targetDf)
     saveModeOptions.map(_.saveMode).getOrElse(dataObject.saveMode) match {
       case SDLSaveMode.Overwrite =>
         val transaction = connection.beginTransaction()
@@ -184,15 +190,32 @@ class JdbcTableSqlEngine(dataObject: JdbcTableDataObject) extends JdbcTableEngin
       logger.error(s"($id) Temporary table ${tmpTable.fullName} already exists! There might be a potential conflict with another job. It will be dropped and recreated.")
       connection.dropTable(tmpTable.fullName)
     }
+    val dbSaveModeOptions = translateToDatabaseSql(saveModeOptions)
     try {
       connection.execJdbcStatement(createTableAsStatement(df, tmpTable.fullName, withData = true))
-      SQLUtil.createUpdateExistingStatement(table, df.columns, tmpTable.fullName, saveModeOptions, dataObject.quoteCaseSensitiveColumn(_))
+      SQLUtil.createUpdateExistingStatement(table, df.columns, tmpTable.fullName, dbSaveModeOptions, dataObject.quoteCaseSensitiveColumn(_))
         .foreach(connection.execJdbcDmlStatement(_))
-      val mergeStmt = SQLUtil.createMergeStatement(table, df.columns, tmpTable.fullName, saveModeOptions, dataObject.quoteCaseSensitiveColumn(_))
+      val mergeStmt = SQLUtil.createMergeStatement(table, df.columns, tmpTable.fullName, dbSaveModeOptions, dataObject.quoteCaseSensitiveColumn(_))
       Map("rows_affected" -> connection.execJdbcDmlStatement(mergeStmt))
     } finally {
       connection.dropTable(tmpTable.fullName)
     }
+  }
+
+  /**
+   * The conditions and values of SaveModeMergeOptions are Spark SQL expressions, like the column expressions of the
+   * SQL engine, e.g. `existing.a <=> new.a` created by UpsertAction. They are translated to the dialect of the database.
+   */
+  private def translateToDatabaseSql(options: SaveModeMergeOptions): SaveModeMergeOptions = {
+    def translate(sql: String) = bridge.transpile(sql, Some(SQLColumn.sqlGlotDialect), Some(connection.sqlGlotDialect))
+    options.copy(
+      deleteCondition = options.deleteCondition.map(translate),
+      updateCondition = options.updateCondition.map(translate),
+      updateExistingCondition = options.updateExistingCondition.map(translate),
+      insertCondition = options.insertCondition.map(translate),
+      insertValuesOverride = options.insertValuesOverride.map { case (column, value) => column -> translate(value) },
+      additionalMergePredicate = options.additionalMergePredicate.map(translate)
+    )
   }
 
   // cache response to avoid jdbc queries

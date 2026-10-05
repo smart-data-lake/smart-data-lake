@@ -34,6 +34,11 @@ import io.smartdatalake.workflow.dataobject.DataObject
 trait ViewDataObject extends DataObject {
 
   /**
+   * True if the view is materialized, i.e. the database stores the result of its query.
+   */
+  def isMaterialized: Boolean = false
+
+  /**
    * The query of the view for a DataFrame written to it, in the SQL dialect of the database.
    * It is exported by a dry-run with schema export, so that CatalogSchemaUpdater can create or replace the view at
    * deployment time, see [[CatalogMetadataApplier]].
@@ -53,7 +58,13 @@ trait ViewDataObject extends DataObject {
   def isSameViewQuery(existingDefinition: String, query: String)(implicit context: ActionPipelineContext): Boolean
 
   /**
-   * Create or replace the view with the given query.
+   * True if the existing view has the given query, see [[isSameViewQuery]]. False if the view does not exist.
+   */
+  def isViewUpToDate(query: String)(implicit context: ActionPipelineContext): Boolean =
+    getExistingViewDefinition.exists(isSameViewQuery(_, query))
+
+  /**
+   * Create or replace the view with the given query. A materialized view is populated with the result of the query.
    */
   def createOrReplaceView(query: String)(implicit context: ActionPipelineContext): Unit
 }
