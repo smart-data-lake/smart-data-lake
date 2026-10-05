@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -64,10 +64,11 @@ import org.apache.spark.sql.DataFrame
  * }
  * }}}
  *
- * @param xmlOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]].
+ * @param xmlOptions Options of the Spark XML data source for reading and writing.
  */
 case class XmlFileDataObject(override val id: DataObjectId,
                              override val path: String,
+                             @LibraryOptions("https://spark.apache.org/docs/latest/sql-data-sources-xml.html#data-source-option", "org.apache.spark.sql.catalyst.xml.XmlOptions")
                              xmlOptions: Option[Map[String,String]] = None,
                              override val partitions: Seq[String] = Seq(),
                              override val schema: Option[GenericSchema] = None,

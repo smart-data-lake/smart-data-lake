@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.SaveModeOptions
 import io.smartdatalake.util.LogUtils.debugLog
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -150,7 +150,7 @@ private object TemporalQueries {
  *                   This is used to list existing partition and is added as additional column on batch read.
  * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
  * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
- * @param options    Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
+ * @param options    Options for the Kafka stream reader.
  *                   These options override connection.options.
  */
 case class KafkaTopicDataObject(override val id: DataObjectId,
@@ -165,6 +165,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 datePartitionCol: Option[DatePartitionColumnDef] = None,
                                 batchReadConsecutivePartitionsAsRanges: Boolean = false,
                                 batchReadMaxOffsetsPerTask: Option[Int] = None,
+                                @LibraryOptions("https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html")
                                 override val options: Map[String, String] = Map(),
                                 override val metadata: Option[DataObjectMetadata] = None
                            )(implicit val instanceRegistry: InstanceRegistry)

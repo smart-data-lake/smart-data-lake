@@ -20,7 +20,7 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.SDLSaveMode
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.util.spark.SparkRepartitionDef
@@ -56,8 +56,7 @@ import org.apache.spark.sql.DataFrame
  * }}}
  *
  * @param stringify Set the data type for all values to string. Use action/transformers instead.
- * @param jsonOptions Settings for the underlying [[org.apache.spark.sql.DataFrameReader]] and
- *                    [[org.apache.spark.sql.DataFrameWriter]].
+ * @param jsonOptions Options of the Spark JSON data source for reading and writing.
  *
  * @note By default, the JSON option `multiline` is enabled.
  *
@@ -67,6 +66,7 @@ import org.apache.spark.sql.DataFrame
 @scala.annotation.nowarn("cat=deprecation")
 case class JsonFileDataObject( override val id: DataObjectId,
                                override val path: String,
+                               @LibraryOptions("https://spark.apache.org/docs/latest/sql-data-sources-json.html#data-source-option", "org.apache.spark.sql.catalyst.json.JSONOptions")
                                jsonOptions: Option[Map[String, String]] = None,
                                override val partitions: Seq[String] = Seq(),
                                override val schema: Option[GenericSchema] = None,

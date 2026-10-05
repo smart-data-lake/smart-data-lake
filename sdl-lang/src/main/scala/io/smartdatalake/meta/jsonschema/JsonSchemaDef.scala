@@ -146,10 +146,12 @@ private[smartdatalake] case class JsonOneOfDef(
 /**
  * A Map is an object with restricted value types.
  * This can be created in JSON schema by limiting the type of additional properties.
+ * @param properties known keys of the map, e.g. the option names of an underlying library. Other keys are still allowed.
  */
 private[smartdatalake] case class JsonMapDef(
                        additionalProperties: JsonTypeDef,
                        description: Option[String] = None,
+                       properties: ListMap[String, JsonTypeDef] = ListMap(),
                        deprecated: Option[Boolean] = None
                      ) extends JsonTypeDef {
   override val `type`: Option[JsonTypeEnum] = Some(JsonTypeEnum.Object)

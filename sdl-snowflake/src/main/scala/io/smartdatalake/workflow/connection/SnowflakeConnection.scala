@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.connection
 import com.snowflake.snowpark.Session
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.util.misc.{ConnectionPoolConfig, JdbcExecution, SmartDataLakeLogger}
 import io.smartdatalake.util.webservice.HttpProxyConfig
 import io.smartdatalake.workflow.action.Action
@@ -90,7 +90,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param role      Snowflake role
  * @param authMode  optional authentication information: for now BasicAuthMode is supported.
  * @param proxy     optional HTTP Proxy for Snowflake connection (Jdbc & Snowpark)
- * @param sparkOptions Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options.
+ * @param sparkOptions Options for the Snowflake Spark Connector.
  */
 case class SnowflakeConnection(override val id: ConnectionId,
                                url: String,
@@ -99,6 +99,7 @@ case class SnowflakeConnection(override val id: ConnectionId,
                                role: String,
                                authMode: AuthMode,
                                proxy: Option[HttpProxyConfig] = None,
+                               @LibraryOptions("https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options")
                                sparkOptions: Map[String, String] = Map(),
                                override val metadata: Option[ConnectionMetadata] = None
                               ) extends Connection with EngineConnection with JdbcExecution with SmartDataLakeLogger {

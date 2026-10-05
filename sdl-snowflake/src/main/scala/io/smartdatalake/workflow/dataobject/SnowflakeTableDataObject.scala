@@ -23,7 +23,7 @@ import com.snowflake.snowpark.SaveMode
 import com.snowflake.snowpark.types.StructType
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.SDLSaveMode._
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -95,7 +95,7 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
- * @param sparkOptions Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options.
+ * @param sparkOptions Options for the Snowflake Spark Connector.
  *                     These options override connection.options.
  * @param metadata     meta data
  */
@@ -110,6 +110,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val postWriteSql: Option[String] = None,
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     connectionId: ConnectionId,
+                                    @LibraryOptions("https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options")
                                     sparkOptions: Map[String, String] = Map(),
                                     virtualPartitions: Seq[String] = Seq(),
                                     readTransformer: Option[GenericDfTransformer] = None,

@@ -186,6 +186,101 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
     }
   }
 
+  private def excelConfig(excelOptions: String) = ConfigFactory.parseString(
+    s"""
+       |{
+       | id = src1
+       | path = "${escapedFilePath(xlsxTempFilePath)}"
+       | excel-options {
+       |   $excelOptions
+       | }
+       |}
+     """.stripMargin)
+
+  test("reading an XSSF excel sheet with an explicit dataAddress") {
+
+    // prepare
+    val actionInputExcel = ExcelFileDataObject.fromConfig(excelConfig("""additional-options { dataAddress = "'sheet number 1'!A1:E2" }"""))
+
+    // check the option is passed on unchanged
+    actionInputExcel.options("dataAddress") shouldEqual "'sheet number 1'!A1:E2"
+
+    // run
+    val df = actionInputExcel.getSparkDataFrame()
+
+    // check: header row plus one data row
+    val data = df.collect().toList
+    data should have size 1
+    data.head.getAs[Int]("a_a") shouldEqual 42
+  }
+
+  test("dataAddress must not be combined with the options it is derived from") {
+    val ex = intercept[Exception](ExcelFileDataObject.fromConfig(excelConfig(
+      """sheet-name = "sheet number 1"
+        |additional-options { dataAddress = "'sheet number 1'!A1:E2" }""".stripMargin)))
+    exceptionMessages(ex).exists(_.contains("dataAddress")) shouldBe true
+  }
+
+  test("additional excel options of the underlying library are passed through") {
+
+    // prepare
+    val actionInputExcel = ExcelFileDataObject.fromConfig(excelConfig(
+      """sheet-name = "sheet number 1"
+        |additional-options {
+        |  useNullForErrorCells = true
+        |  locale = "de-CH"
+        |  KeepUndefinedRows = true
+        |}""".stripMargin))
+
+    // check
+    actionInputExcel.options("useNullForErrorCells") shouldEqual "true"
+    actionInputExcel.options("locale") shouldEqual "de-CH"
+    actionInputExcel.options("KeepUndefinedRows") shouldEqual "true" // option names are case-insensitive
+
+    // run
+    val data = actionInputExcel.getSparkDataFrame().collect().toList
+    data should have size 3
+  }
+
+  test("misspelled excel option attribute fails") {
+    intercept[Exception](ExcelFileDataObject.fromConfig(excelConfig("""sheet-nam = "sheet number 1"""")))
+  }
+
+  test("unknown additional excel option fails with a suggestion") {
+    val ex = intercept[Exception](ExcelFileDataObject.fromConfig(excelConfig("""additional-options { dateAddress = "A1" }""")))
+    exceptionMessages(ex).exists(_.contains("did you mean 'dataAddress'?")) shouldBe true
+  }
+
+  test("unknown additional excel option is passed through if allowUnknownOptions is set") {
+    val actionInputExcel = ExcelFileDataObject.fromConfig(excelConfig(
+      """allow-unknown-options = true
+        |additional-options { someFutureOption = 42 }""".stripMargin))
+    actionInputExcel.options("someFutureOption") shouldEqual "42"
+  }
+
+  test("additional excel option which corresponds to an attribute fails") {
+    val ex = intercept[Exception](ExcelFileDataObject.fromConfig(excelConfig("""additional-options { header = false }""")))
+    exceptionMessages(ex).exists(_.contains("useHeader")) shouldBe true
+  }
+
+  test("list of known spark-excel options is complete") {
+    // option names are read from the string constants of the spark-excel class reading the options
+    val classFile = getClass.getClassLoader.getResourceAsStream("dev/mauch/spark/excel/v2/ExcelOptionsTrait.class")
+    assert(classFile != null, "spark-excel class ExcelOptionsTrait not found. Has it been renamed in a newer spark-excel version?")
+    val valueLiterals = Set("true", "false", "xlsx")
+    val optionNames = ExcelFileDataObjectTest.readStringConstants(classFile).filter(_.matches("[a-z][a-zA-Z]+")) -- valueLiterals
+    val knownOptions = ExcelOptions.sparkExcelOptions ++ ExcelOptions.reservedOptions.keySet
+    withClue("spark-excel options unknown to ExcelOptions, add them to ExcelOptions.sparkExcelOptions:") {
+      (optionNames -- knownOptions) shouldBe empty
+    }
+    withClue("ExcelOptions.sparkExcelOptions not found in spark-excel anymore:") {
+      (ExcelOptions.sparkExcelOptions -- optionNames) shouldBe empty
+    }
+  }
+
+  private def exceptionMessages(ex: Throwable): Seq[String] =
+    Iterator.iterate(ex)(_.getCause).takeWhile(_ != null).map(e => String.valueOf(e.getMessage)).toSeq
+
   testsFor(readNonExistingSources(createDataObject(ExcelOptions(sheetName = Some("testSheet"))), ".xlsx"))
   testsFor(readEmptySources(createDataObject(ExcelOptions(useHeader = false)), ".xlsx"))
   testsFor(validateSchemaMinOnWrite(createDataObjectWithSchemaMin(ExcelOptions(sheetName = Some("testSheet"), useHeader = false)), ".xlsx"))
@@ -289,5 +384,35 @@ class ExcelFileDataObjectTest extends DataObjectTestSuite with BeforeAndAfterAll
   override def createFile(path: String, data: DataFrame): Unit = {
     data.write.options(Map("header" -> "false", "dataAddress" -> "'testSheet'!A1"))
       .format("dev.mauch.spark.excel").save(path)
+  }
+}
+
+object ExcelFileDataObjectTest {
+
+  /**
+   * Read all string constants of a java class file from its constant pool.
+   */
+  def readStringConstants(classFile: java.io.InputStream): Set[String] = {
+    val in = new java.io.DataInputStream(classFile)
+    try {
+      in.skipBytes(8) // magic, minor and major version
+      val count = in.readUnsignedShort()
+      val utf8 = scala.collection.mutable.Map[Int, String]()
+      val stringRefs = scala.collection.mutable.Buffer[Int]()
+      var idx = 1
+      while (idx < count) {
+        in.readUnsignedByte() match {
+          case 1 => utf8(idx) = in.readUTF()
+          case 8 => stringRefs += in.readUnsignedShort()
+          case 7 | 16 | 19 | 20 => in.skipBytes(2)
+          case 15 => in.skipBytes(3)
+          case 3 | 4 | 9 | 10 | 11 | 12 | 17 | 18 => in.skipBytes(4)
+          case 5 | 6 => in.skipBytes(8); idx += 1 // long and double take two entries
+          case tag => throw new IllegalStateException(s"unknown constant pool tag $tag")
+        }
+        idx += 1
+      }
+      stringRefs.map(utf8).toSet
+    } finally in.close()
   }
 }
