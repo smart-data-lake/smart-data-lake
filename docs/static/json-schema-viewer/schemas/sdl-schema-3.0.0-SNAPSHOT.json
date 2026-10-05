@@ -912,7 +912,45 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Settings for the underlying `org.apache.spark.sql.DataFrameReader` and `org.apache.spark.sql.DataFrameWriter`."
+            "description" : "Options of the Spark Avro data source for reading and writing.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/sql-data-sources-avro.html#data-source-option](https://spark.apache.org/docs/latest/sql-data-sources-avro.html#data-source-option) for the available options.",
+            "properties" : {
+              "avroSchema" : {
+                "type" : "string"
+              },
+              "avroSchemaUrl" : {
+                "type" : "string"
+              },
+              "compression" : {
+                "type" : "string"
+              },
+              "datetimeRebaseMode" : {
+                "type" : "string"
+              },
+              "enableStableIdentifiersForUnionType" : {
+                "type" : "string"
+              },
+              "ignoreExtension" : {
+                "type" : "string"
+              },
+              "mode" : {
+                "type" : "string"
+              },
+              "positionalFieldMatching" : {
+                "type" : "string"
+              },
+              "recordName" : {
+                "type" : "string"
+              },
+              "recordNamespace" : {
+                "type" : "string"
+              },
+              "recursiveFieldMaxDepth" : {
+                "type" : "string"
+              },
+              "stableIdentifierPrefixForUnionType" : {
+                "type" : "string"
+              }
+            }
           },
           "schema" : {
             "type" : "string",
@@ -1082,7 +1120,7 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Additional Spark options provided by the connector.  \nPlease seehttps://github.com/GoogleCloudDataproc/spark-bigquery-connector for more information."
+            "description" : "Additional Spark options provided by the BigQuery connector.\n\nOptions are passed to the underlying library, see [https://github.com/GoogleCloudDataproc/spark-bigquery-connector#properties](https://github.com/GoogleCloudDataproc/spark-bigquery-connector#properties) for the available options."
           },
           "schemaMin" : {
             "type" : "string",
@@ -1173,7 +1211,132 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Settings for the underlying`org.apache.spark.sql.DataFrameReader]]and[[org.apache.spark.sql.DataFrameWriter`."
+            "description" : "Options of the Spark CSV data source for reading and writing.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/sql-data-sources-csv.html#data-source-option](https://spark.apache.org/docs/latest/sql-data-sources-csv.html#data-source-option) for the available options.",
+            "properties" : {
+              "charToEscapeQuoteEscaping" : {
+                "type" : "string"
+              },
+              "charset" : {
+                "type" : "string"
+              },
+              "codec" : {
+                "type" : "string"
+              },
+              "columnNameOfCorruptRecord" : {
+                "type" : "string"
+              },
+              "columnPruning" : {
+                "type" : "string"
+              },
+              "comment" : {
+                "type" : "string"
+              },
+              "compression" : {
+                "type" : "string"
+              },
+              "dateFormat" : {
+                "type" : "string"
+              },
+              "delimiter" : {
+                "type" : "string"
+              },
+              "emptyValue" : {
+                "type" : "string"
+              },
+              "enableDateTimeParsingFallback" : {
+                "type" : "string"
+              },
+              "encoding" : {
+                "type" : "string"
+              },
+              "enforceSchema" : {
+                "type" : "string"
+              },
+              "escape" : {
+                "type" : "string"
+              },
+              "escapeQuotes" : {
+                "type" : "string"
+              },
+              "extension" : {
+                "type" : "string"
+              },
+              "header" : {
+                "type" : "string"
+              },
+              "ignoreLeadingWhiteSpace" : {
+                "type" : "string"
+              },
+              "ignoreTrailingWhiteSpace" : {
+                "type" : "string"
+              },
+              "inferSchema" : {
+                "type" : "string"
+              },
+              "inputBufferSize" : {
+                "type" : "string"
+              },
+              "lineSep" : {
+                "type" : "string"
+              },
+              "locale" : {
+                "type" : "string"
+              },
+              "maxCharsPerColumn" : {
+                "type" : "string"
+              },
+              "maxColumns" : {
+                "type" : "string"
+              },
+              "mode" : {
+                "type" : "string"
+              },
+              "multiLine" : {
+                "type" : "string"
+              },
+              "nanValue" : {
+                "type" : "string"
+              },
+              "negativeInf" : {
+                "type" : "string"
+              },
+              "nullValue" : {
+                "type" : "string"
+              },
+              "positiveInf" : {
+                "type" : "string"
+              },
+              "preferDate" : {
+                "type" : "string"
+              },
+              "quote" : {
+                "type" : "string"
+              },
+              "quoteAll" : {
+                "type" : "string"
+              },
+              "samplingRatio" : {
+                "type" : "string"
+              },
+              "sep" : {
+                "type" : "string"
+              },
+              "singleVariantColumn" : {
+                "type" : "string"
+              },
+              "timeZone" : {
+                "type" : "string"
+              },
+              "timestampFormat" : {
+                "type" : "string"
+              },
+              "timestampNTZFormat" : {
+                "type" : "string"
+              },
+              "unescapedQuoteHandling" : {
+                "type" : "string"
+              }
+            }
           },
           "partitions" : {
             "type" : "array",
@@ -1393,7 +1556,7 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Options for Delta Lake tables see:https://docs.delta.io/latest/delta-batch.html]]and[[org.apache.spark.sql.delta.DeltaOptions"
+            "description" : "Options for reading and writing Delta Lake tables.\n\nOptions are passed to the underlying library, see [https://docs.delta.io/latest/delta-batch.html](https://docs.delta.io/latest/delta-batch.html) for the available options."
           },
           "schemaMin" : {
             "type" : "string",
@@ -1548,23 +1711,24 @@
               },
               "useHeader" : {
                 "type" : "boolean",
-                "description" : "If`true` , the first row of the excel sheet specifies the column names (default: true)."
+                "description" : "If`true`, the first row of the excel sheet specifies the column names (default: true).  \nCorresponds to the spark-excel option`header` ."
               },
               "treatEmptyValuesAsNulls" : {
                 "type" : "boolean",
-                "description" : "Empty cells are parsed as`null` values (default: true)."
+                "description" : "Empty cells are parsed as`null`values (default: true).  \nDeprecated: this option is not supported anymore by spark-excel v2 and therefore ignored.  \nUse the spark-excel options`useNullForErrorCells`and`nullValue` instead.",
+                "deprecated" : true
               },
               "inferSchema" : {
                 "type" : "boolean",
-                "description" : "Infer the schema of the excel sheet automatically (default: true)."
+                "description" : "Infer the schema of the excel sheet automatically (default: true).  \nIt is ignored if an explicit`schema` is defined on the DataObject."
               },
               "timestampFormat" : {
                 "type" : "string",
-                "description" : "A format string specifying the format to use when writing timestamps (default: dd-MM-yyyy HH:mm:ss)."
+                "description" : "A format string specifying the format to use when reading/writing timestamps (default: dd-MM-yyyy HH:mm:ss)."
               },
               "dateFormat" : {
                 "type" : "string",
-                "description" : "A format string specifying the format to use when writing dates."
+                "description" : "A format string specifying the format to use when reading/writing dates."
               },
               "maxRowsInMemory" : {
                 "type" : "integer",
@@ -1572,7 +1736,104 @@
               },
               "excerptSize" : {
                 "type" : "integer",
-                "description" : "Sample size for schema inference."
+                "description" : "Sample size (number of rows) for schema inference."
+              },
+              "additionalOptions" : {
+                "type" : "object",
+                "additionalProperties" : {
+                  "type" : "string"
+                },
+                "description" : "Further options passed to the spark-excel data source, using the spark-excel option names,\ne.g.`dataAddress`,`sheetNameIsRegex`,`useNullForErrorCells`or`locale`.  \nOptions which correspond to an attribute above must be set by that attribute.`dataAddress`must not be combined with`sheetName`,`numLinesToSkip`,`startColumn`,`endColumn`or`rowLimit` .\n\nOptions are passed to the underlying library, see [https://github.com/nightscape/spark-excel](https://github.com/nightscape/spark-excel) for the available options.",
+                "properties" : {
+                  "addColorColumns" : {
+                    "type" : "string"
+                  },
+                  "columnNameOfCorruptRecord" : {
+                    "type" : "string"
+                  },
+                  "columnNameOfRowNumber" : {
+                    "type" : "string"
+                  },
+                  "dataAddress" : {
+                    "type" : "string"
+                  },
+                  "enforceSchema" : {
+                    "type" : "string"
+                  },
+                  "fileExtension" : {
+                    "type" : "string"
+                  },
+                  "ignoreAfterHeader" : {
+                    "type" : "string"
+                  },
+                  "ignoreCorruptFiles" : {
+                    "type" : "string"
+                  },
+                  "ignoreLeadingWhiteSpace" : {
+                    "type" : "string"
+                  },
+                  "ignoreMissingFiles" : {
+                    "type" : "string"
+                  },
+                  "ignoreTrailingWhiteSpace" : {
+                    "type" : "string"
+                  },
+                  "keepUndefinedRows" : {
+                    "type" : "string"
+                  },
+                  "locale" : {
+                    "type" : "string"
+                  },
+                  "maxByteArraySize" : {
+                    "type" : "string"
+                  },
+                  "mode" : {
+                    "type" : "string"
+                  },
+                  "modifiedAfter" : {
+                    "type" : "string"
+                  },
+                  "modifiedBefore" : {
+                    "type" : "string"
+                  },
+                  "nanValue" : {
+                    "type" : "string"
+                  },
+                  "negativeInf" : {
+                    "type" : "string"
+                  },
+                  "nullValue" : {
+                    "type" : "string"
+                  },
+                  "positiveInf" : {
+                    "type" : "string"
+                  },
+                  "samplingRatio" : {
+                    "type" : "string"
+                  },
+                  "sheetNameIsRegex" : {
+                    "type" : "string"
+                  },
+                  "tempFileThreshold" : {
+                    "type" : "string"
+                  },
+                  "timeZone" : {
+                    "type" : "string"
+                  },
+                  "useNullForErrorCells" : {
+                    "type" : "string"
+                  },
+                  "usePlainNumberFormat" : {
+                    "type" : "string"
+                  },
+                  "workbookPassword" : {
+                    "type" : "string"
+                  }
+                }
+              },
+              "allowUnknownOptions" : {
+                "type" : "boolean",
+                "description" : "If`true`, keys of`additionalOptions` which are not known as spark-excel option only\ncreate a warning instead of an error (default: false)."
               }
             },
             "title" : "ExcelOptions",
@@ -1733,7 +1994,7 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Options for Iceberg tables see:https://iceberg.apache.org/docs/latest/configuration/"
+            "description" : "Options for reading and writing Iceberg tables.\n\nOptions are passed to the underlying library, see [https://iceberg.apache.org/docs/latest/spark-configuration/](https://iceberg.apache.org/docs/latest/spark-configuration/) for the available options."
           },
           "schemaMin" : {
             "type" : "string",
@@ -1956,7 +2217,7 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Any jdbc options according tohttps://spark.apache.org/docs/latest/sql-data-sources-jdbc.html.  \nNote that some options above set and override some of these options explicitly.  \nUse \"createTableOptions\" and \"createTableColumnTypes\" to control automatic creating of database tables."
+            "description" : "Any jdbc options of the Spark JDBC data source.  \nNote that some options above set and override some of these options explicitly.  \nUse \"createTableOptions\" and \"createTableColumnTypes\" to control automatic creating of database tables.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option](https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option) for the available options."
           },
           "virtualPartitions" : {
             "type" : "array",
@@ -2018,7 +2279,7 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Any jdbc options for reading the view according tohttps://spark.apache.org/docs/latest/sql-data-sources-jdbc.html."
+            "description" : "Any jdbc options of the Spark JDBC data source for reading the view.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option](https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option) for the available options."
           },
           "virtualPartitions" : {
             "type" : "array",
@@ -2068,7 +2329,99 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Settings for the underlying `org.apache.spark.sql.DataFrameReader` and `org.apache.spark.sql.DataFrameWriter`."
+            "description" : "Options of the Spark JSON data source for reading and writing.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/sql-data-sources-json.html#data-source-option](https://spark.apache.org/docs/latest/sql-data-sources-json.html#data-source-option) for the available options.",
+            "properties" : {
+              "allowBackslashEscapingAnyCharacter" : {
+                "type" : "string"
+              },
+              "allowComments" : {
+                "type" : "string"
+              },
+              "allowNonNumericNumbers" : {
+                "type" : "string"
+              },
+              "allowNumericLeadingZeros" : {
+                "type" : "string"
+              },
+              "allowSingleQuotes" : {
+                "type" : "string"
+              },
+              "allowUnquotedControlChars" : {
+                "type" : "string"
+              },
+              "allowUnquotedFieldNames" : {
+                "type" : "string"
+              },
+              "charset" : {
+                "type" : "string"
+              },
+              "columnNameOfCorruptRecord" : {
+                "type" : "string"
+              },
+              "compression" : {
+                "type" : "string"
+              },
+              "dateFormat" : {
+                "type" : "string"
+              },
+              "dropFieldIfAllNull" : {
+                "type" : "string"
+              },
+              "enableDateTimeParsingFallback" : {
+                "type" : "string"
+              },
+              "encoding" : {
+                "type" : "string"
+              },
+              "ignoreNullFields" : {
+                "type" : "string"
+              },
+              "inferTimestamp" : {
+                "type" : "string"
+              },
+              "lineSep" : {
+                "type" : "string"
+              },
+              "locale" : {
+                "type" : "string"
+              },
+              "mode" : {
+                "type" : "string"
+              },
+              "multiLine" : {
+                "type" : "string"
+              },
+              "prefersDecimal" : {
+                "type" : "string"
+              },
+              "pretty" : {
+                "type" : "string"
+              },
+              "primitivesAsString" : {
+                "type" : "string"
+              },
+              "samplingRatio" : {
+                "type" : "string"
+              },
+              "singleVariantColumn" : {
+                "type" : "string"
+              },
+              "timeZone" : {
+                "type" : "string"
+              },
+              "timestampFormat" : {
+                "type" : "string"
+              },
+              "timestampNTZFormat" : {
+                "type" : "string"
+              },
+              "useUnsafeRow" : {
+                "type" : "string"
+              },
+              "writeNonAsciiCharacterAsCodePoint" : {
+                "type" : "string"
+              }
+            }
           },
           "partitions" : {
             "type" : "array",
@@ -2292,7 +2645,7 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).  \nThese options override connection.options."
+            "description" : "Options for the Kafka stream reader.  \nThese options override connection.options.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html](https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html) for the available options."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/DataObjectMetadata",
@@ -2636,7 +2989,24 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Settings for the underlying`org.apache.spark.sql.DataFrameReader]]and[[org.apache.spark.sql.DataFrameWriter`."
+            "description" : "Options of the Spark Parquet data source for reading and writing.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/sql-data-sources-parquet.html#data-source-option](https://spark.apache.org/docs/latest/sql-data-sources-parquet.html#data-source-option) for the available options.",
+            "properties" : {
+              "compression" : {
+                "type" : "string"
+              },
+              "datetimeRebaseMode" : {
+                "type" : "string"
+              },
+              "int96RebaseMode" : {
+                "type" : "string"
+              },
+              "mergeSchema" : {
+                "type" : "string"
+              },
+              "parquet.compression" : {
+                "type" : "string"
+              }
+            }
           },
           "schema" : {
             "type" : "string",
@@ -2939,7 +3309,132 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Settings for the underlying`org.apache.spark.sql.DataFrameReader]]and[[org.apache.spark.sql.DataFrameWriter`."
+            "description" : "Options of the Spark CSV data source for reading and writing.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/sql-data-sources-csv.html#data-source-option](https://spark.apache.org/docs/latest/sql-data-sources-csv.html#data-source-option) for the available options.",
+            "properties" : {
+              "charToEscapeQuoteEscaping" : {
+                "type" : "string"
+              },
+              "charset" : {
+                "type" : "string"
+              },
+              "codec" : {
+                "type" : "string"
+              },
+              "columnNameOfCorruptRecord" : {
+                "type" : "string"
+              },
+              "columnPruning" : {
+                "type" : "string"
+              },
+              "comment" : {
+                "type" : "string"
+              },
+              "compression" : {
+                "type" : "string"
+              },
+              "dateFormat" : {
+                "type" : "string"
+              },
+              "delimiter" : {
+                "type" : "string"
+              },
+              "emptyValue" : {
+                "type" : "string"
+              },
+              "enableDateTimeParsingFallback" : {
+                "type" : "string"
+              },
+              "encoding" : {
+                "type" : "string"
+              },
+              "enforceSchema" : {
+                "type" : "string"
+              },
+              "escape" : {
+                "type" : "string"
+              },
+              "escapeQuotes" : {
+                "type" : "string"
+              },
+              "extension" : {
+                "type" : "string"
+              },
+              "header" : {
+                "type" : "string"
+              },
+              "ignoreLeadingWhiteSpace" : {
+                "type" : "string"
+              },
+              "ignoreTrailingWhiteSpace" : {
+                "type" : "string"
+              },
+              "inferSchema" : {
+                "type" : "string"
+              },
+              "inputBufferSize" : {
+                "type" : "string"
+              },
+              "lineSep" : {
+                "type" : "string"
+              },
+              "locale" : {
+                "type" : "string"
+              },
+              "maxCharsPerColumn" : {
+                "type" : "string"
+              },
+              "maxColumns" : {
+                "type" : "string"
+              },
+              "mode" : {
+                "type" : "string"
+              },
+              "multiLine" : {
+                "type" : "string"
+              },
+              "nanValue" : {
+                "type" : "string"
+              },
+              "negativeInf" : {
+                "type" : "string"
+              },
+              "nullValue" : {
+                "type" : "string"
+              },
+              "positiveInf" : {
+                "type" : "string"
+              },
+              "preferDate" : {
+                "type" : "string"
+              },
+              "quote" : {
+                "type" : "string"
+              },
+              "quoteAll" : {
+                "type" : "string"
+              },
+              "samplingRatio" : {
+                "type" : "string"
+              },
+              "sep" : {
+                "type" : "string"
+              },
+              "singleVariantColumn" : {
+                "type" : "string"
+              },
+              "timeZone" : {
+                "type" : "string"
+              },
+              "timestampFormat" : {
+                "type" : "string"
+              },
+              "timestampNTZFormat" : {
+                "type" : "string"
+              },
+              "unescapedQuoteHandling" : {
+                "type" : "string"
+              }
+            }
           },
           "partitions" : {
             "type" : "array",
@@ -3225,7 +3720,7 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options.  \nThese options override connection.options."
+            "description" : "Options for the Snowflake Spark Connector.  \nThese options override connection.options.\n\nOptions are passed to the underlying library, see [https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options](https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options) for the available options."
           },
           "virtualPartitions" : {
             "type" : "array",
@@ -3569,7 +4064,102 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Settings for the underlying`org.apache.spark.sql.DataFrameReader]]and[[org.apache.spark.sql.DataFrameWriter`."
+            "description" : "Options of the Spark XML data source for reading and writing.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/sql-data-sources-xml.html#data-source-option](https://spark.apache.org/docs/latest/sql-data-sources-xml.html#data-source-option) for the available options.",
+            "properties" : {
+              "arrayElementName" : {
+                "type" : "string"
+              },
+              "attributePrefix" : {
+                "type" : "string"
+              },
+              "charset" : {
+                "type" : "string"
+              },
+              "columnNameOfCorruptRecord" : {
+                "type" : "string"
+              },
+              "compression" : {
+                "type" : "string"
+              },
+              "dateFormat" : {
+                "type" : "string"
+              },
+              "declaration" : {
+                "type" : "string"
+              },
+              "encoding" : {
+                "type" : "string"
+              },
+              "excludeAttribute" : {
+                "type" : "string"
+              },
+              "ignoreNamespace" : {
+                "type" : "string"
+              },
+              "ignoreSurroundingSpaces" : {
+                "type" : "string"
+              },
+              "indent" : {
+                "type" : "string"
+              },
+              "inferSchema" : {
+                "type" : "string"
+              },
+              "locale" : {
+                "type" : "string"
+              },
+              "mode" : {
+                "type" : "string"
+              },
+              "multiLine" : {
+                "type" : "string"
+              },
+              "nullValue" : {
+                "type" : "string"
+              },
+              "preferDate" : {
+                "type" : "string"
+              },
+              "prefersDecimal" : {
+                "type" : "string"
+              },
+              "rootTag" : {
+                "type" : "string"
+              },
+              "rowTag" : {
+                "type" : "string"
+              },
+              "rowValidationXSDPath" : {
+                "type" : "string"
+              },
+              "samplingRatio" : {
+                "type" : "string"
+              },
+              "singleVariantColumn" : {
+                "type" : "string"
+              },
+              "timeZone" : {
+                "type" : "string"
+              },
+              "timestampFormat" : {
+                "type" : "string"
+              },
+              "timestampNTZFormat" : {
+                "type" : "string"
+              },
+              "useLegacyXMLParser" : {
+                "type" : "string"
+              },
+              "validateName" : {
+                "type" : "string"
+              },
+              "valueTag" : {
+                "type" : "string"
+              },
+              "wildcardColName" : {
+                "type" : "string"
+              }
+            }
           },
           "partitions" : {
             "type" : "array",
@@ -5953,7 +6543,7 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Options for the Kafka stream reader (see\nhttps://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)"
+            "description" : "Options for the Kafka stream reader.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html](https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html) for the available options."
           },
           "authMode" : {
             "oneOf" : [ {
@@ -6169,7 +6759,7 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options."
+            "description" : "Options for the Snowflake Spark Connector.\n\nOptions are passed to the underlying library, see [https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options](https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options) for the available options."
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ConnectionMetadata",
@@ -6201,7 +6791,7 @@
               "type" : "string",
               "description" : "The value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
             },
-            "description" : "spark options\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
+            "description" : "Spark configuration properties for the Spark session.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/configuration.html#available-properties](https://spark.apache.org/docs/latest/configuration.html#available-properties) for the available options.\n\nThe value can be provided in plaintext or with the id of a secret provider and the\nname of the secret in the format\n```\n###<PROVIDERID>#<SECRETNAME>###\n```\n ,\ne.g.  \n```\n###ENV#<ENV_VARIABLE_NAME>###\n```\n\n\nto get a secret from an environment variable."
           },
           "enableHive" : {
             "type" : "boolean",
