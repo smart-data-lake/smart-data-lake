@@ -107,16 +107,19 @@ for details, in particular the compiler plugin your project needs for this to wo
 ## Generate schema and statistics metadata
 
 What would be a DataObject configuration viewer without possibility to see structured DataObject schemas.
-Using a Java command line tool called _DataObjectSchemaExporter_, schema, table statistics and column statistics can be exported as Json data for SDLB UI.
+Schemas are exported as Json data for SDLB UI by a dry-run of SDLB with `--test dry-run-with-schema-export`.
+The dry-run initializes all Actions without processing data, and its schemas include the column documentation.
+Table statistics and column statistics are exported from the catalog by a Java command line tool called _CatalogStatsExporter_.
+It can export schemas as well with `--withSchema true`, but these schemas are read from the data and lack the column documentation.
 
-To start the _DataObjectSchemaExporter_ and also the previously mentioned _ConfigJsonExporter_, execute the following command:
+To start the schema export, the _CatalogStatsExporter_ and also the previously mentioned _ConfigJsonExporter_, execute the following command:
 ```
 ./exportConfigSchemaStats.sh
 ```
 
 :::tip Scheduling export
 Export configuration, schema and statistics at least with every release of your data pipelines.
-For this you can easily add _ConfigJsonExporter_ and _DataObjectSchemaExporter_ command line tool in the corresponding release pipeline. 
+For this you can easily add the dry-run with schema export, _ConfigJsonExporter_ and _CatalogStatsExporter_ command line tool in the corresponding release pipeline. 
 :::
 
 ## Synchronize metadata with the UI backend

@@ -22,7 +22,7 @@ import io.smartdatalake.config.ConfigToolbox
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.exporter.ExportWriter.formatSchema
 import io.smartdatalake.config.exporter.FileExportWriter
-import io.smartdatalake.meta.configexporter.DataObjectSchemaExporter.{exportSchemaAndStats, getCurrentVersion}
+import io.smartdatalake.meta.configexporter.CatalogStatsExporter.{exportSchemaAndStats, getCurrentVersion}
 import io.smartdatalake.testutils.DataFrameTestHelper.ComplexTypeTest
 import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
@@ -38,7 +38,7 @@ import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.{Files, Paths}
 
-class DataObjectSchemaExporterTest extends AnyFunSuite with BeforeAndAfter {
+class CatalogStatsExporterTest extends AnyFunSuite with BeforeAndAfter {
 
   private val configPath = getClass.getResource("/dagexporter/dagexporterTest.conf").getPath
   val target = "localfile:./target/schema"
@@ -49,8 +49,8 @@ class DataObjectSchemaExporterTest extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("export simple schema") {
-    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "^(dataObjectCsv1)", targets = Seq(target))
-    DataObjectSchemaExporter.exportSchemaAndStats(exporterConfig)
+    val exporterConfig = CatalogStatsExporterConfig(Seq(configPath), includeRegex = "^(dataObjectCsv1)", targets = Seq(target), withSchema = true)
+    CatalogStatsExporter.exportSchemaAndStats(exporterConfig)
     val writer = FileExportWriter(exportPath)
     val actualOutput = writer.getLatestData("dataObjectCsv1", "schema")
 
@@ -78,8 +78,8 @@ class DataObjectSchemaExporterTest extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("export complex schema") {
-    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectParquet6", targets = Seq(target))
-    DataObjectSchemaExporter.exportSchemaAndStats(exporterConfig)
+    val exporterConfig = CatalogStatsExporterConfig(Seq(configPath), includeRegex = "dataObjectParquet6", targets = Seq(target), withSchema = true)
+    CatalogStatsExporter.exportSchemaAndStats(exporterConfig)
     val writer = FileExportWriter(Paths.get(exporterConfig.targets.head.stripPrefix("localfile:")))
     val actualOutput = writer.getLatestData("dataObjectParquet6", "schema")
     val expectedFieldsJson =
@@ -130,7 +130,7 @@ class DataObjectSchemaExporterTest extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("test main with includes and excludes, don't update if same") {
-    DataObjectSchemaExporter.main(Array(
+    CatalogStatsExporter.main(Array(
         "-c",
         configPath,
         "-t",
@@ -141,6 +141,8 @@ class DataObjectSchemaExporterTest extends AnyFunSuite with BeforeAndAfter {
         "dataObjectCsv5",
         "--preferredSubFeedType",
         "SparkSubFeed",
+        "--withSchema",
+        "true",
         "--stopOnError",
         "false"
       ))
@@ -152,16 +154,14 @@ class DataObjectSchemaExporterTest extends AnyFunSuite with BeforeAndAfter {
     assert(actual2 == expected2)
   }
 
-  test("export stats only with withSchema=false") {
-    DataObjectSchemaExporter.main(Array(
+  test("export stats only by default") {
+    CatalogStatsExporter.main(Array(
       "-c",
       configPath,
       "-t",
       target,
       "-i",
-      "dataObjectCsv1",
-      "--withSchema",
-      "false"
+      "dataObjectCsv1"
     ))
     val writer = FileExportWriter(exportPath)
     assert(writer.getLatestData("dataObjectCsv1", "schema").isEmpty)
@@ -202,8 +202,8 @@ class DataObjectSchemaExporterTest extends AnyFunSuite with BeforeAndAfter {
       .drop("complex") // TODO: complex type not supported by Jdbc, use another DataObject type for testing stats
     testDO.writeSparkDataFrame(df)
     // export
-    val exporterConfig = DataObjectSchemaExporterConfig(Seq(configPath), includeRegex = "dataObjectJdbc14", targets = Seq(target))
-    DataObjectSchemaExporter.exportSchemaAndStats(exporterConfig)
+    val exporterConfig = CatalogStatsExporterConfig(Seq(configPath), includeRegex = "dataObjectJdbc14", targets = Seq(target))
+    CatalogStatsExporter.exportSchemaAndStats(exporterConfig)
     // TODO: stats not available for Jdbc, and using Iceberg or Delta needs a customized spark session...
     // assert(latestStats.apply("columns").asInstanceOf[Map[String, Any]]
     //  .apply("lastname").asInstanceOf[Map[String, Any]]
