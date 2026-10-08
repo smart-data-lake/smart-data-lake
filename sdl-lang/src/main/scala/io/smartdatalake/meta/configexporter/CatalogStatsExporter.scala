@@ -34,11 +34,11 @@ import scopt.OptionParser
 import java.time.LocalDateTime
 import scala.util.{Failure, Success, Try}
 
-case class DataObjectSchemaExporterConfig(configPaths: Seq[String] = null,
+case class CatalogStatsExporterConfig(configPaths: Seq[String] = null,
                                           targets: Seq[String] = Seq("./schema"),
                                           includeRegex: String = ".*",
                                           excludeRegex: Option[String] = None,
-                                          withSchema: Boolean = true,
+                                          withSchema: Boolean = false,
                                           withStats: Boolean = true,
                                           updateStats: Boolean = true,
                                           preferredSubFeedType: Option[String] = None,
@@ -46,12 +46,12 @@ case class DataObjectSchemaExporterConfig(configPaths: Seq[String] = null,
                                           master: String = "local[2]"
                                          )
 
-object DataObjectSchemaExporter extends SmartDataLakeLogger {
+object CatalogStatsExporter extends SmartDataLakeLogger {
 
   val appType: String = getClass.getSimpleName.replaceAll("\\$$", "") // remove $ from object name and use it as appType
   implicit val formats: Formats = Serialization.formats(NoTypeHints)
 
-  protected val parser: OptionParser[DataObjectSchemaExporterConfig] = new OptionParser[DataObjectSchemaExporterConfig](appType) {
+  protected val parser: OptionParser[CatalogStatsExporterConfig] = new OptionParser[CatalogStatsExporterConfig](appType) {
     override def showUsageOnError: Option[Boolean] = Some(true)
     opt[String]('c', "config")
       .required()
@@ -71,7 +71,7 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
       .text("Regular expression used to exclude DataObjects from export, matching DataObject ids. `excludeRegex` is applied after `includeRegex`. Default: no excludes")
     opt[String]("withSchema")
       .action((value, c) => c.copy(withSchema = value.toBoolean))
-      .text("If true, DataObject schemas are exported, otherwise not. Default: true")
+      .text("If true, DataObject schemas are exported, otherwise not. Schemas should normally be exported with an SDLB run using `--test dry-run-with-schema-export`, as only these include the column documentation. Default: false")
     opt[String]('w', "withStats")
       .action((value, c) => c.copy(withStats = value.toBoolean))
       .text("If true, DataObject statistics are exported, otherwise not. Default: true")
@@ -87,15 +87,15 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     opt[String]('m', "master")
       .action((value, c) => c.copy(master = value))
       .text("Spark session master configuration. As schemas might be inferred by Spark, there might be a need to tune this for some DataObjects. Default: local[2]")
-    help("help").text("Export DataObject schemas and statistics as Json documents which can be used by the visualizer. Each Json document is identified by its type (schema or stats), the DataObject Id and the timestamp of creation.")
+    help("help").text("Export DataObject statistics, and optionally schemas, from the catalog as Json documents which can be used by the visualizer. Each Json document is identified by its type (schema or stats), the DataObject Id and the timestamp of creation.")
   }
 
   /**
-   * Takes as input an SDL Config and exports the schema of all DataObjects for the visualizer.
+   * Takes as input an SDL Config and exports the statistics, and optionally the schema, of all DataObjects for the visualizer.
    */
   def main(args: Array[String]): Unit = {
     // Parse all command line arguments
-    parser.parse(args, DataObjectSchemaExporterConfig()) match {
+    parser.parse(args, CatalogStatsExporterConfig()) match {
       case Some(exporterConfig) =>
 
         logger.info(s"starting with configuration ${ProductUtil.formatObj(exporterConfig)}")
@@ -106,13 +106,13 @@ object DataObjectSchemaExporter extends SmartDataLakeLogger {
     }
   }
 
-  def exportSchemaAndStats(config: DataObjectSchemaExporterConfig): Unit = {
+  def exportSchemaAndStats(config: CatalogStatsExporterConfig): Unit = {
 
     // get DataObjects
     val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(config.configPaths)
     val hadoopConf = globalConfig.getHadoopConfiguration
     val startTime = LocalDateTime.now()
-    implicit val context: ActionPipelineContext = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, registry, SmartDataLakeBuilderConfig("DataObjectSchemaExporter", Some("DataObjectSchemaExporter")), runStartTime = startTime, attemptStartTime = startTime, phase = ExecutionPhase.Init, globalConfig = globalConfig)
+    implicit val context: ActionPipelineContext = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, registry, SmartDataLakeBuilderConfig("CatalogStatsExporter", Some("CatalogStatsExporter")), runStartTime = startTime, attemptStartTime = startTime, phase = ExecutionPhase.Init, globalConfig = globalConfig)
     val dataObjects = registry.getDataObjects
       .filter(d => d.id.id.matches(config.includeRegex) && (config.excludeRegex.isEmpty || !d.id.id.matches(config.excludeRegex.get)))
     logger.info(s"Writing ${dataObjects.size} DataObject schemas and stats to target ${config.targets.mkString(",")}")

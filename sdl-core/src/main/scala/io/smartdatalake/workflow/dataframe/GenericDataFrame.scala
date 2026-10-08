@@ -376,7 +376,7 @@ trait GenericSchema extends GenericTypedObject {
 object GenericSchema {
 
   /**
-   * Parsing schema export created by DataObjectSchemaExporter, see [[GenericSchema.toJson]].
+   * Parsing schema export created by a dry-run with schema export or CatalogStatsExporter, see [[GenericSchema.toJson]].
    * The Json is engine-neutral, so it can be parsed for another subFeedType than the one it was created with.
    * Simple data types are given by their Spark type name, e.g. `string`, `integer` or `decimal(10,2)`,
    * and are created with `createSimpleDataType` of the companion of the subFeedType.

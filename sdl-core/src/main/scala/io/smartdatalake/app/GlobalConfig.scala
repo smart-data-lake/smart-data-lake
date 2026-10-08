@@ -80,7 +80,7 @@ import org.apache.hadoop.conf.Configuration
  * @param dataObjectsSchemaSource
  *   Optional source URI for DataObjects schemas for development.* This is used for development on
  *   local environment without access to data. Schemas can be exported on dev/prod environment using
- *   the DataObjectSchemaExporter application, and used on local environment to define DataObject
+ *   a dry-run with `--test dry-run-with-schema-export`, and used on local environment to define DataObject
  *   schemas for executing dry-run's. Source must be a path like `file:./schema` or `uiBackend`.
  *   uiBackend will use global.uiBackend configuration to query UI backend for schemas. Default:
  *   `file:./schema`.
