@@ -119,6 +119,35 @@ Export configuration, schema and statistics at least with every release of your 
 For this you can easily add _ConfigJsonExporter_ and _DataObjectSchemaExporter_ command line tool in the corresponding release pipeline. 
 :::
 
+## Synchronize metadata with the UI backend
+
+The exported schemas, statistics and column lineage, as well as the state of the runs, can be copied between
+a local directory and the UI backend with a third Java command line tool called _ExportSync_. It transfers the
+versions which are newer in the source than in the target, so it can be run repeatedly. Source and target can be
+`uiBackend` (configured with `global.uiBackend`), a local directory prefixed with `localfile:`, or a Hadoop path.
+
+```
+# upload schemas, statistics and lineage exported locally, and the state of the runs
+java -cp sdlb.jar io.smartdatalake.meta.configexporter.ExportSync \
+  --config ./config --source localfile:./viz/schema --target uiBackend \
+  --types schema,stats,lineage,state --stateSource ./viz/state
+
+# download schemas, statistics and lineage from the UI backend
+java -cp sdlb.jar io.smartdatalake.meta.configexporter.ExportSync \
+  --config ./config --source uiBackend --target localfile:./viz/schema
+```
+
+The DataObjects to synchronize are taken from the configuration, and can be filtered with `--includeRegex` and
+`--excludeRegex`. The state is synchronized per application, filtered with `--applicationRegex`, and only once
+a run has finished. `--versions` selects what is transferred: `newer` (default) transfers all versions newer
+than the latest version of the target, `latest` only the latest version of the source, and `all` every version
+missing in the target. `--dryRun` only reports what would be transferred.
+
+The state can only be uploaded to the UI backend, not downloaded from it, as the UI backend stores it in a
+different format. Between state directories it can be copied in both directions; copied state is added to the
+state index file used by the local UI only if the SDL parameter `hadoopFileStateStoreIndexAppend` is set, e.g.
+with the environment variable `SDL_HADOOP_FILE_STATE_STORE_INDEX_APPEND=true`, see [Run State](/docs/reference/runState).
+
 ## Write the metadata into the data catalog
 
 The descriptions above document your pipeline in the SDLB UI. To make them visible in the data catalog

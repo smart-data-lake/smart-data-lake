@@ -20,6 +20,7 @@ package io.smartdatalake.config.exporter
 
 import io.smartdatalake.app.BackendClient
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.exporter.ExportType.ExportType
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.DataFrameSubFeed
 import io.smartdatalake.workflow.dataframe.{ColumnLineage, ColumnLineageDebug, GenericSchema}
@@ -61,7 +62,46 @@ trait ExportWriter extends SmartDataLakeLogger {
 
   def listFiles(version: Option[String]): Seq[FileDescriptor] = throw new NotImplementedException()
 
-  def readLatestSchema(dataObjectId: DataObjectId): Option[String] = throw new NotImplementedException()
+  def readLatestSchema(dataObjectId: DataObjectId): Option[String] = readLatest(ExportType.Schema, dataObjectId)
+
+  /**
+   * List the versions of a document stored for a DataObject, see [[ExportType]].
+   * The versions are timestamps in epoch seconds. An empty list is returned if no document is stored.
+   */
+  def listVersions(tpe: ExportType, dataObjectId: DataObjectId): Seq[Long] = throw new NotImplementedException(s"${getClass.getSimpleName} does not support reading exported documents")
+
+  /**
+   * Read a given version of a document stored for a DataObject, see [[listVersions]].
+   */
+  def readVersion(tpe: ExportType, dataObjectId: DataObjectId, version: Long): Option[String] = throw new NotImplementedException(s"${getClass.getSimpleName} does not support reading exported documents")
+
+  def readLatest(tpe: ExportType, dataObjectId: DataObjectId): Option[String] = {
+    listVersions(tpe, dataObjectId).maxOption.flatMap(readVersion(tpe, dataObjectId, _))
+  }
+
+  /**
+   * Write a given version of a document, e.g. one read from another [[ExportWriter]] with [[readVersion]].
+   */
+  def writeVersion(tpe: ExportType, document: String, dataObjectId: DataObjectId, version: Long): Unit = tpe match {
+    case ExportType.Schema => writeSchema(document, dataObjectId, version)
+    case ExportType.Stats => writeStats(document, dataObjectId, version)
+    case ExportType.Lineage => writeLineage(document, dataObjectId, version)
+  }
+
+  /**
+   * False if the writer keeps only the latest version of a document, overwriting older versions.
+   */
+  def keepsHistory: Boolean = true
+}
+
+/**
+ * Types of documents exported per DataObject.
+ */
+object ExportType extends Enumeration {
+  type ExportType = Value
+  val Schema: Value = Value("schema")
+  val Stats: Value = Value("stats")
+  val Lineage: Value = Value("lineage")
 }
 
 
@@ -149,6 +189,16 @@ object ExportWriter {
     }
     val plan = if (debug.plan.isEmpty) Seq() else Seq("", "Analyzed plan:") ++ debug.plan
     (header ++ inputs ++ unresolvedColumns ++ plan).mkString(System.lineSeparator) + System.lineSeparator
+  }
+
+  /**
+   * The UI backend returns statistics wrapped as `{"stats": ...}`, while they are uploaded unwrapped.
+   */
+  def unwrapDownloadedDocument(tpe: ExportType, content: String): String = {
+    if (tpe == ExportType.Stats) JsonMethods.parse(content) match {
+      case JObject(List(("stats", stats))) => pretty(stats)
+      case _ => content
+    } else content
   }
 
   /**
