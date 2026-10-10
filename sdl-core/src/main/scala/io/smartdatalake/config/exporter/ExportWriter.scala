@@ -86,6 +86,7 @@ trait ExportWriter extends SmartDataLakeLogger {
     case ExportType.Schema => writeSchema(document, dataObjectId, version)
     case ExportType.Stats => writeStats(document, dataObjectId, version)
     case ExportType.Lineage => writeLineage(document, dataObjectId, version)
+    case _ => throw new IllegalArgumentException(s"$tpe is not a document type exported per DataObject")
   }
 
   /**
@@ -95,17 +96,34 @@ trait ExportWriter extends SmartDataLakeLogger {
 }
 
 /**
- * Types of documents exported per DataObject.
+ * Types of exported documents.
  */
 object ExportType extends Enumeration {
   type ExportType = Value
+  /** resolved configuration, see [[ExportWriter.writeConfig]] */
+  val ConfigJson: Value = Value("configJson")
+  /** markdown description files, see [[ExportWriter.writeFile]] */
+  val Description: Value = Value("description")
+  /** schema of a DataObject */
   val Schema: Value = Value("schema")
+  /** statistics of a DataObject */
   val Stats: Value = Value("stats")
+  /** column lineage of a DataObject */
   val Lineage: Value = Value("lineage")
+  /** state of workflow runs, see [[StateSyncEndpoint]] */
+  val State: Value = Value("state")
+
+  /** the types exported per DataObject, which are versioned */
+  val dataObjectTypes: Seq[ExportType] = Seq(Schema, Stats, Lineage)
 }
 
 
 object ExportWriter {
+
+  /**
+   * Filename of the exported configuration if it is written to a directory.
+   */
+  val configFilename = "exportedConfig.json"
 
   /**
    * create document writer depending on target uri scheme

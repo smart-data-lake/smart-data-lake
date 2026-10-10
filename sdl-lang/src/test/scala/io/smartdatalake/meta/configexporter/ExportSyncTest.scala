@@ -21,7 +21,7 @@ package io.smartdatalake.meta.configexporter
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.smartdatalake.app.BackendClient
-import io.smartdatalake.config.ConfigurationException
+import io.smartdatalake.config.{ConfigLoader, ConfigurationException}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.exporter.{ExportType, FileExportWriter, HadoopExportWriter, HadoopStateSyncEndpoint, StateRunId}
 import io.smartdatalake.definitions.Environment
@@ -30,6 +30,7 @@ import io.smartdatalake.workflow.ActionDAGRunState
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path => HadoopPath}
 import org.json4s.jackson.JsonMethods
+import org.json4s.{JInt, JNothing, JString}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -65,7 +66,7 @@ class ExportSyncTest extends AnyFunSuite with BeforeAndAfterAll {
     versions.foreach(v => writer.writeVersion(tpe, doc(id, v), id, v))
   }
 
-  private def baseConfig(source: String, target: String) = ExportSyncConfig(configPaths = Seq(configPath), source = source, target = target)
+  private def baseConfig(source: String, target: String) = ExportSyncConfig(configPaths = Seq(configPath), schemaSource = Some(source), target = target, types = ExportType.dataObjectTypes)
 
   test("select versions") {
     import ExportSync.selectVersions
@@ -111,7 +112,7 @@ class ExportSyncTest extends AnyFunSuite with BeforeAndAfterAll {
       writeDocs(src, ExportType.Stats, id, 100)
       writeDocs(src, ExportType.Lineage, id, 100)
     }
-    ExportSync.main(Array("-c", configPath, "--source", s"localfile:$srcDir", "-t", s"localfile:$tgtDir", "--types", "schema,stats", "-i", "do.*", "-e", "do2"))
+    ExportSync.main(Array("-c", configPath, "--schemaSource", s"localfile:$srcDir", "-t", s"localfile:$tgtDir", "--types", "schema,stats", "-i", "do.*", "-e", "do2"))
     assert(tgt.listVersions(ExportType.Schema, do1) == Seq(100L, 200L))
     assert(tgt.listVersions(ExportType.Stats, do1) == Seq(100L))
     assert(tgt.listVersions(ExportType.Lineage, do1).isEmpty)
@@ -173,7 +174,7 @@ class ExportSyncTest extends AnyFunSuite with BeforeAndAfterAll {
     tgt.writeState(stateJson("app1", 1, 1))
 
     val config = baseConfig(s"localfile:${newDir("src")}", s"localfile:${newDir("tgt")}")
-      .copy(types = Seq(), withState = true, stateSource = Some(s"localfile:$srcDir"), stateTarget = Some(tgtDir.toString), applicationRegex = "app1")
+      .copy(types = Seq(ExportType.State), stateSource = Some(s"localfile:$srcDir"), stateTarget = Some(tgtDir.toString), applicationRegex = "app1")
     val result = ExportSync.sync(config)
     assert(result.transferred == 1) // run 3 is not final
     assert(tgt.listApplications() == Seq("app1"))
@@ -186,7 +187,7 @@ class ExportSyncTest extends AnyFunSuite with BeforeAndAfterAll {
   }
 
   test("state requires stateSource if source is not uiBackend") {
-    val config = baseConfig("localfile:./a", "uiBackend").copy(types = Seq(), withState = true)
+    val config = baseConfig("localfile:./a", "uiBackend").copy(types = Seq(ExportType.State))
     intercept[ConfigurationException](ExportSync.sync(config))
   }
 
@@ -239,12 +240,12 @@ class ExportSyncTest extends AnyFunSuite with BeforeAndAfterAll {
       .willReturn(aResponse().withStatus(200).withBody("""[{"name":"app1","runId":1,"attemptId":1,"status":"SUCCEEDED"}]""")))
     stubFor(post(backendPath("state")).willReturn(aResponse().withStatus(200)))
 
-    val uploadResult = ExportSync.sync(baseConfig(s"localfile:${newDir("src")}", "uiBackend").copy(types = Seq(), withState = true, stateSource = Some(srcDir.toString)))
+    val uploadResult = ExportSync.sync(baseConfig(s"localfile:${newDir("src")}", "uiBackend").copy(types = Seq(ExportType.State), stateSource = Some(srcDir.toString)))
     assert(uploadResult.transferred == 1)
     verify(1, postRequestedFor(backendPath("state")))
 
     val ex = intercept[ConfigurationException](ExportSync.sync(baseConfig("uiBackend", s"localfile:${newDir("tgt")}")
-      .copy(types = Seq(), withState = true, stateSource = Some("uiBackend"), stateTarget = Some(newDir("statetgt").toString))))
+      .copy(types = Seq(ExportType.State), stateSource = Some("uiBackend"), stateTarget = Some(newDir("statetgt").toString))))
     assert(ex.getMessage.contains("not supported"))
   }
 
@@ -269,5 +270,71 @@ class ExportSyncTest extends AnyFunSuite with BeforeAndAfterAll {
     stubFor(get(backendPath("workflow")).willReturn(aResponse().withStatus(200).withBody(runsJson(300 until 100 by -1))))
     val client = BackendClient(Seq(configPath))
     assert(client.listRuns("app1").map(_.runId).sorted == (101 to 300))
+  }
+
+  private val dagexporterPath = getClass.getResource("/dagexporter").getPath
+  private val descriptionPath = getClass.getResource("/dagexporter/description").getPath
+
+  private def tempConf(content: String): String = {
+    val file = Files.createTempFile("exportsync", ".conf")
+    Files.write(file, content.getBytes("UTF-8"))
+    file.toString
+  }
+
+  test("export config json") {
+    val sdlConfig = ConfigLoader.loadConfigFromFilesystem(Seq(dagexporterPath), new Configuration())
+    val actualJsonOutput = JsonMethods.parse(ExportSync.exportConfigJson(sdlConfig, Seq(dagexporterPath)))
+    assert((actualJsonOutput \ "actions").children.size === 8)
+    assert((actualJsonOutput \ "dataObjects").children.size === 15)
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "lineNumber" === JInt(112))
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "endLineNumber" === JNothing)
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_origin" \ "path" === JString("dagexporterTest.conf"))
+    // column descriptions are not part of the exported config, they are applied to the catalog by
+    // CatalogSchemaUpdater and merged into the schemas exported by a dry-run, see ColumnDescriptionParserTest.
+    assert(actualJsonOutput \ "dataObjects" \ "dataObjectParquet6" \ "_columnDescriptions" === JNothing)
+    assert(((actualJsonOutput \ "actions" \ "actionId6" \ "transformers")(0) \ "_parameters")(0) \ "name" === JString("session"))
+    assert((actualJsonOutput \ "actions" \ "actionId8" \ "transformers")(0) \ "_sourceDoc" ===
+      JString("Documentation for TestTransformer.  \nThis should be exported by ExportSync!"))
+  }
+
+  test("write config json to a local and a Hadoop directory") {
+    val (localDir, hadoopDir) = (newDir("configlocal"), newDir("confighadoop"))
+    ExportSync.main(Array("-c", dagexporterPath, "--types", "configJson", "-t", s"localfile:$localDir"))
+    assert(Files.exists(localDir.resolve("exportedConfig.json")))
+    ExportSync.main(Array("-c", dagexporterPath, "--types", "configJson", "-t", hadoopDir.toUri.toString))
+    assert(Files.exists(hadoopDir.resolve("exportedConfig.json")))
+  }
+
+  test("upload config and descriptions to uiBackend") {
+    val descriptionConf = tempConf(s"""global.descriptionPath = "$descriptionPath"""")
+    wireMockServer.resetAll()
+    stubFor(put(backendPath("config")).willReturn(aResponse().withStatus(200)))
+    stubFor(get(backendPath("descriptions/list")).willReturn(aResponse().withStatus(200)
+      .withBody("""[{"name":"/dataObjects/old.md","type":"text/markdown","size":1,"last_modified":"2026-01-01T00:00:00Z"}]""")))
+    stubFor(post(urlPathMatching("/api/v1/descriptions/.*")).willReturn(aResponse().withStatus(200)))
+    stubFor(delete(urlPathMatching("/api/v1/descriptions/.*")).willReturn(aResponse().withStatus(200)))
+
+    val config = ExportSyncConfig(configPaths = Seq(configPath, descriptionConf), target = "uiBackend", types = Seq(ExportType.ConfigJson, ExportType.Description))
+    val result = ExportSync.sync(config)
+    assert(result.transferred == 3) // config, upload of dataObjectParquet6.md, deletion of old.md
+    verify(1, putRequestedFor(backendPath("config")).withQueryParam("repo", equalTo("test")))
+    verify(1, postRequestedFor(backendPath("descriptions/dataObjects/dataObjectParquet6.md")))
+    verify(1, deleteRequestedFor(backendPath("descriptions/dataObjects/old.md")))
+  }
+
+  test("descriptions need global.descriptionPath and a target supporting files") {
+    intercept[ConfigurationException](ExportSync.sync(ExportSyncConfig(configPaths = Seq(configPath), target = "uiBackend", types = Seq(ExportType.Description))))
+    val descriptionConf = tempConf(s"""global.descriptionPath = "$descriptionPath"""")
+    intercept[ConfigurationException](ExportSync.sync(ExportSyncConfig(configPaths = Seq(configPath, descriptionConf), target = s"localfile:${newDir("tgt")}", types = Seq(ExportType.Description))))
+  }
+
+  test("schemaSource defaults to global.dataObjectsSchemaSource") {
+    val (srcDir, tgtDir) = (newDir("src"), newDir("tgt"))
+    writeDocs(FileExportWriter(srcDir), ExportType.Schema, do1, 100)
+    val schemaSourceConf = tempConf(s"""global.dataObjectsSchemaSource = "localfile:$srcDir"""")
+    val result = ExportSync.sync(ExportSyncConfig(configPaths = Seq(configPath, schemaSourceConf), target = s"localfile:$tgtDir", types = Seq(ExportType.Schema)))
+    assert(result.transferred == 1)
+    // without global.dataObjectsSchemaSource, schemaSource is required
+    intercept[ConfigurationException](ExportSync.sync(ExportSyncConfig(configPaths = Seq(configPath), target = s"localfile:$tgtDir", types = Seq(ExportType.Schema))))
   }
 }

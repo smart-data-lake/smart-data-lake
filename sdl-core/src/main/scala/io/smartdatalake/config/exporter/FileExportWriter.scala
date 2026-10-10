@@ -37,7 +37,10 @@ import scala.util.Using
 case class FileExportWriter(path: Path) extends ExportWriter with SmartDataLakeLogger {
 
   override def writeConfig(document: String, version: Option[String]): Unit = {
-    writeFile(document, "config")
+    Files.createDirectories(path)
+    val file = path.resolve(ExportWriter.configFilename)
+    logger.info(s"Writing config to file $file")
+    Files.write(file, document.getBytes("UTF-8"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
   }
 
   override def writeSchema(document: String, dataObjectId: DataObjectId, version: Long): Unit = {
@@ -73,12 +76,6 @@ case class FileExportWriter(path: Path) extends ExportWriter with SmartDataLakeL
       Files.write(newFile, document.getBytes("UTF-8"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
       Files.write(indexFile, (newFilename + System.lineSeparator).getBytes, StandardOpenOption.CREATE, StandardOpenOption.APPEND)
     }
-  }
-
-  def writeFile(document: String, tpe: String): Unit = {
-    if (path.getParent != null) Files.createDirectories(path.getParent)
-    logger.info(s"Writing $tpe to file $path")
-    Files.write(path, document.getBytes("UTF-8"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
   }
 
   def getLatestData(dataObjectId: DataObjectId, tpe: String): Option[String] = {

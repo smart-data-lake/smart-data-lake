@@ -23,7 +23,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
  * Custom Transformer to check export parameter documentation with ConfigJsonExorter.
- * It is used in ConfigJsonExporterTest.
+ * It is used in ExportSyncTest.
  */
 class DynamicTestTransformer extends CustomDfsTransformer {
   def transform(session: SparkSession, dfDataObjectParquet9: DataFrame, isExec: Boolean, optionalBoolean: Option[Boolean], defaultBoolean: Boolean = true, long: Long) = {
