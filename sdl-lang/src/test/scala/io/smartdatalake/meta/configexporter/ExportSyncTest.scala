@@ -136,6 +136,8 @@ class ExportSyncTest extends AnyFunSuite with BeforeAndAfterAll {
     assert(result.transferred == 1)
     val tgt = HadoopExportWriter(new HadoopPath(tgtDir.toUri), new Configuration())
     assert(tgt.readLatest(ExportType.Lineage, do1).contains(doc(do1, 200)))
+    assert(tgt.listAllVersions(ExportType.Lineage, latestOnly = false).map(_.keySet).contains(Set(do1)))
+    assert(FileExportWriter(srcDir).listAllVersions(ExportType.Lineage, latestOnly = false).contains(Map(do1 -> Seq(100L, 200L))))
     // the version of the target is the modification time of its file, the content is identical nevertheless
     val resultAgain = ExportSync.sync(config)
     assert(resultAgain.transferred == 0)
@@ -228,6 +230,36 @@ class ExportSyncTest extends AnyFunSuite with BeforeAndAfterAll {
     assert(tgt.listVersions(ExportType.Stats, do1) == Seq(100L, 200L))
     assert(tgt.readVersion(ExportType.Stats, do1, 200).map(JsonMethods.parse(_)).contains(JsonMethods.parse(doc(do1, 200))))
     assert(tgt.listVersions(ExportType.Stats, do2).isEmpty)
+  }
+
+  test("list versions of all DataObjects of uiBackend at once") {
+    val (srcDir, tgtDir) = (newDir("src"), newDir("tgt"))
+    writeDocs(FileExportWriter(srcDir), ExportType.Schema, do1, 100, 200)
+    wireMockServer.resetAll()
+    // the target needs only the latest version per DataObject
+    stubFor(get(backendPath("dataobjects/schema/tstamps")).withQueryParam("latest", equalTo("true"))
+      .willReturn(aResponse().withStatus(200).withBody("""{"do1":[100]}""")))
+    stubFor(put(urlPathMatching("/api/v1/dataobject/.*")).willReturn(aResponse().withStatus(200)))
+    stubFor(get(backendPath("dataobject/schema/do1")).withQueryParam("tstamp", equalTo("100"))
+      .willReturn(aResponse().withStatus(200).withBody(doc(do1, 100))))
+
+    val uploadResult = ExportSync.sync(baseConfig(s"localfile:$srcDir", "uiBackend").copy(types = Seq(ExportType.Schema)))
+    assert(uploadResult.transferred == 1)
+    verify(1, putRequestedFor(backendPath("dataobject/schema/do1")).withQueryParam("tstamp", equalTo("200")))
+    verify(0, getRequestedFor(urlPathMatching("/api/v1/dataobject/.*/tstamps")))
+
+    // the source needs all versions
+    wireMockServer.resetAll()
+    stubFor(get(backendPath("dataobjects/schema/tstamps")).withQueryParam("latest", absent())
+      .willReturn(aResponse().withStatus(200).withBody("""{"do1":[200,100],"do2":[]}""")))
+    Seq(100, 200).foreach { v =>
+      stubFor(get(backendPath("dataobject/schema/do1")).withQueryParam("tstamp", equalTo(v.toString))
+        .willReturn(aResponse().withStatus(200).withBody(doc(do1, v))))
+    }
+    val downloadResult = ExportSync.sync(baseConfig("uiBackend", s"localfile:$tgtDir").copy(types = Seq(ExportType.Schema)))
+    assert(downloadResult.transferred == 2)
+    assert(FileExportWriter(tgtDir).listVersions(ExportType.Schema, do1) == Seq(100L, 200L))
+    verify(0, getRequestedFor(urlPathMatching("/api/v1/dataobject/.*/tstamps")))
   }
 
   test("upload state to uiBackend, download is not supported") {

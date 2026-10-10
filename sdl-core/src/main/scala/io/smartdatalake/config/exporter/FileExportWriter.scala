@@ -89,6 +89,13 @@ case class FileExportWriter(path: Path) extends ExportWriter with SmartDataLakeL
     readIndex(dataObjectId, tpe.toString).flatMap(parseVersion(dataObjectId, tpe.toString, _)).sorted
   }
 
+  override def listAllVersions(tpe: ExportType, latestOnly: Boolean): Option[Map[DataObjectId, Seq[Long]]] = {
+    val indexSuffix = s".$tpe.index"
+    val dataObjectIds = Option(path.toFile.list()).toSeq.flatten
+      .filter(_.endsWith(indexSuffix)).map(f => DataObjectId(f.stripSuffix(indexSuffix)))
+    Some(dataObjectIds.map(id => id -> listVersions(tpe, id)).toMap)
+  }
+
   override def readVersion(tpe: ExportType, dataObjectId: DataObjectId, version: Long): Option[String] = {
     val (filename, file) = getDataPath(dataObjectId, tpe.toString, version)
     if (readIndex(dataObjectId, tpe.toString).contains(filename) && Files.exists(file)) Some(readFile(file.toFile))

@@ -282,7 +282,12 @@ object ExportSync extends SmartDataLakeLogger {
         .filter(id => id.id.matches(config.includeRegex) && (config.excludeRegex.isEmpty || !id.id.matches(config.excludeRegex.get)))
       logger.info(s"Synchronizing ${dataObjectTypes.mkString(", ")} of ${selectedIds.size} DataObjects from $sourceUri to ${config.target}")
       val source = ExportWriter(sourceUri, config.configPaths, getBackendClient(sourceUri), Some(hadoopConf))
-      dataObjectTypes.map(tpe => tpe.toString -> selectedIds.map(id => syncDocument(tpe, id, source, sourceUri, target, config)).fold(SyncResult())(_ + _))
+      dataObjectTypes.map { tpe =>
+        // list the versions of all DataObjects at once if supported, instead of a request per DataObject
+        val sourceVersions = listAllVersions(tpe, source, latestOnly = config.versions == SyncVersions.Latest, config)
+        val targetVersions = listAllVersions(tpe, target, latestOnly = config.versions != SyncVersions.All, config)
+        tpe.toString -> selectedIds.map(id => syncDocument(tpe, id, source, sourceUri, sourceVersions, target, targetVersions, config)).fold(SyncResult())(_ + _)
+      }
     } else Seq()
 
     // state of workflow runs
@@ -308,12 +313,27 @@ object ExportSync extends SmartDataLakeLogger {
     BuildVersionInfo.appVersionInfo.map(_.version).getOrElse(UploadDefaults.versionDefault)
   }
 
-  private def syncDocument(tpe: ExportType, dataObjectId: DataObjectId, source: ExportWriter, sourceUri: String, target: ExportWriter, config: ExportSyncConfig): SyncResult = {
+  private def listAllVersions(tpe: ExportType, writer: ExportWriter, latestOnly: Boolean, config: ExportSyncConfig): Option[Map[DataObjectId, Seq[Long]]] = {
+    try writer.listAllVersions(tpe, latestOnly)
+    catch {
+      case ex: Exception if !config.stopOnError =>
+        logger.warn(s"Listing $tpe versions of all DataObjects failed, listing them per DataObject: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+        None
+    }
+  }
+
+  private def syncDocument(tpe: ExportType, dataObjectId: DataObjectId,
+                           source: ExportWriter, sourceUri: String, sourceVersions: Option[Map[DataObjectId, Seq[Long]]],
+                           target: ExportWriter, targetVersions: Option[Map[DataObjectId, Seq[Long]]],
+                           config: ExportSyncConfig): SyncResult = {
+    def getVersions(writer: ExportWriter, allVersions: Option[Map[DataObjectId, Seq[Long]]]) =
+      allVersions.map(_.getOrElse(dataObjectId, Seq())).getOrElse(writer.listVersions(tpe, dataObjectId))
     handleErrors(s"$tpe of ${dataObjectId.id}", config) {
-      val versions = selectVersions(source.listVersions(tpe, dataObjectId), target.listVersions(tpe, dataObjectId), config.versions)
+      val targetDocumentVersions = getVersions(target, targetVersions)
+      val versions = selectVersions(getVersions(source, sourceVersions), targetDocumentVersions, config.versions)
       // a target which keeps only the latest version needs only the latest version
       val versionsToWrite = if (target.keepsHistory) versions else versions.maxOption.toSeq
-      var latestTargetDocument = if (versionsToWrite.nonEmpty) target.readLatest(tpe, dataObjectId) else None
+      var latestTargetDocument = if (versionsToWrite.nonEmpty) targetDocumentVersions.maxOption.flatMap(target.readVersion(tpe, dataObjectId, _)) else None
       val transferred = versionsToWrite.map { version =>
         val document = source.readVersion(tpe, dataObjectId, version)
           .getOrElse(throw new IllegalStateException(s"version $version of $tpe for ${dataObjectId.id} listed but not found in $sourceUri"))

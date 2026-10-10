@@ -30,7 +30,7 @@ import org.apache.hadoop.fs.{Path => HadoopPath}
 import org.json4s.JsonAST.JString
 import org.json4s.jackson.JsonMethods
 import org.json4s.jackson.JsonMethods.pretty
-import org.json4s.{JArray, JField, JObject, JValue}
+import org.json4s.{JArray, JField, JInt, JObject, JValue}
 
 import java.nio.file.Paths
 import java.sql.Timestamp
@@ -74,6 +74,15 @@ trait ExportWriter extends SmartDataLakeLogger {
    * Read a given version of a document stored for a DataObject, see [[listVersions]].
    */
   def readVersion(tpe: ExportType, dataObjectId: DataObjectId, version: Long): Option[String] = throw new NotImplementedException(s"${getClass.getSimpleName} does not support reading exported documents")
+
+  /**
+   * List the versions of a document type for all DataObjects at once, see [[listVersions]].
+   * This avoids a request per DataObject for remote writers.
+   *
+   * @param latestOnly if true, only the latest version of each DataObject is needed.
+   * @return versions per DataObject, or None if not supported, then [[listVersions]] is used per DataObject.
+   */
+  def listAllVersions(tpe: ExportType, latestOnly: Boolean): Option[Map[DataObjectId, Seq[Long]]] = None
 
   def readLatest(tpe: ExportType, dataObjectId: DataObjectId): Option[String] = {
     listVersions(tpe, dataObjectId).maxOption.flatMap(readVersion(tpe, dataObjectId, _))
@@ -207,6 +216,22 @@ object ExportWriter {
     }
     val plan = if (debug.plan.isEmpty) Seq() else Seq("", "Analyzed plan:") ++ debug.plan
     (header ++ inputs ++ unresolvedColumns ++ plan).mkString(System.lineSeparator) + System.lineSeparator
+  }
+
+  /**
+   * Operation listing the versions of a document type for all DataObjects of the UI backend, see
+   * [[ExportWriter.listAllVersions]]. It returns a Json object with the versions per DataObject id.
+   */
+  def allVersionsOperation(tpe: ExportType): String = s"dataobjects/$tpe/tstamps"
+
+  def allVersionsParams(latestOnly: Boolean): Map[String, String] = if (latestOnly) Map("latest" -> "true") else Map()
+
+  def parseAllVersions(content: String): Map[DataObjectId, Seq[Long]] = JsonMethods.parse(content) match {
+    case JObject(fields) => fields.map {
+      case (id, JArray(versions)) => DataObjectId(id) -> versions.collect { case JInt(v) => v.toLong }.sorted
+      case (id, _) => throw new IllegalStateException(s"Versions of DataObject $id are not a Json array")
+    }.toMap
+    case _ => throw new IllegalStateException("Versions of all DataObjects are not a Json object")
   }
 
   /**
