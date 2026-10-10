@@ -81,6 +81,15 @@ case class BackendClient(uploader: UploadService) extends ExportWriter with Stat
       .getOrElse(Seq())
   }
 
+  /**
+   * @return None if the UI backend does not support listing the versions of all DataObjects at once (HTTP 404)
+   */
+  override def listAllVersions(tpe: ExportType, latestOnly: Boolean): Option[Map[DataObjectId, Seq[Long]]] = {
+    val versions = download(ExportWriter.allVersionsOperation(tpe), ExportWriter.allVersionsParams(latestOnly)).map(ExportWriter.parseAllVersions)
+    if (versions.isEmpty) logger.warn(s"UI backend does not support listing the versions of all DataObjects, $tpe versions are listed per DataObject")
+    versions
+  }
+
   override def readVersion(tpe: ExportType, dataObjectId: DataObjectId, tstamp: Long): Option[String] = {
     download(s"dataobject/$tpe/${dataObjectId.id}", additionalParams = Map("tstamp" -> tstamp.toString))
       .map(ExportWriter.unwrapDownloadedDocument(tpe, _))

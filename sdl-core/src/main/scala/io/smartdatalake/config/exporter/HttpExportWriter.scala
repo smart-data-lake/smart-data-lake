@@ -57,6 +57,10 @@ case class HttpExportWriter(baseUrl: String) extends ExportWriter with SmartData
       .getOrElse(Seq())
   }
 
+  override def listAllVersions(tpe: ExportType, latestOnly: Boolean): Option[Map[DataObjectId, Seq[Long]]] = {
+    download(ExportWriter.allVersionsOperation(tpe), ExportWriter.allVersionsParams(latestOnly)).map(ExportWriter.parseAllVersions)
+  }
+
   override def readVersion(tpe: ExportType, dataObjectId: DataObjectId, version: Long): Option[String] = {
     download(s"dataobject/$tpe/${dataObjectId.id}", Map("tstamp" -> version.toString))
       .map(ExportWriter.unwrapDownloadedDocument(tpe, _))

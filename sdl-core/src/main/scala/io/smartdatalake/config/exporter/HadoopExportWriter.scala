@@ -65,6 +65,19 @@ case class HadoopExportWriter(path: HadoopPath, hadoopConfig: Configuration = ne
     findFile(tpe, dataObjectId).map(f => filesystem.getFileStatus(f).getModificationTime / 1000).toSeq
   }
 
+  override def listAllVersions(tpe: ExportType, latestOnly: Boolean): Option[Map[DataObjectId, Seq[Long]]] = {
+    val suffix = s".$tpe.json"
+    val files = if (filesystem.exists(path)) filesystem.listStatus(path).toSeq.filter(f => f.isFile && f.getPath.getName.endsWith(suffix)) else Seq()
+    // file names prefixed with "DataObject~" are a fallback, see findFile
+    val (prefixed, unprefixed) = files.partition(_.getPath.getName.startsWith(prefix))
+    val versions = (prefixed ++ unprefixed).map { f =>
+      DataObjectId(f.getPath.getName.stripSuffix(suffix).stripPrefix(prefix)) -> Seq(f.getModificationTime / 1000)
+    }
+    Some(versions.toMap) // unprefixed files come last and win
+  }
+
+  private val prefix = "DataObject~"
+
   override def readVersion(tpe: ExportType, dataObjectId: DataObjectId, version: Long): Option[String] = {
     findFile(tpe, dataObjectId)
       .filter(f => filesystem.getFileStatus(f).getModificationTime / 1000 == version)
