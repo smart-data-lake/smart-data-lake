@@ -18,18 +18,27 @@
  */
 package io.smartdatalake.meta.configexporter
 
-import io.smartdatalake.app.{BackendClient, GlobalConfig}
+import com.typesafe.config.{Config, ConfigRenderOptions, ConfigValue, ConfigValueFactory, ConfigValueType}
+import configs.ConfigObject
+import io.smartdatalake.app.{BackendClient, BuildVersionInfo, GlobalConfig}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.exporter.ExportType.ExportType
-import io.smartdatalake.config.exporter.{ExportType, ExportWriter, StateRunId, StateSyncEndpoint}
-import io.smartdatalake.config.{ConfigLoader, ConfigurationException}
-import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
+import io.smartdatalake.config.exporter.{ExportType, ExportWriter, FileDescriptor, StateRunId, StateSyncEndpoint, UploadDefaults}
+import io.smartdatalake.config.{ConfigLoader, ConfigParser, ConfigurationException}
+import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.hdfs.HdfsUtil.RemoteIteratorWrapper
+import io.smartdatalake.util.misc.HoconUtil.{getConfigValue, updateConfigValue}
+import io.smartdatalake.util.misc.StringUtil.strToLowerCamelCase
+import io.smartdatalake.util.misc.{CustomCodeUtil, HoconUtil, ProductUtil, ScaladocUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ActionDAGRunState
+import io.smartdatalake.workflow.action.generic.customlogic.CustomTransformMethodDef
 import org.apache.commons.lang3.NotImplementedException
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import scopt.OptionParser
 
 import scala.jdk.CollectionConverters._
+import scala.util.Using
 
 /**
  * Which versions [[ExportSync]] transfers from source to target.
@@ -45,16 +54,17 @@ object SyncVersions extends Enumeration {
 }
 
 /**
- * @param types       document types per DataObject to synchronize, see [[ExportType]]
- * @param withState   if true, the state of workflow runs is synchronized as well
- * @param stateSource state directory to read the state from. Reading the state from 'uiBackend' is not supported.
- * @param stateTarget state directory or 'uiBackend' to write the state to. Defaults to `target` if it is 'uiBackend'.
+ * @param schemaSource source uri to read the documents exported per DataObject from (schema, stats, lineage).
+ *                     Defaults to global.dataObjectsSchemaSource.
+ * @param target       target uri to write the documents to
+ * @param types        types to synchronize, see [[ExportType]]
+ * @param stateSource  state directory to read the state from. Reading the state from 'uiBackend' is not supported.
+ * @param stateTarget  state directory or 'uiBackend' to write the state to. Defaults to `target` if it is 'uiBackend'.
  */
 case class ExportSyncConfig(configPaths: Seq[String] = null,
-                            source: String = null,
+                            schemaSource: Option[String] = None,
                             target: String = null,
-                            types: Seq[ExportType] = ExportType.values.toSeq,
-                            withState: Boolean = false,
+                            types: Seq[ExportType] = ExportSync.defaultTypes,
                             stateSource: Option[String] = None,
                             stateTarget: Option[String] = None,
                             versions: SyncVersions.Value = SyncVersions.Newer,
@@ -64,6 +74,9 @@ case class ExportSyncConfig(configPaths: Seq[String] = null,
                             dryRun: Boolean = false,
                             stopOnError: Boolean = true
                            ) {
+  def getSchemaSource(globalConfig: GlobalConfig): String = schemaSource.orElse(globalConfig.dataObjectsSchemaSource)
+    .getOrElse(throw ConfigurationException(s"schemaSource must be given to synchronize ${ExportType.dataObjectTypes.mkString(", ")} if global.dataObjectsSchemaSource is not set"))
+
   def getStateSource: String = stateSource
     .getOrElse(throw ConfigurationException("stateSource must be given to synchronize state"))
 
@@ -72,41 +85,72 @@ case class ExportSyncConfig(configPaths: Seq[String] = null,
 }
 
 /**
- * Synchronizes the documents exported per DataObject (schema, stats, lineage) and the state of workflow runs from a
- * source to a target, transferring the versions which are newer in the source.
- * Source and target can be any [[ExportWriter]] uri, e.g. upload from 'localfile:./viz/schema' to 'uiBackend',
- * or download from 'uiBackend' to 'localfile:./viz/schema'.
+ * Synchronizes the exported documents to a target:
+ * - the resolved configuration as Json document, enriched with the origin of the configuration objects and the
+ *   documentation of custom classes, created from the SDLB configuration
+ * - the markdown description files of global.descriptionPath
+ * - the documents exported per DataObject (schema, stats, lineage), transferring the versions which are newer in
+ *   the schema source
+ * - the state of workflow runs, transferring the runs which are newer in the state source
+ *
+ * Schema source and target can be any [[ExportWriter]] uri, e.g. upload from 'localfile:./viz/schema' to
+ * 'uiBackend', or download from 'uiBackend' to 'localfile:./viz/schema'. If the target is a directory, the
+ * configuration is written to file [[ExportWriter.configFilename]] in that directory.
  */
 object ExportSync extends SmartDataLakeLogger {
 
   val appType: String = getClass.getSimpleName.replaceAll("\\$$", "") // remove $ from object name and use it as appType
 
-  private val stateType = "state"
+  /**
+   * Types synchronized by default. Descriptions and state need additional configuration and must be selected
+   * explicitly.
+   */
+  val defaultTypes: Seq[ExportType] = ExportType.ConfigJson +: ExportType.dataObjectTypes
+
+  /**
+   * Transformer types implemented as Java/Scala class which support a dynamic transform method. For these the
+   * parameters of the transform method are exported to be shown in the UI.
+   * They all hold the class name in configuration parameter [[CLASS_NAME_PARAMETER]].
+   * Note that they are listed by name, as not all corresponding modules are on the classpath of the exporter.
+   */
+  private[configexporter] val customTransformerTypes: Set[String] = Set(
+    "ScalaClassSparkDfsTransformer",
+    "ScalaClassSparkDfTransformer",
+    "ScalaClassGenericDfsTransformer",
+    "ScalaClassGenericDfTransformer",
+    "ScalaClassSnowparkDfsTransformer",
+    "ScalaClassSnowparkDfTransformer"
+  )
+
+  /**
+   * Name of the configuration parameter holding the class name of the transformer types listed in
+   * [[customTransformerTypes]].
+   */
+  private[configexporter] val CLASS_NAME_PARAMETER = "className"
 
   protected val parser: OptionParser[ExportSyncConfig] = new OptionParser[ExportSyncConfig](appType) {
     override def showUsageOnError: Option[Boolean] = Some(true)
     opt[String]('c', "config")
       .required()
       .action((value, c) => c.copy(configPaths = value.split(',').toIndexedSeq))
-      .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma. They define the DataObjects to synchronize and the global.uiBackend configuration.")
-    opt[String]("source")
-      .required()
-      .action((value, c) => c.copy(source = value))
-      .text("Source URI to read exported documents from. Can be 'localfile:./xyz', a Hadoop path, 'uiBackend' or any http/https URL. 'uiBackend' will use global.uiBackend configuration to download from UI backend.")
+      .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma. They are exported as configuration Json document, and define the DataObjects to synchronize, global.descriptionPath, global.dataObjectsSchemaSource and the global.uiBackend configuration.")
+    opt[String]("schemaSource")
+      .action((value, c) => c.copy(schemaSource = Some(value)))
+      .text(s"Source URI to read the documents exported per DataObject (${ExportType.dataObjectTypes.mkString(", ")}) from. Can be 'localfile:./xyz', a Hadoop path, 'uiBackend' or any http/https URL. 'uiBackend' will use global.uiBackend configuration to download from UI backend. Default: global.dataObjectsSchemaSource")
     opt[String]('t', "target")
       .required()
       .action((value, c) => c.copy(target = value))
-      .text("Target URI to write exported documents to. Can be 'localfile:./xyz', a Hadoop path, 'uiBackend' or any http/https URL. 'uiBackend' will use global.uiBackend configuration to upload to UI backend.")
+      .text(s"Target URI to write exported documents to. Can be 'localfile:./xyz', a Hadoop path, 'uiBackend' or any http/https URL. 'uiBackend' will use global.uiBackend configuration to upload to UI backend. 'localfile:' and Hadoop paths are directories, the configuration is written to file ${ExportWriter.configFilename} in it.")
     opt[String]("types")
       .validate(value => {
-        val unknown = value.split(',').map(_.trim).filterNot(t => t == stateType || ExportType.values.exists(_.toString == t))
+        val unknown = value.split(',').map(_.trim).filterNot(t => ExportType.values.exists(_.toString == t))
         if (unknown.isEmpty) success else failure(s"Unknown types ${unknown.mkString(", ")}")
       })
       .action((value, c) => {
         val types = value.split(',').map(_.trim).toSeq
-        c.copy(types = ExportType.values.toSeq.filter(t => types.contains(t.toString)), withState = types.contains(stateType))
+        c.copy(types = ExportType.values.toSeq.filter(t => types.contains(t.toString)))
       })
-      .text(s"Types to synchronize, separated by comma. Possible values are ${(ExportType.values.toSeq.map(_.toString) :+ stateType).mkString(", ")}. Default: ${ExportType.values.mkString(",")}")
+      .text(s"Types to synchronize, separated by comma. Possible values are ${ExportType.values.mkString(", ")}. '${ExportType.Description}' uploads the markdown files of global.descriptionPath, '${ExportType.State}' needs --stateSource. Default: ${defaultTypes.mkString(",")}")
     opt[String]("stateSource")
       .action((value, c) => c.copy(stateSource = Some(value)))
       .text("State directory as given to SmartDataLakeBuilder with --state-path to read the state of workflow runs from. Reading the state from 'uiBackend' is not supported, as the UI backend stores it in a different format.")
@@ -128,13 +172,59 @@ object ExportSync extends SmartDataLakeLogger {
       .text("Regular expression used to include applications when synchronizing state, matching application names. Default: .*")
     opt[Unit]("dryRun")
       .action((_, c) => c.copy(dryRun = true))
-      .text("Only log which versions would be transferred, without writing them.")
+      .text("Only log which documents would be transferred, without writing them.")
     opt[String]('s', "stopOnError")
       .action((value, c) => c.copy(stopOnError = value.toBoolean))
       .text("If true, synchronization is stopped as soon as there is an error. Otherwise errors are logged, synchronization continues and fails at the end. Default: true")
-    help("help").text("Synchronize exported DataObject schemas, statistics, column lineage and the state of workflow runs from a source to a target, e.g. to upload them to or download them from the UI backend. Only versions newer in the source are transferred.")
+    help("help").text("Export the resolved configuration and the description files, and synchronize exported DataObject schemas, statistics, column lineage and the state of workflow runs from a source to a target, e.g. to upload them to or download them from the UI backend. Only versions newer in the source are transferred.")
   }
 
+  /**
+   * Use the following maven profile to add an export step to your build:
+   * ```
+   *     <profile>
+   *         <id>export-config</id>
+   *         <build>
+   *             <plugins>
+   *                 <plugin>
+   *                     <groupId>org.codehaus.mojo</groupId>
+   *                     <artifactId>exec-maven-plugin</artifactId>
+   *                     <version>3.1.0</version>
+   *                     <executions>
+   *                         <execution>
+   *                             <id>export-config</id>
+   *                             <phase>package</phase>
+   *                             <goals>
+   * <!-- use exec instead of java, so that the exporter runs in a separate jvm from mvn -->
+   *                                 <goal>exec</goal>
+   *                             </goals>
+   *                             <configuration>
+   *                                 <executable>java</executable>
+   *                                 <longClasspath>true</longClasspath>
+   *                                 <arguments>
+   *                                     <argument>-Dlog4j.configurationFile=log4j2.yml</argument>
+   *                                     <argument>-classpath</argument>
+   *                                     <classpath/>
+   *                                     <argument>io.smartdatalake.meta.configexporter.ExportSync</argument>
+   *                                     <argument>--config</argument>
+   *                                     <argument>./config,./envConfig/dev.conf</argument>
+   *                                     <argument>--types</argument>
+   *                                     <argument>configJson</argument>
+   *                                     <argument>--target</argument>
+   *                                     <argument>localfile:./viz</argument>
+   *                                 </arguments>
+   *                                 <classpathScope>runtime</classpathScope>
+   *                             </configuration>
+   *                         </execution>
+   *                     </executions>
+   *                 </plugin>
+   *             </plugins>
+   *         </build>
+   *     </profile>
+   * ```
+   *
+   * The new profile can then be executed by the following maven command line: `mvn exec:exec@export-config -Pexport-config`
+   */
   def main(args: Array[String]): Unit = {
     parser.parse(args, ExportSyncConfig()) match {
       case Some(syncConfig) =>
@@ -151,27 +241,52 @@ object ExportSync extends SmartDataLakeLogger {
   }
 
   def sync(config: ExportSyncConfig): SyncResult = {
-    require(config.source != config.target, s"source and target must be different, but both are ${config.source}")
     val sdlConfig = ConfigLoader.loadConfigFromFilesystem(config.configPaths, new Configuration())
-    val hadoopConf = GlobalConfig.from(sdlConfig).getHadoopConfiguration
+    val globalConfig = GlobalConfig.from(sdlConfig)
+    implicit val hadoopConf: Configuration = globalConfig.getHadoopConfiguration
     // create BackendClient only once, as it might need to authenticate
     lazy val backendClient = BackendClient(config.configPaths)
     def getBackendClient(uris: String*) = if (uris.exists(isUiBackend)) Some(backendClient) else None
+    lazy val target = ExportWriter(config.target, config.configPaths, getBackendClient(config.target), Some(hadoopConf))
+    // configuration and descriptions are versioned with the version of the application, unless the target defines it
+    val appVersion = if (!config.target.contains("version=")) Some(getAppVersion) else None
+
+    // configuration
+    val configResults = if (config.types.contains(ExportType.ConfigJson)) {
+      val result = handleErrors(s"${ExportType.ConfigJson}", config) {
+        val configJson = exportConfigJson(sdlConfig, config.configPaths)
+        logger.info(s"${if (config.dryRun) "Would write" else "Writing"} configuration to ${config.target}")
+        if (!config.dryRun) target.writeConfig(configJson, appVersion)
+        SyncResult(transferred = 1)
+      }
+      Seq(ExportType.ConfigJson.toString -> result)
+    } else Seq()
+
+    // description files
+    val descriptionResults = if (config.types.contains(ExportType.Description)) {
+      val result = handleErrors(s"${ExportType.Description}", config) {
+        val descriptionPath = globalConfig.descriptionPath
+          .getOrElse(throw ConfigurationException("global.descriptionPath must be set to synchronize descriptions"))
+        syncDescriptions(new Path(descriptionPath), target, appVersion, config)
+      }
+      Seq(ExportType.Description.toString -> result)
+    } else Seq()
 
     // documents per DataObject
-    val exportResults = if (config.types.nonEmpty) {
+    val dataObjectTypes = config.types.filter(ExportType.dataObjectTypes.contains)
+    val exportResults = if (dataObjectTypes.nonEmpty) {
+      val sourceUri = config.getSchemaSource(globalConfig)
+      require(sourceUri != config.target, s"schemaSource and target must be different, but both are $sourceUri")
       val dataObjectIds = if (sdlConfig.hasPath("dataObjects")) sdlConfig.getObject("dataObjects").keySet.asScala.toSeq.sorted.map(DataObjectId(_)) else Seq()
       val selectedIds = dataObjectIds
         .filter(id => id.id.matches(config.includeRegex) && (config.excludeRegex.isEmpty || !id.id.matches(config.excludeRegex.get)))
-      logger.info(s"Synchronizing ${config.types.mkString(", ")} of ${selectedIds.size} DataObjects from ${config.source} to ${config.target}")
-      val backendClientOpt = getBackendClient(config.source, config.target)
-      val source = ExportWriter(config.source, config.configPaths, backendClientOpt, Some(hadoopConf))
-      val target = ExportWriter(config.target, config.configPaths, backendClientOpt, Some(hadoopConf))
-      config.types.map(tpe => tpe.toString -> selectedIds.map(id => syncDocument(tpe, id, source, target, config)).fold(SyncResult())(_ + _))
+      logger.info(s"Synchronizing ${dataObjectTypes.mkString(", ")} of ${selectedIds.size} DataObjects from $sourceUri to ${config.target}")
+      val source = ExportWriter(sourceUri, config.configPaths, getBackendClient(sourceUri), Some(hadoopConf))
+      dataObjectTypes.map(tpe => tpe.toString -> selectedIds.map(id => syncDocument(tpe, id, source, sourceUri, target, config)).fold(SyncResult())(_ + _))
     } else Seq()
 
     // state of workflow runs
-    val stateResults = if (config.withState) {
+    val stateResults = if (config.types.contains(ExportType.State)) {
       val (stateSourceUri, stateTargetUri) = (config.getStateSource, config.getStateTarget)
       require(stateSourceUri != stateTargetUri, s"stateSource and stateTarget must be different, but both are $stateSourceUri")
       // the UI backend converts the state on upload, so it can not be written back to a state directory
@@ -181,15 +296,19 @@ object ExportSync extends SmartDataLakeLogger {
       val stateTarget = StateSyncEndpoint(stateTargetUri, config.configPaths, backendClientOpt, Some(hadoopConf))
       val applications = stateSource.listApplications().filter(_.matches(config.applicationRegex))
       logger.info(s"Synchronizing state of ${applications.size} applications from $stateSourceUri to $stateTargetUri")
-      Seq(stateType -> applications.map(app => syncState(app, stateSource, stateTarget, config)).fold(SyncResult())(_ + _))
+      Seq(ExportType.State.toString -> applications.map(app => syncState(app, stateSource, stateTarget, config)).fold(SyncResult())(_ + _))
     } else Seq()
 
-    val results = exportResults ++ stateResults
+    val results = configResults ++ descriptionResults ++ exportResults ++ stateResults
     results.foreach { case (tpe, r) => logger.info(s"$tpe: transferred=${r.transferred} upToDate=${r.upToDate} failed=${r.failed}${if (config.dryRun) " (dry run)" else ""}") }
     results.map(_._2).fold(SyncResult())(_ + _)
   }
 
-  private def syncDocument(tpe: ExportType, dataObjectId: DataObjectId, source: ExportWriter, target: ExportWriter, config: ExportSyncConfig): SyncResult = {
+  def getAppVersion: String = {
+    BuildVersionInfo.appVersionInfo.map(_.version).getOrElse(UploadDefaults.versionDefault)
+  }
+
+  private def syncDocument(tpe: ExportType, dataObjectId: DataObjectId, source: ExportWriter, sourceUri: String, target: ExportWriter, config: ExportSyncConfig): SyncResult = {
     handleErrors(s"$tpe of ${dataObjectId.id}", config) {
       val versions = selectVersions(source.listVersions(tpe, dataObjectId), target.listVersions(tpe, dataObjectId), config.versions)
       // a target which keeps only the latest version needs only the latest version
@@ -197,7 +316,7 @@ object ExportSync extends SmartDataLakeLogger {
       var latestTargetDocument = if (versionsToWrite.nonEmpty) target.readLatest(tpe, dataObjectId) else None
       val transferred = versionsToWrite.map { version =>
         val document = source.readVersion(tpe, dataObjectId, version)
-          .getOrElse(throw new IllegalStateException(s"version $version of $tpe for ${dataObjectId.id} listed but not found in ${config.source}"))
+          .getOrElse(throw new IllegalStateException(s"version $version of $tpe for ${dataObjectId.id} listed but not found in $sourceUri"))
         // skip identical content, e.g. if the version of the target is the modification time of an unversioned file
         if (latestTargetDocument.map(normalize).contains(normalize(document))) {
           logger.info(s"$tpe of ${dataObjectId.id} version $version is identical to latest version of target, skipping")
@@ -255,9 +374,149 @@ object ExportSync extends SmartDataLakeLogger {
     catch {
       // a source or target not supporting to read documents is a configuration error
       case ex: NotImplementedException => throw ConfigurationException(s"Cannot synchronize $context: ${ex.getMessage}", throwable = ex)
+      case ex: ConfigurationException => throw ex
       case ex: Exception if !config.stopOnError =>
         logger.warn(s"Synchronizing $context failed: ${ex.getClass.getSimpleName}: ${ex.getMessage}")
         SyncResult(failed = 1)
+    }
+  }
+
+  /**
+   * Upload the markdown description files, and delete the files on the target which no longer exist.
+   */
+  private def syncDescriptions(path: Path, target: ExportWriter, version: Option[String], config: ExportSyncConfig)(implicit hadoopConf: Configuration): SyncResult = {
+    implicit val filesystem: FileSystem = Environment.fileSystemFactory.getFileSystem(path, hadoopConf)
+    if (!filesystem.exists(path)) throw ConfigurationException(s"Description path $path not found")
+    val existingFiles = try {
+      target.listFiles(version).map(f => (f.name.dropWhile(_ == '/'), f)).toMap
+    } catch {
+      case _: NotImplementedException =>
+        logger.info(s"Target ${target.getClass.getSimpleName} does not support listing existing files.")
+        Map[String, FileDescriptor]()
+    }
+    logger.info(s"Searching description files in $path")
+    val files = RemoteIteratorWrapper(filesystem.listFiles(path, true)).filterNot(_.isDirectory).toSeq
+    val relativePaths = files.map { f =>
+      val relativePath = f.getPath.toString.substring(f.getPath.toString.lastIndexOf(path.toString) + path.toString.length + 1)
+      val existingFile = existingFiles.get(relativePath)
+      if (existingFile.exists(e => e.size == f.getLen && e.lastModified.getTime > f.getModificationTime)) {
+        logger.info(s"Description $relativePath already uploaded")
+        (relativePath, false)
+      } else {
+        logger.info(s"${if (config.dryRun) "Would upload" else "Uploading"} description $relativePath")
+        if (!config.dryRun) {
+          val content = Using.resource(filesystem.open(f.getPath))(_.readAllBytes)
+          target.writeFile(content, relativePath, version)
+        }
+        (relativePath, true)
+      }
+    }
+    // delete no longer existing files
+    val filesToDelete = existingFiles.keySet.diff(relativePaths.map(_._1).toSet)
+    filesToDelete.foreach { f =>
+      logger.info(s"${if (config.dryRun) "Would delete" else "Deleting"} description $f")
+      if (!config.dryRun) target.deleteFile(f, version)
+    }
+    val transferred = relativePaths.count(_._2)
+    SyncResult(transferred = transferred + filesToDelete.size, upToDate = relativePaths.size - transferred)
+  }
+
+  /**
+   * Export the SDLB configuration as one Json document, everything resolved and with some metadata enrichments.
+   */
+  private[configexporter] def exportConfigJson(sdlConfig: Config, configPaths: Seq[String]): String = {
+    // remove additional config paths introduced by system properties...
+    val configKeysToRemove = sdlConfig.root.keySet().asScala.diff(Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS, ConfigParser.CONFIG_SECTION_GLOBAL))
+    var config = configKeysToRemove.foldLeft(sdlConfig)((config, key) => config.withoutPath(key))
+    // enrich origin of first class config objects
+    config = enrichOrigin(configPaths, config)
+    // enrich optional source documentation for custom classes from scaladoc
+    config = enrichCustomClassScalaDoc(config)
+    // enrich optional custom transformer parameter info
+    config = enrichCustomTransformerParameters(config)
+    // render config as json
+    config.root.render(ConfigRenderOptions.concise())
+  }
+
+  private def enrichCustomClassScalaDoc(config: Config): Config = {
+    // we are looking for className and type attributes
+    def searchCondition(key: String, value: ConfigValue) = {
+      val lccKey = strToLowerCamelCase(key)
+      // condition
+      value.valueType == ConfigValueType.STRING &&
+      (lccKey == "className" || lccKey == "type") &&
+      value.unwrapped.asInstanceOf[String].split('.').length > 2 // check if configuration value is full class name, e.g. it has at least three name parts
+    }
+    val classConfigurationPaths = HoconUtil.findInConfigObject(config.root, searchCondition)
+    // enrich config with scala doc for config paths found
+    logger.info(s"Enriching source documentation for ${classConfigurationPaths.length} custom classes from scaladoc")
+    classConfigurationPaths.foldLeft(config) {
+      case (config, path) =>
+        val className = getConfigValue(config.root(), path).unwrapped().asInstanceOf[String]
+        try {
+          val scalaDoc = ScaladocUtil.getClassScalaDoc(className).map(ScaladocUtil.formatScaladocWithTags(_))
+          if (scalaDoc.isDefined) updateConfigValue(config.root(), path.init :+ "_sourceDoc", ConfigValueFactory.fromAnyRef(scalaDoc.get)).asInstanceOf[ConfigObject].toConfig
+          else config
+        } catch {
+          case e: Exception =>
+            logger.warn(s"${e.getClass.getSimpleName}: ${e.getMessage} for $className when enriching configuration path ${path.mkString(".")}")
+            config
+        }
+    }
+  }
+
+  private def enrichOrigin(configPaths: Seq[String], config: Config): Config = {
+    val descriptionRegex = """([^\s,]*):\s*([0-9]+)(-[0-9]+)?""".r.unanchored
+    val configSectionsToEnrich = Set(ConfigParser.CONFIG_SECTION_ACTIONS, ConfigParser.CONFIG_SECTION_CONNECTIONS, ConfigParser.CONFIG_SECTION_DATAOBJECTS)
+    val configBasePaths = configPaths.map(new Path(_)).map {
+      case p if p.getName.endsWith(".conf") => p.getParent.toString // if it is a file, take its parent folder as base path
+      case p => p.toString
+    }
+    configSectionsToEnrich.filter(config.hasPath).foldLeft(config) {
+      case (config, sectionKey) =>
+        config.getConfig(sectionKey).root.keySet().asScala.foldLeft(config) {
+          case (config, objectKey) =>
+            val objectConfig = config.getConfig(s"$sectionKey.$objectKey")
+            // parse origins description, as we can not access the detailed private properties
+            // note that currently endLineNumber is not filled by Hocon parser, even though it is foreseen in the code.
+            objectConfig.origin.description() match {
+              case descriptionRegex(path, lineNumber, endLineNumber) =>
+                // relativize path
+                val relativePath = configBasePaths.find(path.contains)
+                  .map(configPath => path.split(configPath).last.dropWhile("\\/".contains(_))).getOrElse(path)
+                // add to config
+                val origin = Seq(
+                  Some("path" -> relativePath),
+                  Some("lineNumber" -> lineNumber.toInt),
+                  Option(endLineNumber).map("endLineNumber" -> _.toInt)
+                ).flatten.toMap
+                config.withValue(s"$sectionKey.$objectKey._origin", ConfigValueFactory.fromMap(origin.asJava))
+            }
+        }
+    }
+  }
+
+  private def enrichCustomTransformerParameters(config: Config): Config = {
+    // we are looking for all transformers which are implemented as Java/Scala class and support a dynamic transform method
+    def searchCondition(key: String, value: ConfigValue) = {
+      // condition
+      value.valueType == ConfigValueType.STRING &&
+        key == "type" &&
+        customTransformerTypes.contains(value.unwrapped.asInstanceOf[String])
+    }
+    val customTransformerConfigurationPaths = HoconUtil.findInConfigObject(config.root, searchCondition)
+    // enrich config with custom transformer parameters if available
+    logger.info(s"Enriching custom transformer parameter information for ${customTransformerConfigurationPaths.length} transformers")
+    customTransformerConfigurationPaths.foldLeft(config) {
+      case (config, path) =>
+        val className = getConfigValue(config.root(), path.init :+ CLASS_NAME_PARAMETER).unwrapped().asInstanceOf[String]
+        val classInstance = CustomCodeUtil.getClassInstanceByName[CustomTransformMethodDef](className)
+        val parameters = classInstance.customTransformMethod.map(CustomCodeUtil.analyzeMethodParameters(None, _))
+        if (parameters.isDefined) {
+          val parametersValue = ConfigValueFactory.fromIterable(parameters.get.map(p => ConfigValueFactory.fromMap(p.toMap.asJava)).asJava)
+          updateConfigValue(config.root(), path.init :+ "_parameters", parametersValue).asInstanceOf[ConfigObject].toConfig
+        }
+        else config
     }
   }
 
