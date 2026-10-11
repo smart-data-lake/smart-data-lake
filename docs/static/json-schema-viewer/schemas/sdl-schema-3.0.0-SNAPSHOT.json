@@ -8705,7 +8705,7 @@
         },
         "dataObjectsSchemaSource" : {
           "type" : "string",
-          "description" : "Optional source URI for DataObjects schemas for development.* This is used for development on\nlocal environment without access to data. Schemas can be exported on dev/prod environment using\nthe DataObjectSchemaExporter application, and used on local environment to define DataObject\nschemas for executing dry-run's. Source must be a path like`file:./schema`or`uiBackend`.  \nuiBackend will use global.uiBackend configuration to query UI backend for schemas. Default:`file:./schema` ."
+          "description" : "Optional source URI for DataObjects schemas for development.* This is used for development on\nlocal environment without access to data. Schemas can be exported on dev/prod environment using\na dry-run with`--test dry-run-with-schema-export`, and used on local environment to define DataObject\nschemas for executing dry-run's. Source must be a path like`file:./schema`or`uiBackend`.  \nuiBackend will use global.uiBackend configuration to query UI backend for schemas. Default:`file:./schema` ."
         },
         "descriptionPath" : {
           "type" : "string",
