@@ -60,6 +60,10 @@ object SyncVersions extends Enumeration {
  * @param types        types to synchronize, see [[ExportType]]
  * @param stateSource  state directory to read the state from. Reading the state from 'uiBackend' is not supported.
  * @param stateTarget  state directory or 'uiBackend' to write the state to. Defaults to `target` if it is 'uiBackend'.
+ * @param updateSearchIndex rebuild the search index of the target after synchronizing configuration, descriptions or
+ *                     schemas, if the target has one. The state does not need it, as it is indexed on upload.
+ * @param updateLineageIndex rebuild the column lineage index of the target if column lineage was transferred, if the
+ *                     target has one. Otherwise the UI backend rebuilds it on the first read.
  */
 case class ExportSyncConfig(configPaths: Seq[String] = null,
                             schemaSource: Option[String] = None,
@@ -72,7 +76,9 @@ case class ExportSyncConfig(configPaths: Seq[String] = null,
                             excludeRegex: Option[String] = None,
                             applicationRegex: String = ".*",
                             dryRun: Boolean = false,
-                            stopOnError: Boolean = true
+                            stopOnError: Boolean = true,
+                            updateSearchIndex: Boolean = true,
+                            updateLineageIndex: Boolean = true
                            ) {
   def getSchemaSource(globalConfig: GlobalConfig): String = schemaSource.orElse(globalConfig.dataObjectsSchemaSource)
     .getOrElse(throw ConfigurationException(s"schemaSource must be given to synchronize ${ExportType.dataObjectTypes.mkString(", ")} if global.dataObjectsSchemaSource is not set"))
@@ -92,6 +98,8 @@ case class ExportSyncConfig(configPaths: Seq[String] = null,
  * - the documents exported per DataObject (schema, stats, lineage), transferring the versions which are newer in
  *   the schema source
  * - the state of workflow runs, transferring the runs which are newer in the state source
+ * - finally the search index of the target is rebuilt over configuration, descriptions and schemas, and the column
+ *   lineage index if column lineage was transferred
  *
  * Schema source and target can be any [[ExportWriter]] uri, e.g. upload from 'localfile:./viz/schema' to
  * 'uiBackend', or download from 'uiBackend' to 'localfile:./viz/schema'. If the target is a directory, the
@@ -106,6 +114,11 @@ object ExportSync extends SmartDataLakeLogger {
    * explicitly.
    */
   val defaultTypes: Seq[ExportType] = ExportType.ConfigJson +: ExportType.dataObjectTypes
+
+  /**
+   * Types the search index of the UI backend is built from.
+   */
+  val searchIndexTypes: Seq[ExportType] = Seq(ExportType.ConfigJson, ExportType.Description, ExportType.Schema)
 
   /**
    * Transformer types implemented as Java/Scala class which support a dynamic transform method. For these the
@@ -176,6 +189,12 @@ object ExportSync extends SmartDataLakeLogger {
     opt[String]('s', "stopOnError")
       .action((value, c) => c.copy(stopOnError = value.toBoolean))
       .text("If true, synchronization is stopped as soon as there is an error. Otherwise errors are logged, synchronization continues and fails at the end. Default: true")
+    opt[Boolean]("updateSearchIndex")
+      .action((value, c) => c.copy(updateSearchIndex = value))
+      .text(s"Rebuild the search index of the target after synchronizing ${searchIndexTypes.mkString(", ")}. Supported by 'uiBackend', which does not rebuild an unchanged index. Default: true")
+    opt[Boolean]("updateLineageIndex")
+      .action((value, c) => c.copy(updateLineageIndex = value))
+      .text(s"Rebuild the column lineage index of the target if ${ExportType.Lineage} was transferred. Supported by 'uiBackend', which otherwise rebuilds it on the first read. Default: true")
     help("help").text("Export the resolved configuration and the description files, and synchronize exported DataObject schemas, statistics, column lineage and the state of workflow runs from a source to a target, e.g. to upload them to or download them from the UI backend. Only versions newer in the source are transferred.")
   }
 
@@ -236,8 +255,11 @@ object ExportSync extends SmartDataLakeLogger {
     }
   }
 
-  case class SyncResult(transferred: Int = 0, upToDate: Int = 0, failed: Int = 0) {
-    def +(other: SyncResult): SyncResult = SyncResult(transferred + other.transferred, upToDate + other.upToDate, failed + other.failed)
+  /**
+   * @param missingInSource number of DataObjects without document in the source
+   */
+  case class SyncResult(transferred: Int = 0, upToDate: Int = 0, failed: Int = 0, missingInSource: Int = 0) {
+    def +(other: SyncResult): SyncResult = SyncResult(transferred + other.transferred, upToDate + other.upToDate, failed + other.failed, missingInSource + other.missingInSource)
   }
 
   def sync(config: ExportSyncConfig): SyncResult = {
@@ -286,8 +308,43 @@ object ExportSync extends SmartDataLakeLogger {
         // list the versions of all DataObjects at once if supported, instead of a request per DataObject
         val sourceVersions = listAllVersions(tpe, source, latestOnly = config.versions == SyncVersions.Latest, config)
         val targetVersions = listAllVersions(tpe, target, latestOnly = config.versions != SyncVersions.All, config)
-        tpe.toString -> selectedIds.map(id => syncDocument(tpe, id, source, sourceUri, sourceVersions, target, targetVersions, config)).fold(SyncResult())(_ + _)
+        val result = selectedIds.map(id => syncDocument(tpe, id, source, sourceUri, sourceVersions, target, targetVersions, config)).fold(SyncResult())(_ + _)
+        if (selectedIds.nonEmpty && result.missingInSource == selectedIds.size) {
+          // documents found in the source, which do not belong to a DataObject of the configuration
+          val otherIds = sourceVersions.map(_.filter(_._2.nonEmpty).keys.map(_.id).toSeq.sorted).getOrElse(Seq())
+          logger.warn(s"No $tpe found in $sourceUri for any of the ${selectedIds.size} DataObjects. Check that this is the right source and that its documents belong to the DataObjects of the configuration." +
+            (if (otherIds.nonEmpty) s" Found $tpe of ${otherIds.size} other DataObjects, e.g. ${otherIds.take(5).mkString(", ")}" else ""))
+        }
+        tpe.toString -> result
       }
+    } else Seq()
+
+    // search index over configuration, descriptions and schemas
+    // it is updated even if nothing was transferred, to retry an update which failed before. The UI backend does not
+    // rebuild an unchanged index.
+    val searchIndexResults = if (config.updateSearchIndex && config.types.exists(searchIndexTypes.contains)) {
+      // the index is built per configuration version. If neither configuration nor descriptions are synchronized,
+      // the target indexes its latest version.
+      val indexVersion = if (config.types.exists(Seq(ExportType.ConfigJson, ExportType.Description).contains)) appVersion else None
+      val result = handleErrors("search index", config) {
+        if (config.dryRun) logger.info(s"Would update search index of ${config.target}")
+        else if (!target.updateSearchIndex(indexVersion)) logger.info(s"${config.target} has no search index to update")
+        SyncResult()
+      }
+      // only reported if it failed, as it is no transferred document
+      if (result.failed > 0) Seq("searchIndex" -> result) else Seq()
+    } else Seq()
+
+    // column lineage index, only if lineage was transferred, as the update forces a rebuild
+    val lineageTransferred = exportResults.exists { case (tpe, r) => tpe == ExportType.Lineage.toString && r.transferred > 0 }
+    val lineageIndexResults = if (config.updateLineageIndex && lineageTransferred) {
+      val result = handleErrors("column lineage index", config) {
+        if (config.dryRun) logger.info(s"Would update column lineage index of ${config.target}")
+        else if (!target.updateLineageIndex()) logger.info(s"${config.target} has no column lineage index to update")
+        SyncResult()
+      }
+      // only reported if it failed, as it is no transferred document
+      if (result.failed > 0) Seq("lineageIndex" -> result) else Seq()
     } else Seq()
 
     // state of workflow runs
@@ -304,8 +361,8 @@ object ExportSync extends SmartDataLakeLogger {
       Seq(ExportType.State.toString -> applications.map(app => syncState(app, stateSource, stateTarget, config)).fold(SyncResult())(_ + _))
     } else Seq()
 
-    val results = configResults ++ descriptionResults ++ exportResults ++ stateResults
-    results.foreach { case (tpe, r) => logger.info(s"$tpe: transferred=${r.transferred} upToDate=${r.upToDate} failed=${r.failed}${if (config.dryRun) " (dry run)" else ""}") }
+    val results = configResults ++ descriptionResults ++ exportResults ++ searchIndexResults ++ lineageIndexResults ++ stateResults
+    results.foreach { case (tpe, r) => logger.info(s"$tpe: transferred=${r.transferred} upToDate=${r.upToDate} missingInSource=${r.missingInSource} failed=${r.failed}${if (config.dryRun) " (dry run)" else ""}") }
     results.map(_._2).fold(SyncResult())(_ + _)
   }
 
@@ -329,26 +386,32 @@ object ExportSync extends SmartDataLakeLogger {
     def getVersions(writer: ExportWriter, allVersions: Option[Map[DataObjectId, Seq[Long]]]) =
       allVersions.map(_.getOrElse(dataObjectId, Seq())).getOrElse(writer.listVersions(tpe, dataObjectId))
     handleErrors(s"$tpe of ${dataObjectId.id}", config) {
-      val targetDocumentVersions = getVersions(target, targetVersions)
-      val versions = selectVersions(getVersions(source, sourceVersions), targetDocumentVersions, config.versions)
-      // a target which keeps only the latest version needs only the latest version
-      val versionsToWrite = if (target.keepsHistory) versions else versions.maxOption.toSeq
-      var latestTargetDocument = if (versionsToWrite.nonEmpty) targetDocumentVersions.maxOption.flatMap(target.readVersion(tpe, dataObjectId, _)) else None
-      val transferred = versionsToWrite.map { version =>
-        val document = source.readVersion(tpe, dataObjectId, version)
-          .getOrElse(throw new IllegalStateException(s"version $version of $tpe for ${dataObjectId.id} listed but not found in $sourceUri"))
-        // skip identical content, e.g. if the version of the target is the modification time of an unversioned file
-        if (latestTargetDocument.map(normalize).contains(normalize(document))) {
-          logger.info(s"$tpe of ${dataObjectId.id} version $version is identical to latest version of target, skipping")
-          false
-        } else {
-          logger.info(s"${if (config.dryRun) "Would transfer" else "Transferring"} $tpe of ${dataObjectId.id} version $version")
-          if (!config.dryRun) target.writeVersion(tpe, document, dataObjectId, version)
-          latestTargetDocument = Some(document)
-          true
-        }
-      }.count(identity)
-      SyncResult(transferred = transferred, upToDate = if (transferred == 0) 1 else 0)
+      val sourceDocumentVersions = getVersions(source, sourceVersions)
+      if (sourceDocumentVersions.isEmpty) {
+        logger.debug(s"No $tpe of ${dataObjectId.id} found in $sourceUri")
+        SyncResult(missingInSource = 1)
+      } else {
+        val targetDocumentVersions = getVersions(target, targetVersions)
+        val versions = selectVersions(sourceDocumentVersions, targetDocumentVersions, config.versions)
+        // a target which keeps only the latest version needs only the latest version
+        val versionsToWrite = if (target.keepsHistory) versions else versions.maxOption.toSeq
+        var latestTargetDocument = if (versionsToWrite.nonEmpty) targetDocumentVersions.maxOption.flatMap(target.readVersion(tpe, dataObjectId, _)) else None
+        val transferred = versionsToWrite.map { version =>
+          val document = source.readVersion(tpe, dataObjectId, version)
+            .getOrElse(throw new IllegalStateException(s"version $version of $tpe for ${dataObjectId.id} listed but not found in $sourceUri"))
+          // skip identical content, e.g. if the version of the target is the modification time of an unversioned file
+          if (latestTargetDocument.map(normalize).contains(normalize(document))) {
+            logger.info(s"$tpe of ${dataObjectId.id} version $version is identical to latest version of target, skipping")
+            false
+          } else {
+            logger.info(s"${if (config.dryRun) "Would transfer" else "Transferring"} $tpe of ${dataObjectId.id} version $version")
+            if (!config.dryRun) target.writeVersion(tpe, document, dataObjectId, version)
+            latestTargetDocument = Some(document)
+            true
+          }
+        }.count(identity)
+        SyncResult(transferred = transferred, upToDate = if (transferred == 0) 1 else 0)
+      }
     }
   }
 

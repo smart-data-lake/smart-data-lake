@@ -140,6 +140,11 @@ exported:
 `configJson,schema,stats,lineage` are exported by default. The target can be `uiBackend` (configured with
 `global.uiBackend`), a local directory prefixed with `localfile:`, or a Hadoop path.
 
+After synchronizing, the UI backend rebuilds its search index over the configuration, descriptions and schemas, and
+its column lineage index if column lineage was transferred. An unchanged search index is not rebuilt. Disable this
+with `--updateSearchIndex false` or `--updateLineageIndex false`. The state of the runs needs no index update, as the
+UI backend indexes it on upload.
+
 ```
 # export the configuration for the local UI
 java -cp sdlb.jar io.smartdatalake.meta.configexporter.ExportSync \
