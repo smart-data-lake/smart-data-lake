@@ -134,6 +134,7 @@ class ExportSyncTest extends AnyFunSuite with BeforeAndAfterAll {
     val config = baseConfig(s"localfile:$srcDir", tgtDir.toUri.toString).copy(types = Seq(ExportType.Lineage), versions = SyncVersions.All)
     val result = ExportSync.sync(config)
     assert(result.transferred == 1)
+    assert(result.missingInSource == 2) // do2, other3
     val tgt = HadoopExportWriter(new HadoopPath(tgtDir.toUri), new Configuration())
     assert(tgt.readLatest(ExportType.Lineage, do1).contains(doc(do1, 200)))
     assert(tgt.listAllVersions(ExportType.Lineage, latestOnly = false).map(_.keySet).contains(Set(do1)))
@@ -141,6 +142,14 @@ class ExportSyncTest extends AnyFunSuite with BeforeAndAfterAll {
     // the version of the target is the modification time of its file, the content is identical nevertheless
     val resultAgain = ExportSync.sync(config)
     assert(resultAgain.transferred == 0)
+  }
+
+  test("documents of DataObjects not in the configuration are missing in source") {
+    val (srcDir, tgtDir) = (newDir("src"), newDir("tgt"))
+    Files.write(srcDir.resolve("unknown.lineage.json"), doc(DataObjectId("unknown"), 100).getBytes("UTF-8"))
+    val result = ExportSync.sync(baseConfig(srcDir.toUri.toString, s"localfile:$tgtDir").copy(types = Seq(ExportType.Lineage)))
+    assert(result == ExportSync.SyncResult(missingInSource = 3))
+    assert(FileExportWriter(tgtDir).listAllVersions(ExportType.Lineage, latestOnly = false).contains(Map()))
   }
 
   test("error handling with stopOnError") {
@@ -352,6 +361,66 @@ class ExportSyncTest extends AnyFunSuite with BeforeAndAfterAll {
     verify(1, putRequestedFor(backendPath("config")).withQueryParam("repo", equalTo("test")))
     verify(1, postRequestedFor(backendPath("descriptions/dataObjects/dataObjectParquet6.md")))
     verify(1, deleteRequestedFor(backendPath("descriptions/dataObjects/old.md")))
+  }
+
+  test("update search index of uiBackend") {
+    wireMockServer.resetAll()
+    stubFor(put(backendPath("config")).willReturn(aResponse().withStatus(200)))
+    stubFor(post(backendPath("search/index")).willReturn(aResponse().withStatus(200).withBody("""{"built":true}""")))
+    val config = ExportSyncConfig(configPaths = Seq(configPath), target = "uiBackend", types = Seq(ExportType.ConfigJson))
+    val result = ExportSync.sync(config)
+    assert(result == ExportSync.SyncResult(transferred = 1))
+    verify(1, postRequestedFor(backendPath("search/index")).withQueryParam("version", equalTo(ExportSync.getAppVersion)))
+    // disabled, or dry run
+    ExportSync.sync(config.copy(updateSearchIndex = false))
+    ExportSync.sync(config.copy(dryRun = true))
+    verify(1, postRequestedFor(backendPath("search/index")))
+    // not for types which are not indexed
+    ExportSync.sync(config.copy(types = Seq(ExportType.Lineage), schemaSource = Some(s"localfile:${newDir("src")}")))
+    verify(1, postRequestedFor(backendPath("search/index")))
+  }
+
+  test("update search index of latest configuration version when synchronizing schemas only") {
+    val srcDir = newDir("src")
+    writeDocs(FileExportWriter(srcDir), ExportType.Schema, do1, 100)
+    wireMockServer.resetAll()
+    stubFor(put(urlPathMatching("/api/v1/dataobject/.*")).willReturn(aResponse().withStatus(200)))
+    stubFor(post(backendPath("search/index")).willReturn(aResponse().withStatus(200).withBody("""{"built":true}""")))
+    val result = ExportSync.sync(baseConfig(s"localfile:$srcDir", "uiBackend").copy(types = Seq(ExportType.Schema)))
+    assert(result.transferred == 1)
+    verify(1, postRequestedFor(backendPath("search/index")).withQueryParam("version", absent()))
+  }
+
+  test("update column lineage index of uiBackend if lineage was transferred") {
+    val srcDir = newDir("src")
+    writeDocs(FileExportWriter(srcDir), ExportType.Lineage, do1, 100)
+    wireMockServer.resetAll()
+    stubFor(put(urlPathMatching("/api/v1/dataobject/.*")).willReturn(aResponse().withStatus(200)))
+    stubFor(post(backendPath("lineage/index")).willReturn(aResponse().withStatus(200)))
+    val config = baseConfig(s"localfile:$srcDir", "uiBackend").copy(types = Seq(ExportType.Lineage))
+    assert(ExportSync.sync(config) == ExportSync.SyncResult(transferred = 1, missingInSource = 2))
+    verify(1, postRequestedFor(backendPath("lineage/index")))
+    // disabled
+    ExportSync.sync(config.copy(updateLineageIndex = false))
+    verify(1, postRequestedFor(backendPath("lineage/index")))
+    // nothing transferred
+    stubFor(get(backendPath("dataobject/lineage/do1/tstamps")).willReturn(aResponse().withStatus(200).withBody("[100]")))
+    stubFor(get(backendPath("dataobject/lineage/do1")).willReturn(aResponse().withStatus(200).withBody(doc(do1, 100))))
+    assert(ExportSync.sync(config).transferred == 0)
+    verify(1, postRequestedFor(backendPath("lineage/index")))
+  }
+
+  test("search index not supported or failing") {
+    wireMockServer.resetAll()
+    stubFor(put(backendPath("config")).willReturn(aResponse().withStatus(200)))
+    // a UI backend without search index answers 404, which is no error
+    val config = ExportSyncConfig(configPaths = Seq(configPath), target = "uiBackend", types = Seq(ExportType.ConfigJson), stopOnError = false)
+    assert(ExportSync.sync(config) == ExportSync.SyncResult(transferred = 1))
+    // a failing update is
+    stubFor(post(backendPath("search/index")).willReturn(aResponse().withStatus(500)))
+    assert(ExportSync.sync(config) == ExportSync.SyncResult(transferred = 1, failed = 1))
+    // local directories have no search index
+    assert(ExportSync.sync(config.copy(target = s"localfile:${newDir("tgt")}")) == ExportSync.SyncResult(transferred = 1))
   }
 
   test("descriptions need global.descriptionPath and a target supporting files") {

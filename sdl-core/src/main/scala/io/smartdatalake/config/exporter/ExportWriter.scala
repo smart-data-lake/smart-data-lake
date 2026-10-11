@@ -102,6 +102,21 @@ trait ExportWriter extends SmartDataLakeLogger {
    * False if the writer keeps only the latest version of a document, overwriting older versions.
    */
   def keepsHistory: Boolean = true
+
+  /**
+   * Rebuild the search index of the target over the configuration, the descriptions and the schemas, if it has one.
+   *
+   * @param version version of the configuration to index, or None for the latest version
+   * @return false if the target has no search index
+   */
+  def updateSearchIndex(version: Option[String]): Boolean = false
+
+  /**
+   * Rebuild the column lineage index of the target over the lineage documents of all DataObjects, if it has one.
+   *
+   * @return false if the target has no column lineage index
+   */
+  def updateLineageIndex(): Boolean = false
 }
 
 /**

@@ -156,6 +156,39 @@ case class BackendClient(uploader: UploadService) extends ExportWriter with Stat
   }
 
   /**
+   * The UI backend never builds its search index implicitly, it must be triggered after uploading.
+   * An unchanged index is not rebuilt.
+   *
+   * @return false if the UI backend does not support a search index (HTTP 404)
+   */
+  override def updateSearchIndex(version: Option[String]): Boolean = {
+    updateIndex("search/index", "search index", Seq(version.map("version" -> _)).flatten.toMap)
+  }
+
+  /**
+   * The UI backend rebuilds its column lineage index on the first read after the lineage changed. Updating it
+   * forces the rebuild, so that the first reader does not have to wait for it.
+   *
+   * @return false if the UI backend does not support a column lineage index (HTTP 404)
+   */
+  override def updateLineageIndex(): Boolean = {
+    updateIndex("lineage/index", "column lineage index")
+  }
+
+  private def updateIndex(subPath: String, name: String, additionalParams: Map[String, String] = Map()): Boolean = {
+    logger.info(s"Updating $name " + additionalParams.map { case (k, v) => s"$k=$v" }.mkString(" "))
+    try {
+      val response = uploader.send(subPath, body = Some("{}"), method = Method.POST, additionalParams = additionalParams)
+      logger.info(s"Updated $name ${response.getOrElse("")}")
+      true
+    } catch {
+      case HttpRequestError(_, 404, _) =>
+        logger.warn(s"UI backend does not support updating the $name")
+        false
+    }
+  }
+
+  /**
    * @return None if the document does not exist (HTTP 404)
    */
   private def download(subPath: String, additionalParams: Map[String, String] = Map()): Option[String] = {
