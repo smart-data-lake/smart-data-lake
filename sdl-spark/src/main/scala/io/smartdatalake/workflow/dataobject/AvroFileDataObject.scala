@@ -51,7 +51,7 @@ import org.apache.spark.sql.DataFrame
  * dataObjects = {
  *   stg-airports {
  *     type = AvroFileDataObject
- *     path = "~{env.basedir}/stg_airports"
+ *     path = ${env.basedir}"/stg_airports"
  *     partitions = [dt]
  *     saveMode = Append
  *     avroOptions {

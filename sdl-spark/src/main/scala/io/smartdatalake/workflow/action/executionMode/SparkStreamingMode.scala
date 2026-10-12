@@ -49,7 +49,7 @@ import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
  *     outputId = int-departures
  *     executionMode = {
  *       type = SparkStreamingMode
- *       checkpointLocation = "~{env.basedir}/checkpoints/copy-departures"
+ *       checkpointLocation = ${env.basedir}"/checkpoints/copy-departures"
  *       triggerType = ProcessingTime
  *       triggerTime = "10 seconds"
  *     }

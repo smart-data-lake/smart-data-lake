@@ -64,7 +64,7 @@ import org.apache.spark.sql.types.{DateType, StringType}
  * dataObjects = {
  *   stg-airports {
  *     type = CsvFileDataObject
- *     path = "~{env.basedir}/stg_airports"
+ *     path = ${env.basedir}"/stg_airports"
  *     csvOptions {
  *       delimiter = ";"
  *       inferSchema = true

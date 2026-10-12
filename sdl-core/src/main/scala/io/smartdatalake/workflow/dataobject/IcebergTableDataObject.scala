@@ -68,7 +68,7 @@ import scala.reflect.runtime.universe.Type
  * dataObjects = {
  *   int-airports {
  *     type = IcebergTableDataObject
- *     path = "~{env.basedir}/int_airports"
+ *     path = ${env.basedir}"/int_airports"
  *     table = { db = "default", name = "int_airports", primaryKey = [ident] }
  *     partitions = [country]
  *     saveMode = Merge

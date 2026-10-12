@@ -61,7 +61,7 @@ import org.apache.spark.sql.DataFrame
  * dataObjects = {
  *   ext-airports {
  *     type = ExcelFileDataObject
- *     path = "~{env.basedir}/ext_airports"
+ *     path = ${env.basedir}"/ext_airports"
  *     excelOptions {
  *       sheetName = "airports"
  *       maxRowsInMemory = 20000

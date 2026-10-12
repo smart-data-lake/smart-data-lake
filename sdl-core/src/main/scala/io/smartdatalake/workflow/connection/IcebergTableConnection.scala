@@ -36,7 +36,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
  *   iceberg-int {
  *     type = IcebergTableConnection
  *     db = "integration"
- *     pathPrefix = "~{env.basedir}/iceberg"
+ *     pathPrefix = ${env.basedir}"/iceberg"
  *     addFilesParallelism = 8
  *   }
  * }

@@ -57,7 +57,7 @@ import org.apache.spark.sql.DataFrame
  * dataObjects = {
  *   stg-airports {
  *     type = XmlFileDataObject
- *     path = "~{env.basedir}/stg_airports"
+ *     path = ${env.basedir}"/stg_airports"
  *     xmlOptions { rowTag = "entry", dateFormat = "yyyy-MM-dd" }
  *     schema = "ident string, name string, elevation_ft integer"
  *   }

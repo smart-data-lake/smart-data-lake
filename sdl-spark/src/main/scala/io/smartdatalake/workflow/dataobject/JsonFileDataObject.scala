@@ -48,7 +48,7 @@ import org.apache.spark.sql.DataFrame
  * dataObjects = {
  *   stg-airports {
  *     type = JsonFileDataObject
- *     path = "~{env.basedir}/stg_airports"
+ *     path = ${env.basedir}"/stg_airports"
  *     jsonOptions { multiLine = false }
  *     saveMode = Overwrite
  *   }

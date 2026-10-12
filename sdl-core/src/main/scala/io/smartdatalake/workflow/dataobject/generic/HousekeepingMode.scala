@@ -46,7 +46,7 @@ trait HousekeepingMode extends ParsableFromConfig[HousekeepingMode] with ConfigH
  * dataObjects = {
  *   int-departures {
  *     type = ParquetFileDataObject
- *     path = "~{env.basedir}/int_departures"
+ *     path = ${env.basedir}"/int_departures"
  *     partitions = [dt]
  *     housekeepingMode = {
  *       type = PartitionRetentionMode
@@ -119,7 +119,7 @@ object PartitionRetentionMode extends FromConfigFactory[HousekeepingMode] {
  * dataObjects = {
  *   int-departures {
  *     type = ParquetFileDataObject
- *     path = "~{env.basedir}/int_departures"
+ *     path = ${env.basedir}"/int_departures"
  *     partitions = [run_id]
  *     housekeepingMode = {
  *       type = PartitionArchiveMode

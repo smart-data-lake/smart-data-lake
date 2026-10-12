@@ -143,7 +143,7 @@ trait ExecutionModeWithMainInputOutput {
  * dataObjects = {
  *   int-departures {
  *     type = ParquetFileDataObject
- *     path = "~{env.basedir}/int_departures"
+ *     path = ${env.basedir}"/int_departures"
  *     partitions = [dt]
  *   }
  * }

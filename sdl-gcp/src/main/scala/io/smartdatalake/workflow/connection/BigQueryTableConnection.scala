@@ -47,7 +47,7 @@ import scala.io.Source
  *     parentProject = "playground-223717"
  *     authMode = {
  *       type = GCPCredentialsKeyAuth
- *       serviceAccountKeyFile = "~{env.basedir}/playground-223717-key.json"
+ *       serviceAccountKeyFile = ${env.basedir}"/playground-223717-key.json"
  *     }
  *   }
  * }

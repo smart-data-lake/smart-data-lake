@@ -162,10 +162,10 @@ see also [Testing](reference/testing)
 
 see also [Housekeeping](reference/housekeeping), [Housekeeping blog post](/blog/sdl-housekeeping)
 
-## Agents (experimental)
+## Remote Agents (experimental)
 * Execute Actions on a remote SDLB instance, e.g. on-premise, controlled by a main instance in the cloud
 
-see also [Agents](reference/agents)
+see also [Remote Agents](reference/agents)
 
 ## User Interface
 * Configuration viewer with catalog, search and lineage view, grouped by feed, subject area and layer

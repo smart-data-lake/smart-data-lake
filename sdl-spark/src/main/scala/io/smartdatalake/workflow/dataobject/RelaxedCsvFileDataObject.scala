@@ -63,7 +63,7 @@ import scala.reflect.runtime.universe.typeOf
  * dataObjects = {
  *   stg-airports {
  *     type = RelaxedCsvFileDataObject
- *     path = "~{env.basedir}/stg_airports"
+ *     path = ${env.basedir}"/stg_airports"
  *     schema = "ident string, name string, elevation_ft integer, _corrupt_record string, _corrupt_record_msg string"
  *     csvOptions { delimiter = ";" }
  *     treatMissingColumnsAsCorrupt = true

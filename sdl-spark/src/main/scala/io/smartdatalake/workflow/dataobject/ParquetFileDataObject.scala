@@ -52,7 +52,7 @@ import org.apache.spark.sql.DataFrame
  * dataObjects = {
  *   int-airports {
  *     type = ParquetFileDataObject
- *     path = "~{env.basedir}/int_airports"
+ *     path = ${env.basedir}"/int_airports"
  *     partitions = [year, month]
  *     saveMode = Overwrite
  *   }

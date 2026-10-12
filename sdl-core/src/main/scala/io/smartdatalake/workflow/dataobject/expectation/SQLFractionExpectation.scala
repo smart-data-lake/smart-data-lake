@@ -42,7 +42,7 @@ import io.smartdatalake.workflow.dataobject.generic.ExpectationValidation
  * dataObjects = {
  *   int-departures {
  *     type = ParquetFileDataObject
- *     path = "~{env.basedir}/int_departures"
+ *     path = ${env.basedir}"/int_departures"
  *     expectations = [{
  *       type = SQLFractionExpectation
  *       name = "pctBob"

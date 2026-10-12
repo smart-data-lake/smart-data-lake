@@ -46,7 +46,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
  * agents = {
  *   storage-agent1 {
  *     type = StorageAgent
- *     path = "~{env.basedir}/storage-agent1"
+ *     path = ${env.basedir}"/storage-agent1"
  *     execTimeoutSec = 900
  *     connections {
  *       remoteFile { id = remoteFile, type = HadoopFileConnection, pathPrefix = "/data/remote" }

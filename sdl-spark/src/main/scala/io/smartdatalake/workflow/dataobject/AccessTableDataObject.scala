@@ -51,7 +51,7 @@ import scala.jdk.CollectionConverters._
  * dataObjects = {
  *   ext-orders {
  *     type = AccessTableDataObject
- *     path = "~{env.basedir}/ext_orders/northwind.accdb"
+ *     path = ${env.basedir}"/ext_orders/northwind.accdb"
  *     table {
  *       db = "northwind"
  *       name = "Orders"

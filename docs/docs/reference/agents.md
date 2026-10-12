@@ -1,6 +1,6 @@
 ---
 id: agents
-title: Agents (Experimental)
+title: Remote Agents (Experimental)
 ---
 
 :::info
@@ -9,7 +9,7 @@ This feature is Experimental
 
 ## Introduction
 
-The Agent feature allows to have a main instance of SDLB sending instructions to another Instance of SDLB, called the Remote Agent.
+The Remote Agent feature allows to have a main instance of SDLB sending instructions to another Instance of SDLB, called the Remote Agent.
 This Remote Agent then executes the action in its environment and returns the schema of the resulting data in an empty SparkSubFeed.
 Only metadata is sent over the connection between Remote Agent and Main Instance.
 The Main Instance then fetches the result if needed using its own connection to the Data.

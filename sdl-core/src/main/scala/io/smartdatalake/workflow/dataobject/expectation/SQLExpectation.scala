@@ -40,7 +40,7 @@ import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.Expe
  * dataObjects = {
  *   int-departures {
  *     type = ParquetFileDataObject
- *     path = "~{env.basedir}/int_departures"
+ *     path = ${env.basedir}"/int_departures"
  *     expectations = [{
  *       type = SQLExpectation
  *       name = "avgRatingGt1"

@@ -36,7 +36,7 @@ import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
  *   deltalake-int {
  *     type = DeltaLakeTableConnection
  *     db = "integration"
- *     pathPrefix = "~{env.basedir}/deltalake"
+ *     pathPrefix = ${env.basedir}"/deltalake"
  *   }
  * }
  * }}}

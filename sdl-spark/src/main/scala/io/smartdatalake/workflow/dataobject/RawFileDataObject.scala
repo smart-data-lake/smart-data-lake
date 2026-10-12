@@ -46,7 +46,7 @@ import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
  * dataObjects = {
  *   stg-documents {
  *     type = RawFileDataObject
- *     path = "~{env.basedir}/stg_documents"
+ *     path = ${env.basedir}"/stg_documents"
  *     customFormat = binaryFile
  *     partitions = [year]
  *   }
@@ -58,7 +58,7 @@ import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
  * dataObjects = {
  *   stg-documents-files {
  *     type = RawFileDataObject
- *     path = "~{env.basedir}/stg_documents"
+ *     path = ${env.basedir}"/stg_documents"
  *     fileName = "*.pdf"
  *     partitions = [year]
  *     customPartitionLayout = "%year%/"

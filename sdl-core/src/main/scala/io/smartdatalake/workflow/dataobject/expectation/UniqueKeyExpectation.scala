@@ -45,7 +45,7 @@ import io.smartdatalake.workflow.dataobject.generic.TableDataObject
  * dataObjects = {
  *   int-airports {
  *     type = DeltaLakeTableDataObject
- *     path = "~{env.basedir}/int_airports"
+ *     path = ${env.basedir}"/int_airports"
  *     table = { db = "default", name = "int_airports", primaryKey = [ident] }
  *     expectations = [{
  *       type = UniqueKeyExpectation
