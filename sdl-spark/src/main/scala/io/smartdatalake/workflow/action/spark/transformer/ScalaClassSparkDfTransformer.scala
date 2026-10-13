@@ -51,6 +51,7 @@ import org.slf4j.Logger
  * Note that the following options are passed by default to the transformation:
  *   - isExec: defined as `context.isExecPhase`
  *   - dataObjectId: id of the DataObject of the input SubFeed
+ *   - nbOfPartitions: number of partition values to be processed, e.g. to choose the number of Spark partitions
  *
  * Pick this transformer when the transformation logic is too complex for SQL and should live in compiled, unit-testable
  * code. The class named by `className` must be on the classpath of the SDLB job and needs a constructor without

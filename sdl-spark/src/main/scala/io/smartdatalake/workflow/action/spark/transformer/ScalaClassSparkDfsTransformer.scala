@@ -56,6 +56,7 @@ import org.slf4j.Logger
  *   - isExec: defined as `context.isExecPhase`
  *   - outputDataObjectId: defined as outputDataObject.id if transformation has only one output
  *     DataObject configured.
+ *   - nbOfPartitions: number of partition values to be processed, e.g. to choose the number of Spark partitions
  *
  * The class named by `className` must be on the classpath of the SDLB job and needs a constructor without arguments.
  * Input and output DataFrames are matched by DataObjectId; use `renamedInputIds`/`renamedOutputIds` to write generic

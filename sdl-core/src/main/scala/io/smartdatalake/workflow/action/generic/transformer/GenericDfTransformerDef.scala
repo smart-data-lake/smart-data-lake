@@ -23,7 +23,7 @@ import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfTransformer.PREVIOUS_TRANSFORMER_NAME
-import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.IS_EXEC
+import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.{IS_EXEC, NB_OF_PARTITIONS}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
@@ -211,7 +211,8 @@ trait OptionsGenericDfTransformer extends GenericDfTransformer {
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // prepare default options
     val defaultOptions = Seq(
-      IS_EXEC -> context.isExecPhase.toString
+      IS_EXEC -> context.isExecPhase.toString,
+      NB_OF_PARTITIONS -> partitionValues.size.toString
     ).toMap
     // transform
     transformWithOptions(
