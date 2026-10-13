@@ -88,32 +88,20 @@ private[smartdatalake] object ScaladocUtil {
     }
   }
 
-  def formatScaladocLinkTag(captureGroup1: String, captureGroup2: String): String = {
-    var parsedLink = ""
-
+  def formatScaladocLinkTag(link: String): String = {
     // Do not wrap urls in inline code blocks
-    if (captureGroup1.contains("https://")){
-      val splitHyperref = captureGroup1.split(" ")
-      if (splitHyperref.length > 1){
-        // If the Url contains an alias (pretty name), preserve it
-        parsedLink = s"[${splitHyperref.drop(1).mkString(" ")}](${splitHyperref(0)})"
-      }else{
-        parsedLink = captureGroup1
-      }
-    } else {
-      parsedLink = s"`$captureGroup1`"
-    }
-
-    s"$parsedLink${if (captureGroup2 != null) captureGroup2 else " "}"
+    if (link.contains("https://")) {
+      val splitHyperref = link.split(" ")
+      // If the Url contains an alias (pretty name), preserve it
+      if (splitHyperref.length > 1) s"[${splitHyperref.drop(1).mkString(" ")}](${splitHyperref(0)})"
+      else link
+    } else s"`$link`"
   }
 
   def formatScaladocString(str: String): String = {
-    // Remove link square brackets (including plural s handling)
-    // If the link is followed by a single s, remove the space
-    val bracketRemovalPattern = raw"\[\[(.+?)]] ([.s,])?".r
-    bracketRemovalPattern.replaceAllIn(str, m =>
-      formatScaladocLinkTag(m.group(1), m.group(2))
-    )
+    // Remove link square brackets
+    val bracketRemovalPattern = raw"\[\[(.+?)]]".r
+    bracketRemovalPattern.replaceAllIn(str, m => scala.util.matching.Regex.quoteReplacement(formatScaladocLinkTag(m.group(1))))
       .replaceAll(raw"\.\n(?!\n)", ".  \n") // Add carriage return for Markdown formatting
       .replaceAll(raw"(\\r)?\\n", "\n") // convert & standardize line separator
       .replaceAll(raw"\n\h*\*\h*", "\n") // remove trailing asterisk
@@ -124,15 +112,27 @@ private[smartdatalake] object ScaladocUtil {
   def formatScaladocMarkup(markup: Markup): String = {
     markup match {
       case x: Heading => s"\n\n${x.trimmed.plainString}\n\n"
-      case x: Paragraph => s"\n\n${x.trimmed.plainString}"
+      // Paragraph.trimmed trims every span and joins them with spaces, which loses line breaks and adds spaces
+      // around inline markup like `code`. Only trim the paragraph as a whole, and the indentation of its lines.
+      case x: Paragraph => s"\n\n${x.plainString.trim.replaceAll(raw"\n\h+", "\n")}"
       case x: CodeBlock => dedentCodeBlock(s"\n${x.plainString}\n")
-      case x: Span => s" ${x.trimmed.plainString}"
+      case x: Span => x.plainString
       case x: Document =>
-        val contentStr = x.elements.map(formatScaladocMarkup).mkString("")
+        val contentStr = groupLooseSpans(x.elements).map(formatScaladocMarkup).mkString("")
         formatScaladocString(contentStr)
           .replaceAll(raw"\{\{\{\n?", "```\n") // convert wiki code block to markup code block
           .replaceAll(raw"(.*)\n?}}}", "$1\n```\n") // convert wiki code block to markup code block
     }
+  }
+
+  // The parser leaves text that is not followed by a blank line (e.g. "Example:" before a code block, or a
+  // Scaladoc without any blank line) as top level spans. Group consecutive spans into a paragraph of their own.
+  private def groupLooseSpans(elements: List[Markup]): List[Markup] = elements match {
+    case (_: Span) :: _ =>
+      val (spans, rest) = elements.span(_.isInstanceOf[Span])
+      Paragraph(spans.collect { case s: Span => s }) :: groupLooseSpans(rest)
+    case head :: tail => head :: groupLooseSpans(tail)
+    case Nil => Nil
   }
 
   def extractScalaDoc(annotations: Seq[Annotation]): Option[Scaladoc] = {

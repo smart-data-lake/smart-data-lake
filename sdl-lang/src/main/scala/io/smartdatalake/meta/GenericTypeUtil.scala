@@ -20,7 +20,7 @@ package io.smartdatalake.meta
 
 import io.smartdatalake.config.{LibraryOptions, LibraryOptionsProvider}
 import io.smartdatalake.definitions.SaveModeOptions
-import io.smartdatalake.util.misc.ScaladocUtil.{extractScalaDoc, formatScaladocString, formatScaladocWithTags}
+import io.smartdatalake.util.misc.ScaladocUtil.{extractScalaDoc, formatScaladocMarkup, formatScaladocWithTags}
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, GenericFileTransformer, ValidationRule}
@@ -168,7 +168,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     val name = tpe.typeSymbol.name.toString
     val scaladoc = extractScalaDoc(tpe.typeSymbol.annotations)
     val description = scaladoc.map(formatScaladocWithTags(_, tag => !(tag.isInstanceOf[Tag.Param] || tag.isInstanceOf[Tag.OtherTag])))
-    val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.textParams.view.mapValues(formatScaladocString).toMap).getOrElse(Map())) else Seq()
+    val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.tags.collect { case p: Tag.Param => p.name -> formatScaladocMarkup(p.markup) }.toMap).getOrElse(Map())) else Seq()
     // only java annotations are kept for runtime. SDLB needs to use Java @Deprecated annotation to be able to retrieve this with reflection.
     val isDeprecated = tpe.typeSymbol.annotations.exists(_.tree.tpe =:= typeOf[Deprecated])
     GenericTypeDef(name, baseType, tpe, description, tpe.typeSymbol.asClass.isCaseClass, isDeprecated, parentTypes.toSet, attributes)
