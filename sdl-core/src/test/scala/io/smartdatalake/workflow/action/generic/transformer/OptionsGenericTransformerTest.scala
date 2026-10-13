@@ -18,7 +18,7 @@
  */
 package io.smartdatalake.workflow.action.generic.transformer
 
-import io.smartdatalake.config.InstanceRegistry
+import io.smartdatalake.config.{ExcludeFromSchemaExport, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.util.hdfs.PartitionValues
@@ -60,7 +60,7 @@ class OptionsGenericTransformerTest extends AnyFunSuite {
 }
 
 case class OptionsCapturingDfTransformer(options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map())
-    extends OptionsGenericDfTransformer {
+    extends OptionsGenericDfTransformer with ExcludeFromSchemaExport {
   override def name: String = "capture"
   override def description: Option[String] = None
   var capturedOptions: Map[String, String] = Map()
@@ -73,7 +73,7 @@ case class OptionsCapturingDfTransformer(options: Map[String, String] = Map(), r
 }
 
 case class OptionsCapturingDfsTransformer(options: Map[String, String] = Map(), runtimeOptions: Map[String, String] = Map())
-    extends OptionsGenericDfsTransformer {
+    extends OptionsGenericDfsTransformer with ExcludeFromSchemaExport {
   override def name: String = "capture"
   override def description: Option[String] = None
   var capturedOptions: Map[String, String] = Map()
