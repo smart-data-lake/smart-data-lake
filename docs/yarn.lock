@@ -2809,10 +2809,10 @@
     micromark-util-character "^1.1.0"
     micromark-util-symbol "^1.0.1"
 
-"@smart-data-lake/sdlb-schema-viewer@2.0.3":
-  version "2.0.3"
-  resolved "https://npm.pkg.github.com/download/@smart-data-lake/sdlb-schema-viewer/2.0.3/d9175091bdd44073cd1a15a699cd5cdda171bb5a#d9175091bdd44073cd1a15a699cd5cdda171bb5a"
-  integrity sha512-V+Gj7kEefq9k5TYCkWgVQuHn2dLg8QT0FAGJU3PQW/q1SyE6TfaML2aDjCr71uR4sxfGuXdPs9FGMRIJQUin9Q==
+"@smart-data-lake/sdlb-schema-viewer@2.0.4":
+  version "2.0.4"
+  resolved "https://npm.pkg.github.com/download/@smart-data-lake/sdlb-schema-viewer/2.0.4/0802c0d6e73a065cf00d2f55eede814ee46765d8#0802c0d6e73a065cf00d2f55eede814ee46765d8"
+  integrity sha512-CFm8vgUkCabFW1ApJNFXGm4dbutNk6C6Cdsn+6wWAS97ry4aLZ7o8aJ7WuLEdsDiHEH+1t/6o/SQtW/a8Px7dg==
   dependencies:
     globals "^16.2.0"
     json-schema "^0.4.0"
