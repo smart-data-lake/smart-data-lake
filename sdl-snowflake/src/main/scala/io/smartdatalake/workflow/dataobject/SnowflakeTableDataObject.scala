@@ -110,7 +110,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val postWriteSql: Option[String] = None,
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     connectionId: ConnectionId,
-                                    @LibraryOptions("https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options")
+                                    @LibraryOptions("https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options", "net.snowflake.spark.snowflake.Parameters.KNOWN_PARAMETERS")
                                     sparkOptions: Map[String, String] = Map(),
                                     virtualPartitions: Seq[String] = Seq(),
                                     readTransformer: Option[GenericDfTransformer] = None,

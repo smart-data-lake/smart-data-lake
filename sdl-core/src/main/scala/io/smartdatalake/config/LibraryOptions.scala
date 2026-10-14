@@ -34,6 +34,12 @@ import scala.annotation.StaticAnnotation
  * @param optionsProvider Optional fully qualified name of a Scala object which knows the option names, either a
  *                        [[LibraryOptionsProvider]] or a Spark `org.apache.spark.sql.catalyst.DataSourceOptions`
  *                        object, e.g. `org.apache.spark.sql.catalyst.csv.CSVOptions`.
+ *                        Alternatively the fully qualified name of a member of a Scala object holding a collection
+ *                        of option names, e.g. `org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions.jdbcOptionNames`.
+ *                        The member is read by reflection and may also be private.
+ *                        Or the fully qualified name of a Java class, whose public static final String constants
+ *                        are the option names, e.g. `org.apache.iceberg.spark.SparkReadOptions`.
+ *                        Multiple option providers can be given as comma separated list.
  */
 final class LibraryOptions(docUrl: String, optionsProvider: String) extends StaticAnnotation {
   def this(docUrl: String) = this(docUrl, "")

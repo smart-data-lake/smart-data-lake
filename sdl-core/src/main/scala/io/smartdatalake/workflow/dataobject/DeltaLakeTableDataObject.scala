@@ -120,7 +120,7 @@ import scala.util.Try
 case class DeltaLakeTableDataObject(override val id: DataObjectId,
                                     path: Option[String] = None,
                                     override val partitions: Seq[String] = Seq(),
-                                    @LibraryOptions("https://docs.delta.io/latest/delta-batch.html")
+                                    @LibraryOptions("https://docs.delta.io/latest/delta-batch.html", "org.apache.spark.sql.delta.DeltaOptions.validOptionKeys")
                                     options: Map[String,String] = Map(),
                                     override val schemaMin: Option[GenericSchema] = None,
                                     override var table: Table,

@@ -127,7 +127,7 @@ case class JdbcViewDataObject(override val id: DataObjectId,
                               connectionId: ConnectionId,
                               override val schemaMin: Option[GenericSchema] = None,
                               jdbcFetchSize: Int = 1000,
-                              @LibraryOptions("https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option")
+                              @LibraryOptions("https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option", "org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions.jdbcOptionNames")
                               jdbcOptions: Map[String, String] = Map(),
                               virtualPartitions: Seq[String] = Seq(),
                               override val expectedPartitionsCondition: Option[String] = None,

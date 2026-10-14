@@ -125,7 +125,7 @@ case class JdbcTableDataObject(override val id: DataObjectId,
                                saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                override val allowSchemaEvolution: Boolean = false,
                                connectionId: ConnectionId,
-                               @LibraryOptions("https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option")
+                               @LibraryOptions("https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option", "org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions.jdbcOptionNames")
                                jdbcOptions: Map[String, String] = Map(),
                                virtualPartitions: Seq[String] = Seq(),
                                override val expectedPartitionsCondition: Option[String] = None,
