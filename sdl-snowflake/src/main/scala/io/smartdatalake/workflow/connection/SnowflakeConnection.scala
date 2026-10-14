@@ -99,7 +99,7 @@ case class SnowflakeConnection(override val id: ConnectionId,
                                role: String,
                                authMode: AuthMode,
                                proxy: Option[HttpProxyConfig] = None,
-                               @LibraryOptions("https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options")
+                               @LibraryOptions("https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options", "net.snowflake.spark.snowflake.Parameters.KNOWN_PARAMETERS")
                                sparkOptions: Map[String, String] = Map(),
                                override val metadata: Option[ConnectionMetadata] = None
                               ) extends Connection with EngineConnection with JdbcExecution with SmartDataLakeLogger {
