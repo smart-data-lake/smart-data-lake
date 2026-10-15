@@ -139,7 +139,18 @@
             <version>${project.parent.version}</version>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>io.smartdatalake</groupId>
+            <artifactId>sdl-sql_${scala.minor.version}</artifactId>
+            <version>${project.parent.version}</version>
+            <optional>true</optional>
+        </dependency>
 
+        <dependency>
+            <!-- create instances without calling the constructor to get supported SubFeed types for the json schema -->
+            <groupId>org.objenesis</groupId>
+            <artifactId>objenesis</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.github.scopt</groupId>
             <artifactId>scopt_${scala.minor.version}</artifactId>

@@ -28,7 +28,8 @@ import io.smartdatalake.workflow.dataobject.DataObject
 import org.reflections.Reflections
 
 import java.lang.reflect.Modifier
-import scala.reflect.runtime.universe.{Type, TypeTag}
+import scala.collection.concurrent.TrieMap
+import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 import scala.util.Try
 
 /**
@@ -41,6 +42,8 @@ import scala.util.Try
  *
  * Implementations are discovered on the classpath by reflection (see [[DataObjectEngine.createEngines]])
  * and must provide a public constructor with the concrete DataObject as single parameter.
+ * The constructor must not access the DataObject, as engines are also created without DataObject to get their
+ * subFeedType, see [[DataObjectEngine.engineSubFeedTypes]].
  */
 trait DataObjectEngine {
 
@@ -63,6 +66,16 @@ object DataObjectEngine {
       .filter(c => !c.isInterface && !Modifier.isAbstract(c.getModifiers))
       .map(_.getConstructor(dataObjectClass).newInstance(dataObject).asInstanceOf[E])
   }
+
+  /**
+   * Get the subFeed types of the engine implementations of trait E available on the classpath, without having a DataObject.
+   * Engines are instantiated with `null` as DataObject for this, see contract of [[DataObjectEngine]].
+   */
+  def engineSubFeedTypes[E <: DataObjectEngine : TypeTag, D <: DataObject](dataObjectClass: Class[D]): Seq[Type] = {
+    engineSubFeedTypesCache.getOrElseUpdate(typeOf[E].typeSymbol.fullName,
+      createEngines[E, D](null.asInstanceOf[D], dataObjectClass).map(_.subFeedType))
+  }
+  private val engineSubFeedTypesCache = TrieMap[String, Seq[Type]]()
 }
 
 /**

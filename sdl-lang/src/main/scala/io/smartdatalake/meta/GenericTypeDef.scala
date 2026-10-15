@@ -31,8 +31,17 @@ private[smartdatalake] case class GenericTypeDef(
                                                   isFinal: Boolean,
                                                   isDeprecated: Boolean,
                                                   superTypes: Set[Type],
-                                                  attributes: Seq[GenericAttributeDef]
+                                                  attributes: Seq[GenericAttributeDef],
+                                                  subFeedTypes: Option[SubFeedTypesDef] = None
                          )
+
+/**
+ * SubFeed types supported by an Action or DataObject, see [[SubFeedTypeUtil]].
+ *
+ * @param read SubFeed types a DataObject can be read with. For Actions the SubFeed types it can process.
+ * @param write SubFeed types a DataObject can be written with. For Actions the same as read.
+ */
+private[smartdatalake] case class SubFeedTypesDef(read: Seq[Type], write: Seq[Type])
 
 /**
  * Generic definition of attributes of SDL configuration elements

@@ -115,6 +115,14 @@ class DataObjectEngineTest extends AnyFunSuite {
     assert(dataObject.engineForContext.isInstanceOf[DummyTestEngine])
   }
 
+  test("subFeed types of engine implementations are found without DataObject") {
+    val types = DataObjectEngine.engineSubFeedTypes[DummyTestEngine, DummyEngineTestDataObject](classOf[DummyEngineTestDataObject])
+    assert(types.size == 2)
+    assert(types.exists(_ =:= typeOf[ScalaSubFeed]))
+    assert(types.exists(_ =:= typeOf[DataFrameSubFeed]))
+    assert(DataObjectEngine.engineSubFeedTypes[DummyMissingTestEngine, DummyMissingEngineTestDataObject](classOf[DummyMissingEngineTestDataObject]).isEmpty)
+  }
+
   test("missing engine implementation throws ConfigurationException with hint") {
     implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
     val dataObject = DummyMissingEngineTestDataObject(DataObjectId("test5"))

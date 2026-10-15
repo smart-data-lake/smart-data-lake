@@ -270,6 +270,11 @@ class JsonTypeConverterTest extends AnyFunSuite {
     val copyActionExecCondDesc = (schemaJson \ "definitions" \ "Action" \ "CopyAction" \ "properties" \ "executionCondition" \ "description").asInstanceOf[org.json4s.JString].s
     assert(copyActionExecCondDesc.contains("Optional execution condition for this action"), 
       s"CopyAction.executionCondition description should contain 'Optional execution condition for this action' but was: $copyActionExecCondDesc")
+
+    // custom keywords are prefixed with "x-" (issue #1181)
+    assert((schemaJson \ "x-version") == org.json4s.JString("test-version"))
+    assert((schemaJson \ "definitions" \ "Action" \ "FileTransferAction" \ "x-subFeedTypes").extract[Seq[String]](org.json4s.DefaultFormats, implicitly) == Seq("FileSubFeed"))
+    assert((schemaJson \ "definitions" \ "DataObject" \ "JdbcViewDataObject" \ "x-writeSubFeedTypes").extract[Seq[String]](org.json4s.DefaultFormats, implicitly) == Seq("SQLSubFeed"))
   }
 }
 

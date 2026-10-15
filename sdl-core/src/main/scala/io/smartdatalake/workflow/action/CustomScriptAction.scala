@@ -53,9 +53,8 @@ import io.smartdatalake.workflow.{ActionPipelineContext, ParameterSubFeed}
  * }}}
  *
  * @note Output DataObjects must implement [[io.smartdatalake.workflow.dataobject.generic.CanReceiveParameterNotification]]
- *       to be able to receive the notification. No DataObject shipped with SDLB implements it yet, so `outputIds`
- *       normally references a custom DataObject implementation. Otherwise the Action fails with a
- *       ConfigurationException when the configuration is parsed.
+ *       to be able to receive the notification, e.g. MLflowDataObject or a custom DataObject implementation.
+ *       Otherwise the Action fails with a ConfigurationException when the configuration is parsed.
  * @param inputIds               input DataObject's
  * @param outputIds              output DataObject's
  * @param scripts                definition of scripts to execute
