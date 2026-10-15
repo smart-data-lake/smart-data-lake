@@ -1,7 +1,7 @@
 {
   "type" : "object",
   "$schema" : "http://json-schema.org/draft-07/schema#",
-  "version" : "3.0.0-SNAPSHOT",
+  "x-version" : "3.0.0-SNAPSHOT",
   "id" : "sdl-schema-3.0.0-SNAPSHOT.json#",
   "definitions" : {
     "ExecutionMode" : {
@@ -820,7 +820,8 @@
         "title" : "AccessTableDataObject",
         "required" : [ "type", "path", "table" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type Microsoft Access.  \nCan read a single table from a Microsoft Access database file (.mdb/.accdb) and expose it as a Spark DataFrame.  \nThe database file is read through the Hadoop filesystem layer, copied to a local temporary file and opened with\nthe Jackcess library. Column types are mapped from JDBC types to Spark types, dates/times become Timestamps.  \nUse this to ingest legacy Access files into the data lake; for a real database prefer `JdbcTableDataObject`.\n\nExample:\n```\ndataObjects = {\n  ext-orders {\n    type = AccessTableDataObject\n    path = ${env.basedir}\"/ext_orders/northwind.accdb\"\n    table {\n      db = \"northwind\"\n      name = \"Orders\"\n      primaryKey = [OrderID]\n    }\n  }\n}\n```\n\n\nNOTE: read-only: writing and `dropTable` are not implemented. The whole table is materialized on the driver,\nso this is not suited for very large Access tables.\n\nSEE: `JdbcTableDataObject`"
+        "description" : "`DataObject` of type Microsoft Access.  \nCan read a single table from a Microsoft Access database file (.mdb/.accdb) and expose it as a Spark DataFrame.  \nThe database file is read through the Hadoop filesystem layer, copied to a local temporary file and opened with\nthe Jackcess library. Column types are mapped from JDBC types to Spark types, dates/times become Timestamps.  \nUse this to ingest legacy Access files into the data lake; for a real database prefer `JdbcTableDataObject`.\n\nExample:\n```\ndataObjects = {\n  ext-orders {\n    type = AccessTableDataObject\n    path = ${env.basedir}\"/ext_orders/northwind.accdb\"\n    table {\n      db = \"northwind\"\n      name = \"Orders\"\n      primaryKey = [OrderID]\n    }\n  }\n}\n```\n\n\nNOTE: read-only: writing and `dropTable` are not implemented. The whole table is materialized on the driver,\nso this is not suited for very large Access tables.\n\nSEE: `JdbcTableDataObject`",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SparkSubFeed" ]
       },
       "ActionsExporterDataObject" : {
         "type" : "object",
@@ -840,7 +841,8 @@
         "title" : "ActionsExporterDataObject",
         "required" : [ "type" ],
         "additionalProperties" : false,
-        "description" : "Exports a util `DataFrame` that contains properties and metadata extracted from all `Action`s\nthat are registered in the current `InstanceRegistry`.\n\nAlternatively, it can export the properties and metadata of all `Action`s defined in config files. For this, the\nconfiguration \"config\" has to be set to the location of the config.\n\nExample:\n```\ndataObjects = {\n ...  \n actions-exporter {\n   type = ActionsExporterDataObject\n   config = path/to/myconfiguration.conf\n }\n ...  \n}\n```\n\n\nThe config value can point to a configuration file or a directory containing configuration files.\n\nSEE: Refer to `ConfigLoader.loadConfigFromFilesystem()` for details about the configuration loading."
+        "description" : "Exports a util `DataFrame` that contains properties and metadata extracted from all `Action`s\nthat are registered in the current `InstanceRegistry`.\n\nAlternatively, it can export the properties and metadata of all `Action`s defined in config files. For this, the\nconfiguration \"config\" has to be set to the location of the config.\n\nExample:\n```\ndataObjects = {\n ...  \n actions-exporter {\n   type = ActionsExporterDataObject\n   config = path/to/myconfiguration.conf\n }\n ...  \n}\n```\n\n\nThe config value can point to a configuration file or a directory containing configuration files.\n\nSEE: Refer to `ConfigLoader.loadConfigFromFilesystem()` for details about the configuration loading.",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SparkSubFeed" ]
       },
       "AirbyteDataObject" : {
         "type" : "object",
@@ -851,7 +853,7 @@
           "config" : {
             "type" : "string",
             "description" : "Configuration for the source. Its entries are connector specific and are validated against the\nspecification reported by the connector itself in prepare phase.",
-            "existingJavaType" : "com.typesafe.config.Config"
+            "x-existingJavaType" : "com.typesafe.config.Config"
           },
           "streamName" : {
             "type" : "string",
@@ -888,7 +890,8 @@
         "title" : "AirbyteDataObject",
         "required" : [ "type", "config", "streamName", "cmd" ],
         "additionalProperties" : false,
-        "description" : "Uses an Airbyte Connector to read data from a data source.  \nSee https://docs.airbyte.com/integrations/sources/ for the list of available sources.\n\nAn Airbyte Connector is started using shell commands and streams json data into the AirbyteDataObject using stdout pipe.  \nAirbyte Connectors are often written in Python. See https://docs.airbyte.com/connector-development/ for developing a custom connector.\n\nLimitations: Airbyte Connectors can not be distributed to executors. They run on the driver and have only access to locally mounted directories.  \nIn order to avoid memory problems Spark BlockManager is used to create a new Spark partition after every maxRecordsPerPartition number of records.\n\nAlso note that the getDataFrame method is not lazy in Exec-Phase. It will query the Airbyte Connector before creating the DataFrame.\n\nExample:\n```\ndataObjects = {\n  ext-users {\n    type = AirbyteDataObject\n    streamName = \"users\"\n    # the entries of config are connector specific, see the documentation of the connector used\n    config {\n      host = \"db.example.com\"\n      port = 5432\n      database = \"postgres\"\n      username = \"sdlb\"\n      password = \"###\"\n    }\n    cmd {\n      type = DockerRunScript\n      image = \"airbyte/source-postgres:latest\"\n    }\n    incrementalCursorFields = [\"updated_at\"]\n  }\n}\n```\n"
+        "description" : "Uses an Airbyte Connector to read data from a data source.  \nSee https://docs.airbyte.com/integrations/sources/ for the list of available sources.\n\nAn Airbyte Connector is started using shell commands and streams json data into the AirbyteDataObject using stdout pipe.  \nAirbyte Connectors are often written in Python. See https://docs.airbyte.com/connector-development/ for developing a custom connector.\n\nLimitations: Airbyte Connectors can not be distributed to executors. They run on the driver and have only access to locally mounted directories.  \nIn order to avoid memory problems Spark BlockManager is used to create a new Spark partition after every maxRecordsPerPartition number of records.\n\nAlso note that the getDataFrame method is not lazy in Exec-Phase. It will query the Airbyte Connector before creating the DataFrame.\n\nExample:\n```\ndataObjects = {\n  ext-users {\n    type = AirbyteDataObject\n    streamName = \"users\"\n    # the entries of config are connector specific, see the documentation of the connector used\n    config {\n      host = \"db.example.com\"\n      port = 5432\n      database = \"postgres\"\n      username = \"sdlb\"\n      password = \"###\"\n    }\n    cmd {\n      type = DockerRunScript\n      image = \"airbyte/source-postgres:latest\"\n    }\n    incrementalCursorFields = [\"updated_at\"]\n  }\n}\n```\n",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SparkSubFeed" ]
       },
       "AvroFileDataObject" : {
         "type" : "object",
@@ -1075,7 +1078,9 @@
         "title" : "AvroFileDataObject",
         "required" : [ "type", "path" ],
         "additionalProperties" : false,
-        "description" : "A `io.smartdatalake.workflow.dataobject.DataObject` backed by an Avro data source.\n\nIt manages read and write access and configurations required for `io.smartdatalake.workflow.action.Action`s to\nwork on Avro formatted files.\n\nReading and writing details are delegated to Apache Spark `org.apache.spark.sql.DataFrameReader`\nand `org.apache.spark.sql.DataFrameWriter` respectively. The reader and writer implementations are provided by\nthe [databricks spark-avro](https://github.com/databricks/spark-avro) project.\n\nAvro files carry their own schema. If the `schema` attribute is defined, it is not pushed to the reader but applied\nafterwards to select and cast the content to the target schema.\n\nExample:\n```\ndataObjects = {\n  stg-airports {\n    type = AvroFileDataObject\n    path = ${env.basedir}\"/stg_airports\"\n    partitions = [dt]\n    saveMode = Append\n    avroOptions {\n      compression = \"snappy\"\n    }\n  }\n}\n```\n\n\nSEE: `org.apache.spark.sql.DataFrameReader`\n\nSEE: `org.apache.spark.sql.DataFrameWriter`"
+        "description" : "A `io.smartdatalake.workflow.dataobject.DataObject` backed by an Avro data source.\n\nIt manages read and write access and configurations required for `io.smartdatalake.workflow.action.Action`s to\nwork on Avro formatted files.\n\nReading and writing details are delegated to Apache Spark `org.apache.spark.sql.DataFrameReader`\nand `org.apache.spark.sql.DataFrameWriter` respectively. The reader and writer implementations are provided by\nthe [databricks spark-avro](https://github.com/databricks/spark-avro) project.\n\nAvro files carry their own schema. If the `schema` attribute is defined, it is not pushed to the reader but applied\nafterwards to select and cast the content to the target schema.\n\nExample:\n```\ndataObjects = {\n  stg-airports {\n    type = AvroFileDataObject\n    path = ${env.basedir}\"/stg_airports\"\n    partitions = [dt]\n    saveMode = Append\n    avroOptions {\n      compression = \"snappy\"\n    }\n  }\n}\n```\n\n\nSEE: `org.apache.spark.sql.DataFrameReader`\n\nSEE: `org.apache.spark.sql.DataFrameWriter`",
+        "x-readSubFeedTypes" : [ "FileSubFeed", "ParameterSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "FileSubFeed", "SparkSubFeed" ]
       },
       "BigQueryTableDataObject" : {
         "type" : "object",
@@ -1194,7 +1199,9 @@
         "title" : "BigQueryTableDataObject",
         "required" : [ "type", "table", "connectionId" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type BigQueryTableDataObject.  \nProvides details to access BigQuery Tables to an Action.  \nThe object uses the official Spark-connector by Google see: https://github.com/GoogleCloudDataproc/spark-bigquery-connector.  \nAs of now, the only authentication mode supported is a Service Account Key.\n\nA `io.smartdatalake.workflow.connection.BigQueryTableConnection` is required, as it holds the service account key\nused to authenticate. The table can either be read directly (table.name/table.db) or through a SQL query\n(table.query), in which case viewsEnabled must be true and BigQuery materializes a temporary table.\n\nExample:\n```\nconnections = {\n  google-playground {\n    type = BigQueryTableConnection\n    parentProject = \"playground-223717\"\n    authMode = { type = GCPCredentialsKeyAuth, serviceAccountKeyFile = \"/secrets/playground-sa-key.json\" }\n  }\n}\ndataObjects = {\n  int-test-table {\n    type = BigQueryTableDataObject\n    connectionId = google-playground\n    project = \"playground-223717\"\n    table = { db = \"sdl_playground\", name = \"test_table\" }\n    writeMethod = \"indirect\"\n    temporaryGcsBucket = \"sdl-playground-tmp\"\n  }\n}\n```\n"
+        "description" : "`DataObject` of type BigQueryTableDataObject.  \nProvides details to access BigQuery Tables to an Action.  \nThe object uses the official Spark-connector by Google see: https://github.com/GoogleCloudDataproc/spark-bigquery-connector.  \nAs of now, the only authentication mode supported is a Service Account Key.\n\nA `io.smartdatalake.workflow.connection.BigQueryTableConnection` is required, as it holds the service account key\nused to authenticate. The table can either be read directly (table.name/table.db) or through a SQL query\n(table.query), in which case viewsEnabled must be true and BigQuery materializes a temporary table.\n\nExample:\n```\nconnections = {\n  google-playground {\n    type = BigQueryTableConnection\n    parentProject = \"playground-223717\"\n    authMode = { type = GCPCredentialsKeyAuth, serviceAccountKeyFile = \"/secrets/playground-sa-key.json\" }\n  }\n}\ndataObjects = {\n  int-test-table {\n    type = BigQueryTableDataObject\n    connectionId = google-playground\n    project = \"playground-223717\"\n    table = { db = \"sdl_playground\", name = \"test_table\" }\n    writeMethod = \"indirect\"\n    temporaryGcsBucket = \"sdl-playground-tmp\"\n  }\n}\n```\n",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "SparkSubFeed" ]
       },
       "CsvFileDataObject" : {
         "type" : "object",
@@ -1473,7 +1480,9 @@
         "title" : "CsvFileDataObject",
         "required" : [ "type", "path" ],
         "additionalProperties" : false,
-        "description" : "A `DataObject` backed by a comma-separated value (CSV) data source.\n\nIt manages read and write access and configurations required for\n`io.smartdatalake.workflow.action.Action`s to work on CSV formatted files.\n\nCSV reading and writing details are delegated to Apache Spark\n`org.apache.spark.sql.DataFrameReader` and `org.apache.spark.sql.DataFrameWriter`\nrespectively.\n\nRead Schema specifications:\n\nIf a data object schema is not defined via the `schema` attribute (default) and `inferSchema`\noption is disabled (default) in `csvOptions`, then all column types are set to String and the\nfirst row of the CSV file is read to determine the column names and the number of fields.\n\nIf the `header` option is disabled in `csvOptions` (it is enabled by default, see note below),\nthen the header is defined as \"_c#\" for each column where \"#\" is the column index. Otherwise the\nfirst row of the CSV file is not included in the DataFrame content and its entries are used as\nthe column names for the schema.\n\nIf a data object schema is not defined via the `schema` attribute and `inferSchema` is enabled in\n`csvOptions`, then the `samplingRatio` (default: 1.0) option in `csvOptions` is used to extract a\nsample from the CSV file in order to determine the input schema automatically.\n\nExample:\n```\ndataObjects = {\n  stg-airports {\n    type = CsvFileDataObject\n    path = ${env.basedir}\"/stg_airports\"\n    csvOptions {\n      delimiter = \";\"\n      inferSchema = true\n    }\n    partitions = [dt]\n    saveMode = Append\n  }\n}\n```\n\n\nNOTE: This data object sets the following default values for `csvOptions`: header = true,\ninferSchema = false, delimiter = \",\", and quote = null. All other `csvOption` default to the\nvalues defined by Apache Spark. Note that either `header` or `inferSchema` must be enabled in\n`csvOptions`, or an explicit `schema` must be defined.\n\nSEE: `org.apache.spark.sql.DataFrameReader`\n\nSEE: `org.apache.spark.sql.DataFrameWriter`"
+        "description" : "A `DataObject` backed by a comma-separated value (CSV) data source.\n\nIt manages read and write access and configurations required for\n`io.smartdatalake.workflow.action.Action`s to work on CSV formatted files.\n\nCSV reading and writing details are delegated to Apache Spark\n`org.apache.spark.sql.DataFrameReader` and `org.apache.spark.sql.DataFrameWriter`\nrespectively.\n\nRead Schema specifications:\n\nIf a data object schema is not defined via the `schema` attribute (default) and `inferSchema`\noption is disabled (default) in `csvOptions`, then all column types are set to String and the\nfirst row of the CSV file is read to determine the column names and the number of fields.\n\nIf the `header` option is disabled in `csvOptions` (it is enabled by default, see note below),\nthen the header is defined as \"_c#\" for each column where \"#\" is the column index. Otherwise the\nfirst row of the CSV file is not included in the DataFrame content and its entries are used as\nthe column names for the schema.\n\nIf a data object schema is not defined via the `schema` attribute and `inferSchema` is enabled in\n`csvOptions`, then the `samplingRatio` (default: 1.0) option in `csvOptions` is used to extract a\nsample from the CSV file in order to determine the input schema automatically.\n\nExample:\n```\ndataObjects = {\n  stg-airports {\n    type = CsvFileDataObject\n    path = ${env.basedir}\"/stg_airports\"\n    csvOptions {\n      delimiter = \";\"\n      inferSchema = true\n    }\n    partitions = [dt]\n    saveMode = Append\n  }\n}\n```\n\n\nNOTE: This data object sets the following default values for `csvOptions`: header = true,\ninferSchema = false, delimiter = \",\", and quote = null. All other `csvOption` default to the\nvalues defined by Apache Spark. Note that either `header` or `inferSchema` must be enabled in\n`csvOptions`, or an explicit `schema` must be defined.\n\nSEE: `org.apache.spark.sql.DataFrameReader`\n\nSEE: `org.apache.spark.sql.DataFrameWriter`",
+        "x-readSubFeedTypes" : [ "FileSubFeed", "ParameterSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "FileSubFeed", "SparkSubFeed" ]
       },
       "DataObjectsExporterDataObject" : {
         "type" : "object",
@@ -1493,7 +1502,8 @@
         "title" : "DataObjectsExporterDataObject",
         "required" : [ "type" ],
         "additionalProperties" : false,
-        "description" : "Exports a util `DataFrame` that contains properties and metadata extracted from all\n`DataObject`s that are registered in the current `InstanceRegistry`.\n\nAlternatively, it can export the properties and metadata of all `DataObject`s defined in config\nfiles. For this, the configuration \"config\" has to be set to the location of the config.\n\nExample:\n```\ndataObjects = {\n ...  \n dataobject-exporter {\n   type = DataObjectsExporterDataObject\n   config = path/to/myconfiguration.conf\n }\n ...  \n}\n```\n\n\nThe config value can point to a configuration file or a directory containing configuration files.\n\nSEE: Refer to `ConfigLoader.loadConfigFromFilesystem()` for details about the configuration\nloading."
+        "description" : "Exports a util `DataFrame` that contains properties and metadata extracted from all\n`DataObject`s that are registered in the current `InstanceRegistry`.\n\nAlternatively, it can export the properties and metadata of all `DataObject`s defined in config\nfiles. For this, the configuration \"config\" has to be set to the location of the config.\n\nExample:\n```\ndataObjects = {\n ...  \n dataobject-exporter {\n   type = DataObjectsExporterDataObject\n   config = path/to/myconfiguration.conf\n }\n ...  \n}\n```\n\n\nThe config value can point to a configuration file or a directory containing configuration files.\n\nSEE: Refer to `ConfigLoader.loadConfigFromFilesystem()` for details about the configuration\nloading.",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SparkSubFeed" ]
       },
       "DebeziumCdcDataObject" : {
         "type" : "object",
@@ -1532,7 +1542,8 @@
         "title" : "DebeziumCdcDataObject",
         "required" : [ "type", "connectionId", "table" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type DebeziumCdcDataObject.  \nProvides details to access Change data over Debezium Engine.  \nNote that this implementation is not yet tested on production, and must therefore be seen as experimental.\n\nThe DataObject runs an embedded Debezium engine to read the change events of one database table. The returned\nDataFrame contains the columns of the changed row, followed by three SDLB metadata columns: `_change_type`\n(insert, update_preimage, update_postimage, delete or read), `_commit_timestamp` and `_change_ordinal`.  \nThe naming of the metadata columns follows the change data feed of Delta Lake and Iceberg, see `CdcChangeType`.  \nThe result can be historized without further configuration by using HistorizeAction, see its documentation.  \nDebezium's own envelope\nfields (before, after, source, op, ...) are not part of the result. Read offsets are stored in SDLBs state, so it\nsupports incremental output and should be used together with DataObjectStateIncrementalMode. Reading stops once no\nmore events arrive within `maxWaitTimeAfterLastBatchMilliSeconds`. If no event arrives at all, `schemaMin` is used\nas fallback schema for the empty DataFrame.\n\nExample:\n```\nconnections = {\n  dbz-postgres {\n    type = DebeziumConnection\n    dbEngine = \"postgresql\"\n    hostname = \"localhost\"\n    port = 5432\n    db = \"demo\"\n    authMode = { type = BasicAuthMode, user = \"###ENV#PG_USER###\", password = \"###ENV#PG_PWD###\" }\n  }\n}\ndataObjects = {\n  src-test {\n    type = DebeziumCdcDataObject\n    connectionId = dbz-postgres\n    table = { db = \"demo\", name = \"test\" }\n    debeziumProperties = {\n      \"plugin.name\" = \"pgoutput\"\n      \"schema.history.internal\" = \"io.debezium.storage.file.history.FileSchemaHistory\"\n      \"schema.history.internal.file.filename\" = \"/tmp/schemahistory.dat\"\n    }\n  }\n}\n```\n"
+        "description" : "`DataObject` of type DebeziumCdcDataObject.  \nProvides details to access Change data over Debezium Engine.  \nNote that this implementation is not yet tested on production, and must therefore be seen as experimental.\n\nThe DataObject runs an embedded Debezium engine to read the change events of one database table. The returned\nDataFrame contains the columns of the changed row, followed by three SDLB metadata columns: `_change_type`\n(insert, update_preimage, update_postimage, delete or read), `_commit_timestamp` and `_change_ordinal`.  \nThe naming of the metadata columns follows the change data feed of Delta Lake and Iceberg, see `CdcChangeType`.  \nThe result can be historized without further configuration by using HistorizeAction, see its documentation.  \nDebezium's own envelope\nfields (before, after, source, op, ...) are not part of the result. Read offsets are stored in SDLBs state, so it\nsupports incremental output and should be used together with DataObjectStateIncrementalMode. Reading stops once no\nmore events arrive within `maxWaitTimeAfterLastBatchMilliSeconds`. If no event arrives at all, `schemaMin` is used\nas fallback schema for the empty DataFrame.\n\nExample:\n```\nconnections = {\n  dbz-postgres {\n    type = DebeziumConnection\n    dbEngine = \"postgresql\"\n    hostname = \"localhost\"\n    port = 5432\n    db = \"demo\"\n    authMode = { type = BasicAuthMode, user = \"###ENV#PG_USER###\", password = \"###ENV#PG_PWD###\" }\n  }\n}\ndataObjects = {\n  src-test {\n    type = DebeziumCdcDataObject\n    connectionId = dbz-postgres\n    table = { db = \"demo\", name = \"test\" }\n    debeziumProperties = {\n      \"plugin.name\" = \"pgoutput\"\n      \"schema.history.internal\" = \"io.debezium.storage.file.history.FileSchemaHistory\"\n      \"schema.history.internal.file.filename\" = \"/tmp/schemahistory.dat\"\n    }\n  }\n}\n```\n",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SparkSubFeed" ]
       },
       "DeltaLakeTableDataObject" : {
         "type" : "object",
@@ -1556,7 +1567,126 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Options for reading and writing Delta Lake tables.\n\nOptions are passed to the underlying library, see [https://docs.delta.io/latest/delta-batch.html](https://docs.delta.io/latest/delta-batch.html) for the available options."
+            "description" : "Options for reading and writing Delta Lake tables.\n\nOptions are passed to the underlying library, see [https://docs.delta.io/latest/delta-batch.html](https://docs.delta.io/latest/delta-batch.html) for the available options.",
+            "properties" : {
+              "__v1_save_as_table_overwrite" : {
+                "type" : "string"
+              },
+              "checkpointLocation" : {
+                "type" : "string"
+              },
+              "compression" : {
+                "type" : "string"
+              },
+              "dataChange" : {
+                "type" : "string"
+              },
+              "endingTimestamp" : {
+                "type" : "string"
+              },
+              "endingVersion" : {
+                "type" : "string"
+              },
+              "excludeRegex" : {
+                "type" : "string"
+              },
+              "failOnDataLoss" : {
+                "type" : "string"
+              },
+              "ignoreChanges" : {
+                "type" : "string"
+              },
+              "ignoreDeletes" : {
+                "type" : "string"
+              },
+              "ignoreFileDeletion" : {
+                "type" : "string"
+              },
+              "maxFilesPerTrigger" : {
+                "type" : "string"
+              },
+              "maxRecordsPerFile" : {
+                "type" : "string"
+              },
+              "mergeSchema" : {
+                "type" : "string"
+              },
+              "optimizeWrite" : {
+                "type" : "string"
+              },
+              "overwriteSchema" : {
+                "type" : "string"
+              },
+              "parquet.writer.version" : {
+                "type" : "string"
+              },
+              "partitionOverwriteMode" : {
+                "type" : "string"
+              },
+              "path" : {
+                "type" : "string"
+              },
+              "queryName" : {
+                "type" : "string"
+              },
+              "readChangeData" : {
+                "type" : "string"
+              },
+              "readChangeFeed" : {
+                "type" : "string"
+              },
+              "replaceOn" : {
+                "type" : "string"
+              },
+              "replaceUsing" : {
+                "type" : "string"
+              },
+              "replaceWhere" : {
+                "type" : "string"
+              },
+              "schemaLocation" : {
+                "type" : "string"
+              },
+              "schemaTrackingLocation" : {
+                "type" : "string"
+              },
+              "spark.sql.parquet.outputTimestampType" : {
+                "type" : "string"
+              },
+              "startingTimestamp" : {
+                "type" : "string"
+              },
+              "startingVersion" : {
+                "type" : "string"
+              },
+              "streamingSourceTrackingId" : {
+                "type" : "string"
+              },
+              "targetAlias" : {
+                "type" : "string"
+              },
+              "timestampAsOf" : {
+                "type" : "string"
+              },
+              "txnAppId" : {
+                "type" : "string"
+              },
+              "txnVersion" : {
+                "type" : "string"
+              },
+              "useNullIntolerantEqualityWithDPO" : {
+                "type" : "string"
+              },
+              "userMetadata" : {
+                "type" : "string"
+              },
+              "versionAsOf" : {
+                "type" : "string"
+              },
+              "writePartitionColumns" : {
+                "type" : "string"
+              }
+            }
           },
           "schemaMin" : {
             "type" : "string",
@@ -1674,7 +1804,9 @@
         "title" : "DeltaLakeTableDataObject",
         "required" : [ "type", "table" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type DeltaLakeTableDataObject.  \nProvides details to access Tables in delta format to an Action.\n\nDelta format maintains a transaction log in a separate _delta_log subfolder.  \nThe schema is registered in Metastore by DeltaLakeTableDataObject.\n\nThe following anomalies might occur:\n- table is registered in metastore but path does not exist → table is dropped from metastore\n- table is registered in metastore but path is empty → error is thrown. Delete the path to clean up\n- table is registered and path contains parquet files, but _delta_log subfolder is missing → path is converted to delta format\n- table is not registered but path contains parquet files and _delta_log subfolder → Table is registered\n- table is not registered but path contains parquet files without _delta_log subfolder → path is converted to delta format and table is registered\n- table is not registered and path does not exist → table is created on write\n\nDeltaLakeTableDataObject implements\n- `CanMergeDataFrame` by using DeltaTable.merge API.  \n- `CanEvolveSchema` by using mergeSchema option.  \n- Overwriting partitions is implemented by replaceWhere option in one transaction.\n\nUse this DataObject instead of a plain file DataObject if you need ACID transactions, merge (upsert) or schema\nevolution on a table.\n\nExample:\n```\ndataObjects = {\n  int-airports {\n    type = DeltaLakeTableDataObject\n    path = ${env.basedir}\"/int_airports\"\n    table = { db = \"default\", name = \"int_airports\", primaryKey = [ident] }\n    saveMode = Merge\n    allowSchemaEvolution = true\n    retentionPeriod = 168\n  }\n}\n```\n\n\nNOTE: DeltaLake needs the spark properties spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension and\nspark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog. They are added automatically\nby DeltaLakeModulePlugin when SDLB creates the SparkSession (except on Databricks, where they are preset),\nso normally no manual configuration is needed.\n\nSEE: `io.smartdatalake.workflow.connection.DeltaLakeTableConnection` to share catalog, db and path prefix between\nmultiple DeltaLake DataObjects."
+        "description" : "`DataObject` of type DeltaLakeTableDataObject.  \nProvides details to access Tables in delta format to an Action.\n\nDelta format maintains a transaction log in a separate _delta_log subfolder.  \nThe schema is registered in Metastore by DeltaLakeTableDataObject.\n\nThe following anomalies might occur:\n- table is registered in metastore but path does not exist → table is dropped from metastore\n- table is registered in metastore but path is empty → error is thrown. Delete the path to clean up\n- table is registered and path contains parquet files, but _delta_log subfolder is missing → path is converted to delta format\n- table is not registered but path contains parquet files and _delta_log subfolder → Table is registered\n- table is not registered but path contains parquet files without _delta_log subfolder → path is converted to delta format and table is registered\n- table is not registered and path does not exist → table is created on write\n\nDeltaLakeTableDataObject implements\n- `CanMergeDataFrame` by using DeltaTable.merge API.  \n- `CanEvolveSchema` by using mergeSchema option.  \n- Overwriting partitions is implemented by replaceWhere option in one transaction.\n\nUse this DataObject instead of a plain file DataObject if you need ACID transactions, merge (upsert) or schema\nevolution on a table.\n\nExample:\n```\ndataObjects = {\n  int-airports {\n    type = DeltaLakeTableDataObject\n    path = ${env.basedir}\"/int_airports\"\n    table = { db = \"default\", name = \"int_airports\", primaryKey = [ident] }\n    saveMode = Merge\n    allowSchemaEvolution = true\n    retentionPeriod = 168\n  }\n}\n```\n\n\nNOTE: DeltaLake needs the spark properties spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension and\nspark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog. They are added automatically\nby DeltaLakeModulePlugin when SDLB creates the SparkSession (except on Databricks, where they are preset),\nso normally no manual configuration is needed.\n\nSEE: `io.smartdatalake.workflow.connection.DeltaLakeTableConnection` to share catalog, db and path prefix between\nmultiple DeltaLake DataObjects.",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SparkConnectSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "SparkConnectSubFeed", "SparkSubFeed" ]
       },
       "ExcelFileDataObject" : {
         "type" : "object",
@@ -1970,7 +2102,9 @@
         "title" : "ExcelFileDataObject",
         "required" : [ "type", "path" ],
         "additionalProperties" : false,
-        "description" : "A `DataObject` backed by an Microsoft Excel data source.\n\nIt manages read and write access and configurations required for `io.smartdatalake.workflow.action.Action`s to\nwork on Microsoft Excel (.xslx) formatted files.\n\nReading and writing details are delegated to Apache Spark `org.apache.spark.sql.DataFrameReader`\nand `org.apache.spark.sql.DataFrameWriter` respectively. The reader and writer implementation is provided by the\n[Crealytics spark-excel](https://github.com/crealytics/spark-excel) project.\n\nRead Schema:\n\nWhen `useHeader` is set to true (default), the reader will use the first row of the Excel sheet as column names for\nthe schema and not include the first row as data values. Otherwise the column names are taken from the schema.  \nIf the schema is not provided or inferred, then each column name is defined as \"_c#\" where \"#\" is the column index.\n\nWhen a data object schema is provided, it is used as the schema for the DataFrame. Otherwise if `inferSchema` is\nenabled (default), then the data types of the columns are inferred based on the first `excerptSize` rows\n(excluding the first).  \nWhen no schema is provided and `inferSchema` is disabled, all columns are assumed to be of string type.\n\nColumn names read from the header are cleaned up on read: blanks, dashes and dots become underscores, all other\nnon-alphanumeric characters are dropped and camel case is converted to lower case with underscores.\n\nExample:\n```\ndataObjects = {\n  ext-airports {\n    type = ExcelFileDataObject\n    path = ${env.basedir}\"/ext_airports\"\n    excelOptions {\n      sheetName = \"airports\"\n      maxRowsInMemory = 20000\n    }\n  }\n}\n```\n\n\nNOTE: The Excel data source cannot read a whole directory at once, so files are read one by one.  \n`numLinesToSkip` and `startColumn` are read-only options and must not be set when writing."
+        "description" : "A `DataObject` backed by an Microsoft Excel data source.\n\nIt manages read and write access and configurations required for `io.smartdatalake.workflow.action.Action`s to\nwork on Microsoft Excel (.xslx) formatted files.\n\nReading and writing details are delegated to Apache Spark `org.apache.spark.sql.DataFrameReader`\nand `org.apache.spark.sql.DataFrameWriter` respectively. The reader and writer implementation is provided by the\n[Crealytics spark-excel](https://github.com/crealytics/spark-excel) project.\n\nRead Schema:\n\nWhen `useHeader` is set to true (default), the reader will use the first row of the Excel sheet as column names for\nthe schema and not include the first row as data values. Otherwise the column names are taken from the schema.  \nIf the schema is not provided or inferred, then each column name is defined as \"_c#\" where \"#\" is the column index.\n\nWhen a data object schema is provided, it is used as the schema for the DataFrame. Otherwise if `inferSchema` is\nenabled (default), then the data types of the columns are inferred based on the first `excerptSize` rows\n(excluding the first).  \nWhen no schema is provided and `inferSchema` is disabled, all columns are assumed to be of string type.\n\nColumn names read from the header are cleaned up on read: blanks, dashes and dots become underscores, all other\nnon-alphanumeric characters are dropped and camel case is converted to lower case with underscores.\n\nExample:\n```\ndataObjects = {\n  ext-airports {\n    type = ExcelFileDataObject\n    path = ${env.basedir}\"/ext_airports\"\n    excelOptions {\n      sheetName = \"airports\"\n      maxRowsInMemory = 20000\n    }\n  }\n}\n```\n\n\nNOTE: The Excel data source cannot read a whole directory at once, so files are read one by one.  \n`numLinesToSkip` and `startColumn` are read-only options and must not be set when writing.",
+        "x-readSubFeedTypes" : [ "FileSubFeed", "ParameterSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "FileSubFeed", "SparkSubFeed" ]
       },
       "IcebergTableDataObject" : {
         "type" : "object",
@@ -1994,7 +2128,162 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Options for reading and writing Iceberg tables.\n\nOptions are passed to the underlying library, see [https://iceberg.apache.org/docs/latest/spark-configuration/](https://iceberg.apache.org/docs/latest/spark-configuration/) for the available options."
+            "description" : "Options for reading and writing Iceberg tables.\n\nOptions are passed to the underlying library, see [https://iceberg.apache.org/docs/latest/spark-configuration/](https://iceberg.apache.org/docs/latest/spark-configuration/) for the available options.",
+            "properties" : {
+              "advisory-partition-size" : {
+                "type" : "string"
+              },
+              "aggregate-push-down-enabled" : {
+                "type" : "string"
+              },
+              "as-of-timestamp" : {
+                "type" : "string"
+              },
+              "async-micro-batch-planning-enabled" : {
+                "type" : "string"
+              },
+              "async-queue-preload-file-limit" : {
+                "type" : "string"
+              },
+              "async-queue-preload-row-limit" : {
+                "type" : "string"
+              },
+              "batch-size" : {
+                "type" : "string"
+              },
+              "branch" : {
+                "type" : "string"
+              },
+              "check-nullability" : {
+                "type" : "string"
+              },
+              "check-ordering" : {
+                "type" : "string"
+              },
+              "compression-codec" : {
+                "type" : "string"
+              },
+              "compression-level" : {
+                "type" : "string"
+              },
+              "compression-strategy" : {
+                "type" : "string"
+              },
+              "delete-format" : {
+                "type" : "string"
+              },
+              "delete-granularity" : {
+                "type" : "string"
+              },
+              "distribution-mode" : {
+                "type" : "string"
+              },
+              "end-snapshot-id" : {
+                "type" : "string"
+              },
+              "end-timestamp" : {
+                "type" : "string"
+              },
+              "fanout-enabled" : {
+                "type" : "string"
+              },
+              "file-open-cost" : {
+                "type" : "string"
+              },
+              "isolation-level" : {
+                "type" : "string"
+              },
+              "locality" : {
+                "type" : "string"
+              },
+              "lookback" : {
+                "type" : "string"
+              },
+              "merge-schema" : {
+                "type" : "string"
+              },
+              "mergeSchema" : {
+                "type" : "string"
+              },
+              "output-sort-order-id" : {
+                "type" : "string"
+              },
+              "output-spec-id" : {
+                "type" : "string"
+              },
+              "overwrite-mode" : {
+                "type" : "string"
+              },
+              "path" : {
+                "type" : "string"
+              },
+              "shred-variants" : {
+                "type" : "string"
+              },
+              "snapshot-id" : {
+                "type" : "string"
+              },
+              "snapshot-property" : {
+                "type" : "string"
+              },
+              "split-size" : {
+                "type" : "string"
+              },
+              "start-snapshot-id" : {
+                "type" : "string"
+              },
+              "start-timestamp" : {
+                "type" : "string"
+              },
+              "stream-from-timestamp" : {
+                "type" : "string"
+              },
+              "streaming-max-files-per-micro-batch" : {
+                "type" : "string"
+              },
+              "streaming-max-rows-per-micro-batch" : {
+                "type" : "string"
+              },
+              "streaming-skip-delete-snapshots" : {
+                "type" : "string"
+              },
+              "streaming-skip-overwrite-snapshots" : {
+                "type" : "string"
+              },
+              "streaming-snapshot-polling-interval-ms" : {
+                "type" : "string"
+              },
+              "tag" : {
+                "type" : "string"
+              },
+              "target-delete-file-size-bytes" : {
+                "type" : "string"
+              },
+              "target-file-size-bytes" : {
+                "type" : "string"
+              },
+              "timestampAsOf" : {
+                "type" : "string"
+              },
+              "use-table-distribution-and-ordering" : {
+                "type" : "string"
+              },
+              "validate-from-snapshot-id" : {
+                "type" : "string"
+              },
+              "variant-inference-buffer-size" : {
+                "type" : "string"
+              },
+              "vectorization-enabled" : {
+                "type" : "string"
+              },
+              "versionAsOf" : {
+                "type" : "string"
+              },
+              "write-format" : {
+                "type" : "string"
+              }
+            }
           },
           "schemaMin" : {
             "type" : "string",
@@ -2108,7 +2397,9 @@
         "title" : "IcebergTableDataObject",
         "required" : [ "type", "table" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type IcebergTableDataObject.  \nProvides details to access Tables in Iceberg format to an Action.\n\nIceberg format maintains a transaction log in a separate metadata subfolder.  \nThe schema is registered in Metastore by IcebergTableDataObject.  \nFor this either the default spark catalog must be wrapped in an IcebergSessionCatalog,\nor an additional IcebergCatalog has to be configured. See also https://iceberg.apache.org/docs/latest/getting-started/.\n\nThe following anomalies between metastore and filesystem might occur:\n- table is registered in metastore but path does not exist → table is dropped from metastore\n- table is registered in metastore but path is empty → error is thrown. Delete the path manually to clean up.  \n- table is registered and path contains parquet files, but metadata subfolder is missing → path is converted to Iceberg format\n- table is not registered but path contains parquet files and metadata subfolder → Table is registered in catalog\n- table is not registered but path contains parquet files without metadata subfolder → path is converted to Iceberg format and table is registered in catalog\n- table is not registered and path does not exist → table is created on write\n\nIcebergTableDataObject implements\n- `CanMergeDataFrame` by writing a temp table and using one SQL merge statement.  \n- `CanEvolveSchema` by using internal Iceberg API.  \n- Overwriting partitions is implemented by using DataFrameWriterV2.overwrite(condition) API in one transaction.\n\nPick this DataObject over a plain file DataObject if you need ACID transactions, merge (upsert), schema evolution\nor snapshot expiration on a table, and over DeltaLakeTableDataObject if your platform standardizes on Iceberg.  \nNote that `partitions` are always mapped to Iceberg identity transforms; other Iceberg partition transforms\n(bucket, truncate, days, ...) cannot be configured from SDLB.\n\nExample:\n```\ndataObjects = {\n  int-airports {\n    type = IcebergTableDataObject\n    path = ${env.basedir}\"/int_airports\"\n    table = { db = \"default\", name = \"int_airports\", primaryKey = [ident] }\n    partitions = [country]\n    saveMode = Merge\n    allowSchemaEvolution = true\n  }\n}\n```\n\n\nNOTE: If the Iceberg table is defined on a hadoop catalog, `path` must not be set as it is derived from the catalog\ndirectory structure.\n\nNOTE: The engine specific implementation is provided by module sdl-iceberg (classic Spark) or sdl-sparkconnect\n(Spark Connect), see `IcebergTableEngine`.\n\nSEE: `IcebergTableConnection` to share catalog, db and path prefix between multiple Iceberg DataObjects."
+        "description" : "`DataObject` of type IcebergTableDataObject.  \nProvides details to access Tables in Iceberg format to an Action.\n\nIceberg format maintains a transaction log in a separate metadata subfolder.  \nThe schema is registered in Metastore by IcebergTableDataObject.  \nFor this either the default spark catalog must be wrapped in an IcebergSessionCatalog,\nor an additional IcebergCatalog has to be configured. See also https://iceberg.apache.org/docs/latest/getting-started/.\n\nThe following anomalies between metastore and filesystem might occur:\n- table is registered in metastore but path does not exist → table is dropped from metastore\n- table is registered in metastore but path is empty → error is thrown. Delete the path manually to clean up.  \n- table is registered and path contains parquet files, but metadata subfolder is missing → path is converted to Iceberg format\n- table is not registered but path contains parquet files and metadata subfolder → Table is registered in catalog\n- table is not registered but path contains parquet files without metadata subfolder → path is converted to Iceberg format and table is registered in catalog\n- table is not registered and path does not exist → table is created on write\n\nIcebergTableDataObject implements\n- `CanMergeDataFrame` by writing a temp table and using one SQL merge statement.  \n- `CanEvolveSchema` by using internal Iceberg API.  \n- Overwriting partitions is implemented by using DataFrameWriterV2.overwrite(condition) API in one transaction.\n\nPick this DataObject over a plain file DataObject if you need ACID transactions, merge (upsert), schema evolution\nor snapshot expiration on a table, and over DeltaLakeTableDataObject if your platform standardizes on Iceberg.  \nNote that `partitions` are always mapped to Iceberg identity transforms; other Iceberg partition transforms\n(bucket, truncate, days, ...) cannot be configured from SDLB.\n\nExample:\n```\ndataObjects = {\n  int-airports {\n    type = IcebergTableDataObject\n    path = ${env.basedir}\"/int_airports\"\n    table = { db = \"default\", name = \"int_airports\", primaryKey = [ident] }\n    partitions = [country]\n    saveMode = Merge\n    allowSchemaEvolution = true\n  }\n}\n```\n\n\nNOTE: If the Iceberg table is defined on a hadoop catalog, `path` must not be set as it is derived from the catalog\ndirectory structure.\n\nNOTE: The engine specific implementation is provided by module sdl-iceberg (classic Spark) or sdl-sparkconnect\n(Spark Connect), see `IcebergTableEngine`.\n\nSEE: `IcebergTableConnection` to share catalog, db and path prefix between multiple Iceberg DataObjects.",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SparkConnectSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "SparkConnectSubFeed", "SparkSubFeed" ]
       },
       "JdbcTableDataObject" : {
         "type" : "object",
@@ -2217,7 +2508,105 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Any jdbc options of the Spark JDBC data source.  \nNote that some options above set and override some of these options explicitly.  \nUse \"createTableOptions\" and \"createTableColumnTypes\" to control automatic creating of database tables.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option](https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option) for the available options."
+            "description" : "Any jdbc options of the Spark JDBC data source.  \nNote that some options above set and override some of these options explicitly.  \nUse \"createTableOptions\" and \"createTableColumnTypes\" to control automatic creating of database tables.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option](https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option) for the available options.",
+            "properties" : {
+              "batchsize" : {
+                "type" : "string"
+              },
+              "cascadetruncate" : {
+                "type" : "string"
+              },
+              "connectionprovider" : {
+                "type" : "string"
+              },
+              "createtablecolumntypes" : {
+                "type" : "string"
+              },
+              "createtableoptions" : {
+                "type" : "string"
+              },
+              "customschema" : {
+                "type" : "string"
+              },
+              "dbtable" : {
+                "type" : "string"
+              },
+              "driver" : {
+                "type" : "string"
+              },
+              "fetchsize" : {
+                "type" : "string"
+              },
+              "hint" : {
+                "type" : "string"
+              },
+              "isolationlevel" : {
+                "type" : "string"
+              },
+              "keytab" : {
+                "type" : "string"
+              },
+              "lowerbound" : {
+                "type" : "string"
+              },
+              "numpartitions" : {
+                "type" : "string"
+              },
+              "partitioncolumn" : {
+                "type" : "string"
+              },
+              "prefertimestampntz" : {
+                "type" : "string"
+              },
+              "preparequery" : {
+                "type" : "string"
+              },
+              "principal" : {
+                "type" : "string"
+              },
+              "pushdownaggregate" : {
+                "type" : "string"
+              },
+              "pushdownjoin" : {
+                "type" : "string"
+              },
+              "pushdownlimit" : {
+                "type" : "string"
+              },
+              "pushdownoffset" : {
+                "type" : "string"
+              },
+              "pushdownpredicate" : {
+                "type" : "string"
+              },
+              "pushdowntablesample" : {
+                "type" : "string"
+              },
+              "query" : {
+                "type" : "string"
+              },
+              "querytimeout" : {
+                "type" : "string"
+              },
+              "refreshkrb5config" : {
+                "type" : "string"
+              },
+              "sessioninitstatement" : {
+                "type" : "string"
+              },
+              "tablecomment" : {
+                "type" : "string"
+              },
+              "truncate" : {
+                "type" : "string"
+              },
+              "upperbound" : {
+                "type" : "string"
+              },
+              "url" : {
+                "type" : "string"
+              }
+            }
           },
           "virtualPartitions" : {
             "type" : "array",
@@ -2250,7 +2639,9 @@
         "title" : "JdbcTableDataObject",
         "required" : [ "type", "table", "connectionId" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type JDBC.  \nProvides details for an action to read and write tables in a database through JDBC.\n\nReading and writing data is implemented by engine specific implementations of `JdbcTableEngine`, which are\ndiscovered on the classpath: sdl-spark reads and writes with Spark.\n\nNote that Sparks distributed processing can not directly write to a JDBC table in one transaction.  \nJdbcTableDataObject implements this in one transaction by writing to a temporary-table with Spark,\nthen using a separate \"insert into ... select\" SQL statement to copy data into the final table.\n\nJdbcTableDataObject implements\n- `CanMergeDataFrame` by writing a temp table and using one SQL merge statement.  \n- `CanEvolveSchema` by generating corresponding alter table DDL statements.  \n- Overwriting partitions is implemented by using SQL delete and insert statement embedded in one transaction.\n\nRequires a `JdbcConnection` referenced by `connectionId`, which holds url, driver and credentials.\n\nExample:\n```\nconnections = {\n  jdbc-dwh {\n    type = JdbcConnection\n    url = \"jdbc:postgresql://dwh:5432/mydb\"\n    driver = org.postgresql.Driver\n  }\n}\ndataObjects = {\n  int-airports {\n    type = JdbcTableDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = airports, primaryKey = [ident] }\n    saveMode = Merge\n  }\n}\n```\n"
+        "description" : "`DataObject` of type JDBC.  \nProvides details for an action to read and write tables in a database through JDBC.\n\nReading and writing data is implemented by engine specific implementations of `JdbcTableEngine`, which are\ndiscovered on the classpath: sdl-spark reads and writes with Spark.\n\nNote that Sparks distributed processing can not directly write to a JDBC table in one transaction.  \nJdbcTableDataObject implements this in one transaction by writing to a temporary-table with Spark,\nthen using a separate \"insert into ... select\" SQL statement to copy data into the final table.\n\nJdbcTableDataObject implements\n- `CanMergeDataFrame` by writing a temp table and using one SQL merge statement.  \n- `CanEvolveSchema` by generating corresponding alter table DDL statements.  \n- Overwriting partitions is implemented by using SQL delete and insert statement embedded in one transaction.\n\nRequires a `JdbcConnection` referenced by `connectionId`, which holds url, driver and credentials.\n\nExample:\n```\nconnections = {\n  jdbc-dwh {\n    type = JdbcConnection\n    url = \"jdbc:postgresql://dwh:5432/mydb\"\n    driver = org.postgresql.Driver\n  }\n}\ndataObjects = {\n  int-airports {\n    type = JdbcTableDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = airports, primaryKey = [ident] }\n    saveMode = Merge\n  }\n}\n```\n",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SQLSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "SQLSubFeed", "SparkSubFeed" ]
       },
       "JdbcViewDataObject" : {
         "type" : "object",
@@ -2279,7 +2670,105 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Any jdbc options of the Spark JDBC data source for reading the view.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option](https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option) for the available options."
+            "description" : "Any jdbc options of the Spark JDBC data source for reading the view.\n\nOptions are passed to the underlying library, see [https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option](https://spark.apache.org/docs/latest/sql-data-sources-jdbc.html#data-source-option) for the available options.",
+            "properties" : {
+              "batchsize" : {
+                "type" : "string"
+              },
+              "cascadetruncate" : {
+                "type" : "string"
+              },
+              "connectionprovider" : {
+                "type" : "string"
+              },
+              "createtablecolumntypes" : {
+                "type" : "string"
+              },
+              "createtableoptions" : {
+                "type" : "string"
+              },
+              "customschema" : {
+                "type" : "string"
+              },
+              "dbtable" : {
+                "type" : "string"
+              },
+              "driver" : {
+                "type" : "string"
+              },
+              "fetchsize" : {
+                "type" : "string"
+              },
+              "hint" : {
+                "type" : "string"
+              },
+              "isolationlevel" : {
+                "type" : "string"
+              },
+              "keytab" : {
+                "type" : "string"
+              },
+              "lowerbound" : {
+                "type" : "string"
+              },
+              "numpartitions" : {
+                "type" : "string"
+              },
+              "partitioncolumn" : {
+                "type" : "string"
+              },
+              "prefertimestampntz" : {
+                "type" : "string"
+              },
+              "preparequery" : {
+                "type" : "string"
+              },
+              "principal" : {
+                "type" : "string"
+              },
+              "pushdownaggregate" : {
+                "type" : "string"
+              },
+              "pushdownjoin" : {
+                "type" : "string"
+              },
+              "pushdownlimit" : {
+                "type" : "string"
+              },
+              "pushdownoffset" : {
+                "type" : "string"
+              },
+              "pushdownpredicate" : {
+                "type" : "string"
+              },
+              "pushdowntablesample" : {
+                "type" : "string"
+              },
+              "query" : {
+                "type" : "string"
+              },
+              "querytimeout" : {
+                "type" : "string"
+              },
+              "refreshkrb5config" : {
+                "type" : "string"
+              },
+              "sessioninitstatement" : {
+                "type" : "string"
+              },
+              "tablecomment" : {
+                "type" : "string"
+              },
+              "truncate" : {
+                "type" : "string"
+              },
+              "upperbound" : {
+                "type" : "string"
+              },
+              "url" : {
+                "type" : "string"
+              }
+            }
           },
           "virtualPartitions" : {
             "type" : "array",
@@ -2312,7 +2801,9 @@
         "title" : "JdbcViewDataObject",
         "required" : [ "type", "table", "connectionId" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of a view in a database accessed through JDBC.\n\nWriting a DataFrame creates or replaces the view with the query of the DataFrame, i.e. `CREATE OR REPLACE VIEW ... AS\nSELECT ...`, so no data is written. This needs an engine which can render its DataFrames as SQL, i.e. the SQL\nengine of sdl-sql: the Action writing the view must use the JdbcConnection of the view as engine connection\n(`engineConnectionId`), and all its inputs must be `JdbcTableDataObject`s or `JdbcViewDataObject`s of this\nconnection. The view is replaced in exec phase. In init phase a missing view is created, like a missing table is\ncreated by JdbcTableDataObject, and the query is validated by executing it on the database without fetching any rows.\n\nWith `allowSchemaEvolution = false`, an existing view is not replaced by an SDLB run, and the run fails if the columns\nof the view changed. The view is then deployed with CatalogSchemaUpdater, from its query exported by a dry-run with\nschema export, like the tables are created and migrated.\n\nAs the view is evaluated on every read, its query must not depend on the current run. The Action writing the view\ntherefore ignores the partition values and filters of its inputs, and must not have an execution mode, see\n`ViewDataObject`.\n\nA view can have `virtualPartitions`, like a JdbcTableDataObject. The partition values of the Action writing the view\nare then not applied to the view, but passed on to the next Action, which reads the view filtered by them.  \nWith `incrementalOutputExpr`, the next Action can read the view incrementally with DataObjectStateIncrementalMode,\nlike a JdbcTableDataObject.\n\nReading a view is the same as reading a table, it is done by all engines supporting `JdbcTableDataObject`, e.g.  \nSpark. So a view created by the SQL engine can be the input of a Spark Action in the same feed.\n\nWith `materialized = true` a materialized view is created, which stores the result of its query in the database.  \nIt is supported for the SQL dialects postgres, redshift, oracle, snowflake and databricks. The Action writing it\nrefreshes it on every run, except Snowflake, which refreshes materialized views automatically. If its query changed\nand `allowSchemaEvolution = true`, it is replaced instead. Postgres, Redshift and Oracle can not replace a\nmaterialized view, so it is dropped and created again in one transaction (where the database supports\ntransactional DDL), and the privileges granted on it are read before and granted again afterwards (Postgres and\nOracle). Note that Postgres can not drop a materialized view while other views depend on it.  \nThe query of an existing materialized view is read from pg_matviews for Postgres, ALL_MVIEWS for Oracle, with\nSHOW MATERIALIZED VIEWS for Snowflake and SHOW CREATE TABLE for Databricks. If it can not be read, e.g. for Redshift,\na change of the query is not detected, and the materialized view is only refreshed.  \nOn Databricks and Snowflake, a hash of the query is also stored with the view or materialized view, as table property\n`sdlb.queryHash` (Databricks) or as tag `SDLB_QUERY_HASH` in the schema of the view (Snowflake, needs Enterprise\nEdition and the privilege to create tags), and compared instead of the definition if it is set.  \nTo switch an existing view between materialized and not materialized, drop it first.\n\nExample:\n```\ndataObjects = {\n  int-airports {\n    type = JdbcTableDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = airports }\n  }\n  btl-swiss-airports {\n    type = JdbcViewDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = swiss_airports }\n  }\n}\nactions = {\n  create-swiss-airports {\n    type = CopyAction\n    inputId = int-airports\n    outputId = btl-swiss-airports\n    engineConnectionId = jdbc-dwh\n    transformers = [{\n      type = SQLDfTransformer\n      code = \"select ident, name from %{inputViewName} where iso_country = 'CH'\"\n    }]\n  }\n}\n```\n"
+        "description" : "`DataObject` of a view in a database accessed through JDBC.\n\nWriting a DataFrame creates or replaces the view with the query of the DataFrame, i.e. `CREATE OR REPLACE VIEW ... AS\nSELECT ...`, so no data is written. This needs an engine which can render its DataFrames as SQL, i.e. the SQL\nengine of sdl-sql: the Action writing the view must use the JdbcConnection of the view as engine connection\n(`engineConnectionId`), and all its inputs must be `JdbcTableDataObject`s or `JdbcViewDataObject`s of this\nconnection. The view is replaced in exec phase. In init phase a missing view is created, like a missing table is\ncreated by JdbcTableDataObject, and the query is validated by executing it on the database without fetching any rows.\n\nWith `allowSchemaEvolution = false`, an existing view is not replaced by an SDLB run, and the run fails if the columns\nof the view changed. The view is then deployed with CatalogSchemaUpdater, from its query exported by a dry-run with\nschema export, like the tables are created and migrated.\n\nAs the view is evaluated on every read, its query must not depend on the current run. The Action writing the view\ntherefore ignores the partition values and filters of its inputs, and must not have an execution mode, see\n`ViewDataObject`.\n\nA view can have `virtualPartitions`, like a JdbcTableDataObject. The partition values of the Action writing the view\nare then not applied to the view, but passed on to the next Action, which reads the view filtered by them.  \nWith `incrementalOutputExpr`, the next Action can read the view incrementally with DataObjectStateIncrementalMode,\nlike a JdbcTableDataObject.\n\nReading a view is the same as reading a table, it is done by all engines supporting `JdbcTableDataObject`, e.g.  \nSpark. So a view created by the SQL engine can be the input of a Spark Action in the same feed.\n\nWith `materialized = true` a materialized view is created, which stores the result of its query in the database.  \nIt is supported for the SQL dialects postgres, redshift, oracle, snowflake and databricks. The Action writing it\nrefreshes it on every run, except Snowflake, which refreshes materialized views automatically. If its query changed\nand `allowSchemaEvolution = true`, it is replaced instead. Postgres, Redshift and Oracle can not replace a\nmaterialized view, so it is dropped and created again in one transaction (where the database supports\ntransactional DDL), and the privileges granted on it are read before and granted again afterwards (Postgres and\nOracle). Note that Postgres can not drop a materialized view while other views depend on it.  \nThe query of an existing materialized view is read from pg_matviews for Postgres, ALL_MVIEWS for Oracle, with\nSHOW MATERIALIZED VIEWS for Snowflake and SHOW CREATE TABLE for Databricks. If it can not be read, e.g. for Redshift,\na change of the query is not detected, and the materialized view is only refreshed.  \nOn Databricks and Snowflake, a hash of the query is also stored with the view or materialized view, as table property\n`sdlb.queryHash` (Databricks) or as tag `SDLB_QUERY_HASH` in the schema of the view (Snowflake, needs Enterprise\nEdition and the privilege to create tags), and compared instead of the definition if it is set.  \nTo switch an existing view between materialized and not materialized, drop it first.\n\nExample:\n```\ndataObjects = {\n  int-airports {\n    type = JdbcTableDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = airports }\n  }\n  btl-swiss-airports {\n    type = JdbcViewDataObject\n    connectionId = jdbc-dwh\n    table = { db = public, name = swiss_airports }\n  }\n}\nactions = {\n  create-swiss-airports {\n    type = CopyAction\n    inputId = int-airports\n    outputId = btl-swiss-airports\n    engineConnectionId = jdbc-dwh\n    transformers = [{\n      type = SQLDfTransformer\n      code = \"select ident, name from %{inputViewName} where iso_country = 'CH'\"\n    }]\n  }\n}\n```\n",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SQLSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "SQLSubFeed" ]
       },
       "JsonFileDataObject" : {
         "type" : "object",
@@ -2558,7 +3049,9 @@
         "title" : "JsonFileDataObject",
         "required" : [ "type", "path" ],
         "additionalProperties" : false,
-        "description" : "A `io.smartdatalake.workflow.dataobject.DataObject` backed by a JSON data source.\n\nIt manages read and write access and configurations required for `io.smartdatalake.workflow.action.Action`s to\nwork on JSON formatted files.\n\nReading and writing details are delegated to Apache Spark `org.apache.spark.sql.DataFrameReader`\nand `org.apache.spark.sql.DataFrameWriter` respectively.\n\nUse this DataObject for semi-structured, nested data. As JSON carries no fixed schema, Spark infers it from the data\nunless an explicit `schema` is configured - configuring a schema is recommended for stable pipelines.\n\nExample:\n```\ndataObjects = {\n  stg-airports {\n    type = JsonFileDataObject\n    path = ${env.basedir}\"/stg_airports\"\n    jsonOptions { multiLine = false }\n    saveMode = Overwrite\n  }\n}\n```\n\n\nNOTE: By default, the JSON option `multiline` is enabled.\n\nSEE: `org.apache.spark.sql.DataFrameReader`\n\nSEE: `org.apache.spark.sql.DataFrameWriter`"
+        "description" : "A `io.smartdatalake.workflow.dataobject.DataObject` backed by a JSON data source.\n\nIt manages read and write access and configurations required for `io.smartdatalake.workflow.action.Action`s to\nwork on JSON formatted files.\n\nReading and writing details are delegated to Apache Spark `org.apache.spark.sql.DataFrameReader`\nand `org.apache.spark.sql.DataFrameWriter` respectively.\n\nUse this DataObject for semi-structured, nested data. As JSON carries no fixed schema, Spark infers it from the data\nunless an explicit `schema` is configured - configuring a schema is recommended for stable pipelines.\n\nExample:\n```\ndataObjects = {\n  stg-airports {\n    type = JsonFileDataObject\n    path = ${env.basedir}\"/stg_airports\"\n    jsonOptions { multiLine = false }\n    saveMode = Overwrite\n  }\n}\n```\n\n\nNOTE: By default, the JSON option `multiline` is enabled.\n\nSEE: `org.apache.spark.sql.DataFrameReader`\n\nSEE: `org.apache.spark.sql.DataFrameWriter`",
+        "x-readSubFeedTypes" : [ "FileSubFeed", "ParameterSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "FileSubFeed", "SparkSubFeed" ]
       },
       "KafkaTopicDataObject" : {
         "type" : "object",
@@ -2655,7 +3148,9 @@
         "title" : "KafkaTopicDataObject",
         "required" : [ "type", "topicName", "connectionId" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type KafkaTopic.  \nProvides details to an action to read from Kafka Topics using either\n`org.apache.spark.sql.DataFrameReader` or `org.apache.spark.sql.streaming.DataStreamReader`\n\nKey & value schema can be automatically read from and written to confluent schema registry for JSON and Avro.  \nJSON and Avro can also be parsed with a fixed schema.\n\nCan interpret record timestamp as SDLB partition values by setting datePartitionCol attribute. This allows to use this DataObject as input for PartitionDiffMode.  \nThe DataObject does not support writing with SDLB partition values, as timestamp is autogenerated by Kafka using current time.\n\nSupport incremental output and use with DataObjectStateIncrementalMode.\n\nExample:\n```\nconnections = {\n  kafka-con {\n    type = KafkaConnection\n    brokers = \"localhost:9092\"\n    schemaRegistry = \"http://localhost:8081\"\n  }\n}\ndataObjects = {\n  stg-departures {\n    type = KafkaTopicDataObject\n    topicName = \"departures\"\n    connectionId = kafka-con\n    valueType = AvroSchemaRegistry\n    selectCols = [\"value.*\", \"timestamp\"]\n  }\n}\n```\n"
+        "description" : "`DataObject` of type KafkaTopic.  \nProvides details to an action to read from Kafka Topics using either\n`org.apache.spark.sql.DataFrameReader` or `org.apache.spark.sql.streaming.DataStreamReader`\n\nKey & value schema can be automatically read from and written to confluent schema registry for JSON and Avro.  \nJSON and Avro can also be parsed with a fixed schema.\n\nCan interpret record timestamp as SDLB partition values by setting datePartitionCol attribute. This allows to use this DataObject as input for PartitionDiffMode.  \nThe DataObject does not support writing with SDLB partition values, as timestamp is autogenerated by Kafka using current time.\n\nSupport incremental output and use with DataObjectStateIncrementalMode.\n\nExample:\n```\nconnections = {\n  kafka-con {\n    type = KafkaConnection\n    brokers = \"localhost:9092\"\n    schemaRegistry = \"http://localhost:8081\"\n  }\n}\ndataObjects = {\n  stg-departures {\n    type = KafkaTopicDataObject\n    topicName = \"departures\"\n    connectionId = kafka-con\n    valueType = AvroSchemaRegistry\n    selectCols = [\"value.*\", \"timestamp\"]\n  }\n}\n```\n",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "SparkSubFeed" ]
       },
       "MLflowDataObject" : {
         "type" : "object",
@@ -2691,7 +3186,9 @@
         "title" : "MLflowDataObject",
         "required" : [ "type", "experimentName" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` representing an experiment of an MLflow instance.\n\nIt holds the information needed to connect to MLflow and is used\n- as additional output (`outputMlflowId`) of `io.smartdatalake.workflow.action.mlflow.MLflowTrainAction`, where\nit receives the information about the training run as `io.smartdatalake.workflow.ParameterSubFeed` parameters,\nsee `MLflowRunInfo`,\n- as additional input (`inputMlflowId`) of `io.smartdatalake.workflow.action.mlflow.MLflowPredictAction`, where\nit provides the connection and the model of the latest training run.\n\n\"additional\" means it is connected to a DataFrame Action without carrying a DataFrame, see\n`io.smartdatalake.workflow.action.DataFrameActionImpl.additionalInputs`.\n\nNo data is read or written by this DataObject, and it does not create a DataFrame. The model itself is stored by\nMLflow, not by SDLB.\n\nNote that the model is configured on the Actions, not here: one experiment can produce several models.\n\nExample:\n```\ndataObjects {\n  mlflow-price-model {\n    type = MLflowDataObject\n    trackingUri = \"http://localhost:5000\"\n    experimentName = \"price-prediction\"\n  }\n}\n```\n"
+        "description" : "`DataObject` representing an experiment of an MLflow instance.\n\nIt holds the information needed to connect to MLflow and is used\n- as additional output (`outputMlflowId`) of `io.smartdatalake.workflow.action.mlflow.MLflowTrainAction`, where\nit receives the information about the training run as `io.smartdatalake.workflow.ParameterSubFeed` parameters,\nsee `MLflowRunInfo`,\n- as additional input (`inputMlflowId`) of `io.smartdatalake.workflow.action.mlflow.MLflowPredictAction`, where\nit provides the connection and the model of the latest training run.\n\n\"additional\" means it is connected to a DataFrame Action without carrying a DataFrame, see\n`io.smartdatalake.workflow.action.DataFrameActionImpl.additionalInputs`.\n\nNo data is read or written by this DataObject, and it does not create a DataFrame. The model itself is stored by\nMLflow, not by SDLB.\n\nNote that the model is configured on the Actions, not here: one experiment can produce several models.\n\nExample:\n```\ndataObjects {\n  mlflow-price-model {\n    type = MLflowDataObject\n    trackingUri = \"http://localhost:5000\"\n    experimentName = \"price-prediction\"\n  }\n}\n```\n",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed" ],
+        "x-writeSubFeedTypes" : [ "ParameterSubFeed" ]
       },
       "ODataDataObject" : {
         "type" : "object",
@@ -2813,7 +3310,8 @@
         "title" : "ODataDataObject",
         "required" : [ "type", "baseUrl", "tableName" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type OData.\n\nReads one entity set (table) of an OData v4 REST service, e.g. Microsoft Dynamics 365 / Dataverse, into a Spark\nDataFrame. The requested columns are derived from the configured `schema`, which is mandatory - the service is\nqueried with a corresponding OData `select` system query option, optionally narrowed by `sourceFilters`. This\nDataObject is read-only (there is no write support) and requests are executed on the driver, not distributed to\nexecutors. Responses are collected in a memory buffer that spills to temporary files once it grows too large, see\n`responseBufferSetup`.\n\nExample:\n```\ndataObjects = {\n  ext-tasks {\n    type = ODataDataObject\n    baseUrl = \"https://myorg.crm4.dynamics.com/api/data/v9.2/\"\n    tableName = \"tasks\"\n    schema = \"activityid string, subject string, modifiedon string\"\n    sourceFilters = \"statecode eq 0\"\n    incrementalOutputExpr = \"modifiedon\"\n    authMode = {\n      type = AzureADClientGrantAuthMode\n      authority = \"https://login.microsoftonline.com/{tenant-guid}/\"\n      applicationId = \"###ENV#AZURE_CLIENT_ID###\"\n      clientSecret = \"###ENV#AZURE_CLIENT_SECRET###\"\n      scope = \"https://myorg.crm4.dynamics.com/.default\"\n    }\n  }\n}\n```\n"
+        "description" : "`DataObject` of type OData.\n\nReads one entity set (table) of an OData v4 REST service, e.g. Microsoft Dynamics 365 / Dataverse, into a Spark\nDataFrame. The requested columns are derived from the configured `schema`, which is mandatory - the service is\nqueried with a corresponding OData `select` system query option, optionally narrowed by `sourceFilters`. This\nDataObject is read-only (there is no write support) and requests are executed on the driver, not distributed to\nexecutors. Responses are collected in a memory buffer that spills to temporary files once it grows too large, see\n`responseBufferSetup`.\n\nExample:\n```\ndataObjects = {\n  ext-tasks {\n    type = ODataDataObject\n    baseUrl = \"https://myorg.crm4.dynamics.com/api/data/v9.2/\"\n    tableName = \"tasks\"\n    schema = \"activityid string, subject string, modifiedon string\"\n    sourceFilters = \"statecode eq 0\"\n    incrementalOutputExpr = \"modifiedon\"\n    authMode = {\n      type = AzureADClientGrantAuthMode\n      authority = \"https://login.microsoftonline.com/{tenant-guid}/\"\n      applicationId = \"###ENV#AZURE_CLIENT_ID###\"\n      clientSecret = \"###ENV#AZURE_CLIENT_SECRET###\"\n      scope = \"https://myorg.crm4.dynamics.com/.default\"\n    }\n  }\n}\n```\n",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SparkSubFeed" ]
       },
       "OpenApiDataObject" : {
         "type" : "object",
@@ -2941,7 +3439,8 @@
         "title" : "OpenApiDataObject",
         "required" : [ "type", "baseUrl", "operationId" ],
         "additionalProperties" : false,
-        "description" : "Reads data from an OpenApi compliant WebService operation.  \nThe operation must return JSON and have its schema defined in the OpenApi specification.\n\nLimitations:\n- Only GET method implemented for now\n- No dynamic URL parameters supported for now\n- Only responseContentType=application/json will be parsed into schema.  \nOtherwise schema will be a single column with name 'content' of type String or Binary.  \n- Only token based pagination is supported. Use pagingLinkJsonPath to extract Url for the next page.  \n- OpenApi Webservice requests can not be parallelized and distributed to executors. They run on the driver.  \nIn order to avoid memory problems Spark BlockManager is used to create\na new Spark partition after every maxRecordsPerPartition number of records.\n\nAlso note that the getDataFrame method is not lazy in Exec-Phase.  \nIt will query the WebService before creating the DataFrame.\n\nExample:\n```\ndataObjects = {\n  ext-datasets {\n    type = OpenApiDataObject\n    baseUrl = \"https://data.sbb.ch/api/explore/v2.1\"\n    apiDocsUrl = \"swagger.json\"\n    operationId = getDatasets\n    urlParameters = { include_links = \"true\" }\n    pagingLinkJsonPath = \"$._links[?(\n```\n"
+        "description" : "Reads data from an OpenApi compliant WebService operation.  \nThe operation must return JSON and have its schema defined in the OpenApi specification.\n\nLimitations:\n- Only GET method implemented for now\n- No dynamic URL parameters supported for now\n- Only responseContentType=application/json will be parsed into schema.  \nOtherwise schema will be a single column with name 'content' of type String or Binary.  \n- Only token based pagination is supported. Use pagingLinkJsonPath to extract Url for the next page.  \n- OpenApi Webservice requests can not be parallelized and distributed to executors. They run on the driver.  \nIn order to avoid memory problems Spark BlockManager is used to create\na new Spark partition after every maxRecordsPerPartition number of records.\n\nAlso note that the getDataFrame method is not lazy in Exec-Phase.  \nIt will query the WebService before creating the DataFrame.\n\nExample:\n```\ndataObjects = {\n  ext-datasets {\n    type = OpenApiDataObject\n    baseUrl = \"https://data.sbb.ch/api/explore/v2.1\"\n    apiDocsUrl = \"swagger.json\"\n    operationId = getDatasets\n    urlParameters = { include_links = \"true\" }\n    pagingLinkJsonPath = \"$._links[?(\n```\n",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SparkSubFeed" ]
       },
       "PKViolatorsDataObject" : {
         "type" : "object",
@@ -2965,7 +3464,8 @@
         "title" : "PKViolatorsDataObject",
         "required" : [ "type" ],
         "additionalProperties" : false,
-        "description" : "Checks for Primary Key violations for all `DataObject`s with Primary Keys defined that are registered in the current `InstanceRegistry`.  \nReturns the DataFrame of Primary Key violations.\n\nAlternatively, it can check for Primary Key violations of all `DataObject`s defined in config files. For this, the\nconfiguration \"config\" has to be set to the location of the config.\n\nExample:\n```\ndataObjects = {\n  primarykey-violations {\n    type = PKViolatorsDataObject\n    config = \"path/to/myconfiguration.conf\"\n    flattenOutput = true\n  }\n}\n```\n\n\nSEE: Refer to `ConfigLoader.loadConfigFromFilesystem()` for details about the configuration loading."
+        "description" : "Checks for Primary Key violations for all `DataObject`s with Primary Keys defined that are registered in the current `InstanceRegistry`.  \nReturns the DataFrame of Primary Key violations.\n\nAlternatively, it can check for Primary Key violations of all `DataObject`s defined in config files. For this, the\nconfiguration \"config\" has to be set to the location of the config.\n\nExample:\n```\ndataObjects = {\n  primarykey-violations {\n    type = PKViolatorsDataObject\n    config = \"path/to/myconfiguration.conf\"\n    flattenOutput = true\n  }\n}\n```\n\n\nSEE: Refer to `ConfigLoader.loadConfigFromFilesystem()` for details about the configuration loading.",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SQLSubFeed", "ScalaSubFeed", "SnowparkSubFeed", "SparkConnectSubFeed", "SparkSubFeed" ]
       },
       "ParquetFileDataObject" : {
         "type" : "object",
@@ -3131,7 +3631,9 @@
         "title" : "ParquetFileDataObject",
         "required" : [ "type", "path" ],
         "additionalProperties" : false,
-        "description" : "A `io.smartdatalake.workflow.dataobject.DataObject` backed by an Apache Parquet data source.\n\nIt manages read and write access and configurations required for `io.smartdatalake.workflow.action.Action`s to\nwork on Parquet formatted files.\n\nReading and writing details are delegated to Apache Spark `org.apache.spark.sql.DataFrameReader`\nand `org.apache.spark.sql.DataFrameWriter` respectively.\n\nThis is the default choice for storing intermediate and integration layer data in a data lake: it is columnar,\ncompressed and carries its schema, so no `schema` needs to be configured for reading. If a `schema` is configured\nit is applied after reading to select and cast the given columns, see also `NestedColumnUtil`.\n\nExample:\n```\ndataObjects = {\n  int-airports {\n    type = ParquetFileDataObject\n    path = ${env.basedir}\"/int_airports\"\n    partitions = [year, month]\n    saveMode = Overwrite\n  }\n}\n```\n\n\nSEE: `org.apache.spark.sql.DataFrameReader`\n\nSEE: `org.apache.spark.sql.DataFrameWriter`"
+        "description" : "A `io.smartdatalake.workflow.dataobject.DataObject` backed by an Apache Parquet data source.\n\nIt manages read and write access and configurations required for `io.smartdatalake.workflow.action.Action`s to\nwork on Parquet formatted files.\n\nReading and writing details are delegated to Apache Spark `org.apache.spark.sql.DataFrameReader`\nand `org.apache.spark.sql.DataFrameWriter` respectively.\n\nThis is the default choice for storing intermediate and integration layer data in a data lake: it is columnar,\ncompressed and carries its schema, so no `schema` needs to be configured for reading. If a `schema` is configured\nit is applied after reading to select and cast the given columns, see also `NestedColumnUtil`.\n\nExample:\n```\ndataObjects = {\n  int-airports {\n    type = ParquetFileDataObject\n    path = ${env.basedir}\"/int_airports\"\n    partitions = [year, month]\n    saveMode = Overwrite\n  }\n}\n```\n\n\nSEE: `org.apache.spark.sql.DataFrameReader`\n\nSEE: `org.apache.spark.sql.DataFrameWriter`",
+        "x-readSubFeedTypes" : [ "FileSubFeed", "ParameterSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "FileSubFeed", "SparkSubFeed" ]
       },
       "RawFileDataObject" : {
         "type" : "object",
@@ -3292,7 +3794,9 @@
         "title" : "RawFileDataObject",
         "required" : [ "type", "path" ],
         "additionalProperties" : false,
-        "description" : "DataObject of type raw for files with unknown content.  \nProvides details to an Action to access raw files.\n\nBy specifying customFormat, binary or text files can read with Spark.\n\nUse this DataObject to move files around without interpreting their content, e.g. with a FileTransferAction, or to\ningest formats SDLB has no dedicated DataObject for. Without customFormat this DataObject can only be used by\nfile based Actions; reading or writing it with Spark then fails with a configuration exception.\n\nExample:\n```\ndataObjects = {\n  stg-documents {\n    type = RawFileDataObject\n    path = ${env.basedir}\"/stg_documents\"\n    customFormat = binaryFile\n    partitions = [year]\n  }\n}\n```\n\n\nNote that customPartitionLayout is only supported by file based Actions, not by Spark:\n```\ndataObjects = {\n  stg-documents-files {\n    type = RawFileDataObject\n    path = ${env.basedir}\"/stg_documents\"\n    fileName = \"*.pdf\"\n    partitions = [year]\n    customPartitionLayout = \"%year%/\"\n  }\n}\n```\n"
+        "description" : "DataObject of type raw for files with unknown content.  \nProvides details to an Action to access raw files.\n\nBy specifying customFormat, binary or text files can read with Spark.\n\nUse this DataObject to move files around without interpreting their content, e.g. with a FileTransferAction, or to\ningest formats SDLB has no dedicated DataObject for. Without customFormat this DataObject can only be used by\nfile based Actions; reading or writing it with Spark then fails with a configuration exception.\n\nExample:\n```\ndataObjects = {\n  stg-documents {\n    type = RawFileDataObject\n    path = ${env.basedir}\"/stg_documents\"\n    customFormat = binaryFile\n    partitions = [year]\n  }\n}\n```\n\n\nNote that customPartitionLayout is only supported by file based Actions, not by Spark:\n```\ndataObjects = {\n  stg-documents-files {\n    type = RawFileDataObject\n    path = ${env.basedir}\"/stg_documents\"\n    fileName = \"*.pdf\"\n    partitions = [year]\n    customPartitionLayout = \"%year%/\"\n  }\n}\n```\n",
+        "x-readSubFeedTypes" : [ "FileSubFeed", "ParameterSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "FileSubFeed", "SparkSubFeed" ]
       },
       "RelaxedCsvFileDataObject" : {
         "type" : "object",
@@ -3579,7 +4083,9 @@
         "title" : "RelaxedCsvFileDataObject",
         "required" : [ "type", "path" ],
         "additionalProperties" : false,
-        "description" : "A `DataObject` which allows for more flexible CSV parsing.  \nThe standard CsvFileDataObject does not support reading multiple CSV-Files with different column order, missing columns\nor additional columns.  \nRelaxCsvFileDataObject works more like reading JSON-Files. You need to define a schema, then it tries to read every file\nwith that schema independently of the column order, adding missing columns and removing superfluous ones.\n\nCSV files are read by Spark as whole text files and then parsed manually with Sparks CSV parser class. You can therefore use the\nnormal CSV options of spark, but some properties are fixed, e.g. header=true, inferSchema=false, enforceSchema (ignored).\n\nExample:\n```\ndataObjects = {\n  stg-airports {\n    type = RelaxedCsvFileDataObject\n    path = ${env.basedir}\"/stg_airports\"\n    schema = \"ident string, name string, elevation_ft integer, _corrupt_record string, _corrupt_record_msg string\"\n    csvOptions { delimiter = \";\" }\n    treatMissingColumnsAsCorrupt = true\n    treatSuperfluousColumnsAsCorrupt = true\n  }\n}\n```\n\n\nNOTE: This data object sets the following default values for `csvOptions`: delimiter = \",\", quote = null\nAll other `csvOption` default to the values defined by Apache Spark.\n\nSEE: `org.apache.spark.sql.DataFrameReader`\n\nSEE: `org.apache.spark.sql.DataFrameWriter`\n\nIf mode is permissive you can retrieve the corrupt input record by adding <options.columnNameOfCorruptRecord> as field to the schema.  \nRelaxCsvFileDataObject also supports getting an error msg by adding \"<options.columnNameOfCorruptRecord>_msg\" as field to the schema."
+        "description" : "A `DataObject` which allows for more flexible CSV parsing.  \nThe standard CsvFileDataObject does not support reading multiple CSV-Files with different column order, missing columns\nor additional columns.  \nRelaxCsvFileDataObject works more like reading JSON-Files. You need to define a schema, then it tries to read every file\nwith that schema independently of the column order, adding missing columns and removing superfluous ones.\n\nCSV files are read by Spark as whole text files and then parsed manually with Sparks CSV parser class. You can therefore use the\nnormal CSV options of spark, but some properties are fixed, e.g. header=true, inferSchema=false, enforceSchema (ignored).\n\nExample:\n```\ndataObjects = {\n  stg-airports {\n    type = RelaxedCsvFileDataObject\n    path = ${env.basedir}\"/stg_airports\"\n    schema = \"ident string, name string, elevation_ft integer, _corrupt_record string, _corrupt_record_msg string\"\n    csvOptions { delimiter = \";\" }\n    treatMissingColumnsAsCorrupt = true\n    treatSuperfluousColumnsAsCorrupt = true\n  }\n}\n```\n\n\nNOTE: This data object sets the following default values for `csvOptions`: delimiter = \",\", quote = null\nAll other `csvOption` default to the values defined by Apache Spark.\n\nSEE: `org.apache.spark.sql.DataFrameReader`\n\nSEE: `org.apache.spark.sql.DataFrameWriter`\n\nIf mode is permissive you can retrieve the corrupt input record by adding <options.columnNameOfCorruptRecord> as field to the schema.  \nRelaxCsvFileDataObject also supports getting an error msg by adding \"<options.columnNameOfCorruptRecord>_msg\" as field to the schema.",
+        "x-readSubFeedTypes" : [ "FileSubFeed", "ParameterSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "FileSubFeed", "SparkSubFeed" ]
       },
       "SFtpFileRefDataObject" : {
         "type" : "object",
@@ -3623,7 +4129,9 @@
         "title" : "SFtpFileRefDataObject",
         "required" : [ "type", "path", "connectionId" ],
         "additionalProperties" : false,
-        "description" : "Connects to SFtp files\nNeeds java library \"com.hieronymus % sshj % 0.21.1\"\nThe following authentication mechanisms are supported\n→ public/private-key: private key must be saved in ~/.ssh, public key must be registered on server.  \n→ user/pwd authentication: user and password is taken from two variables set as parameters.  \nThese variables could come from clear text (CLEAR), a file (FILE) or an environment variable (ENV)\n\nHost, port and credentials are not configured here but in the referenced `SFtpFileRefConnection`, so that they can\nbe shared between multiple DataObjects. Files are only referenced, not parsed - use a FileTransferAction to copy\nthem to/from another FileRefDataObject.\n\nExample:\n```\nconnections = {\n  sftp-src {\n    type = SFtpFileRefConnection\n    host = \"sftp.example.com\"\n    authMode = { type = BasicAuthMode, user = \"###ENV#SFTP_USER###\", password = \"###ENV#SFTP_PWD###\" }\n  }\n}\ndataObjects = {\n  ext-airports {\n    type = SFtpFileRefDataObject\n    path = \"/data/airports\"\n    connectionId = sftp-src\n    partitions = [year]\n    partitionLayout = \"%year%/\"\n  }\n}\n```\n"
+        "description" : "Connects to SFtp files\nNeeds java library \"com.hieronymus % sshj % 0.21.1\"\nThe following authentication mechanisms are supported\n→ public/private-key: private key must be saved in ~/.ssh, public key must be registered on server.  \n→ user/pwd authentication: user and password is taken from two variables set as parameters.  \nThese variables could come from clear text (CLEAR), a file (FILE) or an environment variable (ENV)\n\nHost, port and credentials are not configured here but in the referenced `SFtpFileRefConnection`, so that they can\nbe shared between multiple DataObjects. Files are only referenced, not parsed - use a FileTransferAction to copy\nthem to/from another FileRefDataObject.\n\nExample:\n```\nconnections = {\n  sftp-src {\n    type = SFtpFileRefConnection\n    host = \"sftp.example.com\"\n    authMode = { type = BasicAuthMode, user = \"###ENV#SFTP_USER###\", password = \"###ENV#SFTP_PWD###\" }\n  }\n}\ndataObjects = {\n  ext-airports {\n    type = SFtpFileRefDataObject\n    path = \"/data/airports\"\n    connectionId = sftp-src\n    partitions = [year]\n    partitionLayout = \"%year%/\"\n  }\n}\n```\n",
+        "x-readSubFeedTypes" : [ "FileSubFeed", "ParameterSubFeed" ],
+        "x-writeSubFeedTypes" : [ "FileSubFeed" ]
       },
       "SnowflakeTableDataObject" : {
         "type" : "object",
@@ -3720,7 +4228,252 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Options for the Snowflake Spark Connector.  \nThese options override connection.options.\n\nOptions are passed to the underlying library, see [https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options](https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options) for the available options."
+            "description" : "Options for the Snowflake Spark Connector.  \nThese options override connection.options.\n\nOptions are passed to the underlying library, see [https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options](https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options) for the available options.",
+            "properties" : {
+              "abort_detached_query" : {
+                "type" : "string"
+              },
+              "awsaccesskey" : {
+                "type" : "string"
+              },
+              "awssecretkey" : {
+                "type" : "string"
+              },
+              "bind_variable" : {
+                "type" : "string"
+              },
+              "check_bucket_configuration" : {
+                "type" : "string"
+              },
+              "column_mapping" : {
+                "type" : "string"
+              },
+              "column_mismatch_behavior" : {
+                "type" : "string"
+              },
+              "columnmap" : {
+                "type" : "string"
+              },
+              "connection_id" : {
+                "type" : "string"
+              },
+              "continue_on_error" : {
+                "type" : "string"
+              },
+              "dbtable" : {
+                "type" : "string"
+              },
+              "expected_partition_count" : {
+                "type" : "string"
+              },
+              "extracopyoptions" : {
+                "type" : "string"
+              },
+              "force" : {
+                "type" : "string"
+              },
+              "force_skip_pre_post_action_check_for_session_sharing" : {
+                "type" : "string"
+              },
+              "internal_check_table_existence_in_current_schema_only" : {
+                "type" : "string"
+              },
+              "internal_check_table_existence_with_fully_qualified_name" : {
+                "type" : "string"
+              },
+              "internal_execute_query_in_sync_mode" : {
+                "type" : "string"
+              },
+              "internal_quote_json_field_name" : {
+                "type" : "string"
+              },
+              "internal_skip_write_when_writing_empty_dataframe" : {
+                "type" : "string"
+              },
+              "internal_staging_table_name_remove_quotes_only" : {
+                "type" : "string"
+              },
+              "internal_support_aws_stage_end_point" : {
+                "type" : "string"
+              },
+              "internal_use_aws_region_url" : {
+                "type" : "string"
+              },
+              "internal_use_parse_json_for_write" : {
+                "type" : "string"
+              },
+              "jdbc_query_result_format" : {
+                "type" : "string"
+              },
+              "keep_column_case" : {
+                "type" : "string"
+              },
+              "max_retry_count" : {
+                "type" : "string"
+              },
+              "non_proxy_hosts" : {
+                "type" : "string"
+              },
+              "parallelism" : {
+                "type" : "string"
+              },
+              "partition_size_in_mb" : {
+                "type" : "string"
+              },
+              "pem_private_key" : {
+                "type" : "string"
+              },
+              "postactions" : {
+                "type" : "string"
+              },
+              "preactions" : {
+                "type" : "string"
+              },
+              "proxy_host" : {
+                "type" : "string"
+              },
+              "proxy_password" : {
+                "type" : "string"
+              },
+              "proxy_port" : {
+                "type" : "string"
+              },
+              "proxy_protocol" : {
+                "type" : "string"
+              },
+              "proxy_user" : {
+                "type" : "string"
+              },
+              "purge" : {
+                "type" : "string"
+              },
+              "query" : {
+                "type" : "string"
+              },
+              "s3_stage_vpce_dns_name" : {
+                "type" : "string"
+              },
+              "s3maxfilesize" : {
+                "type" : "string"
+              },
+              "sfaccount" : {
+                "type" : "string"
+              },
+              "sfauthenticator" : {
+                "type" : "string"
+              },
+              "sfcompress" : {
+                "type" : "string"
+              },
+              "sfdatabase" : {
+                "type" : "string"
+              },
+              "sfpassword" : {
+                "type" : "string"
+              },
+              "sfrole" : {
+                "type" : "string"
+              },
+              "sfschema" : {
+                "type" : "string"
+              },
+              "sfssl" : {
+                "type" : "string"
+              },
+              "sftimezone" : {
+                "type" : "string"
+              },
+              "sftoken" : {
+                "type" : "string"
+              },
+              "sfurl" : {
+                "type" : "string"
+              },
+              "sfuser" : {
+                "type" : "string"
+              },
+              "sfwarehouse" : {
+                "type" : "string"
+              },
+              "sfworkloadidentityprovider" : {
+                "type" : "string"
+              },
+              "snowflake_stage" : {
+                "type" : "string"
+              },
+              "streaming_stage" : {
+                "type" : "string"
+              },
+              "string_timestamp_format" : {
+                "type" : "string"
+              },
+              "support_share_connection" : {
+                "type" : "string"
+              },
+              "tempdir" : {
+                "type" : "string"
+              },
+              "temporary_aws_access_key_id" : {
+                "type" : "string"
+              },
+              "temporary_aws_secret_access_key" : {
+                "type" : "string"
+              },
+              "temporary_aws_session_token" : {
+                "type" : "string"
+              },
+              "temporary_azure_sas_token" : {
+                "type" : "string"
+              },
+              "time_output_format" : {
+                "type" : "string"
+              },
+              "timestamp_ltz_output_format" : {
+                "type" : "string"
+              },
+              "timestamp_ntz_output_format" : {
+                "type" : "string"
+              },
+              "timestamp_tz_output_format" : {
+                "type" : "string"
+              },
+              "treat_decimal_as_long" : {
+                "type" : "string"
+              },
+              "trim_space" : {
+                "type" : "string"
+              },
+              "truncate_columns" : {
+                "type" : "string"
+              },
+              "truncate_table" : {
+                "type" : "string"
+              },
+              "upload_chunk_size_in_mb" : {
+                "type" : "string"
+              },
+              "use_aws_multiple_parts_upload" : {
+                "type" : "string"
+              },
+              "use_copy_unload" : {
+                "type" : "string"
+              },
+              "use_exponential_backoff" : {
+                "type" : "string"
+              },
+              "use_json_in_structured_data" : {
+                "type" : "string"
+              },
+              "use_parquet_in_write" : {
+                "type" : "string"
+              },
+              "use_proxy" : {
+                "type" : "string"
+              },
+              "usestagingtable" : {
+                "type" : "string"
+              }
+            }
           },
           "virtualPartitions" : {
             "type" : "array",
@@ -3787,7 +4540,9 @@
         "title" : "SnowflakeTableDataObject",
         "required" : [ "type", "table", "connectionId" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type SnowflakeTableDataObject.  \nProvides details to access Snowflake tables via an action\nCan be used both for interacting with Snowflake through Spark with JDBC,\nas well as for actions written in the Snowpark API that run directly on Snowflake.  \nAn Action uses Snowpark if its `engineConnectionId` references the SnowflakeConnection of its DataObjects,\notherwise the DataObject is read and written with the Snowflake Spark connector.\n\nNote 1: Snowflake does not support partitioning.  \nBut SDLB emulates partitions through the `virtualPartitions` attribute.\n\nNote 2: Snowflake is tricky with Datatypes.  \nAs Integral types like Long, Int, Short don't exist in Snowflake, they all become a Decimal(38,0) by default.  \nSDLB improves the default by automatically converting Integral types to Decimals with accurate precision on write, e.g. Int => Decimal(10,0).  \nFor adapting types on read, use the `readTransformer` attribute.\n\nNote 3: case-insensitive column names are all uppercase in Snowflake tables. This is opposite from Spark when Spark is in case-insensitive mode (see also `Environment.caseSensitive`)\nIf `Environment.caseSensitive=false` then SDLB converts all case-insensitive column names to lowercase when reading from Snowflake with Spark Connector.\n\nExample:\n```\ndataObjects = {\n  tgt-airports {\n    type = SnowflakeTableDataObject\n    connectionId = sf-con\n    table {\n      db = \"test_schema\"\n      name = \"airports\"\n    }\n    virtualPartitions = [dt]\n    saveMode = Append\n  }\n}\n```\n"
+        "description" : "`DataObject` of type SnowflakeTableDataObject.  \nProvides details to access Snowflake tables via an action\nCan be used both for interacting with Snowflake through Spark with JDBC,\nas well as for actions written in the Snowpark API that run directly on Snowflake.  \nAn Action uses Snowpark if its `engineConnectionId` references the SnowflakeConnection of its DataObjects,\notherwise the DataObject is read and written with the Snowflake Spark connector.\n\nNote 1: Snowflake does not support partitioning.  \nBut SDLB emulates partitions through the `virtualPartitions` attribute.\n\nNote 2: Snowflake is tricky with Datatypes.  \nAs Integral types like Long, Int, Short don't exist in Snowflake, they all become a Decimal(38,0) by default.  \nSDLB improves the default by automatically converting Integral types to Decimals with accurate precision on write, e.g. Int => Decimal(10,0).  \nFor adapting types on read, use the `readTransformer` attribute.\n\nNote 3: case-insensitive column names are all uppercase in Snowflake tables. This is opposite from Spark when Spark is in case-insensitive mode (see also `Environment.caseSensitive`)\nIf `Environment.caseSensitive=false` then SDLB converts all case-insensitive column names to lowercase when reading from Snowflake with Spark Connector.\n\nExample:\n```\ndataObjects = {\n  tgt-airports {\n    type = SnowflakeTableDataObject\n    connectionId = sf-con\n    table {\n      db = \"test_schema\"\n      name = \"airports\"\n    }\n    virtualPartitions = [dt]\n    saveMode = Append\n  }\n}\n```\n",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SnowparkSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "SnowparkSubFeed", "SparkSubFeed" ]
       },
       "SparkConnectTableDataObject" : {
         "type" : "object",
@@ -3913,7 +4668,9 @@
         "title" : "SparkConnectTableDataObject",
         "required" : [ "type", "table", "connectionId" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` of type SparkConnectTableDataObject.  \nProvides access to tables of the catalog of a remote Spark Connect server through the normal Spark Table API,\ne.g. spark.read.table and DataFrame.write.saveAsTable.\n\nNote that data is only accessed through the Spark Connect session - there is no Hadoop FileSystem access\nto the underlying data from the SDLB client.\n\nNote that SDLSaveMode.Merge needs a table format supporting row-level operations on the server side, e.g. delta or iceberg."
+        "description" : "`DataObject` of type SparkConnectTableDataObject.  \nProvides access to tables of the catalog of a remote Spark Connect server through the normal Spark Table API,\ne.g. spark.read.table and DataFrame.write.saveAsTable.\n\nNote that data is only accessed through the Spark Connect session - there is no Hadoop FileSystem access\nto the underlying data from the SDLB client.\n\nNote that SDLSaveMode.Merge needs a table format supporting row-level operations on the server side, e.g. delta or iceberg.",
+        "x-readSubFeedTypes" : [ "ParameterSubFeed", "SparkConnectSubFeed" ],
+        "x-writeSubFeedTypes" : [ "SparkConnectSubFeed" ]
       },
       "WebserviceFileDataObject" : {
         "type" : "object",
@@ -4047,7 +4804,9 @@
         "title" : "WebserviceFileDataObject",
         "required" : [ "type", "url" ],
         "additionalProperties" : false,
-        "description" : "`DataObject` to call webservice and return response as InputStream, or upload data as OutputStream to webservice.\n\nThe corresponding Action to process the response or upload data should be a FileTransferAction.  \nThis is implemented as FileRefDataObject because the response / upload data is treated as some file content.\n\nFileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.\n\nQuery parameter (partitions) and possible values can be configured through `partitionDefs` attribute.  \nIf no values are given for a query parameter, the values are taken from the partition values of the input SubFeed, e.g. the command line if it is the first Action in the DAG.\n\nExample:\n```\ndataObjects = {\n  ext-departures {\n    type = WebserviceFileDataObject\n    url = \"https://opensky-network.org/api/flights/departure\"\n    authMode = { type = BasicAuthMode, user = \"###ENV#API_USER###\", password = \"###ENV#API_PWD###\" }\n    followRedirects = true\n    retries = 3\n    partitionDefs = [\n      { name = airport, values = [LSZB, EDDF] }\n    ]\n    partitionLayout = \"?airport=%airport%\"\n  }\n}\n```\n"
+        "description" : "`DataObject` to call webservice and return response as InputStream, or upload data as OutputStream to webservice.\n\nThe corresponding Action to process the response or upload data should be a FileTransferAction.  \nThis is implemented as FileRefDataObject because the response / upload data is treated as some file content.\n\nFileRefDataObjects support partitioned data. For a WebserviceFileDataObject partitions are mapped as query parameters to create query string.\n\nQuery parameter (partitions) and possible values can be configured through `partitionDefs` attribute.  \nIf no values are given for a query parameter, the values are taken from the partition values of the input SubFeed, e.g. the command line if it is the first Action in the DAG.\n\nExample:\n```\ndataObjects = {\n  ext-departures {\n    type = WebserviceFileDataObject\n    url = \"https://opensky-network.org/api/flights/departure\"\n    authMode = { type = BasicAuthMode, user = \"###ENV#API_USER###\", password = \"###ENV#API_PWD###\" }\n    followRedirects = true\n    retries = 3\n    partitionDefs = [\n      { name = airport, values = [LSZB, EDDF] }\n    ]\n    partitionLayout = \"?airport=%airport%\"\n  }\n}\n```\n",
+        "x-readSubFeedTypes" : [ "FileSubFeed", "ParameterSubFeed" ],
+        "x-writeSubFeedTypes" : [ "FileSubFeed" ]
       },
       "XmlFileDataObject" : {
         "type" : "object",
@@ -4291,7 +5050,9 @@
         "title" : "XmlFileDataObject",
         "required" : [ "type", "path" ],
         "additionalProperties" : false,
-        "description" : "A `DataObject` backed by an XML data source.\n\nIt manages read and write access and configurations required for `Action`s to\nwork on XML formatted files.\n\nReading and writing details are delegated to Apache Spark `org.apache.spark.sql.DataFrameReader`\nand `org.apache.spark.sql.DataFrameWriter` respectively. The reader and writer implementations are provided by\nSparks built-in XML data source, see https://spark.apache.org/docs/latest/sql-data-sources-xml.html.\n\nThe most important entry in `xmlOptions` is `rowTag`, which selects the XML element that is mapped to one row of the\nresulting DataFrame. Nested elements become structs and arrays, so a transformer is normally needed to flatten them.\n\nRows read can be validated against an XSD schema by setting the `rowValidationXSDPath` option. The XSD file is read\nthrough the Hadoop filesystem, so a full path can be given, e.g. `dbfs:/demos/xml/invoice.xsd`.  \nNote that this is independent of deriving the schema of this DataObject from an XSD file, which is done with the\n`xsdfile` schema provider, see also `schema` attribute.\n\nExample:\n```\ndataObjects = {\n  stg-airports {\n    type = XmlFileDataObject\n    path = ${env.basedir}\"/stg_airports\"\n    xmlOptions { rowTag = \"entry\", dateFormat = \"yyyy-MM-dd\" }\n    schema = \"ident string, name string, elevation_ft integer\"\n  }\n}\n```\n"
+        "description" : "A `DataObject` backed by an XML data source.\n\nIt manages read and write access and configurations required for `Action`s to\nwork on XML formatted files.\n\nReading and writing details are delegated to Apache Spark `org.apache.spark.sql.DataFrameReader`\nand `org.apache.spark.sql.DataFrameWriter` respectively. The reader and writer implementations are provided by\nSparks built-in XML data source, see https://spark.apache.org/docs/latest/sql-data-sources-xml.html.\n\nThe most important entry in `xmlOptions` is `rowTag`, which selects the XML element that is mapped to one row of the\nresulting DataFrame. Nested elements become structs and arrays, so a transformer is normally needed to flatten them.\n\nRows read can be validated against an XSD schema by setting the `rowValidationXSDPath` option. The XSD file is read\nthrough the Hadoop filesystem, so a full path can be given, e.g. `dbfs:/demos/xml/invoice.xsd`.  \nNote that this is independent of deriving the schema of this DataObject from an XSD file, which is done with the\n`xsdfile` schema provider, see also `schema` attribute.\n\nExample:\n```\ndataObjects = {\n  stg-airports {\n    type = XmlFileDataObject\n    path = ${env.basedir}\"/stg_airports\"\n    xmlOptions { rowTag = \"entry\", dateFormat = \"yyyy-MM-dd\" }\n    schema = \"ident string, name string, elevation_ft integer\"\n  }\n}\n```\n",
+        "x-readSubFeedTypes" : [ "FileSubFeed", "ParameterSubFeed", "SparkSubFeed" ],
+        "x-writeSubFeedTypes" : [ "FileSubFeed", "SparkSubFeed" ]
       }
     },
     "Action" : {
@@ -4420,34 +5181,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "CompletenessExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "precision" : {
-                    "type" : "integer",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CompletenessExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation on comparing count all records of input and output table.  \nCompleteness is calculated as the fraction of main output count-all over main input count-all.\n\nUse it to detect unintended record loss in an Action, e.g. rows dropped by a join or a filter.  \nAs it needs a main input and a main output to compare, it can only be configured as `expectations`\nof an Action (see `ActionExpectation`), not on a DataObject. The scope is fixed to the whole\ntable, and the fraction is rounded down, so an incomplete result is detected aggressively.\n\nExample:\n```\nactions = {\n  join-departures-airports {\n    type = CustomDataFrameAction\n    inputIds = [stg-departures, int-airports]\n    outputIds = [btl-departures-arrivals-airports]\n    mainInputId = stg-departures\n    expectations = [{\n      type = CompletenessExpectation\n      expectation = \"> 0.95\"\n    }]\n  }\n}\n```\n"
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "TransferRateExpectation"
                   },
                   "name" : {
@@ -4472,6 +5205,34 @@
                 "required" : [ "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation on transfer rate.  \nTransfer rate is calculated as the fraction of main output count over main input count.\n\nUse this Action level expectation to detect records unintentionally lost (or multiplied) by the transformation of an Action,\ne.g. by a join that does not match, or a filter that is too restrictive. In contrast to `CompletenessExpectation`,\nwhich always compares the count of the whole table (scope `All`), the transfer rate compares the number of records\nprocessed by the current job, e.g. only the incrementally loaded records.\n\nExample:\n```\nactions = {\n  copy-airports {\n    type = CopyAction\n    inputId = stg-airports\n    outputId = int-airports\n    expectations = [\n      { type = TransferRateExpectation, expectation = \"> 0.95\", failedSeverity = Warn }\n    ]\n  }\n}\n```\n\n\nNOTE: The metric is only available for Actions with a main input and a main output, e.g. `io.smartdatalake.workflow.action.CopyAction`\nor `io.smartdatalake.workflow.action.CustomDataFrameAction`.\n\nSEE: `CompletenessExpectation`"
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CompletenessExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "integer",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "CompletenessExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on comparing count all records of input and output table.  \nCompleteness is calculated as the fraction of main output count-all over main input count-all.\n\nUse it to detect unintended record loss in an Action, e.g. rows dropped by a join or a filter.  \nAs it needs a main input and a main output to compare, it can only be configured as `expectations`\nof an Action (see `ActionExpectation`), not on a DataObject. The scope is fixed to the whole\ntable, and the fraction is rounded down, so an incomplete result is detected aggressively.\n\nExample:\n```\nactions = {\n  join-departures-airports {\n    type = CustomDataFrameAction\n    inputIds = [stg-departures, int-airports]\n    outputIds = [btl-departures-arrivals-airports]\n    mainInputId = stg-departures\n    expectations = [{\n      type = CompletenessExpectation\n      expectation = \"> 0.95\"\n    }]\n  }\n}\n```\n"
               } ]
             },
             "description" : "List of expectation definitions to evaluate when executing this Action, see `Expectation` for details.\n\nNote: Expectations defined on DataObjects measure data quality and are evaluated against the output only.  \nExpectations defined on Actions measure quality of the transformation process and can measure and compare metrics between all input DataObjects and the main output DataObject.\n\nExpectations defined at Action level are executed together with the expectations of the main output DataObject."
@@ -4499,7 +5260,8 @@
         "title" : "CopyAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "This `Action` copies data between an input and output DataObject using DataFrames. The input\nDataObject reads the data and converts it to a DataFrame according to its definition. The\nDataFrame might be transformed using SQL or DataFrame transformations. Then the output\nDataObjects writes the DataFrame to the output according to its definition.\n\nCopyAction is the standard 1:1 Action. Use it whenever exactly one input should be written to\nexactly one output. Choose `CustomDataFrameAction` instead if you need multiple inputs or\noutputs, and `FileTransferAction` if the data should be moved byte-by-byte without being read\ninto a DataFrame.\n\nExample:\n```\nactions = {\n  copy-airports {\n    type = CopyAction\n    inputId = stg-airports\n    outputId = int-airports\n    transformers = [{\n      type = SQLDfTransformer\n      code = \"select ident, name, latitude_deg, longitude_deg from %{inputViewName}\"\n    }]\n  }\n}\n```\n"
+        "description" : "This `Action` copies data between an input and output DataObject using DataFrames. The input\nDataObject reads the data and converts it to a DataFrame according to its definition. The\nDataFrame might be transformed using SQL or DataFrame transformations. Then the output\nDataObjects writes the DataFrame to the output according to its definition.\n\nCopyAction is the standard 1:1 Action. Use it whenever exactly one input should be written to\nexactly one output. Choose `CustomDataFrameAction` instead if you need multiple inputs or\noutputs, and `FileTransferAction` if the data should be moved byte-by-byte without being read\ninto a DataFrame.\n\nExample:\n```\nactions = {\n  copy-airports {\n    type = CopyAction\n    inputId = stg-airports\n    outputId = int-airports\n    transformers = [{\n      type = SQLDfTransformer\n      code = \"select ident, name, latitude_deg, longitude_deg from %{inputViewName}\"\n    }]\n  }\n}\n```\n",
+        "x-subFeedTypes" : [ "SQLSubFeed", "ScalaSubFeed", "SnowparkSubFeed", "SparkConnectSubFeed", "SparkSubFeed" ]
       },
       "CustomDataFrameAction" : {
         "type" : "object",
@@ -4608,34 +5370,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "CompletenessExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "precision" : {
-                    "type" : "integer",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CompletenessExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation on comparing count all records of input and output table.  \nCompleteness is calculated as the fraction of main output count-all over main input count-all.\n\nUse it to detect unintended record loss in an Action, e.g. rows dropped by a join or a filter.  \nAs it needs a main input and a main output to compare, it can only be configured as `expectations`\nof an Action (see `ActionExpectation`), not on a DataObject. The scope is fixed to the whole\ntable, and the fraction is rounded down, so an incomplete result is detected aggressively.\n\nExample:\n```\nactions = {\n  join-departures-airports {\n    type = CustomDataFrameAction\n    inputIds = [stg-departures, int-airports]\n    outputIds = [btl-departures-arrivals-airports]\n    mainInputId = stg-departures\n    expectations = [{\n      type = CompletenessExpectation\n      expectation = \"> 0.95\"\n    }]\n  }\n}\n```\n"
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "TransferRateExpectation"
                   },
                   "name" : {
@@ -4660,6 +5394,34 @@
                 "required" : [ "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation on transfer rate.  \nTransfer rate is calculated as the fraction of main output count over main input count.\n\nUse this Action level expectation to detect records unintentionally lost (or multiplied) by the transformation of an Action,\ne.g. by a join that does not match, or a filter that is too restrictive. In contrast to `CompletenessExpectation`,\nwhich always compares the count of the whole table (scope `All`), the transfer rate compares the number of records\nprocessed by the current job, e.g. only the incrementally loaded records.\n\nExample:\n```\nactions = {\n  copy-airports {\n    type = CopyAction\n    inputId = stg-airports\n    outputId = int-airports\n    expectations = [\n      { type = TransferRateExpectation, expectation = \"> 0.95\", failedSeverity = Warn }\n    ]\n  }\n}\n```\n\n\nNOTE: The metric is only available for Actions with a main input and a main output, e.g. `io.smartdatalake.workflow.action.CopyAction`\nor `io.smartdatalake.workflow.action.CustomDataFrameAction`.\n\nSEE: `CompletenessExpectation`"
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CompletenessExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "integer",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "CompletenessExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on comparing count all records of input and output table.  \nCompleteness is calculated as the fraction of main output count-all over main input count-all.\n\nUse it to detect unintended record loss in an Action, e.g. rows dropped by a join or a filter.  \nAs it needs a main input and a main output to compare, it can only be configured as `expectations`\nof an Action (see `ActionExpectation`), not on a DataObject. The scope is fixed to the whole\ntable, and the fraction is rounded down, so an incomplete result is detected aggressively.\n\nExample:\n```\nactions = {\n  join-departures-airports {\n    type = CustomDataFrameAction\n    inputIds = [stg-departures, int-airports]\n    outputIds = [btl-departures-arrivals-airports]\n    mainInputId = stg-departures\n    expectations = [{\n      type = CompletenessExpectation\n      expectation = \"> 0.95\"\n    }]\n  }\n}\n```\n"
               } ]
             },
             "description" : "List of expectation definitions to evaluate when executing this Action, see `Expectation` for details.\n\nNote: Expectations defined on DataObjects measure data quality and are evaluated against the output only.  \nExpectations defined on Actions measure quality of the transformation process and can measure and compare metrics between all input DataObjects and the main output DataObject.\n\nExpectations defined at Action level are executed together with the expectations of the main output DataObject."
@@ -4690,7 +5452,8 @@
         "title" : "CustomDataFrameAction",
         "required" : [ "type", "inputIds", "outputIds" ],
         "additionalProperties" : false,
-        "description" : "This `Action` transforms data between many input and output DataObjects using DataFrames.  \nCustomDataFrameAction allows to define transformations between n input DataObjects and m output DataObjects,\nbut is is recommended to implement n:1 or 1:m transformations, as otherwise dependencies between DataObjects might not be accurate anymore.  \nThe input DataFrames might be transformed using SQL or DataFrame transformations.  \nWhen chaining multiple transformers, output DataFrames of previous transformers are available as input DataFrames for later transformers by their corresponding name.\n\nUse CustomDataFrameAction for joins, unions and fan-outs. For simple 1:1 copies prefer `CopyAction`,\nwhich derives more accurate lineage. Note that a transformer must return a result for every outputId,\nkeyed by the output DataObject id, otherwise the Action fails with a configuration error.\n\nExample:\n```\nactions = {\n  join-departures-airports {\n    type = CustomDataFrameAction\n    inputIds = [stg-departures, int-airports]\n    outputIds = [btl-departures-arrivals-airports]\n    mainInputId = stg-departures\n    transformers = [{\n      type = SQLDfsTransformer\n      code = {\n        btl-departures-arrivals-airports = \"\"\"select d.*, a.name from %{inputViewName_stg-departures} d\n          join %{inputViewName_int-airports} a on d.estdepartureairport = a.ident\"\"\"\n      }\n    }]\n  }\n}\n```\n"
+        "description" : "This `Action` transforms data between many input and output DataObjects using DataFrames.  \nCustomDataFrameAction allows to define transformations between n input DataObjects and m output DataObjects,\nbut is is recommended to implement n:1 or 1:m transformations, as otherwise dependencies between DataObjects might not be accurate anymore.  \nThe input DataFrames might be transformed using SQL or DataFrame transformations.  \nWhen chaining multiple transformers, output DataFrames of previous transformers are available as input DataFrames for later transformers by their corresponding name.\n\nUse CustomDataFrameAction for joins, unions and fan-outs. For simple 1:1 copies prefer `CopyAction`,\nwhich derives more accurate lineage. Note that a transformer must return a result for every outputId,\nkeyed by the output DataObject id, otherwise the Action fails with a configuration error.\n\nExample:\n```\nactions = {\n  join-departures-airports {\n    type = CustomDataFrameAction\n    inputIds = [stg-departures, int-airports]\n    outputIds = [btl-departures-arrivals-airports]\n    mainInputId = stg-departures\n    transformers = [{\n      type = SQLDfsTransformer\n      code = {\n        btl-departures-arrivals-airports = \"\"\"select d.*, a.name from %{inputViewName_stg-departures} d\n          join %{inputViewName_int-airports} a on d.estdepartureairport = a.ident\"\"\"\n      }\n    }]\n  }\n}\n```\n",
+        "x-subFeedTypes" : [ "SQLSubFeed", "ScalaSubFeed", "SnowparkSubFeed", "SparkConnectSubFeed", "SparkSubFeed" ]
       },
       "CustomFileAction" : {
         "type" : "object",
@@ -4777,7 +5540,8 @@
         "title" : "CustomFileAction",
         "required" : [ "type", "inputId", "outputId", "transformer" ],
         "additionalProperties" : false,
-        "description" : "`Action` to transform files between two Hadoop Data Objects.  \nThe transformation is executed in distributed mode on Spark executors.  \nA custom file transformer must be given, which reads a file as input stream and writes one or more output files.  \nThe transformer can also transform partition values, e.g. to standardize partition values extracted from the file path\nof the input into different partition columns of the output.\n\nUse this Action if files must be processed as files (byte or line streams), e.g. to unzip, decrypt or repair a file\nformat Spark can not read. The list of files to transfer is created on the driver and then distributed to the\nexecutors, where the transformer gets the input stream and the output stream of one file at a time. If the content\ncan be read as a DataFrame, prefer `CopyAction`, if the files only need to be moved unchanged prefer\n`FileTransferAction`.\n\nExample:\n```\nactions = {\n  transform-airports {\n    type = CustomFileAction\n    inputId = stg-airports\n    outputId = int-airports\n    transformer = {\n      type = ScalaClassFileTransformer\n      className = com.company.transformer.CutColumnsFileTransformer\n      options = { delimiter = \",\" }\n    }\n    filesPerPartition = 5\n  }\n}\n```\n\n\nIf the transformer returns or throws an exception for a file, the remaining files are still processed, but the Action\nfails afterwards, listing all failed files. Note that the output files already written stay in place.  \nNote that the file references created in init phase are a prediction with one output file per input file and the default\nfile name, as files are only written in exec phase. If the transformer creates multiple or differently named output files,\nthe file references passed on to the next Action therefore differ between init and exec phase. This is relevant\nfor runs only executing the init phase, e.g. simulation.\n\nNOTE: inputId must be a HadoopFileDataObject and outputId a SparkFileDataObject, and the transformer code must be\nserializable as it is shipped to the Spark executors."
+        "description" : "`Action` to transform files between two Hadoop Data Objects.  \nThe transformation is executed in distributed mode on Spark executors.  \nA custom file transformer must be given, which reads a file as input stream and writes one or more output files.  \nThe transformer can also transform partition values, e.g. to standardize partition values extracted from the file path\nof the input into different partition columns of the output.\n\nUse this Action if files must be processed as files (byte or line streams), e.g. to unzip, decrypt or repair a file\nformat Spark can not read. The list of files to transfer is created on the driver and then distributed to the\nexecutors, where the transformer gets the input stream and the output stream of one file at a time. If the content\ncan be read as a DataFrame, prefer `CopyAction`, if the files only need to be moved unchanged prefer\n`FileTransferAction`.\n\nExample:\n```\nactions = {\n  transform-airports {\n    type = CustomFileAction\n    inputId = stg-airports\n    outputId = int-airports\n    transformer = {\n      type = ScalaClassFileTransformer\n      className = com.company.transformer.CutColumnsFileTransformer\n      options = { delimiter = \",\" }\n    }\n    filesPerPartition = 5\n  }\n}\n```\n\n\nIf the transformer returns or throws an exception for a file, the remaining files are still processed, but the Action\nfails afterwards, listing all failed files. Note that the output files already written stay in place.  \nNote that the file references created in init phase are a prediction with one output file per input file and the default\nfile name, as files are only written in exec phase. If the transformer creates multiple or differently named output files,\nthe file references passed on to the next Action therefore differ between init and exec phase. This is relevant\nfor runs only executing the init phase, e.g. simulation.\n\nNOTE: inputId must be a HadoopFileDataObject and outputId a SparkFileDataObject, and the transformer code must be\nserializable as it is shipped to the Spark executors.",
+        "x-subFeedTypes" : [ "FileSubFeed" ]
       },
       "CustomScriptAction" : {
         "type" : "object",
@@ -4835,7 +5599,8 @@
         "title" : "CustomScriptAction",
         "required" : [ "type", "inputIds", "outputIds" ],
         "additionalProperties" : false,
-        "description" : "`Action` execute script after multiple input DataObjects are ready, notifying multiple output DataObjects when script succeeded.\n\nNote that this action can also be used to give your data pipeline additional structure, e.g. adding a decision point after several actions have been executed.\n\nNo data is read or written by this Action: the input DataObjects are only used as dependencies to order the DAG,\nand the output DataObjects just receive a notification once all scripts succeeded. The last line of a script's\nstandard output is parsed as `key=value` pairs and passed on as parameters to the next script and output SubFeeds.\n\nExample:\n```\nactions = {\n  refresh-dashboard {\n    type = CustomScriptAction\n    inputIds = [int-airports]\n    outputIds = [ext-dashboard]\n    scripts = [{\n      type = CmdScript\n      linuxCmd = \"./scripts/refresh-dashboard.sh\"\n      winCmd = \"scripts\\\\refresh-dashboard.cmd\"\n    }]\n  }\n}\n```\n\n\nNOTE: Output DataObjects must implement `io.smartdatalake.workflow.dataobject.generic.CanReceiveParameterNotification`\nto be able to receive the notification. No DataObject shipped with SDLB implements it yet, so `outputIds`\nnormally references a custom DataObject implementation. Otherwise the Action fails with a\nConfigurationException when the configuration is parsed."
+        "description" : "`Action` execute script after multiple input DataObjects are ready, notifying multiple output DataObjects when script succeeded.\n\nNote that this action can also be used to give your data pipeline additional structure, e.g. adding a decision point after several actions have been executed.\n\nNo data is read or written by this Action: the input DataObjects are only used as dependencies to order the DAG,\nand the output DataObjects just receive a notification once all scripts succeeded. The last line of a script's\nstandard output is parsed as `key=value` pairs and passed on as parameters to the next script and output SubFeeds.\n\nExample:\n```\nactions = {\n  refresh-dashboard {\n    type = CustomScriptAction\n    inputIds = [int-airports]\n    outputIds = [ext-dashboard]\n    scripts = [{\n      type = CmdScript\n      linuxCmd = \"./scripts/refresh-dashboard.sh\"\n      winCmd = \"scripts\\\\refresh-dashboard.cmd\"\n    }]\n  }\n}\n```\n\n\nNOTE: Output DataObjects must implement `io.smartdatalake.workflow.dataobject.generic.CanReceiveParameterNotification`\nto be able to receive the notification, e.g. MLflowDataObject or a custom DataObject implementation.  \nOtherwise the Action fails with a ConfigurationException when the configuration is parsed.",
+        "x-subFeedTypes" : [ "ParameterSubFeed" ]
       },
       "DeduplicateAction" : {
         "type" : "object",
@@ -4984,7 +5749,8 @@
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
         "description" : "Former name of `UpsertAction`, kept for backward compatibility of existing configurations.  \nIt behaves exactly like `UpsertAction`, see there for a description and the available parameters.\n\nThe name was misleading: this Action does not deduplicate its input data, it keeps the latest version of every\nrecord identified by the primary key of the output table (Slowly Changing Dimension Type 1). Use a\nDeduplicateTransformer if you need to make the input data unique.\n\nDEPRECATED: Renamed to `UpsertAction` in version 3.0.0. Change `type = DeduplicateAction` to\n`type = UpsertAction` in your configuration, all parameters stay the same.",
-        "deprecated" : true
+        "deprecated" : true,
+        "x-subFeedTypes" : [ "SQLSubFeed", "ScalaSubFeed", "SnowparkSubFeed", "SparkConnectSubFeed", "SparkSubFeed" ]
       },
       "FileTransferAction" : {
         "type" : "object",
@@ -5079,7 +5845,8 @@
         "title" : "FileTransferAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "`Action` to transfer files between SFtp, Hadoop, local Filesystem and a Webservice. Note that the Input DataObject and Output DataObject are not interpreted by this Action: the Data is just transferred as is.  \nAs data is transferred as is, matching the data format between the Input DataObject (e.g. CSV from WebserviceFileDataObject) and Output DataObject (e.g. CsvFileDataObject) is in the responsibility of the developer/user.  \nIf you want to convert or transform data formats between input and output, use the CopyAction instead. CopyAction will read the data from the Input DataObject into a DataFrame, and write that DataFrame to the Output DataObject. In this case the DataObjects are responsible to convert the data into a DataFrame and back.\n\nOptionally a file transformer can be configured to transform files as byte streams, create multiple output files per input\nfile, or transform partition values, e.g. to standardize partition values extracted from the file path of the input.  \nNote that the transformation is executed on the driver, in up to maxParallelism threads. Large files or CPU intensive\ntransformations can therefore cause memory and CPU resource problems on the driver.  \nUse CustomFileAction instead to distribute the transformation on Spark executors if the input is a HadoopFileDataObject.  \nNote that the file references created in init phase are a prediction with one output file per input file and the default\nfile name, as files are only written in exec phase. If the transformer creates multiple or differently named output files,\nthe file references passed on to the next Action therefore differ between init and exec phase. This is relevant\nfor runs only executing the init phase, e.g. simulation.\n\nExample:\n```\nactions = {\n  download-airports {\n    type = FileTransferAction\n    inputId = ext-airports\n    outputId = stg-airports\n    overwrite = false\n    maxParallelism = 4\n  }\n}\n```\n"
+        "description" : "`Action` to transfer files between SFtp, Hadoop, local Filesystem and a Webservice. Note that the Input DataObject and Output DataObject are not interpreted by this Action: the Data is just transferred as is.  \nAs data is transferred as is, matching the data format between the Input DataObject (e.g. CSV from WebserviceFileDataObject) and Output DataObject (e.g. CsvFileDataObject) is in the responsibility of the developer/user.  \nIf you want to convert or transform data formats between input and output, use the CopyAction instead. CopyAction will read the data from the Input DataObject into a DataFrame, and write that DataFrame to the Output DataObject. In this case the DataObjects are responsible to convert the data into a DataFrame and back.\n\nOptionally a file transformer can be configured to transform files as byte streams, create multiple output files per input\nfile, or transform partition values, e.g. to standardize partition values extracted from the file path of the input.  \nNote that the transformation is executed on the driver, in up to maxParallelism threads. Large files or CPU intensive\ntransformations can therefore cause memory and CPU resource problems on the driver.  \nUse CustomFileAction instead to distribute the transformation on Spark executors if the input is a HadoopFileDataObject.  \nNote that the file references created in init phase are a prediction with one output file per input file and the default\nfile name, as files are only written in exec phase. If the transformer creates multiple or differently named output files,\nthe file references passed on to the next Action therefore differ between init and exec phase. This is relevant\nfor runs only executing the init phase, e.g. simulation.\n\nExample:\n```\nactions = {\n  download-airports {\n    type = FileTransferAction\n    inputId = ext-airports\n    outputId = stg-airports\n    overwrite = false\n    maxParallelism = 4\n  }\n}\n```\n",
+        "x-subFeedTypes" : [ "FileSubFeed" ]
       },
       "HistorizeAction" : {
         "type" : "object",
@@ -5197,7 +5964,7 @@
           "timeAxisUnit" : {
             "type" : "string",
             "description" : "Time between ticks on the time axis. Used to create valid to timestamp for existing/old\nrecords. Set to 0 to create a history with half-open intervals (e.g. valid to timestamp is\nexclusive). Format is `x(ns|us|ms|s|m|h|d)`, e.g. 1d. Default is 1ms.",
-            "existingJavaType" : "java.time.Duration"
+            "x-existingJavaType" : "java.time.Duration"
           },
           "cacheOutput" : {
             "type" : "boolean",
@@ -5262,7 +6029,8 @@
         "title" : "HistorizeAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "This `Action` historizes data between an input and output DataObject using DataFrames.  \nHistorization creates a technical history of data by creating valid-from/to columns. The\nDataFrame might be transformed using SQL or DataFrame transformations. These transformations are\napplied before the deduplication.\n\nBy default, a history with closed intervals is created, e.g. valid-from and valid-to is\ninclusive. The time axis unit can be set by configuration attribute `timeAxisUnit`. It is used as\nthe offset between valid-to of the previous record and valid-from of the current record. A\nhistory with half-open intervals can be created by setting timeAxisUnit=0. In a half-open\ninterval valid-from is inclusive and valid-to is exclusive.\n\nHistorizeAction needs a transactional table (e.g. implementation of\n`TransactionalTableDataObject`) as output with defined primary keys.\n\nSince SDLB version 3.0 incremental historization is used per default, and full historization is removed.  \nIncremental historization does not rewrite all data in output table.  \nIt still needs to join new data with all existing data, but uses hash values to minimize data\ntransfer. If you have change-data-capture (CDC) information available to identify deleted\nrecords, you can set mergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join\nbetween new and existing data. This is optimal from a performance perspective.\n\nIf the input delivers change events using SDLBs standard CDC columns `_change_type`, `_commit_timestamp` and\n`_change_ordinal` (as DebeziumCdcDataObject does), CDC historization is used without any further configuration,\nsee mergeModeCDCAutoDetect.\n\nIf you still have a legacy full historization table, migration to incremental historization should happen\nautomatically. The missing hash column is detected and added to existing data.\n\nBy default the validity of a new version starts at the reference timestamp of the run. If the input contains the\ntimestamp of the last change in the source system, it can be used instead by setting sourceTimestampColumn, so\nthat the history reflects the time axis of the source system.\n\nExample:\n```\nactions = {\n  historize-airports {\n    type = HistorizeAction\n    inputId = stg-airports\n    outputId = int-airports\n    timeAxisUnit = 1d\n    historizeBlacklist = [last_updated]\n  }\n}\n```\n"
+        "description" : "This `Action` historizes data between an input and output DataObject using DataFrames.  \nHistorization creates a technical history of data by creating valid-from/to columns. The\nDataFrame might be transformed using SQL or DataFrame transformations. These transformations are\napplied before the deduplication.\n\nBy default, a history with closed intervals is created, e.g. valid-from and valid-to is\ninclusive. The time axis unit can be set by configuration attribute `timeAxisUnit`. It is used as\nthe offset between valid-to of the previous record and valid-from of the current record. A\nhistory with half-open intervals can be created by setting timeAxisUnit=0. In a half-open\ninterval valid-from is inclusive and valid-to is exclusive.\n\nHistorizeAction needs a transactional table (e.g. implementation of\n`TransactionalTableDataObject`) as output with defined primary keys.\n\nSince SDLB version 3.0 incremental historization is used per default, and full historization is removed.  \nIncremental historization does not rewrite all data in output table.  \nIt still needs to join new data with all existing data, but uses hash values to minimize data\ntransfer. If you have change-data-capture (CDC) information available to identify deleted\nrecords, you can set mergeModeCDCColumn and mergeModeCDCDeletedValue to even avoid the join\nbetween new and existing data. This is optimal from a performance perspective.\n\nIf the input delivers change events using SDLBs standard CDC columns `_change_type`, `_commit_timestamp` and\n`_change_ordinal` (as DebeziumCdcDataObject does), CDC historization is used without any further configuration,\nsee mergeModeCDCAutoDetect.\n\nIf you still have a legacy full historization table, migration to incremental historization should happen\nautomatically. The missing hash column is detected and added to existing data.\n\nBy default the validity of a new version starts at the reference timestamp of the run. If the input contains the\ntimestamp of the last change in the source system, it can be used instead by setting sourceTimestampColumn, so\nthat the history reflects the time axis of the source system.\n\nExample:\n```\nactions = {\n  historize-airports {\n    type = HistorizeAction\n    inputId = stg-airports\n    outputId = int-airports\n    timeAxisUnit = 1d\n    historizeBlacklist = [last_updated]\n  }\n}\n```\n",
+        "x-subFeedTypes" : [ "SQLSubFeed", "ScalaSubFeed", "SnowparkSubFeed", "SparkConnectSubFeed", "SparkSubFeed" ]
       },
       "MLflowPredictAction" : {
         "type" : "object",
@@ -5427,34 +6195,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "CompletenessExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "precision" : {
-                    "type" : "integer",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CompletenessExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation on comparing count all records of input and output table.  \nCompleteness is calculated as the fraction of main output count-all over main input count-all.\n\nUse it to detect unintended record loss in an Action, e.g. rows dropped by a join or a filter.  \nAs it needs a main input and a main output to compare, it can only be configured as `expectations`\nof an Action (see `ActionExpectation`), not on a DataObject. The scope is fixed to the whole\ntable, and the fraction is rounded down, so an incomplete result is detected aggressively.\n\nExample:\n```\nactions = {\n  join-departures-airports {\n    type = CustomDataFrameAction\n    inputIds = [stg-departures, int-airports]\n    outputIds = [btl-departures-arrivals-airports]\n    mainInputId = stg-departures\n    expectations = [{\n      type = CompletenessExpectation\n      expectation = \"> 0.95\"\n    }]\n  }\n}\n```\n"
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "TransferRateExpectation"
                   },
                   "name" : {
@@ -5479,6 +6219,34 @@
                 "required" : [ "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation on transfer rate.  \nTransfer rate is calculated as the fraction of main output count over main input count.\n\nUse this Action level expectation to detect records unintentionally lost (or multiplied) by the transformation of an Action,\ne.g. by a join that does not match, or a filter that is too restrictive. In contrast to `CompletenessExpectation`,\nwhich always compares the count of the whole table (scope `All`), the transfer rate compares the number of records\nprocessed by the current job, e.g. only the incrementally loaded records.\n\nExample:\n```\nactions = {\n  copy-airports {\n    type = CopyAction\n    inputId = stg-airports\n    outputId = int-airports\n    expectations = [\n      { type = TransferRateExpectation, expectation = \"> 0.95\", failedSeverity = Warn }\n    ]\n  }\n}\n```\n\n\nNOTE: The metric is only available for Actions with a main input and a main output, e.g. `io.smartdatalake.workflow.action.CopyAction`\nor `io.smartdatalake.workflow.action.CustomDataFrameAction`.\n\nSEE: `CompletenessExpectation`"
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CompletenessExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "integer",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "CompletenessExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on comparing count all records of input and output table.  \nCompleteness is calculated as the fraction of main output count-all over main input count-all.\n\nUse it to detect unintended record loss in an Action, e.g. rows dropped by a join or a filter.  \nAs it needs a main input and a main output to compare, it can only be configured as `expectations`\nof an Action (see `ActionExpectation`), not on a DataObject. The scope is fixed to the whole\ntable, and the fraction is rounded down, so an incomplete result is detected aggressively.\n\nExample:\n```\nactions = {\n  join-departures-airports {\n    type = CustomDataFrameAction\n    inputIds = [stg-departures, int-airports]\n    outputIds = [btl-departures-arrivals-airports]\n    mainInputId = stg-departures\n    expectations = [{\n      type = CompletenessExpectation\n      expectation = \"> 0.95\"\n    }]\n  }\n}\n```\n"
               } ]
             },
             "description" : "List of expectation definitions to evaluate when executing this Action, see `Expectation` for details.\n\nNote: Expectations defined on DataObjects measure data quality and are evaluated against the output only.  \nExpectations defined on Actions measure quality of the transformation process and can measure and compare metrics between all input DataObjects and the main output DataObject.\n\nExpectations defined at Action level are executed together with the expectations of the main output DataObject."
@@ -5499,7 +6267,8 @@
         "title" : "MLflowPredictAction",
         "required" : [ "type", "inputId", "inputMlflowId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "`Action` to apply a machine learning model tracked by MLflow to a DataFrame.\n\nThe model is loaded with `mlflow.pyfunc.spark_udf` and applied to the DataFrame of `inputId`, adding the\nprediction as an additional column. The result is written to `outputId`. Configured `transformers` are applied to\nthe input before the model.\n\nThe `MLflowDataObject` of `inputMlflowId` is an additional input of this DataFrame Action, see\n`io.smartdatalake.workflow.action.DataFrameActionImpl.additionalInputs`: it delivers no DataFrame, but it holds\nthe connection to MLflow and creates the dependency on a preceding `MLflowTrainAction` in the DAG.\n\nThe model is addressed by an alias or a version of the registered model `modelName`, or by an explicit `modelUri`.  \nIf none of these is given, the model of the latest run of the experiment is used, which is the model just trained\nby an `MLflowTrainAction` in the same job.\n\nThe model is not loaded in Init phase, so a dry run neither contacts MLflow nor downloads model artifacts.\n\nNote that this needs a python environment with `mlflow` installed, and MLflow version 2.9 or newer.\n\nExample:\n```\nactions {\n  predict-price {\n    type = MLflowPredictAction\n    inputId = int-listings\n    inputMlflowId = mlflow-price-model\n    outputId = int-listings-predicted\n    modelName = \"price-regressor\"\n    modelAlias = \"champion\"\n    featureColumns = [reviews_per_month, minimum_nights]\n  }\n}\n```\n"
+        "description" : "`Action` to apply a machine learning model tracked by MLflow to a DataFrame.\n\nThe model is loaded with `mlflow.pyfunc.spark_udf` and applied to the DataFrame of `inputId`, adding the\nprediction as an additional column. The result is written to `outputId`. Configured `transformers` are applied to\nthe input before the model.\n\nThe `MLflowDataObject` of `inputMlflowId` is an additional input of this DataFrame Action, see\n`io.smartdatalake.workflow.action.DataFrameActionImpl.additionalInputs`: it delivers no DataFrame, but it holds\nthe connection to MLflow and creates the dependency on a preceding `MLflowTrainAction` in the DAG.\n\nThe model is addressed by an alias or a version of the registered model `modelName`, or by an explicit `modelUri`.  \nIf none of these is given, the model of the latest run of the experiment is used, which is the model just trained\nby an `MLflowTrainAction` in the same job.\n\nThe model is not loaded in Init phase, so a dry run neither contacts MLflow nor downloads model artifacts.\n\nNote that this needs a python environment with `mlflow` installed, and MLflow version 2.9 or newer.\n\nExample:\n```\nactions {\n  predict-price {\n    type = MLflowPredictAction\n    inputId = int-listings\n    inputMlflowId = mlflow-price-model\n    outputId = int-listings-predicted\n    modelName = \"price-regressor\"\n    modelAlias = \"champion\"\n    featureColumns = [reviews_per_month, minimum_nights]\n  }\n}\n```\n",
+        "x-subFeedTypes" : [ "SparkSubFeed" ]
       },
       "MLflowTrainAction" : {
         "type" : "object",
@@ -5629,34 +6398,6 @@
                 "type" : "object",
                 "properties" : {
                   "type" : {
-                    "const" : "CompletenessExpectation"
-                  },
-                  "name" : {
-                    "type" : "string",
-                    "description" : "The name of the expectation"
-                  },
-                  "expectation" : {
-                    "type" : "string",
-                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
-                  },
-                  "precision" : {
-                    "type" : "integer",
-                    "description" : "Number of digits to keep when calculating fraction. Default is 4."
-                  },
-                  "failedSeverity" : {
-                    "type" : "string",
-                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
-                    "enum" : [ "Warn", "Error" ]
-                  }
-                },
-                "title" : "CompletenessExpectation",
-                "required" : [ "type" ],
-                "additionalProperties" : false,
-                "description" : "Definition of expectation on comparing count all records of input and output table.  \nCompleteness is calculated as the fraction of main output count-all over main input count-all.\n\nUse it to detect unintended record loss in an Action, e.g. rows dropped by a join or a filter.  \nAs it needs a main input and a main output to compare, it can only be configured as `expectations`\nof an Action (see `ActionExpectation`), not on a DataObject. The scope is fixed to the whole\ntable, and the fraction is rounded down, so an incomplete result is detected aggressively.\n\nExample:\n```\nactions = {\n  join-departures-airports {\n    type = CustomDataFrameAction\n    inputIds = [stg-departures, int-airports]\n    outputIds = [btl-departures-arrivals-airports]\n    mainInputId = stg-departures\n    expectations = [{\n      type = CompletenessExpectation\n      expectation = \"> 0.95\"\n    }]\n  }\n}\n```\n"
-              }, {
-                "type" : "object",
-                "properties" : {
-                  "type" : {
                     "const" : "TransferRateExpectation"
                   },
                   "name" : {
@@ -5681,6 +6422,34 @@
                 "required" : [ "type" ],
                 "additionalProperties" : false,
                 "description" : "Definition of expectation on transfer rate.  \nTransfer rate is calculated as the fraction of main output count over main input count.\n\nUse this Action level expectation to detect records unintentionally lost (or multiplied) by the transformation of an Action,\ne.g. by a join that does not match, or a filter that is too restrictive. In contrast to `CompletenessExpectation`,\nwhich always compares the count of the whole table (scope `All`), the transfer rate compares the number of records\nprocessed by the current job, e.g. only the incrementally loaded records.\n\nExample:\n```\nactions = {\n  copy-airports {\n    type = CopyAction\n    inputId = stg-airports\n    outputId = int-airports\n    expectations = [\n      { type = TransferRateExpectation, expectation = \"> 0.95\", failedSeverity = Warn }\n    ]\n  }\n}\n```\n\n\nNOTE: The metric is only available for Actions with a main input and a main output, e.g. `io.smartdatalake.workflow.action.CopyAction`\nor `io.smartdatalake.workflow.action.CustomDataFrameAction`.\n\nSEE: `CompletenessExpectation`"
+              }, {
+                "type" : "object",
+                "properties" : {
+                  "type" : {
+                    "const" : "CompletenessExpectation"
+                  },
+                  "name" : {
+                    "type" : "string",
+                    "description" : "The name of the expectation"
+                  },
+                  "expectation" : {
+                    "type" : "string",
+                    "description" : "Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1\".  \nTogether with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.  \nIf no expectation is defined, the aggExpression evaluation result is just recorded in metrics."
+                  },
+                  "precision" : {
+                    "type" : "integer",
+                    "description" : "Number of digits to keep when calculating fraction. Default is 4."
+                  },
+                  "failedSeverity" : {
+                    "type" : "string",
+                    "description" : "Severity if expectation fails - can be Error (default) or Warn.  \nIf set to Error, execution will fail, otherwise there will be just a warning logged.",
+                    "enum" : [ "Warn", "Error" ]
+                  }
+                },
+                "title" : "CompletenessExpectation",
+                "required" : [ "type" ],
+                "additionalProperties" : false,
+                "description" : "Definition of expectation on comparing count all records of input and output table.  \nCompleteness is calculated as the fraction of main output count-all over main input count-all.\n\nUse it to detect unintended record loss in an Action, e.g. rows dropped by a join or a filter.  \nAs it needs a main input and a main output to compare, it can only be configured as `expectations`\nof an Action (see `ActionExpectation`), not on a DataObject. The scope is fixed to the whole\ntable, and the fraction is rounded down, so an incomplete result is detected aggressively.\n\nExample:\n```\nactions = {\n  join-departures-airports {\n    type = CustomDataFrameAction\n    inputIds = [stg-departures, int-airports]\n    outputIds = [btl-departures-arrivals-airports]\n    mainInputId = stg-departures\n    expectations = [{\n      type = CompletenessExpectation\n      expectation = \"> 0.95\"\n    }]\n  }\n}\n```\n"
               } ]
             },
             "description" : "List of expectation definitions to evaluate when executing this Action, see `Expectation` for details.\n\nNote: Expectations defined on DataObjects measure data quality and are evaluated against the output only.  \nExpectations defined on Actions measure quality of the transformation process and can measure and compare metrics between all input DataObjects and the main output DataObject.\n\nExpectations defined at Action level are executed together with the expectations of the main output DataObject."
@@ -5701,7 +6470,8 @@
         "title" : "MLflowTrainAction",
         "required" : [ "type", "inputId", "outputMlflowId", "modelName" ],
         "additionalProperties" : false,
-        "description" : "`Action` to train a machine learning model with python code and track it with MLflow.\n\nThe training data is read from `inputId`, and the python model code gets it as a PySpark DataFrame in the variable\n`df`. The code is executed inside an MLflow run with `mlflow.autolog()` enabled, so for most frameworks the\nparameters, metrics and the model itself are logged without any further code.\n\nThe `MLflowDataObject` of `outputMlflowId` is an additional output of this DataFrame Action, see\n`io.smartdatalake.workflow.action.DataFrameActionImpl.additionalOutputs`: it receives the information about the\nrun as `ParameterSubFeed` parameters, see `io.smartdatalake.util.mlflow.MLflowRunInfo`, which also makes a\nsubsequent `MLflowPredictAction` depend on this Action.\n\n`outputId` is optional. Configure it to write the training data on to a DataObject, which also allows preparing\nthe features with `transformers`. Without it this Action only trains a model.\n\nNo model is trained in Init phase, so a dry run creates no MLflow runs.\n\nNote that this needs a python environment with `mlflow` installed, and MLflow version 2.9 or newer.\n\nExample:\n```\nactions {\n  train-price-model {\n    type = MLflowTrainAction\n    inputId = int-listings\n    outputMlflowId = mlflow-price-model\n    modelName = \"price-regressor\"\n    registerModel = true\n    modelAlias = \"champion\"\n    pythonModelCode = \"\"\"\n      from sklearn.linear_model import LinearRegression\n      pdf = df.toPandas()\n      LinearRegression().fit(pdf`\"reviews_per_month\"`, pdf[\"price\"])\n    \"\"\"\n  }\n}\n```\n"
+        "description" : "`Action` to train a machine learning model with python code and track it with MLflow.\n\nThe training data is read from `inputId`, and the python model code gets it as a PySpark DataFrame in the variable\n`df`. The code is executed inside an MLflow run with `mlflow.autolog()` enabled, so for most frameworks the\nparameters, metrics and the model itself are logged without any further code.\n\nThe `MLflowDataObject` of `outputMlflowId` is an additional output of this DataFrame Action, see\n`io.smartdatalake.workflow.action.DataFrameActionImpl.additionalOutputs`: it receives the information about the\nrun as `ParameterSubFeed` parameters, see `io.smartdatalake.util.mlflow.MLflowRunInfo`, which also makes a\nsubsequent `MLflowPredictAction` depend on this Action.\n\n`outputId` is optional. Configure it to write the training data on to a DataObject, which also allows preparing\nthe features with `transformers`. Without it this Action only trains a model.\n\nNo model is trained in Init phase, so a dry run creates no MLflow runs.\n\nNote that this needs a python environment with `mlflow` installed, and MLflow version 2.9 or newer.\n\nExample:\n```\nactions {\n  train-price-model {\n    type = MLflowTrainAction\n    inputId = int-listings\n    outputMlflowId = mlflow-price-model\n    modelName = \"price-regressor\"\n    registerModel = true\n    modelAlias = \"champion\"\n    pythonModelCode = \"\"\"\n      from sklearn.linear_model import LinearRegression\n      pdf = df.toPandas()\n      LinearRegression().fit(pdf`\"reviews_per_month\"`, pdf[\"price\"])\n    \"\"\"\n  }\n}\n```\n",
+        "x-subFeedTypes" : [ "SparkSubFeed" ]
       },
       "UpsertAction" : {
         "type" : "object",
@@ -5849,7 +6619,8 @@
         "title" : "UpsertAction",
         "required" : [ "type", "inputId", "outputId" ],
         "additionalProperties" : false,
-        "description" : "This `Action` keeps the **latest version of every record** in the output DataObject, identified by the primary\nkey of the output table. This is known as *Slowly Changing Dimension Type 1* (SCD1): when a record changes in the\nsource, the stored version is overwritten and no history is kept. Use `HistorizeAction` if you need the full\nhistory of every change (SCD2).\n\nRecords which are no longer delivered by the source are kept, so the output always contains the complete set of\nrecords ever seen, each one in its most recent state. The DataFrame might be transformed using SQL or DataFrame\ntransformations. These transformations are applied before the upsert.\n\nUpsertAction adds an additional Column `Environment.capturedColumnName`. It contains the\ntimestamp of the last occurrence of the record in the source. This creates lots of updates.  \nEspecially when using saveMode.Merge it is better to set `Environment.capturedColumnName` to\nthe last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to\nenable this optimization.\n\nIf the input contains the timestamp of the last change of the record in the source system, it can be used as\n`Environment.capturedColumnName` by setting sourceTimestampColumn, so that the output reflects the time axis of\nthe source system instead of the schedule of the pipeline. updateCapturedColumnOnlyWhenChanged is normally not\nneeded then, as the source timestamp is only moved forward if the source system changed the record anyway.\n\nUpsertAction needs a transactional table (e.g. `TransactionalTableDataObject`) as output\nwith defined primary keys. If output implements `CanMergeDataFrame`, saveMode.\n\nUpsertAction's input data must be unique across the primary key, otherwise the merge\nstatement creates errors like\n`DeltaUnsupportedOperationException: [DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE] Cannot perform Merge as multiple source rows matched and attempted to modify the same`.  \nThis can be achieved through adding a DeduplicateTransformer to transformers. Note that this is\nnot included by default in UpsertAction, as it is a performance intensive operation.\n\nExample:\n```\nactions = {\n  upsert-airports {\n    type = UpsertAction\n    inputId = stg-airports\n    outputId = int-airports\n    updateCapturedColumnOnlyWhenChanged = true\n    mergeModeAdditionalJoinPredicate = \"existing.dl_ts_captured > current_date - interval 7 days\"\n  }\n}\n```\n\n\nNOTE: UpsertAction was called DeduplicateAction until version 3.0.0. The old name is deprecated but still works,\nsee `DeduplicateAction`. It was misleading, as this Action does not deduplicate its input data."
+        "description" : "This `Action` keeps the **latest version of every record** in the output DataObject, identified by the primary\nkey of the output table. This is known as *Slowly Changing Dimension Type 1* (SCD1): when a record changes in the\nsource, the stored version is overwritten and no history is kept. Use `HistorizeAction` if you need the full\nhistory of every change (SCD2).\n\nRecords which are no longer delivered by the source are kept, so the output always contains the complete set of\nrecords ever seen, each one in its most recent state. The DataFrame might be transformed using SQL or DataFrame\ntransformations. These transformations are applied before the upsert.\n\nUpsertAction adds an additional Column `Environment.capturedColumnName`. It contains the\ntimestamp of the last occurrence of the record in the source. This creates lots of updates.  \nEspecially when using saveMode.Merge it is better to set `Environment.capturedColumnName` to\nthe last change of the record in the source. Use updateCapturedColumnOnlyWhenChanged = true to\nenable this optimization.\n\nIf the input contains the timestamp of the last change of the record in the source system, it can be used as\n`Environment.capturedColumnName` by setting sourceTimestampColumn, so that the output reflects the time axis of\nthe source system instead of the schedule of the pipeline. updateCapturedColumnOnlyWhenChanged is normally not\nneeded then, as the source timestamp is only moved forward if the source system changed the record anyway.\n\nUpsertAction needs a transactional table (e.g. `TransactionalTableDataObject`) as output\nwith defined primary keys. If output implements `CanMergeDataFrame`, saveMode.\n\nUpsertAction's input data must be unique across the primary key, otherwise the merge\nstatement creates errors like\n`DeltaUnsupportedOperationException: [DELTA_MULTIPLE_SOURCE_ROW_MATCHING_TARGET_ROW_IN_MERGE] Cannot perform Merge as multiple source rows matched and attempted to modify the same`.  \nThis can be achieved through adding a DeduplicateTransformer to transformers. Note that this is\nnot included by default in UpsertAction, as it is a performance intensive operation.\n\nExample:\n```\nactions = {\n  upsert-airports {\n    type = UpsertAction\n    inputId = stg-airports\n    outputId = int-airports\n    updateCapturedColumnOnlyWhenChanged = true\n    mergeModeAdditionalJoinPredicate = \"existing.dl_ts_captured > current_date - interval 7 days\"\n  }\n}\n```\n\n\nNOTE: UpsertAction was called DeduplicateAction until version 3.0.0. The old name is deprecated but still works,\nsee `DeduplicateAction`. It was misleading, as this Action does not deduplicate its input data.",
+        "x-subFeedTypes" : [ "SQLSubFeed", "ScalaSubFeed", "SnowparkSubFeed", "SparkConnectSubFeed", "SparkSubFeed" ]
       }
     },
     "HttpAuthMode" : {
@@ -6759,7 +7530,252 @@
             "additionalProperties" : {
               "type" : "string"
             },
-            "description" : "Options for the Snowflake Spark Connector.\n\nOptions are passed to the underlying library, see [https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options](https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options) for the available options."
+            "description" : "Options for the Snowflake Spark Connector.\n\nOptions are passed to the underlying library, see [https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options](https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options) for the available options.",
+            "properties" : {
+              "abort_detached_query" : {
+                "type" : "string"
+              },
+              "awsaccesskey" : {
+                "type" : "string"
+              },
+              "awssecretkey" : {
+                "type" : "string"
+              },
+              "bind_variable" : {
+                "type" : "string"
+              },
+              "check_bucket_configuration" : {
+                "type" : "string"
+              },
+              "column_mapping" : {
+                "type" : "string"
+              },
+              "column_mismatch_behavior" : {
+                "type" : "string"
+              },
+              "columnmap" : {
+                "type" : "string"
+              },
+              "connection_id" : {
+                "type" : "string"
+              },
+              "continue_on_error" : {
+                "type" : "string"
+              },
+              "dbtable" : {
+                "type" : "string"
+              },
+              "expected_partition_count" : {
+                "type" : "string"
+              },
+              "extracopyoptions" : {
+                "type" : "string"
+              },
+              "force" : {
+                "type" : "string"
+              },
+              "force_skip_pre_post_action_check_for_session_sharing" : {
+                "type" : "string"
+              },
+              "internal_check_table_existence_in_current_schema_only" : {
+                "type" : "string"
+              },
+              "internal_check_table_existence_with_fully_qualified_name" : {
+                "type" : "string"
+              },
+              "internal_execute_query_in_sync_mode" : {
+                "type" : "string"
+              },
+              "internal_quote_json_field_name" : {
+                "type" : "string"
+              },
+              "internal_skip_write_when_writing_empty_dataframe" : {
+                "type" : "string"
+              },
+              "internal_staging_table_name_remove_quotes_only" : {
+                "type" : "string"
+              },
+              "internal_support_aws_stage_end_point" : {
+                "type" : "string"
+              },
+              "internal_use_aws_region_url" : {
+                "type" : "string"
+              },
+              "internal_use_parse_json_for_write" : {
+                "type" : "string"
+              },
+              "jdbc_query_result_format" : {
+                "type" : "string"
+              },
+              "keep_column_case" : {
+                "type" : "string"
+              },
+              "max_retry_count" : {
+                "type" : "string"
+              },
+              "non_proxy_hosts" : {
+                "type" : "string"
+              },
+              "parallelism" : {
+                "type" : "string"
+              },
+              "partition_size_in_mb" : {
+                "type" : "string"
+              },
+              "pem_private_key" : {
+                "type" : "string"
+              },
+              "postactions" : {
+                "type" : "string"
+              },
+              "preactions" : {
+                "type" : "string"
+              },
+              "proxy_host" : {
+                "type" : "string"
+              },
+              "proxy_password" : {
+                "type" : "string"
+              },
+              "proxy_port" : {
+                "type" : "string"
+              },
+              "proxy_protocol" : {
+                "type" : "string"
+              },
+              "proxy_user" : {
+                "type" : "string"
+              },
+              "purge" : {
+                "type" : "string"
+              },
+              "query" : {
+                "type" : "string"
+              },
+              "s3_stage_vpce_dns_name" : {
+                "type" : "string"
+              },
+              "s3maxfilesize" : {
+                "type" : "string"
+              },
+              "sfaccount" : {
+                "type" : "string"
+              },
+              "sfauthenticator" : {
+                "type" : "string"
+              },
+              "sfcompress" : {
+                "type" : "string"
+              },
+              "sfdatabase" : {
+                "type" : "string"
+              },
+              "sfpassword" : {
+                "type" : "string"
+              },
+              "sfrole" : {
+                "type" : "string"
+              },
+              "sfschema" : {
+                "type" : "string"
+              },
+              "sfssl" : {
+                "type" : "string"
+              },
+              "sftimezone" : {
+                "type" : "string"
+              },
+              "sftoken" : {
+                "type" : "string"
+              },
+              "sfurl" : {
+                "type" : "string"
+              },
+              "sfuser" : {
+                "type" : "string"
+              },
+              "sfwarehouse" : {
+                "type" : "string"
+              },
+              "sfworkloadidentityprovider" : {
+                "type" : "string"
+              },
+              "snowflake_stage" : {
+                "type" : "string"
+              },
+              "streaming_stage" : {
+                "type" : "string"
+              },
+              "string_timestamp_format" : {
+                "type" : "string"
+              },
+              "support_share_connection" : {
+                "type" : "string"
+              },
+              "tempdir" : {
+                "type" : "string"
+              },
+              "temporary_aws_access_key_id" : {
+                "type" : "string"
+              },
+              "temporary_aws_secret_access_key" : {
+                "type" : "string"
+              },
+              "temporary_aws_session_token" : {
+                "type" : "string"
+              },
+              "temporary_azure_sas_token" : {
+                "type" : "string"
+              },
+              "time_output_format" : {
+                "type" : "string"
+              },
+              "timestamp_ltz_output_format" : {
+                "type" : "string"
+              },
+              "timestamp_ntz_output_format" : {
+                "type" : "string"
+              },
+              "timestamp_tz_output_format" : {
+                "type" : "string"
+              },
+              "treat_decimal_as_long" : {
+                "type" : "string"
+              },
+              "trim_space" : {
+                "type" : "string"
+              },
+              "truncate_columns" : {
+                "type" : "string"
+              },
+              "truncate_table" : {
+                "type" : "string"
+              },
+              "upload_chunk_size_in_mb" : {
+                "type" : "string"
+              },
+              "use_aws_multiple_parts_upload" : {
+                "type" : "string"
+              },
+              "use_copy_unload" : {
+                "type" : "string"
+              },
+              "use_exponential_backoff" : {
+                "type" : "string"
+              },
+              "use_json_in_structured_data" : {
+                "type" : "string"
+              },
+              "use_parquet_in_write" : {
+                "type" : "string"
+              },
+              "use_proxy" : {
+                "type" : "string"
+              },
+              "usestagingtable" : {
+                "type" : "string"
+              }
+            }
           },
           "metadata" : {
             "$ref" : "#/definitions/Others/ConnectionMetadata",
