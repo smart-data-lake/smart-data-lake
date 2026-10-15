@@ -113,7 +113,8 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
 
   private val connection = getConnection[BigQueryTableConnection](connectionId)
 
-  private val bigquery = connection.bigQueryObject
+  // evaluate lazily, so that credentials are not evaluated when parsing the configuration but in prepare
+  @transient private lazy val bigquery = connection.bigQueryObject
 
   lazy val bigQueryTable = bigquery.getTable(table.db.get, table.name)
 

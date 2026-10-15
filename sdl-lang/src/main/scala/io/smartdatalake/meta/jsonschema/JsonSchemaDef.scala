@@ -26,6 +26,7 @@ import org.json4s.jackson.Serialization
 
 import scala.collection.AbstractMap
 import scala.collection.immutable.ListMap
+import scala.reflect.NameTransformer
 
 /**
  * Enumeration of JSON schema types
@@ -48,6 +49,10 @@ private[smartdatalake] sealed trait JsonTypeDef extends JsonExtractor
 /**
  * Definition of a JSON object
  * @param properties: ListMap ensures that property ordering is kept. It has to be lazy to break recursive conversion.
+ * @param `x-readSubFeedTypes` custom keyword: SubFeed types a DataObject can be read with, e.g. SparkSubFeed.
+ * @param `x-writeSubFeedTypes` custom keyword: SubFeed types a DataObject can be written with.
+ * @param `x-subFeedTypes` custom keyword: SubFeed types an Action can process.
+ * Custom keywords are prefixed with "x-" to distinguish them from JSON schema keywords.
  */
 private[smartdatalake] case class JsonObjectDef(
                           properties: LazyListMapWrapper[String,JsonTypeDef],
@@ -55,7 +60,10 @@ private[smartdatalake] case class JsonObjectDef(
                           required: Seq[String] = Seq(),
                           additionalProperties: Boolean = false,
                           description: Option[String] = None,
-                          deprecated: Option[Boolean] = None
+                          deprecated: Option[Boolean] = None,
+                          `x-readSubFeedTypes`: Seq[String] = Seq(),
+                          `x-writeSubFeedTypes`: Seq[String] = Seq(),
+                          `x-subFeedTypes`: Seq[String] = Seq()
                         ) extends JsonTypeDef {
   override val `type`: Option[JsonTypeEnum] = Some(JsonTypeEnum.Object)
 }
@@ -78,7 +86,7 @@ private[smartdatalake] case class JsonStringDef(
                           description: Option[String] = None,
                           default: Option[String] = None,
                           `enum`: Option[Seq[String]] = None,
-                          existingJavaType: Option[String] = None,
+                          `x-existingJavaType`: Option[String] = None,
                           deprecated: Option[Boolean] = None
                         ) extends JsonTypeDef {
   override val `type`: Option[JsonTypeEnum] = Some(JsonTypeEnum.String)
@@ -167,7 +175,7 @@ private[smartdatalake] trait SchemaRootDef extends JsonExtractor
  */
 private[smartdatalake] case class SchemaRootObjectDef(
                                 `$schema`: String,
-                                version: String,
+                                `x-version`: String,
                                 id: String,
                                 definitions: Map[String, ListMap[String,JsonTypeDef]],
                                 properties: ListMap[String,JsonTypeDef],
@@ -206,7 +214,8 @@ private[smartdatalake] object JsonExtractor {
             => false
             case _ => true
           }
-          .map { case (k, v) => (k, Extraction.decompose(v)(format)) }
+          // decode names of attributes which are not valid identifiers, e.g. `x-version` is encoded as x$minusversion
+          .map { case (k, v) => (NameTransformer.decode(k), Extraction.decompose(v)(format)) }
         val jsonObj = if (obj.`type`.isDefined) JObject(("type", JString(obj.`type`.get.toString)) +: attributes)
         else JObject(attributes)
         jsonObj

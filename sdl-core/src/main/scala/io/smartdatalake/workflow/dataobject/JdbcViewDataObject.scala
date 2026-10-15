@@ -190,7 +190,13 @@ case class JdbcViewDataObject(override val id: DataObjectId,
   override def getSubFeed(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed =
     DataFrameSubFeed.getCompanion(subFeedType).getSubFeed(getDataFrame(partitionValues, subFeedType), id, partitionValues)
 
-  override def getSubFeedSupportedTypes: Seq[Type] = tableDataObject.getSubFeedSupportedTypes
+  // reading is delegated to tableDataObject, but its supported types are determined without creating it, as the
+  // json schema export calls this on a DataObject which is not initialized, see io.smartdatalake.meta.SubFeedTypeUtil
+  override def getSubFeedSupportedTypes: Seq[Type] = {
+    val types = DataObjectEngine.engineSubFeedTypes[JdbcTableEngine, JdbcTableDataObject](classOf[JdbcTableDataObject])
+    if (types.isEmpty) throw ConfigurationException(s"($id) No engine implementation found on classpath for JdbcTableDataObject. Add sdl-spark to the classpath to read with Spark.")
+    types
+  }
 
   override def writeSubFeedSupportedTypes: Seq[Type] = viewEngines.map(_.subFeedType)
 

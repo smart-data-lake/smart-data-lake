@@ -84,7 +84,7 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
     // create output schema
     val jsonRootDef = SchemaRootObjectDef(
       `$schema` = "http://json-schema.org/draft-07/schema#",
-      version = version,
+      `x-version` = version,
       id = s"sdl-schema-$version.json#",
       properties = ListMap(
         globalKey -> globalJsonDef,
@@ -113,8 +113,18 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
       // Otherwise, there might happen a stack overflow with ProxyAction.
       val properties = new LazyListMapWrapper(() => ListMap(typeProperty ++ attributes.map(a => (a.name, convertToJsonType(a))):_*))
       val required = typeProperty.map(_._1) ++ attributes.filter(_.isRequired).map(_.name)
-      jsonschema.JsonObjectDef(properties, required = required, title = typeDef.name, description = typeDef.description,
+      val jsonObjectDef = jsonschema.JsonObjectDef(properties, required = required, title = typeDef.name, description = typeDef.description,
         deprecated = if (typeDef.isDeprecated) Some(true) else None)
+      addSubFeedTypes(jsonObjectDef, typeDef)
+    }
+
+    private def addSubFeedTypes(jsonObjectDef: JsonObjectDef, typeDef: GenericTypeDef): JsonObjectDef = {
+      def names(types: Seq[Type]) = types.map(_.typeSymbol.name.toString)
+      typeDef.subFeedTypes match {
+        case Some(t) if typeDef.tpe <:< typeOf[DataObject] => jsonObjectDef.copy(`x-readSubFeedTypes` = names(t.read), `x-writeSubFeedTypes` = names(t.write))
+        case Some(t) => jsonObjectDef.copy(`x-subFeedTypes` = names(t.read))
+        case None => jsonObjectDef
+      }
     }
 
     private def getTypeAttributesForJsonSchema(typeDef: GenericTypeDef): Seq[GenericAttributeDef] = {
@@ -208,8 +218,8 @@ private[smartdatalake] object JsonSchemaUtil extends SmartDataLakeLogger {
             case _ => throw new IllegalStateException(s"Can not handle List with elements of type ${t.typeArgs.map(_.typeSymbol.fullName).mkString(",")}")
           }
         case t =>
-          logger.warn(s"Json schema creator for ${t.typeSymbol.fullName} missing. Creating type as existingJavaType.")
-          JsonStringDef(description, existingJavaType = Some(t.typeSymbol.fullName), deprecated = isDeprecated)
+          logger.warn(s"Json schema creator for ${t.typeSymbol.fullName} missing. Creating type as x-existingJavaType.")
+          JsonStringDef(description, `x-existingJavaType` = Some(t.typeSymbol.fullName), deprecated = isDeprecated)
       }
     }
 
