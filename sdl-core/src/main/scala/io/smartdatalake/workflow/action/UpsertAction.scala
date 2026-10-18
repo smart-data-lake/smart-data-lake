@@ -279,6 +279,7 @@ case class UpsertAction(
                          updateCapturedColumnOnlyWhenChanged: Boolean = false,
                          sourceTimestampColumn: Option[String] = None,
                          mergeModeAdditionalJoinPredicate: Option[String] = None,
+                         override val mergeModeFilter: Option[MergeModeFilter] = None,
                          override val cacheOutput: Boolean = false,
                          override val cacheInput: Boolean = false,
                          override val executionMode: Option[ExecutionMode] = None,

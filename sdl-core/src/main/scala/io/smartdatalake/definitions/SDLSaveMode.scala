@@ -144,7 +144,7 @@ object SaveModeMergeOptions {
 case class SaveModeMergeExpressions(saveMode: SaveModeMergeOptions, subFeedType: Type, existingAliasReplacement: Option[String] = None) {
   private val functions = DataFrameSubFeed.getFunctions(subFeedType)
   def replaceExistingAlias(s: String): String = {
-    existingAliasReplacement.map(replacement => s.replaceAll("existing\\.", replacement + ".")).getOrElse(s)
+    existingAliasReplacement.map(replacement => SaveModeMergeExpressions.replaceAlias(s, "existing", replacement)).getOrElse(s)
   }
   import functions._
   val deleteConditionExpr: Option[GenericColumn] = saveMode.deleteCondition.map(c => expr(replaceExistingAlias(c)))
@@ -153,4 +153,42 @@ case class SaveModeMergeExpressions(saveMode: SaveModeMergeOptions, subFeedType:
   val insertConditionExpr: Option[GenericColumn] = saveMode.insertCondition.map(c => expr(replaceExistingAlias(c)))
   val insertValuesOverrideExpr: Map[String, GenericColumn] = saveMode.insertValuesOverride.view.mapValues(expr).toMap
   val additionalMergePredicateExpr: Option[GenericColumn] = saveMode.additionalMergePredicate.map(c => expr(replaceExistingAlias(c)))
+}
+
+object SaveModeMergeExpressions {
+
+  /**
+   * Replace references to a table alias, e.g. `existing.col`, with another alias.
+   * Quoted string literals and identifiers are left unchanged, as well as names only ending with the alias.
+   */
+  private[smartdatalake] def replaceAlias(expression: String, alias: String, replacement: String): String = {
+    val aliasPattern = s"(?<![\\w.])${java.util.regex.Pattern.quote(alias)}\\.".r
+    def replaceUnquoted(part: String) = aliasPattern.replaceAllIn(part, java.util.regex.Matcher.quoteReplacement(replacement + "."))
+    val result = new StringBuilder
+    var unquotedStart = 0
+    var i = 0
+    while (i < expression.length) {
+      val quote = expression(i)
+      if (quote == '\'' || quote == '"' || quote == '`') {
+        result.append(replaceUnquoted(expression.substring(unquotedStart, i)))
+        // find end of quoted part, handling backslash escapes and doubled quotes
+        var j = i + 1
+        var closed = false
+        while (j < expression.length && !closed) {
+          if (expression(j) == '\\' && quote != '`') j += 2
+          else if (expression(j) == quote) {
+            if (j + 1 < expression.length && expression(j + 1) == quote) j += 2
+            else closed = true
+            if (closed) j += 1
+          } else j += 1
+        }
+        val end = math.min(j, expression.length)
+        result.append(expression.substring(i, end))
+        i = end
+        unquotedStart = end
+      } else i += 1
+    }
+    result.append(replaceUnquoted(expression.substring(unquotedStart)))
+    result.toString
+  }
 }

@@ -149,6 +149,29 @@ Use the table alias `existing` to reference columns of the existing table data:
 Limiting the existing data means records outside the predicate are treated as not existing, which creates duplicate versions if such a record is delivered again. Use it only if you know the source cannot deliver older records.
 :::
 
+### Restricting the merge to the data of interest
+
+On large partitioned or clustered tables, set `mergeModeFilter` to restrict the existing data considered by the merge to the partitions or value ranges of the incoming data.
+SDLB then adds a predicate on the filter columns to the merge condition, so that the table format or database can skip partitions and files instead of reading the whole table.
+The filter columns default to the partition columns of the output DataObject.
+For tables without partitions, e.g. a liquid clustered DeltaLake table, list the columns explicitly:
+
+```
+    mergeModeFilter {}                           # use the partition columns of the output
+    mergeModeFilter { columns = [event_date] }   # use the given columns
+```
+
+HistorizeAction always computes the range `[min, max]` of each filter column in the historized data with an additional aggregation, also if partition values are available, so that records closing deleted versions in other partitions are matched too; the incoming data is evaluated separately for this, so it must be deterministic, e.g. not depend on a source changing in between or on non-deterministic functions.
+Ranges are widened where values can't be compared exactly (timestamps by two days to be independent of time zones, floating point numbers minimally), so the predicate always includes the data of interest. A bound that would exceed the timestamp range, e.g. for `9999-12-31`, is left open.
+No range is created on string columns of JDBC tables or with a non-binary collation (e.g. `UTF8_LCASE`), as the target might compare strings differently.
+`mergeModeFilter` is not supported with streaming execution modes.
+
+:::caution
+`mergeModeFilter` is only correct if records never change their values in the filter columns.
+A record that moves to another partition or value range is not found by the merge and inserted again, creating duplicate versions.
+Choose filter columns that are part of the primary key, or that are otherwise guaranteed to stay unchanged.
+:::
+
 If you still have a table from a legacy full historization, migration happens automatically: the missing `dl_hash` column is detected and added to the existing data on the next run.
 
 ## Change Data Capture (CDC) historization
@@ -306,6 +329,7 @@ The complete list of parameters is available in the [Configuration Schema Viewer
 | `checkInputUnique` | `false` | Fail if the input contains duplicate primary keys, instead of silently dropping duplicates. |
 | `sourceTimestampColumn` | - | Column holding the timestamp of the last change in the source system, used as valid-from of new versions. |
 | `mergeModeAdditionalJoinPredicate` | - | Condition to limit the existing data read for the merge, using table alias `existing`. |
+| `mergeModeFilter` | - | Restrict the existing data considered by the merge to the partitions or value ranges of the incoming data, see above. |
 | `mergeModeCDCColumn` | - | Column holding the CDC operation to replay, enabling CDC historization. |
 | `mergeModeCDCDeletedValue` | - | Value of `mergeModeCDCColumn` marking a record as deleted. Defaults to `delete` for SDLB's standard CDC columns. |
 | `mergeModeCDCAutoDetect` | `true` | Enable CDC historization automatically if the input has a column `_change_type`. |

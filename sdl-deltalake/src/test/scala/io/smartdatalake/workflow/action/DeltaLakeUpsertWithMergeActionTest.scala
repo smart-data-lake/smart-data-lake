@@ -50,6 +50,16 @@ class DeltaLakeUpsertWithMergeActionTest extends AnyFunSuite
     )
   }
 
+  test("upsert load mergeModeFilter") {
+    testUpsertWithMergeModeFilter(
+      (id, _) => MockSparkDataObject(id),
+      (id, pks, registry) => {
+        val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)
+        DeltaLakeTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
+      }
+    )
+  }
+
   test("upsert load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
     testUpsertWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
       (id, _) => MockSparkDataObject(id),
@@ -90,4 +100,13 @@ class DeltaLakeUpsertWithMergeActionTest extends AnyFunSuite
     )
   }
 
+  test("upsert into partitioned table with mergeModeFilter and PartitionDiffMode") {
+    testUpsertWithMergeModeFilterPartitioned(
+      (id, partitions, registry) => MockSparkDataObject(id, partitions = partitions)(registry),
+      (id, pks, partitions, registry) => {
+        val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_") + "_part", primaryKey = pks)
+        DeltaLakeTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, partitions = partitions)(registry)
+      }
+    )
+  }
 }

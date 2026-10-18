@@ -150,6 +150,18 @@ object SQLUtil extends SmartDataLakeLogger {
   def escapeSqlStringLiteral(str: String): String = str.replace("'", "''")
 
   /**
+   * Render a number as SQL literal, or None if it is not a finite number.
+   */
+  def numberLiteral(value: Any): Option[String] = value match {
+    case d: Double if d.isNaN || d.isInfinite => None
+    case f: Float if f.isNaN || f.isInfinite => None
+    case d: java.math.BigDecimal => Some(d.toPlainString)
+    case d: BigDecimal => Some(d.bigDecimal.toPlainString)
+    case n @ (_: Byte | _: Short | _: Int | _: Long | _: BigInt | _: java.math.BigInteger | _: Double | _: Float) => Some(n.toString)
+    case _ => None
+  }
+
+  /**
    * Execute a SQL statement as is.
    * Use this for SDLB generated statements, which address the table by its fully qualified name, see [[Table.fullName]].
    */

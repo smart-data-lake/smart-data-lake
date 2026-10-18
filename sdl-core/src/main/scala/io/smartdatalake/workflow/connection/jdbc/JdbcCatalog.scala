@@ -23,7 +23,7 @@ import io.smartdatalake.workflow.connection.Connection
 import io.smartdatalake.workflow.dataobject.generic.{ForeignKeyDefinition, PrimaryKeyDefinition}
 
 import scala.collection.mutable.{Set => MutableSet}
-import java.sql.{ResultSet, SQLException}
+import java.sql.{Date, ResultSet, SQLException, Timestamp}
 
 /**
  * SQL JDBC Catalog query method definition.
@@ -38,9 +38,21 @@ import java.sql.{ResultSet, SQLException}
 abstract class JdbcCatalog(connection: Connection with GenericJdbcExecution, url: String) extends SmartDataLakeLogger  {
 
   // identifiers are quoted with double quotes (standard SQL), except by databases in MySQL tradition
+  protected lazy val subProtocol: String = url.split(':').drop(1).headOption.map(_.toLowerCase).getOrElse("")
   protected lazy val (quoteStart, quoteEnd) = {
-    val subProtocol = url.split(':').drop(1).headOption.map(_.toLowerCase).getOrElse("")
     if (JdbcCatalog.backtickQuotingSubProtocols.contains(subProtocol)) ("`", "`") else ("\"", "\"")
+  }
+
+  /**
+   * Render a value as SQL literal for this database, or None if the value type is not supported.
+   * The default uses standard SQL literals; SQL Server needs CAST for date/time values.
+   * Boolean literals are not supported, as they are not portable across databases.
+   */
+  def sqlLiteral(value: Any): Option[String] = value match {
+    case s: String => Some(s"'${SQLUtil.escapeSqlStringLiteral(s)}'")
+    case d: Date => Some(if (subProtocol == "sqlserver") s"CAST('$d' AS DATE)" else s"DATE '$d'")
+    case t: Timestamp => Some(if (subProtocol == "sqlserver") s"CAST('$t' AS DATETIME2)" else s"TIMESTAMP '$t'")
+    case x => SQLUtil.numberLiteral(x)
   }
   // true if the given identifier is quoted
   def isQuotedIdentifier(s: String) : Boolean = {

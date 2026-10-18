@@ -19,17 +19,19 @@
 package io.smartdatalake.testutils
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.definitions.Environment
+import io.smartdatalake.definitions.{Environment, MergeModeFilter}
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil.getCommonSubFeed
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.UpsertAction
+import io.smartdatalake.workflow.action.executionMode.PartitionDiffMode
 import io.smartdatalake.workflow.action.generic.transformer.{FilterTransformer, SQLDfTransformer}
 import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import io.smartdatalake.workflow.dataobject.generic._
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, ExecutionPhase, InitSubFeed}
 import org.slf4j.Logger
 
 import java.sql.Timestamp
@@ -654,6 +656,107 @@ trait UpsertActionBehaviour extends GenericTestTool {
       val actual = tgtDO.getDataFrame(Seq(), subFeedType)(context2)
       val resultat = expected.isEqual(actual)
       if (!resultat) printFailedTestResultGdf("upsert 1st 2nd load", Seq())(actual)(expected)
+      assert(resultat)
+    }
+  }
+
+  /**
+   * Shows that mergeModeFilter restricts the existing data considered by the merge to the value range of the incoming data:
+   * a record outside the range is not matched and therefore inserted again. This is the documented consequence of
+   * violating the precondition that records never change their values in the filter columns.
+   */
+  def testUpsertWithMergeModeFilter(
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
+      tgtConnection: Option[Connection] = None
+  ): Unit = {
+
+    implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+    tgtConnection.foreach(instanceRegistry.register)
+    implicit val contextInit: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
+
+    // setup DataObjects
+    val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
+    val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname")), instanceRegistry))
+    val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+    val helper = DataFrameSubFeed.getCompanion(subFeedType)
+    import helper.implicits._
+    val srcSubFeed = ScalaSubFeed(None, "src1", Seq())
+
+    // 1st load without filter
+    val context1 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = LocalDateTime.now(), phase = ExecutionPhase.Exec)
+    val action1 = UpsertAction("dda", srcDO.id, tgtDO.id)
+    srcDO.writeDataFrame(Seq(("doe", "john", 5), ("pan", "peter", 7)).toDF("lastname", "firstname", "rating"), Seq())(context1)
+    action1.init(Seq(srcSubFeed))(context1.copy(phase = ExecutionPhase.Init))
+    action1.exec(Seq(srcSubFeed))(context1)
+
+    // 2nd load with filter on rating: incoming range is [7, 9], existing doe/john/5 is outside and not matched
+    val context2 = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = LocalDateTime.now(), phase = ExecutionPhase.Exec)
+    val action2 = UpsertAction("dda", srcDO.id, tgtDO.id, mergeModeFilter = Some(MergeModeFilter(Seq("rating"))))
+    srcDO.writeDataFrame(Seq(("doe", "john", 9), ("pan", "peter", 7)).toDF("lastname", "firstname", "rating"), Seq())(context2)
+    action2.init(Seq(srcSubFeed))(context2.copy(phase = ExecutionPhase.Init))
+    action2.exec(Seq(srcSubFeed))(context2)
+
+    {
+      val dfExpected = Seq(
+        ("doe", "john",  5),
+        ("doe", "john",  9),
+        ("pan", "peter", 7)
+      ).toDF("lastname", "firstname", "rating")
+      val dfActual = tgtDO.getDataFrame(Seq(), subFeedType)(context2).select("lastname", "firstname", "rating")
+      val resultat = dfExpected.isEqual(dfActual)
+      if (!resultat) printFailedTestResultGdf("upsert with mergeModeFilter", Seq())(dfActual)(dfExpected)
+      assert(resultat)
+    }
+  }
+
+  /**
+   * Success signal of mergeModeFilter: incremental load of new partitions with PartitionDiffMode restricts the merge to
+   * these partitions, existing partitions stay untouched.
+   * Record 1 moves from partition A to C, violating the precondition of mergeModeFilter: it is inserted again, which
+   * shows that partition A was excluded from the merge.
+   */
+  def testUpsertWithMergeModeFilterPartitioned(
+      createSrcDataObject: (String, Seq[String], InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], Seq[String], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
+      tgtConnection: Option[Connection] = None
+  ): Unit = {
+
+    implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+    tgtConnection.foreach(instanceRegistry.register)
+    implicit val contextInit: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
+    instanceRegistry.register(defaultEngineConnection)
+
+    val srcDO = registerDataObject(createSrcDataObject("src1", Seq("dt"), instanceRegistry))
+    val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("id")), Seq("dt"), instanceRegistry))
+    val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+    val helper = DataFrameSubFeed.getCompanion(subFeedType)
+    import helper.implicits._
+    val action = UpsertAction("dda", srcDO.id, tgtDO.id, executionMode = Some(PartitionDiffMode()), mergeModeFilter = Some(MergeModeFilter()))
+    def run(): Unit = {
+      val context = ScalaTestUtil.getDefaultActionPipelineContext.copy(runStartTime = LocalDateTime.now(), phase = ExecutionPhase.Exec)
+      val srcSubFeed = InitSubFeed(srcDO.id, Seq()) // InitSubFeed needed to apply executionMode
+      action.preInit(Seq(srcSubFeed), Seq())(context.copy(phase = ExecutionPhase.Init))
+      action.init(Seq(srcSubFeed))(context.copy(phase = ExecutionPhase.Init))
+      action.preExec(Seq(srcSubFeed))(context)
+      val tgtSubFeeds = action.exec(Seq(srcSubFeed))(context)
+      action.postExec(Seq(srcSubFeed), tgtSubFeeds)(context)
+    }
+
+    // 1st load of partitions A and B
+    srcDO.writeDataFrame(Seq((1, "A", "x"), (2, "B", "y")).toDF("id", "dt", "value"), Seq(PartitionValues(Map("dt" -> "A")), PartitionValues(Map("dt" -> "B"))))
+    run()
+
+    // 2nd load of new partition C
+    srcDO.writeDataFrame(Seq((1, "C", "z"), (3, "C", "w")).toDF("id", "dt", "value"), Seq(PartitionValues(Map("dt" -> "C"))))
+    run()
+
+    {
+      val dfExpected = Seq((1, "A", "x"), (2, "B", "y"), (1, "C", "z"), (3, "C", "w")).toDF("id", "dt", "value")
+      val dfActual = tgtDO.getDataFrame(Seq(), subFeedType)(contextInit.copy(phase = ExecutionPhase.Exec)).select("id", "dt", "value") // JDBC reads only one record outside exec phase
+      val resultat = dfExpected.isEqual(dfActual)
+      if (!resultat) printFailedTestResultGdf("upsert with mergeModeFilter and PartitionDiffMode", Seq())(dfActual)(dfExpected)
       assert(resultat)
     }
   }

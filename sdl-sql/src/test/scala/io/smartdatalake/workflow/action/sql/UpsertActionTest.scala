@@ -20,6 +20,7 @@ package io.smartdatalake.workflow.action.sql
 
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.testutils.UpsertActionBehaviour
+import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.testutils.sql.{MockSQLTableDataObject, SQLTestUtil}
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
@@ -86,5 +87,24 @@ class UpsertActionTest extends AnyFunSuite with BeforeAndAfterAll with SmartData
 
   test("upsert load mergeModeEnable sourceTimestampColumn updateCapturedColumnOnlyWhenChanged") {
     testUpsertWithMergeModeSourceTimestampColumnUpdateOnlyWhenChanged(createSrcDataObject, createTgtDataObject)
+  }
+
+  // tables of mergeModeFilter tests get their own name and are dropped first, as all tests share the same database
+  private def jdbcTable(id: String, suffix: String, primaryKey: Option[Seq[String]], partitions: Seq[String], registry: InstanceRegistry) = {
+    val dataObject = JdbcTableDataObject(id, table = Table(db = None, name = s"${id}_$suffix", primaryKey = primaryKey), connectionId = connection.id,
+      virtualPartitions = partitions, allowSchemaEvolution = true)(registry)
+    dataObject.dropTable(ScalaTestUtil.getDefaultActionPipelineContext(registry))
+    dataObject
+  }
+
+  test("upsert load mergeModeFilter") {
+    testUpsertWithMergeModeFilter(createSrcDataObject, (id, pks, registry) => jdbcTable(id, "filter", pks, Seq(), registry))
+  }
+
+  test("upsert into partitioned table with mergeModeFilter and PartitionDiffMode") {
+    testUpsertWithMergeModeFilterPartitioned(
+      (id, partitions, registry) => jdbcTable(id, "part", None, partitions, registry),
+      (id, pks, partitions, registry) => jdbcTable(id, "part", pks, partitions, registry)
+    )
   }
 }

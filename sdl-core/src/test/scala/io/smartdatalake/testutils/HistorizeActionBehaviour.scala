@@ -21,9 +21,10 @@ package io.smartdatalake.testutils
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions
-import io.smartdatalake.definitions.{CdcChangeType, Environment}
+import io.smartdatalake.definitions.{CdcChangeType, Environment, MergeModeFilter}
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.testutils.plainScala.ScalaTestUtil.getCommonSubFeed
+import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.historization.Historization
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.workflow.action.executionMode.DataFrameIncrementalMode
@@ -740,6 +741,94 @@ trait HistorizeActionBehaviour extends GenericTestTool {
     action.init(Seq(srcSubFeed))(context.copy(phase = ExecutionPhase.Init))
     action.exec(Seq(srcSubFeed))(context)
   }
+
+  /**
+   * mergeModeFilter must not prevent closing records that are no longer delivered by the source:
+   * the range of the filter columns is computed on the historized data including the records closing deleted versions.
+   */
+  def historizeWithMergeModeFilter(
+      createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
+      tgtConnection: Option[Connection] = None
+  ): Unit =
+
+    test("historize load using merge with mergeModeFilter closes deleted records") {
+      implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+      tgtConnection.foreach(instanceRegistry.register)
+      instanceRegistry.register(defaultEngineConnection)
+      implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+
+      val srcDO = registerDataObject(createSrcDataObject("src1", instanceRegistry))
+      val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("lastname", "firstname")), instanceRegistry))
+      val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+      val helper = DataFrameSubFeed.getCompanion(subFeedType)
+      import helper._
+      import helper.implicits._
+      val action = HistorizeAction("ha", srcDO.id, tgtDO.id, mergeModeFilter = Some(MergeModeFilter(Seq("lastname"))))
+
+      // 1st load
+      srcDO.writeDataFrame(Seq(("doe", "john", 5), ("pan", "peter", 5)).toDF("lastname", "firstname", "rating"), Seq())
+      execHistorizeAction(action, context.copy(runStartTime = LocalDateTime.now()))
+      assert(tgtDO.getDataFrame(Seq(), subFeedType).count == 2)
+
+      // 2nd load: doe updated, pan deleted in source
+      srcDO.writeDataFrame(Seq(("doe", "john", 10)).toDF("lastname", "firstname", "rating"), Seq())
+      execHistorizeAction(action, context.copy(runStartTime = LocalDateTime.now()))
+
+      val actual = tgtDO.getDataFrame(Seq(), subFeedType)
+      assert(actual.count == 3) // doe 5 closed, doe 10 current, pan 5 closed
+      val maxValidTo = Timestamp.valueOf(LocalDateTime.of(9999, 12, 31, 0, 0, 0, 0))
+      val panValidTo = actual.filter(col("lastname") === lit("pan")).select(col(Environment.delimitedColumnName)).collect.map(_.get(0))
+      assert(panValidTo.size == 1 && panValidTo.head.asInstanceOf[Timestamp].before(maxValidTo), s"pan must be closed, but valid to is $panValidTo")
+    }
+
+  /**
+   * HistorizeAction must use the range of the filter columns instead of the partition values of the incoming data:
+   * loading partition grp=1 closes record 2 of partition grp=2 as deleted, the closing record must be matched by the merge.
+   * The filter column is numeric, as JDBC creates no range predicate on string columns.
+   */
+  def historizeWithMergeModeFilterPartitioned(
+      createSrcDataObject: (String, Seq[String], InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,
+      createTgtDataObject: (String, Option[Seq[String]], Seq[String], InstanceRegistry) => TransactionalTableDataObject with CanMergeDataFrame,
+      tgtConnection: Option[Connection] = None
+  ): Unit =
+
+    test("historize partitioned load with mergeModeFilter closes deleted records in other partitions") {
+      implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
+      tgtConnection.foreach(instanceRegistry.register)
+      instanceRegistry.register(defaultEngineConnection)
+      implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext.copy(phase = ExecutionPhase.Exec)
+
+      val srcDO = registerDataObject(createSrcDataObject("src1", Seq("grp"), instanceRegistry))
+      val tgtDO = registerDataObject(createTgtDataObject("tgt1", Some(Seq("id", "grp")), Seq("grp"), instanceRegistry))
+      val subFeedType = getCommonSubFeed(srcDO, tgtDO)
+      val helper = DataFrameSubFeed.getCompanion(subFeedType)
+      import helper._
+      import helper.implicits._
+      val action = HistorizeAction("ha", srcDO.id, tgtDO.id, mergeModeFilter = Some(MergeModeFilter()))
+      def exec(partitionValues: Seq[PartitionValues]): Unit = {
+        val ctx = context.copy(runStartTime = LocalDateTime.now())
+        val srcSubFeed = ScalaSubFeed(None, action.inputId, partitionValues)
+        action.prepare(ctx.copy(phase = ExecutionPhase.Prepare))
+        action.preInit(Seq(srcSubFeed), Seq())(ctx.copy(phase = ExecutionPhase.Init))
+        action.init(Seq(srcSubFeed))(ctx.copy(phase = ExecutionPhase.Init))
+        action.exec(Seq(srcSubFeed))(ctx)
+      }
+
+      // 1st load of partitions grp=1 and grp=2
+      srcDO.writeDataFrame(Seq((1, 1, "a"), (2, 2, "b")).toDF("id", "grp", "value"), Seq(PartitionValues(Map("grp" -> "1")), PartitionValues(Map("grp" -> "2"))))
+      exec(Seq())
+
+      // 2nd load of partition grp=1: record 1 updated, record 2 no longer delivered
+      srcDO.writeDataFrame(Seq((1, 1, "a2")).toDF("id", "grp", "value"), Seq(PartitionValues(Map("grp" -> "1"))))
+      exec(Seq(PartitionValues(Map("grp" -> "1")))) // partition values are strings, as parsed from paths
+
+      val dfActual = tgtDO.getDataFrame(Seq(), subFeedType)
+      assert(dfActual.count == 3) // record 1 closed and current version, record 2 closed
+      val maxValidTo = Timestamp.valueOf(LocalDateTime.of(9999, 12, 31, 0, 0, 0, 0))
+      val record2ValidTo = dfActual.filter(col("id") === lit(2)).select(col(Environment.delimitedColumnName)).collect.map(_.get(0))
+      assert(record2ValidTo.size == 1 && record2ValidTo.head.asInstanceOf[Timestamp].before(maxValidTo), s"record 2 must be closed, but valid to is ${record2ValidTo.mkString(",")}")
+    }
 
   def historizeIncrementalPipeline(
       createSrcDataObject: (String, InstanceRegistry) => TableDataObject with CanCreateDataFrame with CanWriteDataFrame,

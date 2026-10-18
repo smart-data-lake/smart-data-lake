@@ -62,6 +62,7 @@ trait ConfigImplicits {
   // --------------------------------------------------------------------------------
   implicit val secretProviderConfigReader: ConfigReader[SecretProviderConfig] = ConfigReader.derive[SecretProviderConfig]
   implicit val conditionReader: ConfigReader[Condition] = ConfigReader.derive[Condition]
+  implicit val mergeModeFilterReader: ConfigReader[MergeModeFilter] = ConfigReader.derive[MergeModeFilter]
   implicit val saveModeOptionsReader: ConfigReader[SaveModeOptions] = ConfigReader.derive[SaveModeOptions]
   // --------------------------------------------------------------------------------
 

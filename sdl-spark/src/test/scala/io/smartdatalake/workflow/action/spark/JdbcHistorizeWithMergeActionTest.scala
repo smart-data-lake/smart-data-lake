@@ -57,4 +57,16 @@ class JdbcHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with Sm
     },
     tgtConnection = Some(jdbcConnection)
   ))
+
+  // JDBC creates no range predicate on string columns, therefore only the test with a numeric filter column is meaningful
+  testsFor(historizeWithMergeModeFilterPartitioned(
+    (id, partitions, registry) => MockSparkDataObject(id, partitions = partitions)(registry),
+    (id, pks, partitions, registry) => {
+      val tgtTable = Table(Some("public"), id.replaceAll("-", "_") + "_part", None, pks)
+      val dataObject = JdbcTableDataObject(id, table = tgtTable, connectionId = jdbcConnection.id, virtualPartitions = partitions, allowSchemaEvolution = true)(registry)
+      dataObject.dropTable(SparkTestUtil.getDefaultActionPipelineContext(registry))
+      dataObject
+    },
+    tgtConnection = Some(jdbcConnection)
+  ))
 }

@@ -35,6 +35,13 @@ class UpsertWithMergeActionTest extends AnyFunSuite with SmartDataLakeLogger wit
     )
   }
 
+  test("upsert load mergeModeFilter") {
+    testUpsertWithMergeModeFilter(
+      (id, _) => MockScalaDataObject(id),
+      (id, pks, _) => MockScalaDataObject(id, primaryKey = pks)
+    )
+  }
+
   test("upsert load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
     testUpsertWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
       (id, _) => MockScalaDataObject(id),

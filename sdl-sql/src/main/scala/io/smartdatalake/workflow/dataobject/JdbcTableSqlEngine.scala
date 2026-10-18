@@ -202,6 +202,9 @@ class JdbcTableSqlEngine(dataObject: JdbcTableDataObject) extends JdbcTableEngin
     }
   }
 
+  // merge conditions are translated from Spark SQL to the dialect of the database, see translateToDatabaseSql
+  override def translatesMergeConditions: Boolean = true
+
   /**
    * The conditions and values of SaveModeMergeOptions are Spark SQL expressions, like the column expressions of the
    * SQL engine, e.g. `existing.a <=> new.a` created by UpsertAction. They are translated to the dialect of the database.
