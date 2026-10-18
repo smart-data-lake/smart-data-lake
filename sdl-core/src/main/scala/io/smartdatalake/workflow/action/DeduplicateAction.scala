@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.action
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.definitions.Condition
+import io.smartdatalake.definitions.{Condition, MergeModeFilter}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
@@ -51,6 +51,7 @@ case class DeduplicateAction(
                               updateCapturedColumnOnlyWhenChanged: Boolean = false,
                               sourceTimestampColumn: Option[String] = None,
                               mergeModeAdditionalJoinPredicate: Option[String] = None,
+                              override val mergeModeFilter: Option[MergeModeFilter] = None,
                               override val cacheOutput: Boolean = false,
                               override val cacheInput: Boolean = false,
                               override val executionMode: Option[ExecutionMode] = None,

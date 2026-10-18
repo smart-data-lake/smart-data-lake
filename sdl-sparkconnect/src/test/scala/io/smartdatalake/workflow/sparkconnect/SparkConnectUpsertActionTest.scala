@@ -82,4 +82,8 @@ class SparkConnectUpsertActionTest extends AnyFunSuite
   test("upsert 1st 2nd load with transformer changing schema") {
     testUpsertWithTransformerChangingSchema(createSrcDataObject, createTgtDataObject)
   }
+
+  test("upsert load mergeModeFilter") {
+    testUpsertWithMergeModeFilter(createSrcDataObject, createTgtDataObject)
+  }
 }

@@ -107,6 +107,9 @@ import scala.reflect.runtime.universe.Type
  *   table data, e.g. it might be sufficient to use only the last 7 days. Specify a condition to
  *   select existing data to be used in transformation as Spark SQL expression. Use table alias
  *   'existing' to reference columns of the existing table data.
+ * @param mergeModeFilter
+ *   Optionally restrict the existing data considered by the merge to the partitions or value ranges of the incoming
+ *   data, see [[MergeModeFilter]]. Only correct if records never change their values in the filter columns.
  * @param mergeModeCDCColumn
  *   Optional column holding the CDC operation to replay to enable mergeModeCDC. If CDC information
  *   is available from the source incremental historization can be further optimized, as the join
@@ -162,6 +165,7 @@ case class HistorizeAction(
                             ignoreOldDeletedColumns: Boolean = false,
                             ignoreOldDeletedNestedColumns: Boolean = true,
                             mergeModeAdditionalJoinPredicate: Option[String] = None,
+                            override val mergeModeFilter: Option[MergeModeFilter] = None,
                             mergeModeCDCColumn: Option[String] = None,
                             mergeModeCDCDeletedValue: Option[String] = None,
                             mergeModeCDCAutoDetect: Boolean = true,
@@ -248,6 +252,10 @@ case class HistorizeAction(
   override val recursiveInputs: Seq[TransactionalTableDataObject] = Seq(output)
 
   override val handleRecursiveInputsAsSubFeeds: Boolean = false
+
+  // Historization creates records closing existing versions also outside the partitions of the incoming data, e.g. for
+  // deleted records. They must be matched by the merge, therefore mergeModeFilter uses the range of the data.
+  override protected def mergeModeFilterUsesPartitionValues: Boolean = false
 
   // DataFrame created by HistorizeAction should not be passed on to the next Action,
   // but must be recreated from the DataObject.

@@ -51,6 +51,16 @@ class IcebergUpsertWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
     )
   }
 
+  test("upsert load mergeModeFilter") {
+    testUpsertWithMergeModeFilter(
+      (id, registry) => MockSparkDataObject(id)(registry),
+      (id, pks, registry) => {
+        val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
+        IcebergTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
+      }
+    )
+  }
+
   test("upsert load mergeModeEnable updateCapturedColumnOnlyWhenChanged") {
     testUpsertWithMergeModeUpdateCapturedColumnOnlyWhenChanged(
       (id, registry) => MockSparkDataObject(id)(registry),
@@ -91,4 +101,13 @@ class IcebergUpsertWithMergeActionTest extends AnyFunSuite with BeforeAndAfter
     )
   }
 
+  test("upsert into partitioned table with mergeModeFilter and PartitionDiffMode") {
+    testUpsertWithMergeModeFilterPartitioned(
+      (id, partitions, registry) => MockSparkDataObject(id, partitions = partitions)(registry),
+      (id, pks, partitions, registry) => {
+        val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_") + "_part", primaryKey = pks)
+        IcebergTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, partitions = partitions)(registry)
+      }
+    )
+  }
 }

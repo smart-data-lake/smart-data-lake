@@ -59,4 +59,19 @@ class IcebergHistorizeWithMergeActionTest extends AnyFunSuite with Matchers with
       None
     ))
 
+  testsFor(historizeWithMergeModeFilter(
+    (id, registry) => MockSparkDataObject(id)(registry),
+    (id, pks, registry) => {
+      val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_"), primaryKey = pks)
+      IcebergTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
+    }
+  ))
+
+  testsFor(historizeWithMergeModeFilterPartitioned(
+    (id, partitions, registry) => MockSparkDataObject(id, partitions = partitions)(registry),
+    (id, pks, partitions, registry) => {
+      val tgtTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = id.replaceAll("-", "_") + "_part", primaryKey = pks)
+      IcebergTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, partitions = partitions, allowSchemaEvolution = true)(registry)
+    }
+  ))
 }

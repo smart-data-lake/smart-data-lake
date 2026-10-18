@@ -57,4 +57,20 @@ class DeltaLakeHistorizeWithMergeActionTest extends AnyFunSuite with Matchers
       DeltaLakeTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
     }
   ))
+
+  testsFor(historizeWithMergeModeFilter(
+    (id, registry) => MockSparkDataObject(id)(registry),
+    (id, pks, registry) => {
+      val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_"), primaryKey = pks)
+      DeltaLakeTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, allowSchemaEvolution = true)(registry)
+    }
+  ))
+
+  testsFor(historizeWithMergeModeFilterPartitioned(
+    (id, partitions, registry) => MockSparkDataObject(id, partitions = partitions)(registry),
+    (id, pks, partitions, registry) => {
+      val tgtTable = Table(db = Some(deltaDb), name = id.replaceAll("-", "_") + "_part", primaryKey = pks)
+      DeltaLakeTableDataObject(id, Some(tempPath + s"/${tgtTable.fullName}"), table = tgtTable, partitions = partitions, allowSchemaEvolution = true)(registry)
+    }
+  ))
 }

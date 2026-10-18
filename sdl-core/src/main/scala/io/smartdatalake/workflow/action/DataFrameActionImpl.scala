@@ -99,6 +99,14 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
     assert(duplicateOutputs.isEmpty, s"($id) ${duplicateOutputs.mkString(", ")} must not be listed as DataFrame output and additional output at the same time")
     mainInputId.foreach(mainId => assert(!additionalInputs.exists(_.id == mainId), s"($id) mainInputId $mainId must not be an additional input, as no DataFrame can be created from it"))
     mainOutputId.foreach(mainId => assert(!additionalOutputs.exists(_.id == mainId), s"($id) mainOutputId $mainId must not be an additional output, as no DataFrame can be written to it"))
+    // fail early if mergeModeFilter has no filter columns or can not be applied
+    mergeModeFilter.foreach { filter =>
+      dataFrameOutputs.foreach(filter.getFilterColumns(id, _))
+      if (executionMode.exists(_.isInstanceOf[DataFrameStreamingExecutionMode])) throw ConfigurationException(
+        s"($id) mergeModeFilter is not supported with streaming execution mode ${executionMode.get.getClass.getSimpleName}",
+        Some(s"actions.${id.id}.mergeModeFilter")
+      )
+    }
     // Note: an Action expectation referencing an additional input is reported by calculateInputAggMetricsWithScopeAll.
   }
 
@@ -137,6 +145,21 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
    * Optionally override and parametrize saveMode in output DataObject configurations when writing to DataObjects.
    */
   def saveModeOptions: Option[SaveModeOptions] = None
+
+  /**
+   * Optionally restrict the existing data of the output table considered by a merge (SDLSaveMode.Merge) to the data
+   * of interest, e.g. the partitions written, to reduce the data read by the merge. See [[MergeModeFilter]] for
+   * details.
+   * Note that the result is only correct if records never change their values in the filter columns, otherwise
+   * duplicate primary keys are created.
+   */
+  def mergeModeFilter: Option[MergeModeFilter] = None
+
+  /**
+   * If false, [[MergeModeFilter]] ignores the partition values of the incoming data and always computes the range of
+   * the filter columns from the data.
+   */
+  protected def mergeModeFilterUsesPartitionValues: Boolean = true
 
   /**
    * List of expectation definitions to evaluate when executing this Action, see [[Expectation]] for details.
@@ -589,7 +612,14 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         assert(preparedSubFeed.dataFrame.isDefined, s"($id) Input from ${preparedSubFeed.dataObjectId} has no DataFrame. Cannot write.")
         assert(!preparedSubFeed.isSkipped, s"($id) Input from ${preparedSubFeed.dataObjectId} is a skipped. Cannot write skipped DataFrame.")
         val df = preparedSubFeed.dataFrame.get
-        val metrics = output.writeDataFrame(df, preparedSubFeed.partitionValues, isRecursiveInput, saveModeOptions)
+        val metrics = (mergeModeFilter, saveModeOptions) match {
+          case (Some(filter), Some(options)) if options.saveMode == SDLSaveMode.Merge =>
+            filter.writeWithPredicate(id, output, df, preparedSubFeed.partitionValues, SaveModeMergeOptions.fromSaveModeOptions(options),
+              usePartitionValues = mergeModeFilterUsesPartitionValues) {
+              (dfToWrite, mergeOptions) => output.writeDataFrame(dfToWrite, preparedSubFeed.partitionValues, isRecursiveInput, Some(mergeOptions))
+            }
+          case _ => output.writeDataFrame(df, preparedSubFeed.partitionValues, isRecursiveInput, saveModeOptions)
+        }
         // return
         preparedSubFeed.withMetrics(metrics).asInstanceOf[DataFrameSubFeed]
     }
