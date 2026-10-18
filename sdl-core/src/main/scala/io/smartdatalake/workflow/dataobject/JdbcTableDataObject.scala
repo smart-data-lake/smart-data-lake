@@ -299,7 +299,8 @@ case class JdbcTableDataObject(override val id: DataObjectId,
    * Listing virtual partitions by a "select distinct partition-columns" query
    */
   override def listPartitions(implicit context: ActionPipelineContext): Seq[PartitionValues] = {
-    if (partitions.nonEmpty) engine.listPartitions
+    // a table not yet existing has no partitions, e.g. on the first run with PartitionDiffMode
+    if (partitions.nonEmpty && isTableExisting) engine.listPartitions
     else Seq()
   }
 
