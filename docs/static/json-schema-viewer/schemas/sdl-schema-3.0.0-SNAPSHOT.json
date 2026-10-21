@@ -5685,6 +5685,21 @@
             "type" : "string",
             "description" : "To optimize performance it might be interesting to limit the records read from the existing\ntable data, e.g. it might be sufficient to use only the last 7 days. Specify a condition to\nselect existing data to be used in transformation as Spark SQL expression. Use table alias\n'existing' to reference columns of the existing table data."
           },
+          "mergeModeFilter" : {
+            "type" : "object",
+            "properties" : {
+              "columns" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "string"
+                },
+                "description" : "Columns of the output table to create the predicate for. Default is to use the partition columns of\nthe output DataObject. Configure columns explicitly if the output is not partitioned, e.g. the\nclustering columns of a liquid clustered DeltaLake table."
+              }
+            },
+            "title" : "MergeModeFilter",
+            "additionalProperties" : false,
+            "description" : "Optionally restrict the existing data of the output table considered by a merge (SDLSaveMode.Merge) to the data\nof interest, e.g. the partitions written, to reduce the data read by the merge. See `MergeModeFilter` for\ndetails.  \nNote that the result is only correct if records never change their values in the filter columns, otherwise\nduplicate primary keys are created."
+          },
           "cacheOutput" : {
             "type" : "boolean",
             "description" : "Cache the output DataFrame of this Action, so that subsequent Actions can reuse it instead of reading the output\nDataObject again. This saves reading the data again, at the cost of materializing it in the engine.\n\nBy default the DataFrame is not propagated to subsequent Actions, they get a fresh DataFrame from the output\nDataObject according to the SubFeed's partition values.\n\nNote that on Snowflake this materializes a temporary table which is only released when the session is closed."
@@ -5936,6 +5951,21 @@
           "mergeModeAdditionalJoinPredicate" : {
             "type" : "string",
             "description" : "To optimize performance it might be interesting to limit the records read from the existing\ntable data, e.g. it might be sufficient to use only the last 7 days. Specify a condition to\nselect existing data to be used in transformation as Spark SQL expression. Use table alias\n'existing' to reference columns of the existing table data."
+          },
+          "mergeModeFilter" : {
+            "type" : "object",
+            "properties" : {
+              "columns" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "string"
+                },
+                "description" : "Columns of the output table to create the predicate for. Default is to use the partition columns of\nthe output DataObject. Configure columns explicitly if the output is not partitioned, e.g. the\nclustering columns of a liquid clustered DeltaLake table."
+              }
+            },
+            "title" : "MergeModeFilter",
+            "additionalProperties" : false,
+            "description" : "Optionally restrict the existing data considered by the merge to the partitions or value ranges of the incoming\ndata, see `MergeModeFilter`. Only correct if records never change their values in the filter columns."
           },
           "mergeModeCDCColumn" : {
             "type" : "string",
@@ -6555,6 +6585,21 @@
           "mergeModeAdditionalJoinPredicate" : {
             "type" : "string",
             "description" : "To optimize performance it might be interesting to limit the records read from the existing\ntable data, e.g. it might be sufficient to use only the last 7 days. Specify a condition to\nselect existing data to be used in transformation as Spark SQL expression. Use table alias\n'existing' to reference columns of the existing table data."
+          },
+          "mergeModeFilter" : {
+            "type" : "object",
+            "properties" : {
+              "columns" : {
+                "type" : "array",
+                "items" : {
+                  "type" : "string"
+                },
+                "description" : "Columns of the output table to create the predicate for. Default is to use the partition columns of\nthe output DataObject. Configure columns explicitly if the output is not partitioned, e.g. the\nclustering columns of a liquid clustered DeltaLake table."
+              }
+            },
+            "title" : "MergeModeFilter",
+            "additionalProperties" : false,
+            "description" : "Optionally restrict the existing data of the output table considered by a merge (SDLSaveMode.Merge) to the data\nof interest, e.g. the partitions written, to reduce the data read by the merge. See `MergeModeFilter` for\ndetails.  \nNote that the result is only correct if records never change their values in the filter columns, otherwise\nduplicate primary keys are created."
           },
           "cacheOutput" : {
             "type" : "boolean",
