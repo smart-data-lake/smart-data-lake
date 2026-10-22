@@ -21,7 +21,7 @@ package io.smartdatalake.lab
 import io.smartdatalake.config.SdlConfigObject.ConfigObjectId
 import io.smartdatalake.lab.LabCatalogGenerator.canCreateSparkDataFrame
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 import io.smartdatalake.workflow.dataframe.{DataFrameWrapper, GenericDataFrame}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject._
@@ -40,13 +40,16 @@ import java.util.TimeZone
  * A wrapper around a Spark DataObject simplifying the interface for interactive use.
  */
 case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateDataFrame](dataObject: T, context: ActionPipelineContext) {
+  private lazy val sparkSubFeedType = dataObject.getSubFeedSupportedTypes.find(canCreateSparkDataFrame)
+    .getOrElse(throw new IllegalStateException(s"$id does not support creating Spark DataFrames"))
+
   def get(): DataFrame = {
-    dataObject.getDataFrame(subFeedType = dataObject.getSubFeedSupportedTypes.find(canCreateSparkDataFrame).get)(context)
+    dataObject.getDataFrame(subFeedType = sparkSubFeedType)(context)
       .asInstanceOf[GenericDataFrame with DataFrameWrapper]
       .inner.asInstanceOf[DataFrame]
   }
   def get(topLevelPartitions: Seq[String]): DataFrame = {
-    if(partitionColumns.isEmpty) throw NotSupportedException(dataObject.id, s"DataObject is not partitioned but called get(...) with topLevelPartitions ${topLevelPartitions.mkString(",")}")
+    if (partitionColumns.isEmpty) throw NotSupportedException(dataObject.id, s"DataObject is not partitioned but called get(...) with topLevelPartitions ${topLevelPartitions.mkString(",")}")
     val topLevelPartitionColumn = partitionColumns.head
     getWithPartitions(topLevelPartitions.map(p => Map(topLevelPartitionColumn -> p)))
   }
@@ -55,9 +58,9 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateDataFrame](da
 
   def getWithPartitions(partitions: Seq[Map[String,String]]): DataFrame = {
     if(partitionColumns.isEmpty) throw NotSupportedException(dataObject.id, s"DataObject is not partitioned but called getWithPartitions(...) with partitions ${partitions.mkString(",")}")
-    implicit val subFeedHelper: SparkSubFeed.type = SparkSubFeed
+    implicit val subFeedHelper: DataFrameSubFeedCompanion = DataFrameSubFeed.getCompanion(sparkSubFeedType)
     val partitionValues = partitions.map(pv => PartitionValues(pv))
-    dataObject.getDataFrame(partitionValues, SparkSubFeed.subFeedType)(context)
+    dataObject.getDataFrame(partitionValues, sparkSubFeedType)(context)
       .where(partitionValues.map(_.getFilterExpr).reduce(_ or _))
       .asInstanceOf[SparkDataFrame].inner
   }
@@ -76,11 +79,12 @@ case class LabSparkDataObjectWrapper[T <: DataObject with CanCreateDataFrame](da
     if(partitions.nonEmpty && partitionColumns.isEmpty)
       throw NotSupportedException(dataObject.id, s"DataObject is not partitioned" +
         s" but called getWithPartitions(...) with partitions ${partitions.mkString(",")}")
+    assert(sparkSubFeedType != null) // assert DataObject has a SparkSubFeedType
     dataObject match {
       case o: CanWriteSparkDataFrame =>
         o.writeSparkDataFrame(ds.toDF(), partitions.map(pv => PartitionValues(pv)))(context)
       // engine-agnostic DataObjects, e.g. JdbcTableDataObject or DeltaLakeTableDataObject
-      case o: CanWriteDataFrame if o.writeSubFeedSupportedTypes.exists(_ =:= typeOf[SparkSubFeed]) =>
+      case o: CanWriteDataFrame =>
         o.writeSparkDataFrame(ds.toDF(), partitions.map(pv => PartitionValues(pv)))(context)
       case _ => throw NotSupportedException(dataObject.id, "can not write Spark DataFrames")
     }
