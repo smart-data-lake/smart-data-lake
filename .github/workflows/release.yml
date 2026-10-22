@@ -12,6 +12,7 @@ on:
   workflow_dispatch:
     branches:
       - 'hotfix/*'
+      - 'master-spark*'
 
 permissions:
   contents: write
