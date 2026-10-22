@@ -131,18 +131,22 @@ private[smartdatalake] trait ExpectationValidation {
 
   /**
    * Collect metrics for expectations with scope = All
+   * @param dfAll is created lazy
    */
-  def getScopeAllAggMetrics(dfAll: GenericDataFrame, expectationsToValidate: Seq[BaseExpectation], existingMetrics: MetricsMap)(implicit context: ActionPipelineContext): Map[String, _] = {
-    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(dfAll.subFeedType)
+  def getScopeAllAggMetrics(dfAll: () => GenericDataFrame, expectationsToValidate: Seq[BaseExpectation], existingMetrics: MetricsMap, subFeedType: Type)(implicit context: ActionPipelineContext): Map[String, _] = {
+    implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
     val aggExpressions = expectationsToValidate.filter(x => x.scope == ExpectationScope.All).flatMap(_.getAggExpressionColumns(this.id))
       .filter(!_.getName.exists(existingMetrics.contains))
     calculateMetrics(dfAll, aggExpressions, ExpectationScope.All)
   }
 
-  def calculateMetrics(df: GenericDataFrame, aggExpressions: Seq[GenericColumn], scope: ExpectationScope): Map[String, _] = {
+  /**
+   * @param df is created lazy
+   */
+  def calculateMetrics(df: () => GenericDataFrame, aggExpressions: Seq[GenericColumn], scope: ExpectationScope): Map[String, _] = {
     if (aggExpressions.nonEmpty) {
       logger.info(s"($id) collecting aggregate column metrics ${aggExpressions.map(_.getName.getOrElse("<unnamed>")).distinct.mkString(", ")} for expectations with scope $scope")
-      val dfMetrics = df.agg(deduplicate(aggExpressions))
+      val dfMetrics = df().agg(deduplicate(aggExpressions))
       dfMetrics.collect.map(row => dfMetrics.schema.columns.zip(row.toSeq).toMap).head
         .mapValues(v => Option(v).getOrElse(None)).toMap // if value is null convert to None
     } else Map()
@@ -152,7 +156,7 @@ private[smartdatalake] trait ExpectationValidation {
     aggExpressions.groupBy(_.getName).map(_._2.head).toSeq // remove potential duplicates
   }
 
-  def validateExpectations(subFeedType: Type, dfJob: Option[GenericDataFrame], dfAll: GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobAndInputMetrics: Map[String, _], additionalExpectations: Seq[BaseExpectation] = Seq(), enrichmentFunc: Map[String, _] => Map[String, _], scopeJobOnly: Boolean = false, loggerContext: String)(implicit context: ActionPipelineContext): (Map[String, _], Seq[ExpectationValidationException]) = {
+  def validateExpectations(subFeedType: Type, dfJob: Option[GenericDataFrame], dfAll: () => GenericDataFrame, partitionValues: Seq[PartitionValues], scopeJobAndInputMetrics: Map[String, _], additionalExpectations: Seq[BaseExpectation] = Seq(), enrichmentFunc: Map[String, _] => Map[String, _], scopeJobOnly: Boolean = false, loggerContext: String)(implicit context: ActionPipelineContext): (Map[String, _], Seq[ExpectationValidationException]) = {
     implicit val functions: DataFrameFunctions = DataFrameSubFeed.getFunctions(subFeedType)
     val expectationsToValidate = (expectations ++ additionalExpectations)
       .filter(e => !scopeJobOnly || e.scope == ExpectationScope.Job)
@@ -160,9 +164,9 @@ private[smartdatalake] trait ExpectationValidation {
     // collect metrics with scope = JobPartition
     val scopeJobPartitionMetrics = getScopeJobPartitionAggMetrics(subFeedType, dfJob, partitionValues, expectationsToValidate)
     // collect metrics with scope = All
-    val scopeAllMetrics = getScopeAllAggMetrics(dfAll, expectationsToValidate, scopeJobAndInputMetrics)
+    val scopeAllMetrics = getScopeAllAggMetrics(dfAll, expectationsToValidate, scopeJobAndInputMetrics, subFeedType)
     // collect custom metrics
-    val customMetrics = expectationsToValidate.flatMap(e => e.getCustomMetrics(this.id, if (e.scope == ExpectationScope.All) Some(dfAll) else dfJob))
+    val customMetrics = expectationsToValidate.flatMap(e => e.getCustomMetrics(this.id, if (e.scope == ExpectationScope.All) Some(dfAll()) else dfJob))
     // enrich metrics
     val metrics = enrichmentFunc(scopeJobAndInputMetrics ++ scopeJobPartitionMetrics ++ scopeAllMetrics ++ customMetrics)
     // evaluate expectations using dummy ExpressionData
