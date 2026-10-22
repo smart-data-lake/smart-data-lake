@@ -1,8 +1,8 @@
 {
   "type" : "object",
   "$schema" : "http://json-schema.org/draft-07/schema#",
-  "x-version" : "3.0.0-SNAPSHOT",
-  "id" : "sdl-schema-3.0.0-SNAPSHOT.json#",
+  "x-version" : "3.0.0",
+  "id" : "sdl-schema-3.0.0.json#",
   "definitions" : {
     "ExecutionMode" : {
       "CustomPartitionMode" : {
