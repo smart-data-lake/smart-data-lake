@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,19 +16,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject.expectation
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.util.misc.ExpressionUtil
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionHelper
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer.INPUT_VIEW_NAME
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn, GenericDataFrame}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.{ExpectationScope, Job}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.ExpectationSeverity
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 
 /**
@@ -36,6 +35,29 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * The SQL query will be evaluated in a separate Spark job against the DataFrame.
  * It supports scope Job and All, but not JobPartition.
  *
+ * Use it when the check cannot be written as a single aggregate expression, e.g. because it needs a subquery,
+ * a `group by ... having`, or a join. Note that this costs an additional Spark job over the data, so prefer
+ * [[SQLExpectation]] whenever a plain aggregate expression is sufficient.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-departures {
+ *     type = ParquetFileDataObject
+ *     path = ${env.basedir}"/int_departures"
+ *     expectations = [{
+ *       type = SQLQueryExpectation
+ *       name = "countOfPartitionsWith1Record"
+ *       code = "select count(*) from (select lastname from %{inputViewName} group by lastname having count(*) = 1)"
+ *       scope = All
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note `scope = JobPartition` is not supported and fails on initialization.
+ * @see [[SQLExpectation]]
+ * @see [[SQLFractionExpectation]]
  * @param code a SQL query returning a single row. All column will be added as metrics.
  *             If there are more than one column, there has to be one column with the same name as this expectation. This column will be used to compare against a potential condition of the expectation.
  *             The special token %{inputViewName} must be used to insert the temporary view name used to provide the DataFrame to the query.
@@ -55,7 +77,7 @@ case class SQLQueryExpectation(override val name: String, override val descripti
     val inputName = dataObjectId.id
     val inputViewName = ActionHelper.createTemporaryViewName(inputName)
     val inputViewNameOptions = Map(INPUT_VIEW_NAME -> inputViewName, s"${INPUT_VIEW_NAME}_$inputName" -> inputViewName)
-    val preparedSql = SparkExpressionUtil.substituteOptions(dataObjectId, Some(s"expectations.$name.code"), code, inputViewNameOptions)
+    val preparedSql = ExpressionUtil.substituteOptions(dataObjectId, Some(s"expectations.$name.code"), code, inputViewNameOptions)
     try {
       df.get.createOrReplaceTempView(s"$inputViewName")
       // create DataFrame from SQL
@@ -78,7 +100,6 @@ case class SQLQueryExpectation(override val name: String, override val descripti
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL code '$code': ${e.getClass.getSimpleName} ${e.getMessage}", Some(s"expectations.$name.code"), e)
     }
   }
-  override def factory: FromConfigFactory[Expectation] = SQLQueryExpectation
 }
 
 object SQLQueryExpectation extends FromConfigFactory[Expectation] {

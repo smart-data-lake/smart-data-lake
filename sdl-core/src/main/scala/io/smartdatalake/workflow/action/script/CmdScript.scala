@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.script
 
 import com.typesafe.config.Config
@@ -35,20 +34,40 @@ import scala.collection.mutable
  * If return value is not zero an exception is thrown.
  *
  * Note about internal implementation: on execution value of parameter map entries where key starts with
- * - 'param' will be added as parameter after the docker run command, sorted by key.
+ * - 'param' will be added as parameter after the command, sorted by key.
  * This allows to customize execution behaviour through Actions or DataObjects using CmdScript.
  *
+ * Example:
+ * {{{
+ * actions = {
+ *   export-airports {
+ *     type = CustomScriptAction
+ *     inputIds = [int-airports]
+ *     outputIds = [ext-airports]
+ *     scripts = [{
+ *       type = CmdScript
+ *       linuxCmd = "sh ./scripts/export_airports.sh"
+ *       winCmd = "wsl sh ./scripts/export_airports.sh"
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note Only the command for the current operating system needs to be defined, but the job will fail on startup
+ *       if the command for the operating system it is running on is missing.
+ * @see [[DockerRunScript]] to run the command inside a docker container instead.
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
- * @param winCmd       Cmd to execute on windows operating systems - note that it is executed with "cmd /C" prefixed
- * @param linuxCmd     Cmd to execute on linux operating systems - note that it is executed with "sh -c" prefixed.
+ * @param winCmd       Cmd to execute on Windows operating systems - note that it is executed with "cmd /C" prefixed
+ * @param linuxCmd     Cmd to execute on Linux operating systems - note that it is executed directly and not through a
+ *                     shell, so an interpreter must be part of the command if needed, e.g. "sh ./scripts/export.sh".
  */
 case class CmdScript(override val name: String = "cmd", override val description: Option[String] = None, winCmd: Option[String] = None, linuxCmd: Option[String] = None) extends CmdScriptBase {
   if (EnvironmentUtil.isWindowsOS) assert(winCmd.isDefined, s"($name) winCmd must be defined when running on Windows")
   if (!EnvironmentUtil.isWindowsOS) assert(linuxCmd.isDefined, s"($name) linuxCmd must be defined when running on Linux")
 
   override private[smartdatalake] def getCmd(parameters: Map[String,String]): Seq[String] = {
-    val cmdParams = parameters.filterKeys(_.startsWith("param")).toSeq.sortBy(_._1).map(_._2)
+    val cmdParams = parameters.view.filterKeys(_.startsWith("param")).toSeq.sortBy(_._1).map(_._2)
     val cmd = if (EnvironmentUtil.isWindowsOS) {
       val cmdElements = if (isWslCmd) CmdScript.splitCmdParameters(winCmd.get).map(e => if (e.matches(raw"^(\.|([A-Z]:)?)\\.*")) preparePath(e) else e)
         else CmdScript.splitCmdParameters(winCmd.get)
@@ -56,8 +75,6 @@ case class CmdScript(override val name: String = "cmd", override val description
     } else CmdScript.splitCmdParameters(linuxCmd.get)
     cmd ++ cmdParams
   }
-
-  override def factory: FromConfigFactory[ParsableScriptDef] = CmdScript
 
   override private[smartdatalake] def isWslCmd = EnvironmentUtil.isWindowsOS && winCmd.exists(_.startsWith("wsl"))
 }
@@ -80,7 +97,7 @@ trait CmdScriptBase extends ParsableScriptDef with SmartDataLakeLogger {
     cmd.!!(errLogger)
   }
 
-  override def execStdOutStream(configObjectId: ConfigObjectId, partitionValues: Seq[PartitionValues], parameters: Map[String, String], errors: mutable.Buffer[String] = mutable.Buffer())(implicit context: ActionPipelineContext): Stream[String] = {
+  override def execStdOutStream(configObjectId: ConfigObjectId, partitionValues: Seq[PartitionValues], parameters: Map[String, String], errors: mutable.Buffer[String] = mutable.Buffer())(implicit context: ActionPipelineContext): LazyList[String] = {
     import sys.process._
     val cmd = getCmd(parameters)
     val errLogger = ProcessLogger.apply { err =>
@@ -88,7 +105,7 @@ trait CmdScriptBase extends ParsableScriptDef with SmartDataLakeLogger {
       errors.append(err)
     }
     logger.info(s"($configObjectId) executing command: ${cmd.mkString(" ")}")
-    cmd.lineStream(errLogger)
+    cmd.lazyLines(log = errLogger)
   }
 
   /**

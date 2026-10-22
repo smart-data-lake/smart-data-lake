@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.executionMode
 
 import com.typesafe.config.Config
@@ -24,14 +23,37 @@ import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, Insta
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.CustomCodeUtil
-import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.CanHandlePartitions
 import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
 
 /**
  * Execution mode to create custom partition execution mode logic.
+ * Implement trait [[CustomPartitionModeLogic]] in a class on the classpath and reference it by `className`.
+ * The implementation receives the main input & output DataObject together with the given partition values and
+ * returns the partition values to process as `Seq[Map[String,String]]`.
+ * Use this if the partition selection of [[PartitionDiffMode]] is not sufficient, e.g. if you need to reprocess
+ * the last n partitions or select partitions by an external trigger table.
+ * Both main input and main output DataObject must support partitions (CanHandlePartitions), otherwise the action fails.
  *
- * Define a function which receives main input&output DataObject and returns partition values to process as `Seq[Map[String,String]]`
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     executionMode = {
+ *       type = CustomPartitionMode
+ *       className = "com.company.dataPipeline.SelectLastDaysPartitionMode"
+ *       options = { nbOfDays = "3" }
+ *     }
+ *   }
+ * }
+ * }}}
  *
+ * @see [[PartitionDiffMode]] for the built-in partition comparison, [[CustomMode]] for full control over the
+ *      [[ExecutionModeResult]].
  * @param className           class name implementing trait [[CustomPartitionModeLogic]]
  * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
  *                            It can be used to ensure processing all partitions over multiple actions in case of errors.
@@ -58,7 +80,6 @@ case class CustomPartitionMode(className: String, override val alternativeOutput
         throw ConfigurationException(s"$actionId has set executionMode = CustomPartitionMode but $mainInput does not support partitions!")
     }
   }
-  override def factory: FromConfigFactory[ExecutionMode] = CustomPartitionMode
 }
 
 object CustomPartitionMode extends FromConfigFactory[ExecutionMode] {

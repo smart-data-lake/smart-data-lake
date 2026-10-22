@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,11 +21,14 @@ package io.smartdatalake.workflow.action
 import io.smartdatalake.app.GlobalConfig
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.{MockSparkDataObject, TestUtil}
+import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.util.misc.SchemaUtil
+import io.smartdatalake.util.spark.SparkSchemaUtil
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfsTransformer
 import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils, Table}
+import io.smartdatalake.workflow.dataobject.generic.Table
+import io.smartdatalake.workflow.dataobject.spark.SparkDataObjectOps._
+import io.smartdatalake.workflow.dataobject.{IcebergTableDataObject, IcebergTestUtils}
 import io.smartdatalake.workflow.{ActionDAGRun, ActionPipelineContext, ExecutionPhase}
 import org.apache.spark.sql.SparkSession
 import org.scalatest.BeforeAndAfter
@@ -44,13 +47,14 @@ class IcebergCustomDataFrameTest extends AnyFunSuite with BeforeAndAfter {
   private val tempPath = tempDir.toAbsolutePath.toString
 
   implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry
-  implicit val contextInit: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  implicit val contextInit: ActionPipelineContext = SparkTestUtil.getDefaultActionPipelineContext
   private val contextPrep = contextInit.copy(phase = ExecutionPhase.Prepare)
-  private val contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that mutable Map dataFrameReuseStatistics is shared between contextInit & contextExec like this!
+  private val contextExec = contextInit.copy(phase = ExecutionPhase.Exec) // note that the DataFrameCacheRegistry is shared between contextInit & contextExec like this!
   Environment._globalConfig = GlobalConfig()
 
   before {
     instanceRegistry.clear()
+    instanceRegistry.register(SparkTestUtil.defaultSparkConnection)
   }
 
   test("CustomDataFrameAction with recursiveInput") {
@@ -58,7 +62,7 @@ class IcebergCustomDataFrameTest extends AnyFunSuite with BeforeAndAfter {
     val srcDO1 = MockSparkDataObject("src1")
     instanceRegistry.register(srcDO1)
     val recTable = Table(catalog = Some("iceberg1"), db = Some("default"), name = "recursive1", primaryKey = Some(Seq("lastname", "cnt")))
-    val recDO = IcebergTableDataObject("rec1", Some(tempPath + s"/${recTable.fullName}"), table = recTable, schemaMin = Some(SparkSchema(SchemaUtil.getSchemaFromDdl("lastname string, cnt long"))))
+    val recDO = IcebergTableDataObject("rec1", Some(tempPath + s"/${recTable.fullName}"), table = recTable, schemaMin = Some(SparkSchema(SparkSchemaUtil.getSchemaFromDdl("lastname string, cnt long"))))
     recDO.dropTable
     instanceRegistry.register(recDO)
     val tgt1DO = MockSparkDataObject("tgt1")

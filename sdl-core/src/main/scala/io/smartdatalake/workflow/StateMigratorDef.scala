@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,12 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
-import org.json4s.JsonAST.{JField, JInt, JNothing, JObject}
-import org.json4s.{JArray, JValue}
+import org.json4s.JArray
+import org.json4s.JsonAST.{JField, JInt, JNothing, JObject, JString}
 
 /**
  * Definition of how to migrate from one state version to another.
@@ -60,13 +59,16 @@ private[smartdatalake] trait StateMigratorDef {
  * - Additionally `actionState.inputIds[].id` was cleaned up as `inputIds[]`, and the same applies for `actionState.outputIds`.
  */
 class StateMigratorDef3To4 extends StateMigratorDef with SmartDataLakeLogger {
-  override val versionFrom = 3
-  override val versionTo = 4
-  override def migrate(json: JObject): JObject = {
-    assert(json \ "runStateFormatVersion" match {
-      case JInt(version) => version <= versionFrom
-      case JNothing => true // first state files did not have an attribute runStateFormatVersion
-    }, s"Version should be equals or less than $versionFrom")
+   override val versionFrom = 3
+   override val versionTo = 4
+   override def migrate(json: JObject): JObject = {
+      assert(json \ "runStateFormatVersion" match {
+        case JInt(version) => version <= versionFrom
+        case JNothing => true // first state files did not have an attribute runStateFormatVersion
+        case _ =>
+          throw new IllegalStateException(s"Expected runStateFormatVersion to be an integer or missing," +
+            s" but found unexpected type during migration from version $versionFrom to $versionTo")
+      }, s"Version should be equals or less than $versionFrom")
 
     // migrate json
     val migratedJson = json.transformField {
@@ -112,13 +114,16 @@ class StateMigratorDef3To4 extends StateMigratorDef with SmartDataLakeLogger {
  * - appVersion: String is converted to appVersionInfo: Map[String,Any]
  */
 class StateMigratorDef4To5 extends StateMigratorDef with SmartDataLakeLogger {
-  override val versionFrom = 4
-  override val versionTo = 5
-  override def migrate(json: JObject): JObject = {
-    assert(json \ "runStateFormatVersion" match {
-      case JInt(version) => version <= versionFrom
-      case JNothing => true // first state files did not have an attribute runStateFormatVersion
-    }, s"Version should be equals or less than $versionFrom")
+   override val versionFrom = 4
+   override val versionTo = 5
+   override def migrate(json: JObject): JObject = {
+      assert(json \ "runStateFormatVersion" match {
+        case JInt(version) => version <= versionFrom
+        case JNothing => true // first state files did not have an attribute runStateFormatVersion
+        case _ =>
+          throw new IllegalStateException(s"Expected runStateFormatVersion to be an integer or missing," +
+            s" but found unexpected type during migration from version $versionFrom to $versionTo")
+      }, s"Version should be equals or less than $versionFrom")
 
     // migrate json
     val migratedJson = json.transformField {
@@ -131,6 +136,47 @@ class StateMigratorDef4To5 extends StateMigratorDef with SmartDataLakeLogger {
     }.asInstanceOf[JObject]
 
     // update version and return
+    updateVersion(migratedJson, versionTo)
+  }
+}
+/**
+ * Migrate state from format version 5 to 6:
+ * - SubFeeds got a new attribute `executionModeResultOptions`, holding the options returned by the ExecutionMode
+ *   of the Action which created the SubFeed.
+ *   No transformation of existing content is needed: the attribute is missing in older state files and defaults to
+ *   an empty Map when read.
+ * - SubFeeds got a new attribute `expectationsResult`, holding the validation result per expectation of the DataObject
+ *   the SubFeed was written to.
+ *   No transformation of existing content is needed: the attribute is missing in older state files and defaults to
+ *   None when read.
+ * - the SubFeed attribute `filter: Option[String]` is replaced by `filters: Seq[ColumnFilter]`.
+ *   The column a legacy filter belongs to is not known, so legacy filters are dropped. This is safe because SubFeeds
+ *   read from the state are output SubFeeds of completed Actions, and only filters with propagate=true are passed on
+ *   to the next Action anyway, see DataFrameActionImpl.updateOutputFilters.
+ *   `filters` defaults to an empty Seq when missing.
+ */
+class StateMigratorDef5To6 extends StateMigratorDef with SmartDataLakeLogger {
+  override val versionFrom = 5
+  override val versionTo = 6
+  override def migrate(json: JObject): JObject = {
+    assert(json \ "runStateFormatVersion" match {
+      case JInt(version) => version <= versionFrom
+      case JNothing => true // first state files did not have an attribute runStateFormatVersion
+      case _ =>
+        throw new IllegalStateException(s"Expected runStateFormatVersion to be an integer or missing," +
+          s" but found unexpected type during migration from version $versionFrom to $versionTo")
+    }, s"Version should be equals or less than $versionFrom")
+
+    // drop the legacy SubFeed attribute `filter`, which is only ever a string.
+    // executionModeResultOptions and expectationsResult need no transformation, they default to an empty Map
+    // respectively None when missing.
+    val migratedJson = json.removeField {
+      case (name, JString(_)) if name == "filter" =>
+        logger.debug("dropping legacy SubFeed attribute 'filter' during state migration")
+        true
+      case _ => false
+    }.asInstanceOf[JObject]
+
     updateVersion(migratedJson, versionTo)
   }
 }

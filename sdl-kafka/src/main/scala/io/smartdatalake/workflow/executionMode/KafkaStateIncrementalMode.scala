@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,14 +16,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.executionMode
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil}
 import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, ExecutionModeResult}
 import io.smartdatalake.workflow.dataobject.{DataObject, KafkaTopicDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataObjectState, SubFeed}
@@ -32,6 +31,32 @@ import java.sql.Timestamp
 
 /**
  * A special incremental execution mode for Kafka Inputs, remembering the state from the last increment through the Kafka Consumer, e.g. committed offsets.
+ *
+ * The state is not kept in the SDLB run state but as committed consumer group offsets in Kafka itself, so no state
+ * store is needed and the Action can be run without `--state-path`. Offsets are only committed after the Action
+ * succeeded, so a failed run is re-read on the next attempt. Pick this over
+ * [[io.smartdatalake.workflow.action.executionMode.DataFrameIncrementalMode]] whenever the input is a
+ * [[io.smartdatalake.workflow.dataobject.KafkaTopicDataObject]], as it avoids reading a comparison value from the output.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-departures {
+ *     type = CopyAction
+ *     inputId = ext-departures-kafka
+ *     outputId = stg-departures
+ *     executionMode = {
+ *       type = KafkaStateIncrementalMode
+ *       delayedMaxTimestampExpr = "timestamp_seconds(unix_seconds(now()) - 10)"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note At least one input DataObject of the Action must be a
+ *       [[io.smartdatalake.workflow.dataobject.KafkaTopicDataObject]], otherwise initialization fails.
+ *       The input KafkaTopicDataObject must set the `groupIdPrefix` option, as it is used as prefix for the Kafka
+ *       consumer group id in which the offsets are committed.
  * @param delayedMaxTimestampExpr Optional expression to define a delay to read latest offsets from Kafka. The expression has to return a timestamp which is used to select ending offsets to read from Kafka.
  *                                Define a spark sql expression working with the attributes of [[DefaultExpressionData]] returning a timestamp.
  *                                Default is to read latest offsets existing in Kafka.
@@ -41,7 +66,7 @@ case class KafkaStateIncrementalMode(delayedMaxTimestampExpr: Option[String] = N
 
   override def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = {
     // validate delayedMaxTimestampExpr expression
-    delayedMaxTimestampExpr.foreach(expression => SparkExpressionUtil.syntaxCheck[DefaultExpressionData, Timestamp](actionId, Some("delayedMaxTimestampExpr"), expression))
+    delayedMaxTimestampExpr.foreach(expression => ExpressionUtil.syntaxCheck[DefaultExpressionData, Timestamp](actionId, Some("delayedMaxTimestampExpr"), expression))
   }
 
   override def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = {
@@ -53,7 +78,7 @@ case class KafkaStateIncrementalMode(delayedMaxTimestampExpr: Option[String] = N
 
   override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): Option[ExecutionModeResult] = {
     // prepare options
-    val delayedMaxTimestamp = delayedMaxTimestampExpr.flatMap(expr => SparkExpressionUtil.evaluate[DefaultExpressionData, Timestamp](actionId, Some("delayedMaxTimestampExpr"), expr, DefaultExpressionData.from(context, Seq())))
+    val delayedMaxTimestamp = delayedMaxTimestampExpr.flatMap(expr => ExpressionUtil.evaluate[DefaultExpressionData, Timestamp](actionId, Some("delayedMaxTimestampExpr"), expr, DefaultExpressionData.from(context, Seq())))
     val options = Map(
       KafkaTopicDataObject.delayedMaxTimestampOption -> delayedMaxTimestamp.map(_.toString)
     ).collect { case (key, Some(value)) => key -> value } // remove keys with empty values
@@ -66,8 +91,6 @@ case class KafkaStateIncrementalMode(delayedMaxTimestampExpr: Option[String] = N
     // commit offsets read to Kafka
     kafkaInputs.foreach(_.commitIncrementalOutputState)
   }
-
-  override def factory: FromConfigFactory[ExecutionMode] = KafkaStateIncrementalMode
 }
 
 object KafkaStateIncrementalMode extends FromConfigFactory[ExecutionMode] {

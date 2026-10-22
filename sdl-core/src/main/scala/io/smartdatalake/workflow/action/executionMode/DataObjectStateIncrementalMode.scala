@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,17 +16,38 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.executionMode
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.config.SdlConfigObject.ActionId
-import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.CanCreateIncrementalOutput
 import io.smartdatalake.workflow.{ActionPipelineContext, DataObjectState, SubFeed}
 
 /**
  * An execution mode for incremental processing by remembering DataObjects state from last increment.
+ *
+ * In contrast to [[DataFrameIncrementalMode]] the state is not derived by comparing input and output, but kept by the
+ * input DataObject itself and persisted in the SDLB run state. Choose this mode for sources which can create an
+ * increment on their own, e.g. Airbyte, OData, Debezium CDC or JDBC sources with an incremental cursor.
+ * It has no configuration attributes.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = ext-airports
+ *     outputId = stg-airports
+ *     executionMode = { type = DataObjectStateIncrementalMode }
+ *   }
+ * }
+ * }}}
+ *
+ * @note SmartDataLakeBuilder must be started with a state path (command line option `--state-path`), otherwise the
+ *       mode fails in the init phase. At least one input DataObject must implement `CanCreateIncrementalOutput`.
+ * @see [[DataFrameIncrementalMode]], [[PartitionDiffMode]]
  */
 case class DataObjectStateIncrementalMode() extends ExecutionMode {
   private var inputsWithIncrementalOutput: Seq[DataObject with CanCreateIncrementalOutput] = Seq()
@@ -53,7 +74,6 @@ case class DataObjectStateIncrementalMode() extends ExecutionMode {
       inputsWithIncrementalOutput.foreach(i => i.setState(i.getState))
     }
   }
-  override def factory: FromConfigFactory[ExecutionMode] = ProcessAllMode
 }
 
 object DataObjectStateIncrementalMode extends FromConfigFactory[ExecutionMode] {

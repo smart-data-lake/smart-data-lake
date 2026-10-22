@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,15 +16,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.config.exporter
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.exporter.ExportType.ExportType
 import io.smartdatalake.util.misc.FileUtil.readFile
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 
 import java.nio.file.{Files, Path, StandardOpenOption}
 import scala.io.Source
+import scala.jdk.CollectionConverters._
 import scala.util.Using
 
 
@@ -36,7 +37,10 @@ import scala.util.Using
 case class FileExportWriter(path: Path) extends ExportWriter with SmartDataLakeLogger {
 
   override def writeConfig(document: String, version: Option[String]): Unit = {
-    writeFile(document, "config")
+    Files.createDirectories(path)
+    val file = path.resolve(ExportWriter.configFilename)
+    logger.info(s"Writing config to file $file")
+    Files.write(file, document.getBytes("UTF-8"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
   }
 
   override def writeSchema(document: String, dataObjectId: DataObjectId, version: Long): Unit = {
@@ -45,6 +49,21 @@ case class FileExportWriter(path: Path) extends ExportWriter with SmartDataLakeL
 
   override def writeStats(document: String, dataObjectId: DataObjectId, version: Long): Unit = {
     writeWithIndex(document, dataObjectId, "stats", version)
+  }
+
+  override def writeLineage(document: String, dataObjectId: DataObjectId, version: Long): Unit = {
+    writeWithIndex(document, dataObjectId, "lineage", version)
+  }
+
+  /**
+   * The debug output is written unversioned and is not added to an index, as it is read by a developer
+   * extending the lineage extraction and not by the local UI.
+   */
+  override def writeLineageDebug(document: String, dataObjectId: DataObjectId): Unit = {
+    if (path.getParent != null) Files.createDirectories(path)
+    val file = path.resolve(s"${dataObjectId.id}.lineage-debug.txt")
+    logger.info(s"Writing column lineage debug output for $dataObjectId to file $file")
+    Files.write(file, document.getBytes("UTF-8"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
   }
 
   def writeWithIndex(document: String, dataObjectId: DataObjectId, tpe: String, version: Long): Unit = {
@@ -59,16 +78,48 @@ case class FileExportWriter(path: Path) extends ExportWriter with SmartDataLakeL
     }
   }
 
-  def writeFile(document: String, tpe: String): Unit = {
-    if (path.getParent != null) Files.createDirectories(path.getParent)
-    logger.info(s"Writing $tpe to file $path")
-    Files.write(path, document.getBytes("UTF-8"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
-  }
-
   def getLatestData(dataObjectId: DataObjectId, tpe: String): Option[String] = {
+    // the index is sorted by version, see writeVersion
     val lastIndexEntry = readIndex(dataObjectId, tpe).lastOption
     val latestFile = lastIndexEntry.map(path.resolve).map(_.toFile)
     latestFile.map(readFile)
+  }
+
+  override def listVersions(tpe: ExportType, dataObjectId: DataObjectId): Seq[Long] = {
+    readIndex(dataObjectId, tpe.toString).flatMap(parseVersion(dataObjectId, tpe.toString, _)).sorted
+  }
+
+  override def listAllVersions(tpe: ExportType, latestOnly: Boolean): Option[Map[DataObjectId, Seq[Long]]] = {
+    val indexSuffix = s".$tpe.index"
+    val dataObjectIds = Option(path.toFile.list()).toSeq.flatten
+      .filter(_.endsWith(indexSuffix)).map(f => DataObjectId(f.stripSuffix(indexSuffix)))
+    Some(dataObjectIds.map(id => id -> listVersions(tpe, id)).toMap)
+  }
+
+  override def readVersion(tpe: ExportType, dataObjectId: DataObjectId, version: Long): Option[String] = {
+    val (filename, file) = getDataPath(dataObjectId, tpe.toString, version)
+    if (readIndex(dataObjectId, tpe.toString).contains(filename) && Files.exists(file)) Some(readFile(file.toFile))
+    else None
+  }
+
+  /**
+   * Write a given version idempotently: nothing is written if this version exists already.
+   * The version might be older than the latest version, so the index is rewritten sorted by version.
+   */
+  override def writeVersion(tpe: ExportType, document: String, dataObjectId: DataObjectId, version: Long): Unit = {
+    val index = readIndex(dataObjectId, tpe.toString)
+    val (newFilename, newFile) = getDataPath(dataObjectId, tpe.toString, version)
+    if (!index.contains(newFilename)) {
+      Files.createDirectories(path)
+      logger.info(s"Writing $tpe for $dataObjectId version $version to file $newFile and updating index")
+      Files.write(newFile, document.getBytes("UTF-8"), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+      val newIndex = (index :+ newFilename).sortBy(f => parseVersion(dataObjectId, tpe.toString, f).getOrElse(Long.MinValue))
+      Files.write(getIndexPath(dataObjectId, tpe.toString), newIndex.map(_ + System.lineSeparator).asJava, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+    }
+  }
+
+  private def parseVersion(dataObjectId: DataObjectId, tpe: String, filename: String): Option[Long] = {
+    filename.stripPrefix(s"${dataObjectId.id}.$tpe.").stripSuffix(".json").toLongOption
   }
 
   def readIndex(dataObjectId: DataObjectId, tpe: String): Seq[String] = {

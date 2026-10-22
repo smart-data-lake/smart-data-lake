@@ -60,6 +60,9 @@ ALTER USER postgres WITH REPLICATION LOGIN;
 
 Running integration tests for Postgres can be done using DebeziumCdcDataObjectPostgresIT run configuration in IntelliJ.
 
+Note that its last test case historizes the change events into table `demo.test_hist`. That table is created and dropped
+by the test itself, so no additional ddl is needed.
+
 ### MySQL
 
 Server can easily be setup with an oneliner as docker / podman command:
@@ -86,7 +89,7 @@ CREATE TABLE demo.test2 (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 ```
 
-*IMPORTANT": Running Integration Test for MySQL doesnt work with an IntelliJ run configuration, as IntelliJ doesn't
+*IMPORTANT": Running Integration Test for MySQL does not work with an IntelliJ run configuration, as IntelliJ doesn't
 handle classpath with shaded jars / dependency-reduced-pom's correctly.
 Use the following Maven command line instead:
 
@@ -118,7 +121,7 @@ DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_general_ci;
 ```
 
-*IMPORTANT": Running Integration Test for MariaDB doesnt work with an IntelliJ run configuration, as IntelliJ doesn't
+*IMPORTANT": Running Integration Test for MariaDB does not work with an IntelliJ run configuration, as IntelliJ doesn't
 handle classpath with shaded jars / dependency-reduced-pom's correctly.
 Use the following Maven command line instead:
 

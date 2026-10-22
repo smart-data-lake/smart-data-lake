@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import com.typesafe.config.Config
@@ -24,8 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{FileUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{DefaultExpressionData, FileUtil, SmartDataLakeLogger, ExpressionUtil}
 import io.smartdatalake.workflow.action.ActionHelper
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfTransformer.PREVIOUS_TRANSFORMER_NAME
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer.INPUT_VIEW_NAME
@@ -41,6 +39,26 @@ import org.apache.hadoop.fs.Path
  * Also note that to create the name of temporary view, special characters are replaced by underscores and a postfix `_sdltemp` is added.
  * It is therefore recommended to use special token `%{inputViewName}` or `%{inputViewName_<input name>}` that will be
  * replaced with the name of the temporary view at runtime.
+ *
+ * Use SQLDfTransformer for 1:1 transformations that are easiest expressed in SQL. Exactly one of `code` or `file`
+ * must be defined. For transformations with multiple inputs or outputs use [[SQLDfsTransformer]] in a
+ * [[io.smartdatalake.workflow.action.CustomDataFrameAction]] instead.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   select-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     transformers = [{
+ *       type = SQLDfTransformer
+ *       code = "select ident, name, latitude_deg, longitude_deg from %{inputViewName} where type = '%{airportType}'"
+ *       options = { airportType = "large_airport" }
+ *     }]
+ *   }
+ * }
+ * }}}
  *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
@@ -59,13 +77,18 @@ import org.apache.hadoop.fs.Path
  * @param options        Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param sqlDialect     SQL dialect the SQL code is written in, default is `spark`. It is used by engines translating the
+ *                       SQL code for the database, e.g. the SQL engine of sdl-sql, which parses it with SQLGlot and
+ *                       supports the dialects listed in https://sqlglot.com/sqlglot/dialects.html.
+ *                       Spark engines expect Spark SQL and ignore it.
  */
 case class SQLDfTransformer(override val name: String = "sqlTransform",
                             override val description: Option[String] = None,
                             file: Option[String] = None,
                             code: Option[String] = None,
                             options: Map[String, String] = Map(),
-                            runtimeOptions: Map[String, String] = Map())
+                            runtimeOptions: Map[String, String] = Map(),
+                            sqlDialect: String = SQLDfTransformer.DefaultSqlDialect)
   extends OptionsGenericDfTransformer with SmartDataLakeLogger {
   assert(file.isEmpty || code.isEmpty, s"Only one of `file` or `code` must be defined for SQLDfTransformer")
 
@@ -78,7 +101,7 @@ case class SQLDfTransformer(override val name: String = "sqlTransform",
     val sql = file.map(file => FileUtil.readFromPath(new Path(file)))
       .orElse(code)
       .getOrElse(throw ConfigurationException(s"Either `file` or `code` must be defined for SQLDfTransformer"))
-    var preparedSql = SparkExpressionUtil.substituteOptions(actionId, Some(s"transformers.$name.code"), sql, options ++ inputViewNameOptions)
+    var preparedSql = ExpressionUtil.substituteOptions(actionId, Some(s"transformers.$name.code"), sql, options ++ inputViewNameOptions)
     try {
       df.createOrReplaceTempView(s"$inputViewName")
       // for backward compatibility the temp view name from versions <= 2.2.x is replaced with the new temp view name including a postfix.
@@ -87,13 +110,11 @@ case class SQLDfTransformer(override val name: String = "sqlTransform",
       }
       // create DataFrame from SQL
       logger.debug(s"($actionId.transformers.$name) Preparing DataFrame from SQL statement: $preparedSql")
-      function.sql(preparedSql, dataObjectId)
+      function.sql(preparedSql, dataObjectId, sqlDialect)
     } catch {
       case e: Throwable => throw new SQLTransformationException(s"($actionId.transformers.$name) SQL query error: ${e.getMessage}. Also note to use token '%{inputViewName}' or '$inputViewName' as temporary view name in the SQL statement.", e)
     }
   }
-
-  override def factory: FromConfigFactory[GenericDfTransformer] = SQLDfTransformer
 }
 
 object SQLDfTransformer extends FromConfigFactory[GenericDfTransformer] {
@@ -102,6 +123,11 @@ object SQLDfTransformer extends FromConfigFactory[GenericDfTransformer] {
   }
 
   private[smartdatalake] val INPUT_VIEW_NAME = "inputViewName"
+
+  /**
+   * Default SQL dialect of SQL transformers
+   */
+  val DefaultSqlDialect = "spark"
 }
 
 

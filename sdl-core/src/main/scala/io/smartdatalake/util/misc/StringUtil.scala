@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.misc
 
 import java.text.Normalizer
@@ -40,7 +39,7 @@ object StringUtil {
   }
 
   /**
-   * Transforms name with dashs and underscores to CamelCase.
+   * Transforms name with dashes and underscores to CamelCase.
    */
   def strToCamelCase(x: String): String = {
     val parts = x.split("[_\\- ]")
@@ -48,7 +47,7 @@ object StringUtil {
   }
 
   /**
-   * Transforms name with dashs and underscores to LowerCamelCase.
+   * Transforms name with dashes and underscores to LowerCamelCase.
    */
   def strToLowerCamelCase(x: String): String = {
     val camelCase = strToCamelCase(x)
@@ -82,10 +81,39 @@ object StringUtil {
   }
 
   /**
-   * Remove all chars from a string which dont belong to lowercase SQL standard naming characters
+   * Remove all chars from a string which do not belong to lowercase SQL standard naming characters
    */
   def removeNonStandardSQLNameChars(x: String): String = {
     x.toLowerCase.replaceAll("[^a-zA-Z0-9_]", "")
+  }
+
+  /**
+   * Prefixes every line of a string with the given number of blanks.
+   * Other than Java's String.indent, lines are joined with the system line separator and no trailing line break is added.
+   */
+  def indent(x: String, spaces: Int): String = {
+    require(spaces >= 0, s"spaces must not be negative, got $spaces")
+    val prefix = " " * spaces
+    x.linesIterator.map(prefix + _).mkString(System.lineSeparator())
+  }
+
+  /**
+   * Computes the Levenshtein distance between two strings, i.e. the minimal number of single character insertions,
+   * deletions or substitutions needed to change one string into the other.
+   * This can be used to suggest the correct name for a misspelled one.
+   */
+  def levenshteinDistance(a: String, b: String): Int = {
+    var prev = (0 to b.length).toArray
+    a.indices.foreach { i =>
+      val curr = new Array[Int](b.length + 1)
+      curr(0) = i + 1
+      b.indices.foreach { j =>
+        val cost = if (a(i) == b(j)) 0 else 1
+        curr(j + 1) = math.min(math.min(curr(j) + 1, prev(j + 1) + 1), prev(j) + cost)
+      }
+      prev = curr
+    }
+    prev(b.length)
   }
 
 }

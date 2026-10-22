@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,14 +16,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
-import io.smartdatalake.workflow.dataobject.FileRef
+import io.smartdatalake.workflow.dataobject.file.FileRef
 
 /**
  * A FileSubFeed is used to transport references to files between Actions.
@@ -41,7 +40,9 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
                        override val isDAGStart: Boolean = false,
                        override val isSkipped: Boolean = false,
                        fileRefMapping: Option[Seq[FileRefMapping]] = None,
-                       override val metrics: Option[MetricsMap] = None
+                       override val metrics: Option[MetricsMap] = None,
+                       override val expectationsResult: Option[Map[String, String]] = None,
+                       override val executionModeResultOptions: Map[String, String] = Map()
 )
   extends SubFeed {
 
@@ -69,25 +70,28 @@ case class FileSubFeed(fileRefs: Option[Seq[FileRef]],
   }
 
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = {
-    this.copy(fileRefs = None, fileRefMapping = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, metrics = None)
+    this.copy(fileRefs = None, fileRefMapping = None, isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, metrics = None, expectationsResult = None, executionModeResultOptions = Map())
   }
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
     case fileSubFeed: FileSubFeed if this.fileRefs.isDefined && fileSubFeed.fileRefs.isDefined =>
       this.copy(fileRefs = this.fileRefs.map(_ ++ fileSubFeed.fileRefs.get)
         , partitionValues = unionPartitionValues(fileSubFeed.partitionValues)
-        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart, isSkipped = this.isSkipped && fileSubFeed.isSkipped)
+        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart, isSkipped = this.isSkipped && fileSubFeed.isSkipped
+        , executionModeResultOptions = unionExecutionModeResultOptions(fileSubFeed))
     case fileSubFeed: FileSubFeed =>
       this.copy(fileRefs = None, partitionValues = unionPartitionValues(fileSubFeed.partitionValues)
-        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart, isSkipped = this.isSkipped && fileSubFeed.isSkipped)
-    case x => this.copy(fileRefs = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart, isSkipped = this.isSkipped && x.isSkipped)
+        , isDAGStart = this.isDAGStart || fileSubFeed.isDAGStart, isSkipped = this.isSkipped && fileSubFeed.isSkipped
+        , executionModeResultOptions = unionExecutionModeResultOptions(fileSubFeed))
+    case x => this.copy(fileRefs = None, partitionValues = unionPartitionValues(x.partitionValues), isDAGStart = this.isDAGStart || x.isDAGStart, isSkipped = this.isSkipped && x.isSkipped
+      , executionModeResultOptions = unionExecutionModeResultOptions(x))
   }
 
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): FileSubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, fileRefs = result.fileRefs, fileRefMapping = None)
+    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, fileRefs = result.fileRefs, fileRefMapping = None, executionModeResultOptions = result.options)
   }
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): FileSubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false, fileRefs = None, fileRefMapping = None)
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false, fileRefs = None, fileRefMapping = None, executionModeResultOptions = result.options)
   }
 }
 object FileSubFeed extends SubFeedConverter[FileSubFeed] {
@@ -96,7 +100,8 @@ object FileSubFeed extends SubFeedConverter[FileSubFeed] {
    */
   override def fromSubFeed( subFeed: SubFeed )(implicit context: ActionPipelineContext): FileSubFeed = {
     subFeed match {
-      case fileSubFeed: FileSubFeed => fileSubFeed
+      // executionModeResultOptions are not passed on to the next Action
+      case fileSubFeed: FileSubFeed => fileSubFeed.copy(executionModeResultOptions = Map())
       case _ => FileSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }

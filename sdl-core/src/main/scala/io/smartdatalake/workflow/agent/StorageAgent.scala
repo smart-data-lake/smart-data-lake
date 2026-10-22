@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.agent
 
 import com.typesafe.config.Config
@@ -34,6 +33,33 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 /**
  * An SDLB Remote Agent that communicates through Hadoop storage (e.g. HDFS, S3, Azure Blob Storage, ...)
  *
+ * An Agent lets a "main" SDLB instance delegate the execution of an Action to a remote SDLB instance, e.g. to read
+ * data from a source only the remote instance can reach. Actions are delegated by setting `agentId` on the Action.
+ * Instead of a network connection, instruction and result are exchanged as files under `path`, so this is the right
+ * choice if the two instances share a storage location but cannot open a socket between them. The `connections`
+ * defined on the agent override the connections with the same id on the remote instance, but only if the agent
+ * server is started with `useOnlyLocalConnectionConfig=false`. With the default `true` the agent server uses its
+ * own local connection configuration only and the connections defined here are ignored.
+ *
+ * Example:
+ * {{{
+ * agents = {
+ *   storage-agent1 {
+ *     type = StorageAgent
+ *     path = ${env.basedir}"/storage-agent1"
+ *     execTimeoutSec = 900
+ *     connections {
+ *       remoteFile { id = remoteFile, type = HadoopFileConnection, pathPrefix = "/data/remote" }
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note Only one instruction is sent at a time per agent instance. If no agent picks up the instruction within
+ *       `startTimeoutSec`, or does not finish within `execTimeoutSec`, the Action fails with a timeout.
+ * @note The `connections` block of the example is only taken into account if the agent server is started with
+ *       `useOnlyLocalConnectionConfig=false`, which is not the default for security reasons.
+ * @see [[JettyAgent]]
  * @param path            Hadoop path where the agent reads instructions from and writes result information to
  * @param startTimeoutSec maximum time to wait for the start of the processing by the agent in seconds (default: 300s)
  * @param execTimeoutSec  maximum time to wait for the execution result in seconds (default: 300s)
@@ -73,8 +99,6 @@ case class StorageAgent(override val id: AgentId, path: String, startTimeoutSec:
   }
 
   override def getClient: AgentClient = this
-
-  override def factory: FromConfigFactory[Agent] = StorageAgent
 }
 
 object StorageAgent extends FromConfigFactory[Agent] {

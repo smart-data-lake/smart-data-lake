@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject.expectation
 
 import com.typesafe.config.Config
@@ -24,18 +23,37 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
-import io.smartdatalake.workflow.dataobject.ExpectationValidation
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.{ExpectationScope, Job}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.ExpectationSeverity
-import org.apache.spark.sql.Column
+import io.smartdatalake.workflow.dataobject.generic.ExpectationValidation
 
 
 /**
  * Definition of an expectation based on counting how many rows match an expression vs the number of all rows.
  * The fraction of these two counts is compared against a given expectation.
  *
+ * Use it for share-based data quality rules, e.g. "at most 1% of the records may have an unknown status", where an
+ * absolute count would depend on the size of the increment. Optionally restrict both counts to a subset of the data
+ * with `globalConditionExpression`, e.g. to ignore records that are known to be incomplete.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-departures {
+ *     type = ParquetFileDataObject
+ *     path = ${env.basedir}"/int_departures"
+ *     expectations = [{
+ *       type = SQLFractionExpectation
+ *       name = "pctBob"
+ *       countConditionExpression = "firstname = 'bob'"
+ *       expectation = "= 0"
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @see [[SQLExpectation]] for an expectation on an arbitrary aggregate expression.
  * @param countConditionExpression SQL expression returning a boolean to match the rows to count for the fraction.
  * @param globalConditionExpression SQL expression returning a boolean used as global filter, e.g. fraction row count and total row count are filtered with global filter before counting.
  * @param expectation Optional SQL comparison operator and literal to define expected percentage for validation, e.g. '= 0.9".
@@ -73,7 +91,8 @@ case class SQLFractionExpectation(
       case e: Exception => throw new ConfigurationException(s"($dataObjectId) Expectation $name: cannot parse SQL expression '$countConditionExpression'", Some(s"expectations.$name.expression"), e)
     }
   }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])
+                              (implicit context: ActionPipelineContext): (Seq[GenericColumn],Map[String,_]) = {
     import ExpectationValidation.partitionDelimiter
     val totalMetric = if (globalConditionExpression.isDefined) totalName else "count"
     if (scope == ExpectationScope.JobPartition) {
@@ -82,22 +101,20 @@ case class SQLFractionExpectation(
           val countExpectation = getMetric[Long](dataObjectId,metrics,n)
           val totalPartitionMetric = (totalMetric +: n.split(partitionDelimiter).drop(1)).mkString(partitionDelimiter)
           val countTotal = getMetric[Long](dataObjectId,metrics,totalPartitionMetric)
-          val (col, pct) = getValidationErrorColumn(dataObjectId, countExpectation, countTotal, n)
-          (col.map(SparkColumn), Map(n -> pct))
+          val (col, pct) = getValidationErrorColumnSql(dataObjectId, countExpectation, countTotal, n)
+          (col.toSeq, Map(n -> pct))
         }
       val cols = colsAndUpdatedMetrics.flatMap(_._1)
-      val updatedMetrics = metrics.filterKeys(!_.startsWith(totalName)).toMap ++ colsAndUpdatedMetrics.map(_._2).reduce(_ ++ _)
+      val updatedMetrics = metrics.view.filterKeys(!_.startsWith(totalName)).toMap ++ colsAndUpdatedMetrics.map(_._2).reduce(_ ++ _)
       (cols, updatedMetrics)
     } else {
       val countExpectation = getMetric[Long](dataObjectId,metrics,name)
       val countTotal = getMetric[Long](dataObjectId,metrics,totalMetric)
-      val (col, pct) = getValidationErrorColumn(dataObjectId, countExpectation, countTotal)
-      val updatedMetrics = metrics.filterKeys(_ != totalName).toMap + (name -> pct)
-      (col.map(SparkColumn).toSeq, updatedMetrics)
+      val (col, pct) = getValidationErrorColumnSql(dataObjectId, countExpectation, countTotal)
+      val updatedMetrics = metrics.view.filterKeys(_ != totalName).toMap + (name -> pct)
+      (col.toSeq, updatedMetrics)
     }
   }
-
-  override def factory: FromConfigFactory[Expectation] = SQLFractionExpectation
 }
 
 object SQLFractionExpectation extends FromConfigFactory[Expectation] {

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.communication.agent
 
 import io.smartdatalake.app.{GlobalConfig, LocalStorageAgentSmartDataLakeBuilderConfig, SmartDataLakeBuilder}
@@ -56,7 +55,7 @@ class StorageAgentServer(sdlb: SmartDataLakeBuilder, agentConfig: LocalStorageAg
     val secondsPolled = (System.currentTimeMillis() / 1000 - startTime).toInt
     if (agentConfig.stopAfterSec.exists(secondsPolled > _)) {
       logger.info(s"Agent is going to stop now, as it has been running for $secondsPolled seconds")
-      return false // dont poll again
+      return false // do not poll again
     }
     WaitUtil.sleepUntil(timeoutSec = agentConfig.stopAfterSec.map(_ - secondsPolled), pollIntervalSec = agentConfig.pollIntervalSec, logInfo = Some(s"checking storage for instructions")) {
       () => getInstructionFileIterator(hadoopPath).nonEmpty
@@ -106,7 +105,7 @@ class StorageAgentServer(sdlb: SmartDataLakeBuilder, agentConfig: LocalStorageAg
   def getInstructionFileIterator(hadoopPath: Path)(implicit filesystem: FileSystem): Iterator[Path] = {
     RemoteIteratorWrapper(filesystem.listStatusIterator(hadoopPath))
       .map(_.getPath)
-      .filter(_.getName.endsWith(FileType.Instruction + ".json"))
+      .filter(_.getName.endsWith(FileType.Instruction.toString + ".json"))
   }
 }
 

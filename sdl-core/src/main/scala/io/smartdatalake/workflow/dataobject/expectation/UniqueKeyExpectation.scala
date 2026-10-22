@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject.expectation
 
 import com.typesafe.config.Config
@@ -24,11 +23,11 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
+import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationScope.{ExpectationScope, Job}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.ExpectationSeverity
-import io.smartdatalake.workflow.dataobject.{DataObject, TableDataObject}
+import io.smartdatalake.workflow.dataobject.generic.TableDataObject
 
 
 /**
@@ -36,6 +35,29 @@ import io.smartdatalake.workflow.dataobject.{DataObject, TableDataObject}
  * Uniqueness is calculated as the fraction of output count distinct on key columns over output count.
  * It supports scope Job and All, but not JobPartition.
  *
+ * Use it to assert that a primary key or business key has no duplicates. If `key` is left empty, the
+ * `table.primaryKey` of the DataObject is used, which requires the DataObject to be a `TableDataObject`
+ * with a primary key defined. Set `scope = All` to check uniqueness over the whole table instead of only
+ * the records written by the current job.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-airports {
+ *     type = DeltaLakeTableDataObject
+ *     path = ${env.basedir}"/int_airports"
+ *     table = { db = "default", name = "int_airports", primaryKey = [ident] }
+ *     expectations = [{
+ *       type = UniqueKeyExpectation
+ *       name = "primaryKeyTest"
+ *       scope = All
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note `scope = JobPartition` is not supported and fails on initialization.
+ *       The fraction is rounded down (floor), so any duplicate is detected aggressively.
  * @param key Optional list of key columns to evaluate uniqueness. If empty primary key definition of DataObject is used if present.
  * @param expectation Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1'.
  *                    Together with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.
@@ -74,24 +96,22 @@ case class UniqueKeyExpectation(
   }
   override def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions, context: ActionPipelineContext): Seq[GenericColumn] = {
     val colsToCheck = (if (key.isEmpty) getPrimaryKeyCols(dataObjectId) else key).map(functions.col)
-    // if (scope == ExpectationScope.Job && functions.requestSubFeedType() == typeOf[SparkSubFeed])
     val countDistinctCol = if (approximate) functions.approxCountDistinct(functions.struct(colsToCheck:_*), approximateRsd).as(countDistinctName)
-    else functions.countDistinct(colsToCheck:_*).as(countDistinctName)
+    else functions.countDistinct(functions.struct(colsToCheck:_*)).as(countDistinctName)
     val countCol = if (scope == ExpectationScope.All) Some(functions.count(functions.col("*")).as(countName)) else None
     Seq(Some(countDistinctCol), countCol).flatten
   }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[GenericColumn],Map[String,_]) = {
     val countDistinct = getMetric[Long](dataObjectId,metrics,countDistinctName)
     val count = getMetric[Long](dataObjectId,metrics,countName)
-    val (col, pct) = getValidationErrorColumn(dataObjectId, countDistinct, count)
-    val updatedMetrics = metrics.filterKeys(_ != countDistinctName).toMap + (name -> pct)
-    (col.map(SparkColumn).toSeq, updatedMetrics)
+    val (col, pct) = getValidationErrorColumnSql(dataObjectId, countDistinct, count)
+    val updatedMetrics = metrics.view.filterKeys(_ != countDistinctName).toMap + (name -> pct)
+    (col.toSeq, updatedMetrics)
   }
   override def calculateAsJobDataFrameObservation: Boolean = {
     // only calculate metrics as DataFrame observation for approximate_count_distinct function, as count_distinct is not supported as aggregate function for Spark observations.
     super.calculateAsJobDataFrameObservation && approximate
   }
-  override def factory: FromConfigFactory[Expectation] = UniqueKeyExpectation
 }
 
 object UniqueKeyExpectation extends FromConfigFactory[Expectation] {

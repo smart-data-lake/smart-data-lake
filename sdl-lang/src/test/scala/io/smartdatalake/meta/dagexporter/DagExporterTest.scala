@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,12 +16,14 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.meta.dagexporter
 
+import io.smartdatalake.util.misc.SmartDataLakeLogger
 import org.scalatest.funsuite.AnyFunSuite
 
-class DagExporterTest extends AnyFunSuite {
+import scala.util.{Failure, Success, Try}
+
+class DagExporterTest extends AnyFunSuite with SmartDataLakeLogger {
 
   test("testMain") {
     val expectedOutput =
@@ -92,8 +94,17 @@ class DagExporterTest extends AnyFunSuite {
         |  }
         |}""".stripMargin
 
-    val actualOutput = DagExporter.exportConfigDagToJSON(DagExporterConfig(getClass.getResource("/dagexporter/dagexporterTest.conf").getPath))
-    assert(actualOutput == expectedOutput)
+    val DagExpCfg = DagExporterConfig(getClass.getResource("/dagexporter/dagexporterTest.conf").getPath)
+    val actualOutput = DagExporter.exportConfigDagToJSON(DagExpCfg)
+
+    Try(assert(actualOutput.linesIterator.toSeq == expectedOutput.linesIterator.toSeq)) match {
+      case Success(_) => logger.debug("testMain succeeded :)")
+      case Failure(e) =>
+        logger.error("TEST FAILED: ")
+        logger.error(s"DagExpCfg: ${DagExpCfg.toDebugString}")
+        throw e
+    }
+
   }
 
 }

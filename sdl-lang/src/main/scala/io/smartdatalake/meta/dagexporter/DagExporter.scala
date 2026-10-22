@@ -1,14 +1,34 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package io.smartdatalake.meta.dagexporter
 
 import io.smartdatalake.config.{ConfigToolbox, ConfigurationException, InstanceRegistry}
-import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.Action
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.writePretty
 import scopt.OptionParser
 
-case class DagExporterConfig(sdlConfigPaths: String = null)
+case class DagExporterConfig(sdlConfigPaths: String = null) {
+  def toDebugString: String = ProductUtil.toDebugString(obj = this)
+}
 
 object DagExporter extends SmartDataLakeLogger {
 
@@ -27,7 +47,8 @@ object DagExporter extends SmartDataLakeLogger {
   }
 
   /**
-   * Takes as input a SDL Config and prints it's containing Actions to STDOUT, in a simplified JSON-Format.
+   * Takes as input a SDL Config and prints it's containing Actions to STDOUT, in a simplified
+   * JSON-Format.
    */
   def main(args: Array[String]): Unit = {
 
@@ -40,17 +61,18 @@ object DagExporter extends SmartDataLakeLogger {
         print(dagAsJSON)
         println("END DAG")
       case None =>
-        logAndThrowException(s"Aborting ${appType} after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+        logAndThrowException(s"Aborting $appType after error",
+          new ConfigurationException("Couldn't set command line parameters correctly."))
     }
   }
 
-  private def toSimplifiedAction(action: Action): SimplifiedAction = {
+  private def toSimplifiedAction(action: Action): SimplifiedAction =
     SimplifiedAction(action.metadata, action.inputs.map(_.id.id), action.outputs.map(_.id.id))
-  }
 
   def exportConfigDagToJSON(config: DagExporterConfig): String = {
-    val (registry, _) = ConfigToolbox.loadAndParseConfig(config.sdlConfigPaths.split(','))
-    val simplifiedActions: Map[String, SimplifiedAction] = registry.getActions.groupBy(action => action.id.id).mapValues(action => toSimplifiedAction(action.head)).toMap
+    val (registry, _) = ConfigToolbox.loadAndParseConfig(config.sdlConfigPaths.split(',').toIndexedSeq)
+    val simplifiedActions: Map[String, SimplifiedAction] =
+      registry.getActions.groupBy(action => action.id.id).view.mapValues(action => toSimplifiedAction(action.head)).toMap
     writePretty(simplifiedActions)(Serialization.formats(NoTypeHints))
   }
 }

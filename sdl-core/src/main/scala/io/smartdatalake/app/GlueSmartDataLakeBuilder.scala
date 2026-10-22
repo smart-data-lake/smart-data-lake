@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ object GlueSmartDataLakeBuilder extends SmartDataLakeBuilder {
       override def errorOnUnknownArgument: Boolean = false
     }
 
-    OParser.parse(parser, args, SmartDataLakeBuilderConfig(), setup) match {
+    OParser.parse(parser, args.toList, SmartDataLakeBuilderConfig(), setup) match {
       case Some(config) =>
         val stats = run(config)
         logStats(stats)

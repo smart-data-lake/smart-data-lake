@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -35,7 +34,9 @@ import org.apache.commons.lang3.NotImplementedException
 case class InitSubFeed(override val dataObjectId: DataObjectId,
                        override val partitionValues: Seq[PartitionValues],
                        override val isSkipped: Boolean = false,
-                       override val metrics: Option[MetricsMap] = None
+                       override val metrics: Option[MetricsMap] = None,
+                       override val expectationsResult: Option[Map[String, String]] = None,
+                       override val executionModeResultOptions: Map[String, String] = Map()
                       )
   extends SubFeed {
   override def isDAGStart: Boolean = true
@@ -60,14 +61,15 @@ case class InitSubFeed(override val dataObjectId: DataObjectId,
   override def toOutput(dataObjectId: DataObjectId): FileSubFeed = throw new NotImplementedException()
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = other match {
-    case x => this.copy(partitionValues = unionPartitionValues(x.partitionValues), isSkipped = this.isSkipped && other.isSkipped)
+    case x => this.copy(partitionValues = unionPartitionValues(x.partitionValues), isSkipped = this.isSkipped && other.isSkipped,
+      executionModeResultOptions = unionExecutionModeResultOptions(other))
   }
 
   def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SubFeed = {
-    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false)
+    this.copy(partitionValues = result.inputPartitionValues, isSkipped = false, executionModeResultOptions = result.options)
   }
 
   def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false)
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), isSkipped = false, executionModeResultOptions = result.options)
   }
 }

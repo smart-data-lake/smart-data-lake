@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.executionMode
 
 import com.typesafe.config.Config
@@ -26,24 +25,56 @@ import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.ActionHelper.getOptionalDataFrame
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.CanCreateDataFrame
+import io.smartdatalake.workflow.{ActionPipelineContext, ColumnFilter, DataFrameSubFeed, SubFeed}
 
 /**
  * Compares max entry in "compare column" between mainOutput and mainInput and incrementally loads the delta.
- * This mode works only with SparkSubFeeds. The filter is not propagated to following actions.
+ * This mode works only with SparkSubFeeds. By default the filter is not propagated to following actions,
+ * see `propagateFilter`.
  *
+ * Pick this mode for non-partitioned sources which have a monotonically increasing column, e.g. a technical
+ * timestamp or a sequence-based id: the mode reads `max(compareCol)` from the output and adds a filter
+ * `compareCol > <lastValue>` on the input. If the output is still empty all records are selected.
+ * If input and output are on the same value, a NoDataToProcessWarning is thrown and following actions are skipped.
+ * `compareCol` must exist in both main input and main output and be of a sortable type.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     executionMode = {
+ *       type = DataFrameIncrementalMode
+ *       compareCol = "dl_ts_captured"
+ *       applyCondition = { expression = "isStartNode" }
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @see [[PartitionDiffMode]] if the input DataObject is partitioned, [[DataObjectStateIncrementalMode]] if the
+ *      input DataObject can remember its own state.
  * @param compareCol          a comparable column name existing in mainInput and mainOutput used to identify the delta. Column content should be bigger for newer records.
  * @param alternativeOutputId optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
  *                            It can be used to ensure processing all partitions over multiple actions in case of errors.
  * @param applyCondition      Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of [[DefaultExecutionModeExpressionData]] returning a boolean.
  *                            Default is to apply the execution mode.
+ * @param propagateFilter     If true the incremental filter is passed on to following actions, where it is applied to
+ *                            every DataObject having the compareCol column. Set this only if the increment written by
+ *                            this action can still be identified by the filter, as the filter is then assumed to be
+ *                            applied already. Default is false, so the filter is only used to read the increment for
+ *                            this action.
  */
 case class DataFrameIncrementalMode(compareCol: String
                                     , override val alternativeOutputId: Option[DataObjectId] = None
                                     , applyCondition: Option[Condition] = None
+                                    , propagateFilter: Boolean = false
                                    ) extends ExecutionMode with ExecutionModeWithMainInputOutput {
-  override val applyConditionsDef = applyCondition.toSeq
+  override val applyConditionsDef: Seq[Condition] = applyCondition.toSeq
 
   override def mainInputOutputNeeded: Boolean = alternativeOutputId.isEmpty
 
@@ -88,14 +119,15 @@ case class DataFrameIncrementalMode(compareCol: String
               } else None
               warnMsg.foreach(msg => throw NoDataToProcessWarning(actionId.id, msg))
               // prepare filter
-              val dataFilter = if (outputLatestValue != null) {
-                logger.info(s"($actionId) DataFrameIncrementalMode selected increment for writing to ${output.id}: column $compareCol} from $outputLatestValue to $inputLatestValue to process")
-                Some(s"$compareCol > cast('$outputLatestValue' as ${inputColType.sql})")
+              val dataFilters = if (outputLatestValue != null) {
+                logger.info(s"($actionId) DataFrameIncrementalMode selected increment for writing to ${output.id}: column $compareCol from $outputLatestValue to $inputLatestValue to process")
+                Seq(ColumnFilter(compareCol, s"$compareCol > cast('$outputLatestValue' as ${inputColType.sql})",
+                  mainInputOnly = true, propagate = propagateFilter))
               } else {
                 logger.info(s"($actionId) DataFrameIncrementalMode selected all data for writing to ${output.id}: output table is currently empty")
-                None
+                Seq()
               }
-              Some(ExecutionModeResult(filter = dataFilter))
+              Some(ExecutionModeResult(filters = dataFilters))
             // select all if output is empty
             case (Some(_), None) =>
               logger.info(s"($actionId) DataFrameIncrementalMode selected all records for writing to ${output.id}, because output DataObject is still empty.")
@@ -109,7 +141,6 @@ case class DataFrameIncrementalMode(compareCol: String
       }
     } else None
   }
-  override def factory: FromConfigFactory[ExecutionMode] = DataFrameIncrementalMode
 }
 
 object DataFrameIncrementalMode extends FromConfigFactory[ExecutionMode] {

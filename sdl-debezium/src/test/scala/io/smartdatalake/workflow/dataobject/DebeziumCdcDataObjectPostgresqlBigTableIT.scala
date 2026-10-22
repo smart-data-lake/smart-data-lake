@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,25 +16,24 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 
 import io.smartdatalake.app.{DefaultSmartDataLakeBuilder, SmartDataLakeBuilderConfig}
-import io.smartdatalake.config.ConfigToolbox
+import io.smartdatalake.config.{ConfigToolbox, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.spark.SparkTestUtil
 import io.smartdatalake.util.hdfs.HdfsUtil
 import io.smartdatalake.util.misc.SmartDataLakeLogger
 import io.smartdatalake.util.secrets.StringOrSecret
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.{ActionMetadata, CopyAction}
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.connection.authMode.BasicAuthMode
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
-import io.smartdatalake.workflow.dataobject.DebeziumCdcDataObjectMySqlIT.sparkSession
+import io.smartdatalake.workflow.connection.jdbc.JdbcConnection
+import io.smartdatalake.workflow.dataobject.generic.Table
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, lit}
-import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
 import java.nio.file.Files
 
@@ -45,22 +44,22 @@ object DebeziumCdcDataObjectPostgresqlBigTableIT extends App with SmartDataLakeL
    * Make sure you setup the db according to the TEST_DB_SETUP.md
    */
 
-
   /**
    * Init tests
    */
 
   val sdlb = DefaultSmartDataLakeBuilder
-  implicit val instanceRegistry = sdlb.instanceRegistry
-  implicit val sparkSession = TestUtil.session
+  implicit val instanceRegistry: InstanceRegistry = sdlb.instanceRegistry
+  implicit val sparkSession: SparkSession = SparkTestUtil.session
   Environment._instanceRegistry = instanceRegistry
   Environment._enableSparkFileDataObjectNoDataCheck = Some(false)
-  implicit val context = ConfigToolbox.getDefaultActionPipelineContext
+  implicit val context: ActionPipelineContext = ConfigToolbox.getDefaultActionPipelineContext(instanceRegistry)
 
   import sparkSession.implicits._
 
-  val COMMIT_TYPE_COLUMN_NAME = "__commit_event"
-  val COMMIT_TIMESTAMP_COLUMN_NAME = "__event_timestamp"
+  val CHANGE_TYPE_COLUMN_NAME = "_change_type"
+  val COMMIT_TIMESTAMP_COLUMN_NAME = "_commit_timestamp"
+  val CHANGE_ORDINAL_COLUMN_NAME = "_change_ordinal"
 
   val connection = DebeziumConnection(
     id = "dbzCon",
@@ -68,14 +67,14 @@ object DebeziumCdcDataObjectPostgresqlBigTableIT extends App with SmartDataLakeL
     hostname = sys.env("PSQL_HOSTNAME"),
     db = Some(sys.env("PSQL_DB")),
     port = sys.env("PSQL_PORT").toInt,
-    authMode = BasicAuthMode(Some(StringOrSecret(sys.env("PSQL_USER"))), Some(StringOrSecret(sys.env("PSQL_PASSWORD"))))
+    authMode = BasicAuthMode(user = StringOrSecret(sys.env("PSQL_USER")), password = StringOrSecret(sys.env("PSQL_PASSWORD")))
   )
 
-  val jdbcConnection = JdbcTableConnection(
+  val jdbcConnection = JdbcConnection(
     id = "psqlCon",
     url = s"jdbc:postgresql://${sys.env("PSQL_HOSTNAME")}:${sys.env("PSQL_PORT").toInt}/${sys.env("PSQL_DB")}",
     driver = "org.postgresql.Driver",
-    authMode = Some(BasicAuthMode(Some(StringOrSecret(sys.env("PSQL_USER"))), Some(StringOrSecret(sys.env("PSQL_PASSWORD"))))),
+    authMode = Some(BasicAuthMode(user = StringOrSecret(sys.env("PSQL_USER")), password = StringOrSecret(sys.env("PSQL_PASSWORD")))),
     db = Some("demo")
   )
 
@@ -98,14 +97,16 @@ object DebeziumCdcDataObjectPostgresqlBigTableIT extends App with SmartDataLakeL
 
   // Setup data objects
 
-  val srcDO1 = DebeziumCdcDataObject("src1",
+  val srcDO1 = DebeziumCdcDataObject(
+    "src1",
     connectionId = "dbzCon",
     Table(Some("demo"), "big_table"),
-    debeziumProperties = Some(Map("database.server.id" -> "12343453455",
-      "plugin.name" -> "pgoutput",
-      "schema.history.internal" -> "io.debezium.storage.file.history.FileSchemaHistory",
-      "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat"
-    ))
+    debeziumProperties = Some(Map(
+        "database.server.id"                    -> "12343453455",
+        "plugin.name"                           -> "pgoutput",
+        "schema.history.internal"               -> "io.debezium.storage.file.history.FileSchemaHistory",
+        "schema.history.internal.file.filename" -> "C://TEMP/schemahistory.dat"
+      ))
   )
   instanceRegistry.register(srcDO1)
 
@@ -117,7 +118,8 @@ object DebeziumCdcDataObjectPostgresqlBigTableIT extends App with SmartDataLakeL
   val action1 = CopyAction("copyAction1", srcDO1.id, tgtDO1.id, metadata = Some(ActionMetadata(feed = Some(feedName))))
   instanceRegistry.register(action1)
 
-  val sdlConfig = SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
+  val sdlConfig =
+    SmartDataLakeBuilderConfig(configuration = Seq("cp:/application.conf"), feedSel = feedName, applicationName = Some(appName), statePath = Some(statePath))
 
   // 1. READ test
 
@@ -127,11 +129,10 @@ object DebeziumCdcDataObjectPostgresqlBigTableIT extends App with SmartDataLakeL
 
   assert(df.columns.contains("id") &&
     df.columns.contains("value") &&
-    df.columns.contains(COMMIT_TYPE_COLUMN_NAME) &&
+    df.columns.contains(CHANGE_TYPE_COLUMN_NAME) &&
     df.columns.contains(COMMIT_TIMESTAMP_COLUMN_NAME)
   )
 
-  assert(df.withColumn("test", col(COMMIT_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
-
+  assert(df.withColumn("test", col(CHANGE_TYPE_COLUMN_NAME) === lit("read")).filter(!$"test").isEmpty)
 
 }

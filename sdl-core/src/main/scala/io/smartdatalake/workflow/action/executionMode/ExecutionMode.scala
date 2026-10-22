@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,6 +30,7 @@ import io.smartdatalake.util.misc.{ProductUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.dataobject._
+import io.smartdatalake.workflow.dataobject.file.FileRef
 
 import java.sql.Timestamp
 import scala.reflect.runtime.universe.TypeTag
@@ -98,6 +99,28 @@ trait ExecutionMode extends ParsableFromConfig[ExecutionMode] with ConfigHolder 
    * If this execution mode should be run as asynchronous streaming process
    */
   def isAsynchronous: Boolean = false
+
+  /**
+   * If this execution mode is a streaming mode (e.g. Spark Structured Streaming).
+   * Overridden by DataFrameStreamingExecutionMode.
+   */
+  def isStreamingMode: Boolean = false
+
+  /**
+   * Returns true if an asynchronous streaming query has been started.
+   * Used by DataFrameActionImpl.isAsynchronousProcessStarted.
+   */
+  def isStreamingStarted: Boolean = false
+
+  /**
+   * Called when the streaming query terminates (e.g. via SparkStreamingQueryListener).
+   */
+  def notifyStreamingQueryTerminated(): Unit = ()
+
+  /**
+   * Reset streaming state between DAG runs (e.g. clears a stored StreamingQuery reference).
+   */
+  def resetStreamingState(): Unit = ()
 }
 
 trait ExecutionModeWithMainInputOutput {
@@ -110,6 +133,31 @@ trait ExecutionModeWithMainInputOutput {
 /**
  * An execution mode which just validates that partition values are given.
  * Note: For start nodes of the DAG partition values can be defined by command line, for subsequent nodes partition values are passed on from previous nodes.
+ *
+ * Use it as a guard on actions which must never process a full load by accident: if the main input SubFeed has no
+ * partition values, the action fails with an IllegalStateException instead of reading everything.
+ * It selects no data itself and has no configuration attributes. In dry-run mode the check is skipped.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   int-departures {
+ *     type = ParquetFileDataObject
+ *     path = ${env.basedir}"/int_departures"
+ *     partitions = [dt]
+ *   }
+ * }
+ * actions = {
+ *   copy-departures {
+ *     type = CopyAction
+ *     inputId = int-departures
+ *     outputId = btl-departures
+ *     executionMode = { type = FailIfNoPartitionValuesMode }
+ *   }
+ * }
+ * }}}
+ *
+ * @see [[PartitionDiffMode]] to select the missing partitions automatically instead of failing.
  */
 case class FailIfNoPartitionValuesMode() extends ExecutionMode {
   override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
@@ -120,8 +168,6 @@ case class FailIfNoPartitionValuesMode() extends ExecutionMode {
     // return: no change of given partition values and filter
     None
   }
-
-  override def factory: FromConfigFactory[ExecutionMode] = FailIfNoPartitionValuesMode
 }
 
 object FailIfNoPartitionValuesMode extends FromConfigFactory[ExecutionMode] {
@@ -131,7 +177,31 @@ object FailIfNoPartitionValuesMode extends FromConfigFactory[ExecutionMode] {
 }
 
 /**
- * An execution mode which forces processing all data from it's inputs.
+ * An execution mode which forces processing all data from its inputs.
+ *
+ * It resets the partition values and data filter received from the preceding action, so the action always reads the
+ * full content of its inputs. Typical use case is an action which needs the complete history of a predecessor's output
+ * (e.g. a full aggregation or a deduplication), combined with an `executionCondition` of "true" to also run it when
+ * the predecessor was skipped because it had no new data. It has no configuration attributes.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   agg-departures {
+ *     type = CustomDataFrameAction
+ *     inputIds = [int-departures]
+ *     outputIds = [btl-departures-agg]
+ *     transformers = [{
+ *       type = SQLDfsTransformer
+ *       code = {
+ *         btl-departures-agg = "select estdepartureairport, count(*) as cnt from %{inputViewName_int-departures} group by estdepartureairport"
+ *       }
+ *     }]
+ *     executionMode = { type = ProcessAllMode }
+ *     executionCondition = { expression = "true" }
+ *   }
+ * }
+ * }}}
  */
 case class ProcessAllMode() extends ExecutionMode {
   override def apply(actionId: ActionId, mainInput: DataObject, mainOutput: DataObject, subFeed: SubFeed
@@ -141,7 +211,6 @@ case class ProcessAllMode() extends ExecutionMode {
     logger.info(s"($actionId) ProcessModeAll reset partition values")
     Some(ExecutionModeResult())
   }
-  override def factory: FromConfigFactory[ExecutionMode] = ProcessAllMode
 }
 
 object ProcessAllMode extends FromConfigFactory[ExecutionMode] {
@@ -154,11 +223,27 @@ object ProcessAllMode extends FromConfigFactory[ExecutionMode] {
  * Result of execution mode application
  * @param inputPartitionValues selected partition values for main input
  * @param outputPartitionValues override of partition values for main output. If None, output partition values are created by transformPartitionValues in getOutputPartitionValues, otherwise not.
+ * @param filters column-bound filters to apply to the input SubFeeds of the Action. A filter is only applied if its
+ *                column exists in the corresponding DataObject, see [[ColumnFilter]]. There must be at most one
+ *                filter per column.
+ * @param fileRefs selected files for main input, used by file based execution modes.
+ * @param options options to pass on to the transformers and Input/Output DataObjects of the Action.
  */
 case class ExecutionModeResult( inputPartitionValues: Seq[PartitionValues] = Seq(), outputPartitionValues: Option[Seq[PartitionValues]] = None
-                                , filter: Option[String] = None, fileRefs: Option[Seq[FileRef]] = None, options: Map[String,String] = Map()) {
+                                , filters: Seq[ColumnFilter] = Seq(), fileRefs: Option[Seq[FileRef]] = None, options: Map[String,String] = Map()) {
+  require(!ColumnFilter.hasDuplicateColumns(filters),
+    s"ExecutionModeResult must not contain more than one ColumnFilter per column, but got ${ColumnFilter.describe(filters)}")
+
   def getOutputPartitionValues(partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues]): Seq[PartitionValues] = {
     outputPartitionValues.getOrElse(partitionValuesTransform(inputPartitionValues).values.toSeq.distinct)
+  }
+
+  /**
+   * Get the filters to apply to an input SubFeed of the Action.
+   * Filters with mainInputOnly=true are only returned for the main input.
+   */
+  def filtersForInput(isMainInput: Boolean): Seq[ColumnFilter] = {
+    if (isMainInput) filters else filters.filterNot(_.mainInputOnly)
   }
 }
 
@@ -167,14 +252,14 @@ case class ExecutionModeResult( inputPartitionValues: Seq[PartitionValues] = Seq
  * @param givenPartitionValues Partition values specified with command line (start action) or passed from previous action
  * @param isStartNode True if the current action is a start node of the DAG.
  */
-case class DefaultExecutionModeExpressionData( feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Option[Timestamp]
+case class DefaultExecutionModeExpressionData( feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Timestamp
                                              , runStartTime: Timestamp, attemptStartTime: Timestamp
                                              , givenPartitionValues: Seq[Map[String,String]], isStartNode: Boolean) {
   override def toString: String = ProductUtil.formatObj(this)
 }
 object DefaultExecutionModeExpressionData {
   def from(context: ActionPipelineContext): DefaultExecutionModeExpressionData = {
-    DefaultExecutionModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
+    DefaultExecutionModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, Timestamp.valueOf(context.referenceTimestamp)
       , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), isStartNode = false)
   }
 }

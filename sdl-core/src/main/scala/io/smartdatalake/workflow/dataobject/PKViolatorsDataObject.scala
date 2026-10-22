@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@ import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
 import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, TableDataObject}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe
@@ -39,17 +40,20 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * Example:
  * {{{
  * dataObjects = {
- *  ...
- *  primarykey-violations {
- *    type = PKViolatorsDataObject
- *    config = path/to/myconfiguration.conf
- *  }
- *  ...
+ *   primarykey-violations {
+ *     type = PKViolatorsDataObject
+ *     config = "path/to/myconfiguration.conf"
+ *     flattenOutput = true
+ *   }
  * }
  * }}}
  *
+ * @param id: unique name of this data object
  * @param config: The config value can point to a configuration file or a directory containing configuration files.
- * @param flattenOutput: if true, key and data column are converted from type map<k,v> to string (default).
+ *                Multiple locations can be given as comma separated list. If not defined, the DataObjects of the
+ *                current run's [[InstanceRegistry]] are checked.
+ * @param flattenOutput: if true, the key and data column are cast from their default type
+ *                       `array<struct<name,value>>` to string (default: false).
  *
  * @see Refer to [[ConfigLoader.loadConfigFromFilesystem()]] for details about the configuration loading.
  */
@@ -60,7 +64,7 @@ case class PKViolatorsDataObject(id: DataObjectId,
                                 (@transient implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateDataFrame with ParsableFromConfig[PKViolatorsDataObject] {
 
-  override def getDataFrame(partitionValues: Seq[PartitionValues], subFeedType: Type)(implicit context: ActionPipelineContext): GenericDataFrame = {
+  override def getDataFrame(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type = getSubFeedSupportedTypes.head)(implicit context: ActionPipelineContext): GenericDataFrame = {
     val functions = DataFrameSubFeed.getFunctions(subFeedType)
     import PKViolatorsDataObject.{columnNameName, columnValueName}
     import functions._
@@ -80,20 +84,20 @@ case class PKViolatorsDataObject(id: DataObjectId,
     def optionalCastColToString(doCast: Boolean)(col: GenericColumn) = if (doCast) col.cast(functions.stringType) else col
 
     def getPKviolatorDf(dataObject: TableDataObject) = {
-      val pkColNames = dataObject.table.primaryKey.get.toArray
+      val pkColNames = dataObject.table.primaryKey.get.toList
       if (dataObject.isTableExisting) {
         val dfTable = dataObject.getDataFrame(Seq(), subFeedType)
         val dfPKViolators = dfTable.getPKviolators(pkColNames)
         val dataColumns = dfPKViolators.schema.columns.diff(pkColNames)
         val colSchema = lit(dfTable.schema.sql).as("schema")
         val keyCol = optionalCastColToString(flattenOutput) {
-          array(pkColNames.map(colName2colRepresentation): _*).as("key")
+          array(pkColNames.map(colName2colRepresentation).toIndexedSeq: _*).as("key")
         }
         val dataCol = optionalCastColToString(flattenOutput) {
           if (dataColumns.isEmpty) {
             lit(null).cast(arrayType(structType(Map(columnNameName -> stringType, columnValueName -> stringType))))
           } else {
-            array(dataColumns.map(colName2colRepresentation): _*)
+            array(dataColumns.map(colName2colRepresentation).toIndexedSeq: _*)
           }
         }.as("data")
         Some( dfPKViolators.select( Seq(
@@ -115,15 +119,13 @@ case class PKViolatorsDataObject(id: DataObjectId,
     pkViolatorsDfs.reduce(_ unionByName _)
   }
 
-  override private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues], subFeedType: universe.Type)(implicit context: ActionPipelineContext) = {
+  override def getSubFeed(partitionValues: Seq[PartitionValues], subFeedType: universe.Type)(implicit context: ActionPipelineContext) = {
     val helper = DataFrameSubFeed.getCompanion(subFeedType)
     val df = getDataFrame(partitionValues, subFeedType)
     helper.getSubFeed(df, id, partitionValues)
   }
 
-  override private[smartdatalake] def getSubFeedSupportedTypes = Seq(typeOf[DataFrameSubFeed])
-
-  override def factory: FromConfigFactory[PKViolatorsDataObject] = PKViolatorsDataObject
+  override def getSubFeedSupportedTypes = Seq(typeOf[DataFrameSubFeed])
 }
 
 object PKViolatorsDataObject extends FromConfigFactory[PKViolatorsDataObject] {

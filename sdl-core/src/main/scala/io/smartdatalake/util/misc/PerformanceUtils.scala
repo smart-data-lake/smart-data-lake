@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,11 +18,8 @@
  */
 package io.smartdatalake.util.misc
 
-import org.apache.spark.annotation.DeveloperApi
-
 import java.time.Duration
 
-@DeveloperApi
 object PerformanceUtils {
   /**
    * Measures time for some code block in seconds (float)

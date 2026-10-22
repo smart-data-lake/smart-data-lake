@@ -40,9 +40,9 @@
     </scm>
 
     <properties>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
-        <maven.compiler.release>8</maven.compiler.release>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.release>17</maven.compiler.release>
     </properties>
 
     <profiles>
@@ -50,7 +50,7 @@
             <id>release-sonatype</id>
             <distributionManagement>
                 <repository>
-                    <id>central</id>
+                    <id>sonatype-central</id>
                     <name>Maven Central Repository</name>
                     <url>https://repo1.maven.org/maven2</url>
                 </repository>
@@ -97,11 +97,10 @@
                     <plugin>
                         <groupId>org.sonatype.central</groupId>
                         <artifactId>central-publishing-maven-plugin</artifactId>
-                        <version>0.8.0</version>
+                        <version>0.11.0</version>
                         <extensions>true</extensions>
                         <configuration>
-                            <publishingServerId>central</publishingServerId>
-                            <tokenAuth>true</tokenAuth>
+                            <publishingServerId>sonatype-central</publishingServerId>
                             <autoPublish>false</autoPublish>
                         </configuration>
                     </plugin>
@@ -139,7 +138,7 @@
         <dependency>
             <groupId>org.mariadb.jdbc</groupId>
             <artifactId>mariadb-java-client</artifactId>
-            <version>3.5.0</version>
+            <version>3.5.9</version>
         </dependency>
 
     </dependencies>
@@ -167,7 +166,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.6.0</version>
+                <version>3.6.2</version>
                 <executions>
                     <execution>
                         <id>shade-jar-with-antlr-relocated</id>

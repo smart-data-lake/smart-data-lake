@@ -1,6 +1,6 @@
 language: scala
-jdk: openjdk8
-scala: 2.11.11
+jdk: openjdk17
+scala: [2.13.18]
 script: mvn test
 
 cache:

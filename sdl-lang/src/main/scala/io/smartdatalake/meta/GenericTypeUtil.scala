@@ -1,25 +1,44 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package io.smartdatalake.meta
 
+import io.smartdatalake.config.{LibraryOptions, LibraryOptionsProvider}
 import io.smartdatalake.definitions.SaveModeOptions
-import io.smartdatalake.util.misc.ScaladocUtil.{extractScalaDoc, formatScaladocString, formatScaladocWithTags}
+import io.smartdatalake.util.misc.ScaladocUtil.{extractScalaDoc, formatScaladocMarkup, formatScaladocWithTags}
 import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.executionMode.ExecutionMode
-import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, ValidationRule}
+import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformer, GenericDfsTransformer, GenericFileTransformer, ValidationRule}
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
 import io.smartdatalake.workflow.action.spark.customlogic.CustomDfTransformerConfig
 import io.smartdatalake.workflow.action.{Action, ActionMetadata}
-import io.smartdatalake.workflow.connection.authMode.AuthMode
-import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
-import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.agent.Agent
-import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata, HousekeepingMode, Table}
+import io.smartdatalake.workflow.connection.authMode.{AuthMode, HttpAuthMode}
+import io.smartdatalake.workflow.connection.{Connection, ConnectionMetadata}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic.{HousekeepingMode, Table}
+import io.smartdatalake.workflow.dataobject.{DataObject, DataObjectMetadata}
 import org.reflections.Reflections
 import scaladoc.Tag
 
 import scala.jdk.CollectionConverters._
 import scala.reflect.internal.Symbols
-import scala.reflect.runtime.universe.{MethodSymbol, TermSymbol, Type, typeOf}
+import scala.reflect.runtime.universe.{Constant, Literal, MethodSymbol, Symbol, TermSymbol, Type, typeOf}
 
 
 /**
@@ -42,6 +61,7 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     typeOf[ConnectionMetadata],
     typeOf[GenericDfTransformer],
     typeOf[GenericDfsTransformer],
+    typeOf[GenericFileTransformer],
     typeOf[ParsableScriptDef],
   typeOf[ExecutionMode],
   typeOf[HousekeepingMode],
@@ -49,11 +69,10 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
   typeOf[HttpAuthMode],
     typeOf[ValidationRule],
     typeOf[SaveModeOptions],
-    typeOf[CustomDfTransformerConfig],
     typeOf[Expectation]
   )
 
-  def getReflections = ReflectionUtil.getReflections("io.smartdatalake")
+  def getReflections: Reflections = ReflectionUtil.getReflections("io.smartdatalake")
 
   /**
    * Finds all relevant types according to the config and generates GenericTypeDefs for them.
@@ -149,13 +168,17 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
     val name = tpe.typeSymbol.name.toString
     val scaladoc = extractScalaDoc(tpe.typeSymbol.annotations)
     val description = scaladoc.map(formatScaladocWithTags(_, tag => !(tag.isInstanceOf[Tag.Param] || tag.isInstanceOf[Tag.OtherTag])))
-    val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.textParams.mapValues(formatScaladocString).toMap).getOrElse(Map())) else Seq()
-    GenericTypeDef(name, baseType, tpe, description, tpe.typeSymbol.asClass.isCaseClass, parentTypes.toSet, attributes)
+    val attributes = if (tpe.typeSymbol.asClass.isCaseClass) attributesForCaseClass(tpe, scaladoc.map(_.tags.collect { case p: Tag.Param => p.name -> formatScaladocMarkup(p.markup) }.toMap).getOrElse(Map())) else Seq()
+    // only java annotations are kept for runtime. SDLB needs to use Java @Deprecated annotation to be able to retrieve this with reflection.
+    val isDeprecated = tpe.typeSymbol.annotations.exists(_.tree.tpe =:= typeOf[Deprecated])
+    val subFeedTypes = if (tpe.typeSymbol.asClass.isCaseClass && baseType.isDefined) SubFeedTypeUtil.subFeedTypes(tpe) else None
+    GenericTypeDef(name, baseType, tpe, description, tpe.typeSymbol.asClass.isCaseClass, isDeprecated, parentTypes.toSet, attributes, subFeedTypes)
   }
 
   /**
    * Find all attributes for a given case class
    */
+  @annotation.nowarn("msg=abstract type pattern")
   def attributesForCaseClass(tpe: Type, paramDescriptions: Map[String,String]): Seq[GenericAttributeDef] = {
     // get case class constructor parameters
     val params = tpe.decls.collectFirst {
@@ -183,9 +206,89 @@ private[smartdatalake] object GenericTypeUtil extends SmartDataLakeLogger {
       val tpe = if (isOptional) {
         p.typeSignature.typeArgs.head
       } else p.typeSignature
+      val libraryOptions = getLibraryOptions(p)
       val description = paramDescriptions.get(p.name.toString)
         .orElse(overriddenMethods.map(m => extractScalaDoc(m.annotations).map(formatScaladocWithTags(_))).find(_.isDefined).flatten) // use Scaladoc from first overridden method
-      GenericAttributeDef(p.name.encodedName.toString, tpe, description, isRequired = !isOptional && !hasDefaultValue, isOverride = isOverride, isDeprecated = isDeprecated)
+        .map(d => libraryOptions.map(o => s"$d\n\n${libraryOptionsDescription(o)}").getOrElse(d))
+        .orElse(libraryOptions.map(libraryOptionsDescription))
+      GenericAttributeDef(p.name.encodedName.toString, tpe, description, isRequired = !isOptional && !hasDefaultValue, isOverride = isOverride, isDeprecated = isDeprecated, libraryOptions = libraryOptions)
     })
+  }
+
+  private def libraryOptionsDescription(libraryOptions: LibraryOptionsDef): String =
+    s"Options are passed to the underlying library, see [${libraryOptions.docUrl}](${libraryOptions.docUrl}) for the available options."
+
+  /**
+   * Read the [[LibraryOptions]] annotation of an attribute and resolve the option names of its options provider.
+   */
+  private def getLibraryOptions(attribute: Symbol): Option[LibraryOptionsDef] = {
+    attribute.annotations.find(_.tree.tpe =:= typeOf[LibraryOptions]).map { annotation =>
+      val args = annotation.tree.children.tail.collect { case Literal(Constant(arg: String)) => arg }
+      val docUrl = args.headOption.getOrElse(throw new IllegalStateException(s"LibraryOptions annotation of attribute ${attribute.fullName} must define docUrl as string literal"))
+      val optionNames = args.lift(1).filter(_.nonEmpty).map(getLibraryOptionNames).getOrElse(Seq())
+      LibraryOptionsDef(docUrl, optionNames)
+    }
+  }
+
+  /**
+   * Get the option names from a comma separated list of option providers. An option provider is either
+   * - a Scala object, which is a [[LibraryOptionsProvider]] or a Spark DataSourceOptions object,
+   * - a member of a Scala object holding a collection of option names, given as `<object>.<member>`,
+   * - a Java class, whose public static final String constants are the option names.
+   * Libraries are accessed by reflection, so that there is no compile time dependency on a specific library version.
+   */
+  private def getLibraryOptionNames(providers: String): Seq[String] = {
+    providers.split(',').map(_.trim).filter(_.nonEmpty).flatMap { provider =>
+      try getOptionNamesFromProvider(provider)
+      catch {
+        case e @ (_: ReflectiveOperationException | _: IllegalStateException) =>
+          logger.warn(s"Could not get option names from options provider $provider: ${e.getClass.getSimpleName} ${e.getMessage}")
+          Set[String]()
+      }
+    }.distinct.sorted.toSeq
+  }
+
+  private def getOptionNamesFromProvider(provider: String): Set[String] = {
+    getScalaObject(provider) match {
+      case Some(p: LibraryOptionsProvider) => p.libraryOptionNames
+      case Some(m) => m.getClass.getMethod("getAllOptions").invoke(m).asInstanceOf[scala.collection.Set[String]].toSet
+      case None =>
+        val (objectName, memberName) = provider.splitAt(provider.lastIndexOf('.'))
+        getScalaObject(objectName) match {
+          case Some(module) =>
+            readMember(module, memberName.drop(1)) match {
+              case names: scala.collection.Iterable[_] => names.map(_.toString).toSet
+              case names: java.util.Collection[_] => names.asScala.map(_.toString).toSet
+              case x => throw new IllegalStateException(s"Member $provider is not a collection of option names but ${x.getClass.getName}")
+            }
+          case None => getStringConstants(Class.forName(provider))
+        }
+    }
+  }
+
+  private def getStringConstants(cls: Class[_]): Set[String] = {
+    import java.lang.reflect.Modifier
+    cls.getFields
+      .filter(f => f.getType == classOf[String] && Modifier.isStatic(f.getModifiers) && Modifier.isFinal(f.getModifiers))
+      .map(_.get(null).asInstanceOf[String])
+      .toSet
+  }
+
+  private def getScalaObject(name: String): Option[AnyRef] = {
+    try Some(Class.forName(name + "$").getField("MODULE$").get(null))
+    catch { case _: ClassNotFoundException => None }
+  }
+
+  /**
+   * Read a parameterless member of a Scala object.
+   * Scala compiles private members accessed by a companion class to methods with an expanded name `<owner>$$<member>`.
+   */
+  private def readMember(module: AnyRef, memberName: String): Any = {
+    val method = module.getClass.getDeclaredMethods
+      .filter(m => m.getParameterCount == 0 && (m.getName == memberName || m.getName.endsWith("$$" + memberName)))
+      .minByOption(_.getName.length) // prefer the exact name
+      .getOrElse(throw new NoSuchMethodException(s"${module.getClass.getName}.$memberName"))
+    method.setAccessible(true)
+    method.invoke(module)
   }
 }

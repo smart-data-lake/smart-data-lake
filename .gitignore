@@ -3,6 +3,12 @@ data/output
 lib
 target
 venv
+.venv
+__pycache__/
+# local MLflow tracking server state, see docs/docs/reference/actions/mlflow.md
+mlruns/
+mlartifacts/
+mlflow.db
 /.externalToolBuilders/
 *.html
 *.js
@@ -11,12 +17,19 @@ venv
 /sdl-core/test_enc.parquet/
 spark-warehouse
 **/spark-warehouse
+# local Spark distribution and Spark Connect server artifacts, see sdl-sparkconnect/start-spark-connect.sh
+spark-*-bin-hadoop*/
+iceberg-warehouse
+**/iceberg-warehouse
+metastore_db
+**/metastore_db
 *.versionsBackup
 **/dependency-reduced-pom.xml
 **/pom.xml.versionsBackup
 
 # User-specific stuff
 .bloop
+.claude
 .idea/**/dictionaries
 .idea/**/shelf
 .idea/**/tasks.xml
@@ -60,3 +73,13 @@ spark-warehouse
 # JIRA plugin
 atlassian-ide-plugin.xml
 
+/*/*.crc
+/*/_SUCCESS
+/*/*.parquet
+/sdl-lang/exportedConfig.json
+/exportedConfig.json
+
+# npm auth for the @smart-data-lake GitHub package registry. docs/.npmrc is
+# tracked and only references ${TOKEN}; a repository-root .npmrc is a local
+# convenience file that tends to hold a literal token, so never commit it.
+/.npmrc

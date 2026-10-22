@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -46,7 +46,7 @@ object LocalStorageAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
         .action((arg, config) => config.copy(useOnlyLocalConnectionConfig = arg))
         .text(
           s"""
-             | Dont allow receiving connection configurations from the client, only use local ones.
+             | do not allow receiving connection configurations from the client, only use local ones.
              | This is a security feature to avoid that the client can connect to arbitrary data sources.
              | Default is true.
           """.stripMargin)
@@ -61,7 +61,7 @@ object LocalStorageAgentSmartDataLakeBuilder extends SmartDataLakeBuilder {
   def main(args: Array[String]): Unit = {
     logProgramStart()
 
-    OParser.parse(agentParser, args, LocalStorageAgentSmartDataLakeBuilderConfig()) match {
+    OParser.parse(agentParser, args.toList, LocalStorageAgentSmartDataLakeBuilderConfig()) match {
       case Some(config) =>
 
         // poll for instructions
@@ -81,8 +81,6 @@ case class LocalStorageAgentSmartDataLakeBuilderConfig(override val feedSel: Str
                                                        override val applicationName: Option[String] = Some("storage-agent"),
                                                        override val configuration: Seq[String] = Seq(),
                                                        override val configurationValueOverwrite: Map[String, String] = Map(),
-                                                       override val master: Option[String] = None,
-                                                       override val deployMode: Option[String] = None,
                                                        override val partitionValues: Option[Seq[PartitionValues]] = None,
                                                        override val parallelism: Int = 1,
                                                        override val statePath: Option[String] = None,

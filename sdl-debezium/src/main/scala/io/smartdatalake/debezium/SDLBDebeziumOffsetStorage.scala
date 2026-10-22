@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.debezium
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -37,7 +36,7 @@ import scala.jdk.CollectionConverters._
 /**
  * Custom offset storage that leverage the sdlb state mechanism to save the offset
  */
-class SDLBDebeziumOffsetStorage() extends OffsetBackingStore with SmartDataLakeLogger {
+class SDLBDebeziumOffsetStorage extends OffsetBackingStore with SmartDataLakeLogger {
 
   private val SDLB_DATA_OBJECT_ID_CONFIG = "offset.storage.sdlb.data.object.id"
   private var dataObjectId: String = ""
@@ -48,13 +47,12 @@ class SDLBDebeziumOffsetStorage() extends OffsetBackingStore with SmartDataLakeL
 
   override def start(): Unit = {
     logger.info(s"Start SDLBDebeziumOffsetStorage for data object DebeziumCdcDataObject($dataObjectId)")
-    instanceRegistry.get[DebeziumCdcDataObject](DataObjectId(dataObjectId)).incrementalState.foreach(state => {
+    instanceRegistry.get[DebeziumCdcDataObject](DataObjectId(dataObjectId)).incrementalState.foreach { state =>
       val key = stringToByteBuffer(state._1)
       val value = stringToByteBuffer(state._2)
 
       data.put(key, value)
-
-    })
+    }
 
   }
 
@@ -69,18 +67,17 @@ class SDLBDebeziumOffsetStorage() extends OffsetBackingStore with SmartDataLakeL
     data.clear()
   }
 
-  override def get(keys: util.Collection[ByteBuffer]): Future[util.Map[ByteBuffer, ByteBuffer]] = {
-    CompletableFuture.completedFuture(data.filterKeys(k => keys.contains(k)).toMap.asJava)
-  }
+  override def get(keys: util.Collection[ByteBuffer]): Future[util.Map[ByteBuffer, ByteBuffer]] =
+    CompletableFuture.completedFuture(data.view.filterKeys(k => keys.contains(k)).toMap.asJava)
 
   override def set(values: util.Map[ByteBuffer, ByteBuffer], callback: Callback[Void]): Future[Void] = {
-    values.asScala.foreach(state => {
+    values.asScala.foreach { state =>
       val key = byteBufferToString(state._1)
       val value = byteBufferToString(state._2)
       instanceRegistry.get[DebeziumCdcDataObject](DataObjectId(dataObjectId)).incrementalState.put(key, value)
-    })
+    }
 
-    if(callback != null) {
+    if (callback != null) {
       callback.onCompletion(null, null)
     }
 
@@ -94,13 +91,10 @@ class SDLBDebeziumOffsetStorage() extends OffsetBackingStore with SmartDataLakeL
     Base64.getEncoder.encodeToString(bytes)
   }
 
-  override def configure(config: WorkerConfig): Unit = {
+  override def configure(config: WorkerConfig): Unit =
     dataObjectId = config.originalsStrings().get(SDLB_DATA_OBJECT_ID_CONFIG)
-  }
 
-  override def connectorPartitions(s: String): util.Set[util.Map[String, AnyRef]] = {
+  override def connectorPartitions(s: String): util.Set[util.Map[String, AnyRef]] =
     // Not used
     Set.empty[util.Map[String, AnyRef]].asJava
-  }
 }
-

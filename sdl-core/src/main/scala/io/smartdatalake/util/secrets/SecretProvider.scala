@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,14 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.secrets
 
 import io.smartdatalake.config.ConfigurationException
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.misc.LogUtil.getRootCause
-import org.apache.spark.annotation.DeveloperApi
-
 /**
  * Configuration to register a SecretProvider.
  *
@@ -47,7 +44,6 @@ case class SecretProviderConfig(className: String, options: Option[Map[String,St
 /**
  * Interface to by implement by a SecretProvider.
  */
-@DeveloperApi
 trait SecretProvider {
   def getSecret(name: String): String
 }

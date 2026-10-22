@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.config.SdlConfigObject
@@ -25,6 +24,9 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe
 
+/**
+ * Schema of a ScalaDataFrame.
+ */
 case class ScalaSchema(override val fields: Seq[ScalaColumnDefinition[_]], isInferred: Boolean = false) extends GenericSchema {
 
   //only ignores upper / lower case difference
@@ -66,11 +68,14 @@ case class ScalaSchema(override val fields: Seq[ScalaColumnDefinition[_]], isInf
   override def removeMetadata: ScalaSchema = copy(fields = fields.map(_.removeMetadata))
 
   override def getEmptyDataFrame(dataObjectId: SdlConfigObject.DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
-    // TODO
-    null
+    toEmptyScalaDataFrame
   }
 
-  override def treeString(level: Int): String = fields.map(f => f"${f.name} (${f.dataType})").mkString("  |  "); //only flat structure as of now
+  override def treeString(level: Int): String = {
+    fields.map(f => f" - ${f.name}: ${f.dataType.sql}${if (!f.nullable) " not null" else ""}").mkString(System.lineSeparator())
+  }
+
+  override def toString: String = "ScalaSchema: " + fields.map(f => s"${f.name}: ${f.dataType.sql}").mkString(", ")
 
   override def subFeedType: universe.Type = universe.typeOf[ScalaSubFeed]
 

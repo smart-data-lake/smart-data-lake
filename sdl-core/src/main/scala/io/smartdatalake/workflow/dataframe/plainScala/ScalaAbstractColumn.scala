@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,11 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.workflow.DataFrameSubFeed
-import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataType}
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaColumn.{optionalizeBinaryFunc, optionalizeUnaryFunc}
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataType, GenericWhen}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
@@ -29,15 +29,52 @@ import scala.reflect.runtime.universe.typeOf
 /**
  * Abstraction of columns that include data (ScalaColumn and ScalaExplodingColumn), and expressions that calculate data and can be evaluated to a column.
  */
+object ScalaAbstractColumn {
+
+  /**
+   * Splits a (possibly SQL-identifier-quoted) column reference into an optional alias and the column name.
+   * A fully backtick-quoted reference (e.g. produced by SQLUtil.sparkQuoteSQLIdentifier) is treated as a single
+   * atomic name and not split on '.', so that dots inside the quoted name are not mistaken for alias separators.
+   */
+  def unquoteIdentifier(raw: String): (Option[String], String) = {
+    if (raw.length >= 2 && raw.head == '`' && raw.last == '`') (None, raw.substring(1, raw.length - 1))
+    else raw.split('.') match {
+      case Array(alias, name) => (Some(alias), name)
+      case _ => (None, raw)
+    }
+  }
+
+  /**
+   * A qualified column reference `x.y` can also address the value of key `y` in the map column `x`,
+   * e.g. `elements.dt`. This is the plain-Scala engine's equivalent of Sparks dot notation for maps and structs,
+   * limited to maps as there is no struct data type.
+   */
+  private[plainScala] def getMapValueColumn(df: ScalaDataFrame, colName: String, key: String): Option[ScalaColumn[_]] = {
+    df.cols.find(c => c.getName.contains(colName) && c.dataType.isInstanceOf[ScalaMapDataType])
+      .map { mapCol =>
+        val valueExpr = ScalaMapValueExpr(mapCol, key)
+        valueExpr.toScalaColumn(valueExpr.data.toIndexedSeq)
+      }
+  }
+}
+
 abstract class ScalaAbstractColumn extends GenericColumn {
 
   def dataType: ScalaDataType[_]
 
-  def data: Seq[_]
+  /**
+   * The values of this expression, computed on every access as the data of the input columns can change
+   * between two accesses, see [[setInputData]]. An implementation must therefore read the data of each of its
+   * input expressions exactly once: reading it twice makes evaluating a chain of n expressions cost O(2^n),
+   * which does not terminate for the chains built by e.g. `concat` over many arguments.
+   */
+  def data: Seq[Option[_]]
 
   def inputColumns: Set[String] = Set()
 
-  def setInputData(inputData: Map[String, Seq[_]], size: Int): Unit = ()
+  def setInputData(inputData: Map[String, ScalaColumn[_]], size: Int): Unit = ()
+
+  def markForDataReset(): Unit = ()
 
   def visit[X](func: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = func(this)
 
@@ -46,97 +83,158 @@ abstract class ScalaAbstractColumn extends GenericColumn {
   def toScalaColumn(df: ScalaDataFrame): ScalaColumn[_] = {
     // get input columns and data
     val inputColumns = visit[Set[String]](_.inputColumns, _ ++ _)
-    val inputData = df.cols.filter(c => inputColumns.contains(c.getName.get))
-      .map(c => (c.getName.get, c.data)).toMap
-    assert(inputData.keySet == inputColumns, s"Missing input data for column(s): ${inputColumns.diff(inputData.keySet).mkString(", ")}")
+    val inputData = inputColumns.map { raw =>
+      val dfCol = ScalaAbstractColumn.unquoteIdentifier(raw) match {
+        case (None, name) =>
+          df.cols.find(c => c.getName.contains(name) || name == "*")
+            .getOrElse(throw ColumnNotFoundException(name, df.cols.map(_.definition.name)))
+        case (Some(alias), name) =>
+          df.cols.find(c => (c.getName.contains(name) || name == "*") && c.definition.dataFrameAlias.contains(alias))
+            .orElse(ScalaAbstractColumn.getMapValueColumn(df, alias, name))
+            .getOrElse(throw ColumnNotFoundException(s"$alias.$name", df.cols.map(_.definition.getFullName())))
+      }
+      (raw, dfCol.asInstanceOf[ScalaColumn[Any]]) //TODO: can be removed when we switch to Scala 2.13, because of improved type inference
+    }.toMap
+    toScalaColumn(inputData, df.nrRows)
+  }
+
+  def toScalaColumn(inputData: Map[String,ScalaColumn[_]], nbOfRows: Int): ScalaColumn[_] = {
     // set input data
-    visit[Unit](expr => expr.setInputData(inputData, df.nrRows), (_, _) => ())
+    visit[Unit](expr => expr.setInputData(inputData, nbOfRows), (_, _) => ())
     // create column
-    dataType
-      .createColumnDefinition(getName.getOrElse(ScalaColumn.nextColName))
-      .createColumn(data.toIndexedSeq)
+    toScalaColumn(data.toIndexedSeq)
+  }
+
+  def toScalaColumn(data: IndexedSeq[Option[_]]): ScalaColumn[_] = {
+    val columnDefinition = ScalaAbstractColumn.unquoteIdentifier(getName.getOrElse(ScalaColumn.nextColName)) match {
+      case (Some(alias), name) => dataType.createColumnDefinition(name).withDataFrameAlias(Some(alias))
+      case (None, name) => dataType.createColumnDefinition(name)
+    }
+    columnDefinition.withProvenance(provenance).createColumn(data)
+  }
+
+  private def compareOptions(a: Option[Any], b: Option[Any]): Option[Boolean] = (a, b) match {
+    case (Some(av), Some(bv)) => Some(av == bv)
+    case _ => None
   }
 
   override def ===(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "not equal", _ => (_ == _), Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "equal", _ => (a,b) => compareOptions(a,b), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def =!=(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "not equal", _ => (_ != _), Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "not equal", _ => (a,b) => compareOptions(a,b).map(x => !x), Some(ScalaBooleanDataType))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  private def compareOptionsNullSafe(a: Option[Any], b: Option[Any]): Option[Boolean] = (a, b) match {
+    case (Some(av), Some(bv)) => Some(av == bv)
+    case (None, None) => Some(true)
+    case _ => Some(false)
+  }
+
+  override def <=>(other: GenericColumn): ScalaAbstractColumn = {
+    other match {
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "equal null", _ => (a,b) => compareOptionsNullSafe(a,b), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def >(other: GenericColumn): ScalaAbstractColumn = {
+
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "gt", _.numeric.gt, Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "gt", dt => optionalizeBinaryFunc((a, b) => dt.ordering.gt(Some(a), Some(b))), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def <(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "lt", _.numeric.lt, Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "lt", dt => optionalizeBinaryFunc((a, b) => dt.ordering.lt(Some(a), Some(b))), Some(ScalaBooleanDataType))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  override def >=(other: GenericColumn): ScalaAbstractColumn = {
+    other match {
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "gteq", dt => optionalizeBinaryFunc((a, b) => dt.ordering.gteq(Some(a), Some(b))), Some(ScalaBooleanDataType))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  override def <=(other: GenericColumn): ScalaAbstractColumn = {
+    other match {
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "lteq", dt => optionalizeBinaryFunc((a, b) => dt.ordering.lteq(Some(a), Some(b))), Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def -(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "minus", _.numeric.minus)
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "minus", dt => optionalizeBinaryFunc(dt.numeric.minus))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def +(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "plus", _.numeric.plus)
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "plus", dt => optionalizeBinaryFunc(dt.numeric.plus))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def /(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "div", _.numericDiv)
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "div", dt => optionalizeBinaryFunc(dt.numericDiv))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def *(other: GenericColumn): ScalaAbstractColumn = {
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "multiply", _.numeric.times)
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "multiply", dt => optionalizeBinaryFunc(dt.numeric.times))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
+
   override def and(other: GenericColumn): ScalaAbstractColumn = {
+    def andFunc: (Option[Any], Option[Any]) => Option[Boolean] = (a, b) => (a, b) match {
+      case (Some(av), Some(bv)) if av.isInstanceOf[Boolean] && bv.isInstanceOf[Boolean] => Some(av.asInstanceOf[Boolean] && bv.asInstanceOf[Boolean])
+      case _ => None
+    }
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "and", _ => (_.asInstanceOf[Boolean] && _.asInstanceOf[Boolean]), Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "and", _ => andFunc, Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def or(other: GenericColumn): ScalaAbstractColumn = {
+    def orFunc: (Option[Any], Option[Any]) => Option[Boolean] = (a, b) => (a, b) match {
+      case (Some(av), Some(bv)) if av.isInstanceOf[Boolean] && bv.isInstanceOf[Boolean] => Some(av.asInstanceOf[Boolean] || bv.asInstanceOf[Boolean])
+      case _ => None
+    }
     other match {
-      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "or", _ => (_.asInstanceOf[Boolean] || _.asInstanceOf[Boolean]), Some(ScalaBooleanDataType))
+      case sc: ScalaAbstractColumn => ScalaBinaryExpr(this, sc, "or", _ => orFunc, Some(ScalaBooleanDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
 
   override def isin(list: Any*): ScalaAbstractColumn = {
-    ScalaUnaryExpr(this, "isin", x => list.contains(x), Some(ScalaBooleanDataType))
+    ScalaUnaryExpr(this, "isin", x => x.map(xx => list.contains(xx)), Some(ScalaBooleanDataType))
   }
 
   override def isNull: ScalaAbstractColumn = {
-    ScalaUnaryExpr(this, "isNull", x => x == null, Some(ScalaBooleanDataType))
+    ScalaUnaryExpr(this, "isNull", x => Some(x.isEmpty), Some(ScalaBooleanDataType))
   }
 
   override def isNotNull: ScalaAbstractColumn = {
-    ScalaUnaryExpr(this, "isNotNull", x => x != null, Some(ScalaBooleanDataType))
+    ScalaUnaryExpr(this, "isNotNull", x => Some(x.isDefined), Some(ScalaBooleanDataType))
   }
 
   override def as(name: String): ScalaAbstractColumn = {
@@ -144,9 +242,13 @@ abstract class ScalaAbstractColumn extends GenericColumn {
   }
 
   override def cast(toDataType: GenericDataType): ScalaAbstractColumn = {
-    if (toDataType.isSameType(this.dataType)) this
-    else toDataType match {
-      case scalaDataType: ScalaDataType[_] => ScalaUnaryExpr(this, "cast", scalaDataType.getCastFunction(this.dataType), Some(scalaDataType))
+    toDataType match {
+      case scalaDataType: ScalaDataType[_] =>
+        // resolve the cast function lazily, as the input data type might not yet be resolved, e.g. a column reference not yet bound to a DataFrame
+        lazy val castFunc: Any => Any =
+          if (toDataType.isSameType(this.dataType)) identity
+          else scalaDataType.getCastFunction(this.dataType)
+        ScalaUnaryExpr(this, "cast", optionalizeUnaryFunc(v => castFunc(v)), Some(scalaDataType))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(toDataType)
     }
   }
@@ -155,8 +257,94 @@ abstract class ScalaAbstractColumn extends GenericColumn {
 
   override def desc: GenericColumn = throw new NotImplementedError("Method 'desc' is not yet supported, as sorting of DataFrames is not yet implemented")
 
-  override def getName: Option[String] = None // default is None. Name is given by ScalaNamedExpr or ScalaColumnReference.
+  /**
+   * Extract the value of a map column for the given key, e.g. `elements['dt']`.
+   */
+  override def apply(extraction: Any): ScalaAbstractColumn = ScalaMapValueExpr(this, extraction)
+
+  /**
+   * Name for this column/expression, which is used for the output column name in the resulting DataFrame.
+   * It is optional, as Name is given only by ScalaNamedExpr or ScalaColumnReference.
+   */
+  override def getName: Option[String] = None
+
+  /**
+   * Description of this expression, used as description of the transformation in the column lineage export.
+   * This is the plain-Scala engines equivalent of Sparks `Expression.sql`.
+   */
+  def describe: String = getClass.getSimpleName
+
+  /**
+   * Provenance of the column created by this expression, see [[ScalaColumnProvenance]].
+   *
+   * The columns read by the expression are collected from the expression tree: a column reference contributes
+   * the column it was resolved to, and a column holding data contributes itself. An expression reading no
+   * column at all, e.g. a literal, gets a provenance without references, which marks a column that has no
+   * source rather than one whose source is unknown.
+   *
+   * The description is built eagerly although the lineage is exported in a dry-run only, as computing it
+   * lazily would keep the expression tree alive - and with it the data of the columns it references.
+   */
+  private[plainScala] def provenance: ScalaColumnProvenance = {
+    val references = visit[Seq[ScalaColumnProvenance]]({
+      // a star reference is resolved to an arbitrary column of the DataFrame, see ScalaColumnReference.setInputData.
+      // it is expanded by select, and reads no specific column where it is not, e.g. in count(*).
+      case reference: ScalaColumnReference if reference.name == "*" || reference.name.endsWith(".*") => Seq()
+      case reference: ScalaColumnReference => reference.resolvedProvenance.toSeq
+      case column: ScalaColumn[_] => Seq(column.definition.provenance)
+      case _ => Seq()
+    }, _ ++ _).distinct
+    ScalaColumnProvenance.calculated(references, isIdentity, Some(describe))
+  }
+
+  /**
+   * True if this expression takes over the value of a column unchanged, which is the case for a reference to a
+   * column and for renaming one.
+   */
+  private def isIdentity: Boolean = this match {
+    case _: ScalaColumnReference => true
+    case _: ScalaColumn[_] => true
+    case named: ScalaNamedExpr => named.in.isIdentity
+    case _ => false
+  }
 }
+
+/**
+ * Operation between many columns/expressions
+ *
+ * @param cols          expressions
+ * @param opName        operation name for information purposes
+ * @param funcCreator   function creator which creates the function for the operation based on the combined datatype (if needed)
+ *                      Note: this is a creator function, which is called lazy, because the datatype is not known at construction time
+ * @param fixedDataType optional fixed datatype, if the result datatype is known in advance (e.g. for boolean operations)
+ */
+case class ScalaManyExpr(cols: Seq[ScalaAbstractColumn], opName: String,
+                         funcCreator: ScalaDataType[Any] => Seq[Option[Any]] => Option[Any],
+                         fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
+  lazy val dataType: ScalaDataType[_] = fixedDataType.getOrElse(
+    cols.map(_.dataType).reduce((a, b) => a.getGreaterType(b))
+  )
+  lazy val func: Seq[Option[Any]] => Any = funcCreator(dataType.asInstanceOf[ScalaDataType[Any]])
+  override def data: Seq[Option[_]] = {
+    // read the data of every input expression exactly once, see the note on ScalaAbstractColumn.data
+    val colsData = cols.map(_.data)
+    assert(colsData.map(_.size).distinct.size == 1, s"Size of all columns must be equal, but got sizes: ${cols.zip(colsData).map { case (c, data) => s"'${c.getName.getOrElse("col")}': ${data.size}" }.mkString(", ")}")
+    val colsDataCasted = cols.zip(colsData).map { case (c, data) =>
+      val castFun = if (dataType != c.dataType && fixedDataType.isEmpty) dataType.getCastFunction(c.dataType) else (x: Any) => x
+      data.map(_.map(castFun))
+    }
+    val opFun = funcCreator(dataType.asInstanceOf[ScalaDataType[Any]])
+    colsDataCasted.transpose.map(opFun)
+  }
+
+  override def describe: String = s"$opName(${cols.map(_.describe).mkString(", ")})"
+
+  override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
+    (cols.map(_.visit(visitorFunc, aggregator)) :+ visitorFunc(this))
+      .reduce(aggregator)
+  }
+}
+
 
 /**
  * Operation between two columns/expressions
@@ -168,49 +356,121 @@ abstract class ScalaAbstractColumn extends GenericColumn {
  *                      Note: this is a creator function, which is called lazy, because the datatype is not known at construction time
  * @param fixedDataType optional fixed datatype, if the result datatype is known in advance (e.g. for boolean operations)
  */
-case class ScalaBinaryExpr(left: ScalaAbstractColumn, right: ScalaAbstractColumn, opName: String, funcCreator: ScalaDataType[Any] => ((Any, Any) => Any), fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
+case class ScalaBinaryExpr(left: ScalaAbstractColumn, right: ScalaAbstractColumn, opName: String,
+                           funcCreator: ScalaDataType[Any] => (Option[Any], Option[Any]) => Option[Any],
+                           fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
   lazy val dataType: ScalaDataType[_] = fixedDataType.getOrElse(
     left.dataType.getGreaterType(right.dataType)
   )
-  lazy val func: (Any, Any) => Any = funcCreator(dataType.asInstanceOf[ScalaDataType[Any]])
-  override lazy val data: Seq[_] = {
-    assert(left.data.size == right.data.size, s"Size of left data (${left.data.size}) must be equal to size of right data (${right.data.size})")
-    val castLeft = if (dataType != left.dataType && fixedDataType.isEmpty) dataType.getCastFunction(left.dataType) else (x: Any) => x
-    val castRight = if (dataType != right.dataType && fixedDataType.isEmpty) dataType.getCastFunction(right.dataType) else (x: Any) => x
-    (left.data zip right.data).map(pair => func(castLeft(pair._1), castRight(pair._2)))
+
+  override def data: Seq[Option[_]] = {
+    // read the data of both operands exactly once, see the note on ScalaAbstractColumn.data
+    val leftData = left.data
+    val rightData = right.data
+    assert(leftData.size == rightData.size, s"Size of left data (${leftData.size}) must be equal to size of right data (${rightData.size})")
+    val funcDataType = left.dataType.getGreaterType(right.dataType)
+    val func: (Option[Any], Option[Any]) => Option[Any] = funcCreator(funcDataType.asInstanceOf[ScalaDataType[Any]])
+    // both operands are cast to the common data type of the operation, which is not the same as the result data type, e.g. for comparisons
+    val castLeft = if (funcDataType != left.dataType) funcDataType.getCastFunction(left.dataType) else (x: Any) => x
+    val castRight = if (funcDataType != right.dataType) funcDataType.getCastFunction(right.dataType) else (x: Any) => x
+    (leftData zip rightData).map(pair => func(pair._1.map(castLeft), pair._2.map(castRight)))
   }
+
+  override def describe: String = s"$opName(${left.describe}, ${right.describe})"
 
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
     Seq(
-      visitorFunc(this),
       left.visit(visitorFunc, aggregator),
-      right.visit(visitorFunc, aggregator)
+      right.visit(visitorFunc, aggregator),
+      visitorFunc(this)
     ).reduce(aggregator)
   }
-
-  override def apply(extraction: Any): ScalaBinaryExpr = throw new NotImplementedError("The 'apply(extraction: Any)' method is not applicable for a ScalaBinaryExpr instance")
 }
 
 /**
  * Operation on one column/expression
  *
  * @param in            input expression
- * @param name          operation name for information purposes
+ * @param opName        operation name for information purposes
  * @param func          function for the operation
  * @param fixedDataType optional fixed datatype, if the result datatype is different thant the dataType of the input column, and it is known in advance
  */
-case class ScalaUnaryExpr(in: ScalaAbstractColumn, name: String, func: Any => Any, fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
+case class ScalaUnaryExpr(in: ScalaAbstractColumn, opName: String, func: Option[Any] => Option[Any], fixedDataType: Option[ScalaDataType[_]] = None) extends ScalaAbstractColumn {
   override def dataType: ScalaDataType[_] = fixedDataType.getOrElse(in.dataType)
 
-  override def data: Seq[_] = in.data.map(func)
+  override def data: Seq[Option[_]] = in.data.map(func)
 
-  override def getName: Option[String] = Some(name)
+  override def describe: String = s"$opName(${in.describe})"
 
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
-    aggregator(visitorFunc(this), in.visit(visitorFunc, aggregator))
+    aggregator(in.visit(visitorFunc, aggregator), visitorFunc(this))
+  }
+}
+
+/**
+ * Map creation expression, see [[ScalaSubFeed.map]].
+ * The columns alternate between key and value, e.g. map('k1', v1, 'k2', v2).
+ * Note: entries with a null key are omitted, as in Sparks map function.
+ *
+ * @param cols key and value expressions
+ */
+case class ScalaMapExpr(cols: Seq[ScalaAbstractColumn]) extends ScalaAbstractColumn {
+  require(cols.size % 2 == 0, s"The map function needs an even number of arguments alternating between key and value, but got ${cols.size}")
+  private val keyCols = cols.zipWithIndex.collect { case (col, idx) if idx % 2 == 0 => col }
+  private val valueCols = cols.zipWithIndex.collect { case (col, idx) if idx % 2 == 1 => col }
+
+  // the data types are resolved lazily, as they are not known at construction time, e.g. for column references not yet bound to a DataFrame
+  lazy val dataType: ScalaMapDataType = ScalaMapDataType(commonDataType(keyCols), commonDataType(valueCols))
+
+  private def commonDataType(cols: Seq[ScalaAbstractColumn]): Option[ScalaDataType[_]] = {
+    cols.map(_.dataType).distinct match {
+      case Seq(dataType) => Some(dataType)
+      case dataTypes => throw new IllegalArgumentException(s"All keys resp. values of the map function must have the same data type, but found: ${dataTypes.mkString(", ")}")
+    }
   }
 
-  override def apply(extraction: Any): ScalaUnaryExpr = throw new NotImplementedError("The 'apply(extraction: Any)' method is not applicable for a ScalaUnaryExpr instance")
+  override def data: Seq[Option[_]] = {
+    // read the data of every key and value expression exactly once, see the note on ScalaAbstractColumn.data
+    val colsData = cols.map(_.data)
+    assert(colsData.map(_.size).distinct.size == 1, s"Size of all columns must be equal, but got sizes: ${cols.zip(colsData).map { case (c, data) => s"'${c.getName.getOrElse("col")}': ${data.size}" }.mkString(", ")}")
+    val keyData = colsData.zipWithIndex.collect { case (data, idx) if idx % 2 == 0 => data }.transpose
+    val valueData = colsData.zipWithIndex.collect { case (data, idx) if idx % 2 == 1 => data }.transpose
+    (keyData zip valueData).map { case (keys, values) =>
+      Some((keys zip values).collect { case (Some(key), value) => (key, value.getOrElse(null)) }.toMap)
+    }
+  }
+
+  override def describe: String = s"map(${cols.map(_.describe).mkString(", ")})"
+
+  override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
+    (cols.map(_.visit(visitorFunc, aggregator)) :+ visitorFunc(this))
+      .reduce(aggregator)
+  }
+}
+
+/**
+ * Extract the value of a map expression for a given key, e.g. `elements['dt']` or `elements.dt`.
+ *
+ * @param in  map expression
+ * @param key key to look up in the map
+ */
+case class ScalaMapValueExpr(in: ScalaAbstractColumn, key: Any) extends ScalaAbstractColumn {
+  override def dataType: ScalaDataType[_] = in.dataType match {
+    case ScalaMapDataType(_, Some(valueType)) => valueType
+    // the value type is unknown for maps created from data, e.g. a case class attribute of type Map -> infer it from the data
+    case _ => data.flatten.headOption.map(v => ScalaDataType.getFor(v.getClass)).getOrElse(ScalaNullDataType)
+  }
+
+  override def data: Seq[Option[_]] = in.data.map(_.flatMap {
+    case map: scala.collection.Map[_, _] => map.asInstanceOf[scala.collection.Map[Any, Any]].get(key).flatMap(Option(_))
+    case value => throw new IllegalArgumentException(s"Cannot extract key '$key' from value '$value' of data type ${in.dataType.typeName}, expected a map")
+  })
+
+  override def describe: String = s"${in.describe}[$key]"
+
+  override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
+    aggregator(in.visit(visitorFunc, aggregator), visitorFunc(this))
+  }
 }
 
 /**
@@ -220,19 +480,19 @@ case class ScalaUnaryExpr(in: ScalaAbstractColumn, name: String, func: Any => An
  * @param value literal value
  * @tparam A type of the literal value
  */
-case class ScalaLiteral[A: ClassTag](value: A) extends ScalaAbstractColumn {
+case class ScalaLiteral[A: ClassTag](value: Option[A]) extends ScalaAbstractColumn {
   override val dataType: ScalaDataType[A] = ScalaDataType.getFor[A]
   private var colSize: Option[Int] = None
 
-  override def setInputData(inputData: Map[String, Seq[_]], size: Int): Unit = {
+  override def setInputData(inputData: Map[String, ScalaColumn[_]], size: Int): Unit = {
     colSize = Some(size)
   }
 
-  override def data: Seq[_] = {
+  override def data: Seq[Option[_]] = {
     Seq.fill(colSize.getOrElse(throw new IllegalStateException("Literal is not initialized")))(value)
   }
 
-  override def apply(extraction: Any): ScalaUnaryExpr = throw new NotImplementedError("The 'apply(extraction: Any)' method is not applicable for a ScalaUnaryExpr instance")
+  override def describe: String = value.map(_.toString).getOrElse("null")
 }
 
 /**
@@ -244,28 +504,34 @@ case class ScalaLiteral[A: ClassTag](value: A) extends ScalaAbstractColumn {
 case class ScalaColumnReference(name: String) extends ScalaAbstractColumn {
   override def inputColumns: Set[String] = Set(name)
 
-  private var resolvedData: Option[Seq[_]] = None
+  private var resolvedColumn: Option[ScalaColumn[_]] = None
 
-  def isResolved: Boolean = resolvedData.isDefined
+  def isResolved: Boolean = resolvedColumn.isDefined
 
-  override def setInputData(inputData: Map[String, Seq[_]], size: Int): Unit = {
-    resolvedData = inputData.get(name)
-      .orElse(throw new IllegalStateException(s"Column with name '$name' not found in input data"))
+  override def setInputData(inputData: Map[String, ScalaColumn[_]], size: Int): Unit = {
+    resolvedColumn = if (name == "*") Some(inputData.head._2)
+    else inputData.get(name).orElse(throw new IllegalStateException(s"Column with name '$name' not found in input data"))
   }
 
   override def dataType: ScalaDataType[_] = {
-    assert(isResolved, s"Column reference with name '$name' is empty!")
-    assert(resolvedData.get.nonEmpty, s"Data for column reference with name '$name' is empty!")
-    ScalaDataType.getFor(resolvedData.get.head.getClass)
+    assert(isResolved, s"Column reference with name '$name' is not resolved!")
+    resolvedColumn.get.dataType
   }
 
-  override def data: Seq[_] = {
-    resolvedData.getOrElse(throw new IllegalStateException(s"Unresolved Column reference with name '$name'"))
+  override def data: Seq[Option[_]] = {
+    assert(isResolved, s"Column reference with name '$name' is not resolved!")
+    resolvedColumn.get.data
   }
 
   override def getName: Option[String] = Some(name)
 
-  override def apply(extraction: Any): ScalaUnaryExpr = throw new NotImplementedError("The 'apply(extraction: Any)' method is not applicable for a ScalaUnaryExpr instance")
+  override def describe: String = name
+
+  /**
+   * Provenance of the column this reference was resolved to, see [[ScalaColumnProvenance]].
+   * It is empty as long as the reference is not bound to a DataFrame.
+   */
+  private[plainScala] def resolvedProvenance: Option[ScalaColumnProvenance] = resolvedColumn.map(_.definition.provenance)
 }
 
 /**
@@ -278,13 +544,115 @@ case class ScalaColumnReference(name: String) extends ScalaAbstractColumn {
 case class ScalaNamedExpr(in: ScalaAbstractColumn, name: String) extends ScalaAbstractColumn {
   override def dataType: ScalaDataType[_] = in.dataType
 
-  override def data: Seq[_] = in.data
+  override def data: Seq[Option[_]] = in.data
 
   override def getName: Option[String] = Some(name)
 
+  override def describe: String = in.describe
+
   override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
-    aggregator(visitorFunc(this), in.visit(visitorFunc, aggregator))
+    aggregator(in.visit(visitorFunc, aggregator), visitorFunc(this))
+  }
+}
+
+/**
+ * Aggregate expression, which applies an aggregation function to an input expression and gives a name to the result
+ * Note: the datatype is the same as the input expression
+ * Note: the output data has always only one value, which is the result of the aggregation function applied to all values of the input expression
+ *
+ * @param in   input expression
+ * @param opName operation name to be given to the expression
+ * @param aggFunc aggregation function
+ * @param outputDataType  output datatype; this is a function, which is called lazy, because the datatype is not known at construction time, as it can depend on the datatype of the input expression
+ */
+case class ScalaAggregateExpr(in: ScalaAbstractColumn, opName: String,
+                              aggFunc: Seq[Option[Any]] => Option[Any],
+                              outputDataType: () => ScalaDataType[_]) extends ScalaAbstractColumn {
+  override def dataType: ScalaDataType[_] = outputDataType()
+
+  override def data: Seq[Option[_]] = {
+    val result = aggFunc(in.data)
+    Seq(result)
   }
 
-  override def apply(extraction: Any): ScalaUnaryExpr = throw new NotImplementedError("The 'apply(extraction: Any)' method is not applicable for a ScalaUnaryExpr instance")
+  override def describe: String = s"$opName(${in.describe})"
+
+  override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
+    aggregator(in.visit(visitorFunc, aggregator), visitorFunc(this))
+  }
 }
+
+
+/**
+ * Operation on one column/expression
+ *
+ * @param in            input expression
+ * @param func          function for the operation
+ * @param fixedDataType optional fixed datatype, if the result datatype is different thant the dataType of the input column, and it is known in advance
+ */
+case class ScalaWhenExpr(condition: ScalaAbstractColumn, in: ScalaAbstractColumn, prev: Option[ScalaAbstractColumn] = None)
+  extends ScalaAbstractColumn with GenericWhen {
+  override def dataType: ScalaDataType[_] = prev.getOrElse(in).dataType
+
+  override def data: Seq[Option[_]] = {
+    val inData = in.data
+    val conditionData = condition.data.map(v => v.map {
+      case b: Boolean => b
+      case _ => false
+    })
+    val outData = if (prev.isDefined) {
+      val prevData = prev.get.data
+      conditionData.zip(inData.zip(prevData)).map {
+        case (predicate, (in, prev)) =>
+          val inFiltered = predicate.flatMap(p => if (p) in else None)
+          prev.orElse(inFiltered)
+      }
+    } else {
+      conditionData.zip(inData).map {
+        case (predicate, in) => predicate.flatMap(p => if (p) in else None)
+      }
+    }
+    outData
+  }
+
+  override def describe: String = prev.map(p => s"${p.describe}.").getOrElse("") + s"when(${condition.describe}, ${in.describe})"
+
+  override def setInputData(inputData: Map[String, ScalaColumn[_]], size: Int): Unit = {
+    super.setInputData(inputData, size)
+    assert(condition.dataType == ScalaBooleanDataType, s"The data type of the condition in a when expression must be boolean, but got ${condition.dataType.getClass.getSimpleName}")
+    assert(prev.forall(_.dataType == in.dataType || in.dataType == ScalaNullDataType), s"The data type of the value in a when expression (${in.dataType.getClass.getSimpleName} must be the same as the data type of the value in the previous when expression (${prev.get.dataType.getClass.getSimpleName})")
+  }
+
+  override def visit[X](visitorFunc: ScalaAbstractColumn => X, aggregator: (X, X) => X): X = {
+    Seq(
+      Some(condition.visit(visitorFunc, aggregator)),
+      Some(in.visit(visitorFunc, aggregator)),
+      prev.map(_.visit(visitorFunc, aggregator)),
+      Some(visitorFunc(this)),
+    ).flatten.reduce(aggregator)
+  }
+
+  override def when(condition: GenericColumn, value: GenericColumn): ScalaAbstractColumn with GenericWhen = {
+    (condition, value) match {
+      case (scalaCondition: ScalaAbstractColumn, sparkValue: ScalaAbstractColumn) => ScalaWhenExpr(scalaCondition, sparkValue, Some(this))
+      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${condition.subFeedType.typeSymbol.name}, ${value.subFeedType.typeSymbol.name} in method when")
+    }
+  }
+
+  override def otherwise(value: GenericColumn): ScalaAbstractColumn = {
+    value  match {
+      case scalaValue: ScalaAbstractColumn =>
+        new ScalaBinaryExpr(this, scalaValue, "otherwise", _ => (a,b) => a.orElse(b), Some(dataType)) {
+          override def setInputData(inputData: Map[String, ScalaColumn[_]], size: Int): Unit = {
+            super.setInputData(inputData, size)
+            assert(scalaValue.dataType == this.dataType,
+              s"The data type of the value in an otherwise expression (${scalaValue.dataType} must be the same" +
+                s" as the data type of the value in the previous when expression (${this.dataType})")
+          }
+        }
+      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${value.subFeedType.typeSymbol.name} in method otherwise")
+    }
+  }
+}
+
+case class ColumnNotFoundException(columnName: String, dfCols: Seq[String]) extends Exception(s"Column with name '$columnName' not found in DataFrame with column(s): ${dfCols.mkString(", ")}")

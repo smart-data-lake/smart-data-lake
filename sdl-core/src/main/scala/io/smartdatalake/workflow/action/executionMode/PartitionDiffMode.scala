@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.executionMode
 
 import com.typesafe.config.Config
@@ -24,27 +23,52 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.ProductUtil
-import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.util.misc.{ExpressionUtil, ProductUtil}
 import io.smartdatalake.workflow.action.ActionHelper.searchCommonInits
 import io.smartdatalake.workflow.action.NoDataToProcessWarning
-import io.smartdatalake.workflow.dataobject.{CanHandlePartitions, DataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.CanHandlePartitions
 import io.smartdatalake.workflow.{ActionPipelineContext, SubFeed}
 
 import java.sql.Timestamp
 
 /**
  * Partition difference execution mode lists partitions on mainInput & mainOutput DataObject and starts loading all missing partitions.
- * Partition columns to be used for comparision need to be a common 'init' of input and output partition columns.
+ * Partition columns to be used for comparison need to be a common 'init' of input and output partition columns.
  * This mode needs mainInput/Output DataObjects which CanHandlePartitions to list partitions.
  * Partition values are passed to following actions for partition columns which they have in common.
  *
+ * This is the standard mode for incremental loading of partitioned DataObjects: it needs no state to be persisted,
+ * as the partitions still missing in the output define the increment. By default it is only applied if no partition
+ * values are given on the command line or by the preceding action. If no partition is missing, a
+ * NoDataToProcessWarning is raised and the following actions are skipped.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-departures {
+ *     type = CopyAction
+ *     inputId = stg-departures
+ *     outputId = int-departures
+ *     executionMode = {
+ *       type = PartitionDiffMode
+ *       partitionColNb = 1
+ *       nbOfPartitionValuesPerRun = 10
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @see [[DataFrameIncrementalMode]] for non-partitioned DataObjects, [[CustomPartitionMode]] for custom partition
+ *      selection logic.
  * @param partitionColNb                  optional number of partition columns to use as a common 'init'.
  * @param alternativeOutputId             optional alternative outputId of DataObject later in the DAG. This replaces the mainOutputId.
  *                                        It can be used to ensure processing all partitions over multiple actions in case of errors.
  * @param nbOfPartitionValuesPerRun       optional restriction of the number of partition values per run.
  * @param applyCondition                  Condition to decide if execution mode should be applied or not. Define a spark sql expression working with attributes of [[DefaultExecutionModeExpressionData]] returning a boolean.
  *                                        Default is to apply the execution mode if given partition values (partition values from command line or passed from previous action) are empty.
+ * @param failCondition                   optional single condition to fail application of execution mode if true. Define as spark sql expression working with attributes of [[PartitionDiffModeExpressionData]] returning a boolean.
+ *                                        This is a shortcut for `failConditions` with one entry and without description. It is evaluated in addition to `failConditions`.
  * @param failConditions                  List of conditions to fail application of execution mode if true. Define as spark sql expressions working with attributes of [[PartitionDiffModeExpressionData]] returning a boolean.
  *                                        Default is that the application of the PartitionDiffMode does not fail the action. If there is no data to process, the following actions are skipped.
  *                                        Multiple conditions are evaluated individually and every condition may fail the execution mode (or-logic)
@@ -78,9 +102,9 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
     // validate fail condition
     failConditionsDef.foreach(_.syntaxCheck[PartitionDiffModeExpressionData](actionId, Some("failCondition")))
     // validate select expression
-    selectExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), expression))
+    selectExpression.foreach(expression => ExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), expression))
     // validate select additional input expression
-    selectAdditionalInputExpression.foreach(expression => SparkExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectAdditionalInputExpression"), expression))
+    selectAdditionalInputExpression.foreach(expression => ExpressionUtil.syntaxCheck[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectAdditionalInputExpression"), expression))
     // check alternativeOutput exists
     alternativeOutput
   }
@@ -116,12 +140,12 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
               val outputOrdering = PartitionValues.getOrdering(outputPartitions)
               val inputOrdering = PartitionValues.getOrdering(inputPartitions)
               // calculate missing partition values
-              val filteredInputPartitionValues = partitionInput.listPartitions.map(_.filterKeys(inputPartitions))
-              val filteredOutputPartitionValues = partitionOutput.listPartitions.map(_.filterKeys(outputPartitions))
-              val inputOutputPartitionValuesMap = if (applyPartitionValuesTransform) {
-                partitionValuesTransform(filteredInputPartitionValues).mapValues(_.filterKeys(outputPartitions))
-              } else PartitionValues.oneToOneMapping(filteredInputPartitionValues) // normally this transformation is 1:1, but it can be implemented in custom transformations for aggregations
-              val outputInputPartitionValuesMap = inputOutputPartitionValuesMap.toSeq.map { case (k, v) => (v, k) }.groupBy(_._1).mapValues(_.map(_._2))
+               val filteredInputPartitionValues = partitionInput.listPartitions.map(pv => pv.elements.view.filterKeys(inputPartitions.contains).toMap).map(PartitionValues(_))
+               val filteredOutputPartitionValues = partitionOutput.listPartitions.map(pv => pv.elements.view.filterKeys(outputPartitions.contains).toMap).map(PartitionValues(_))
+               val inputOutputPartitionValuesMap = if (applyPartitionValuesTransform) {
+                 partitionValuesTransform(filteredInputPartitionValues).view.mapValues(pv => pv.elements.view.filterKeys(outputPartitions.contains).toMap).toMap.map { case (k, v) => (k, PartitionValues(v)) }
+               } else PartitionValues.oneToOneMapping(filteredInputPartitionValues) // normally this transformation is 1:1, but it can be implemented in custom transformations for aggregations
+               val outputInputPartitionValuesMap = inputOutputPartitionValuesMap.toSeq.map { case (k, v) => (v, k) }.groupBy(_._1).view.mapValues(_.map(_._2)).toMap
               var selectedOutputPartitionValues = inputOutputPartitionValuesMap.values.toSet.diff(filteredOutputPartitionValues.toSet).toSeq
               // reverse lookup input partitions as selection of output partitions might have changed
               var selectedInputPartitionValues = selectedOutputPartitionValues.flatMap(outputInputPartitionValuesMap)
@@ -130,7 +154,7 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
                 inputPartitionValues = filteredInputPartitionValues.map(_.getMapString), outputPartitionValues = filteredOutputPartitionValues.map(_.getMapString),
                 selectedInputPartitionValues = selectedInputPartitionValues.map(_.getMapString), selectedOutputPartitionValues = selectedOutputPartitionValues.map(_.getMapString))
               selectedOutputPartitionValues = if (selectExpression.isDefined) {
-                SparkExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), selectExpression.get, data)
+                ExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectExpression"), selectExpression.get, data)
                   .map(_.map(PartitionValues(_)))
                   .getOrElse(selectedOutputPartitionValues)
                   .sorted(outputOrdering)
@@ -145,7 +169,7 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
               data = data.copy(selectedInputPartitionValues = selectedInputPartitionValues.map(_.getMapString), selectedOutputPartitionValues = selectedOutputPartitionValues.map(_.getMapString))
               // apply optional select additional input partitions expression
               selectedInputPartitionValues = if (selectAdditionalInputExpression.isDefined) {
-                SparkExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectAdditionalInputExpression"), selectAdditionalInputExpression.get, data)
+                ExpressionUtil.evaluate[PartitionDiffModeExpressionData, Seq[Map[String, String]]](actionId, Some("selectAdditionalInputExpression"), selectAdditionalInputExpression.get, data)
                   .map(_.map(PartitionValues(_)))
                   .getOrElse(selectedInputPartitionValues)
                   .sorted(inputOrdering)
@@ -167,8 +191,6 @@ case class PartitionDiffMode(partitionColNb: Option[Int] = None
       }
     } else None
   }
-
-  override def factory: FromConfigFactory[ExecutionMode] = PartitionDiffMode
 }
 
 object PartitionDiffMode extends FromConfigFactory[ExecutionMode] {
@@ -184,7 +206,7 @@ object PartitionDiffMode extends FromConfigFactory[ExecutionMode] {
  * @param selectedInputPartitionValues  input partition values selected by PartitionDiffMode
  * @param selectedOutputPartitionValues output partition values selected by PartitionDiffMode
  */
-case class PartitionDiffModeExpressionData(feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Option[Timestamp]
+case class PartitionDiffModeExpressionData(feed: String, application: String, runId: Int, attemptId: Int, referenceTimestamp: Timestamp
                                            , runStartTime: Timestamp, attemptStartTime: Timestamp
                                            , givenPartitionValues: Seq[Map[String, String]], inputPartitionValues: Seq[Map[String, String]], outputPartitionValues: Seq[Map[String, String]]
                                            , selectedInputPartitionValues: Seq[Map[String, String]], selectedOutputPartitionValues: Seq[Map[String, String]]) {
@@ -193,7 +215,7 @@ case class PartitionDiffModeExpressionData(feed: String, application: String, ru
 
 object PartitionDiffModeExpressionData {
   def from(context: ActionPipelineContext): PartitionDiffModeExpressionData = {
-    PartitionDiffModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, context.referenceTimestamp.map(Timestamp.valueOf)
+    PartitionDiffModeExpressionData(context.feed, context.application, context.executionId.runId, context.executionId.attemptId, Timestamp.valueOf(context.referenceTimestamp)
       , Timestamp.valueOf(context.runStartTime), Timestamp.valueOf(context.attemptStartTime), Seq(), Seq(), Seq(), Seq(), Seq())
   }
 }

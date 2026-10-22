@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -66,8 +66,8 @@ case class AzureRelayAgentServer(sdlb: SmartDataLakeBuilder, config: LocalAzureR
             val responseMessageOpt = agentController.handle(sdlMessage, config)
             if (responseMessageOpt.isDefined) {
               sendSDLMessage(responseMessageOpt.get, connection)
-              if(responseMessageOpt.get.agentResult.get.exception.isDefined){
-                throw(responseMessageOpt.get.agentResult.get.exception.get)
+              if(responseMessageOpt.get.agentResult.get.errorMsg.isDefined){
+                throw new Exception(responseMessageOpt.get.agentResult.get.errorMsg.get)
               }
             }
             else closeConnection(connection)

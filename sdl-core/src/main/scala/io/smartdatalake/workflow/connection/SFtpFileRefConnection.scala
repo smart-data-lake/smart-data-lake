@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,7 +34,32 @@ import java.time.Duration
 import scala.util.{Try, Using}
 
 /**
- * SFTP Connection information
+ * SFTP Connection information.
+ *
+ * It holds host, port and credentials of an SFTP server and manages a pool of SSH connections which is shared
+ * by all DataObjects referencing this connection. Use it together with `SFtpFileRefDataObject` to list and
+ * transfer remote files, e.g. with a FileTransferAction. Only [[BasicAuthMode]] (user/password) and
+ * [[PublicKeyAuthMode]] (user, key taken from the local ssh agent/key store) are supported.
+ *
+ * Example:
+ * {{{
+ * connections {
+ *   sftp-partner {
+ *     type = SFtpFileRefConnection
+ *     host = "sftp.partner.example.com"
+ *     port = 22
+ *     authMode = {
+ *       type = BasicAuthMode
+ *       user = "###ENV#SFTP_USER###"
+ *       password = "###ENV#SFTP_PASSWORD###"
+ *     }
+ *     maxParallelConnections = 4
+ *   }
+ * }
+ * }}}
+ *
+ * @note the host key of the server must be known (e.g. present in `~/.ssh/known_hosts`), otherwise the connection
+ *       fails unless `ignoreHostKeyVerification` is enabled.
  *
  * @param id unique id of this connection
  * @param host sftp host
@@ -87,7 +112,7 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
   // setup connection pool
   val pool = new GenericObjectPool[SSHClient](new SFtpClientPoolFactory)
   pool.setMaxTotal(maxParallelConnections)
-  pool.setMinEvictableIdle(Duration.ofSeconds(connectionPoolMaxIdleTimeSec)) // timeout to close sftp connection if not in use
+  pool.setMinEvictableIdleDuration(Duration.ofSeconds(connectionPoolMaxIdleTimeSec)) // timeout to close sftp connection if not in use
   pool.setTestOnBorrow(true)
   pool.setTestOnReturn(true)
 
@@ -106,8 +131,6 @@ case class SFtpFileRefConnection(override val id: ConnectionId,
 
     override def destroyObject(p: PooledObject[SSHClient]): Unit = p.getObject.close()
   }
-
-  override def factory: FromConfigFactory[Connection] = SFtpFileRefConnection
 }
 
 object SFtpFileRefConnection extends FromConfigFactory[Connection] {
@@ -118,6 +141,24 @@ object SFtpFileRefConnection extends FromConfigFactory[Connection] {
 
 /**
  * Proxy configuration to create java.net.Proxy instance.
+ * Use it if the SFTP server can only be reached through a forward proxy.
+ *
+ * Example:
+ * {{{
+ * connections {
+ *   sftp-partner {
+ *     type = SFtpFileRefConnection
+ *     host = "sftp.partner.example.com"
+ *     authMode = { type = PublicKeyAuthMode, user = "sdlb" }
+ *     proxy = {
+ *       host = "proxy.company.example.com"
+ *       port = 8080
+ *       proxyType = HTTP
+ *     }
+ *   }
+ * }
+ * }}}
+ *
  * @param host proxy host
  * @param port proxy port
  * @param proxyType Type of proxy: HTTP or SOCKS. Default is HTTP.

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import com.typesafe.config.Config
@@ -24,15 +23,36 @@ import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.misc.StringUtil.indent
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import org.apache.commons.lang3.StringUtils
 import org.slf4j.event.Level
 
 /**
  * Log schema, sample data and plan of DataFrame to transform.
  * This transformer can be used to log debug output between different transformers.
  * It's not intended for production use.
+ * The DataFrame is returned unchanged, so the transformer can be inserted at any position in the
+ * `transformers` list of an Action without influencing its result.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   load-ratings {
+ *     type = CopyAction
+ *     inputId = stg-ratings
+ *     outputId = int-ratings
+ *     transformers = [{
+ *       type = DebugTransformer
+ *       show = true
+ *       showOptions = { numRows = "20", vertical = "true" }
+ *       explain = true
+ *       explainOptions = { mode = "extended" }
+ *       logLevel = debug
+ *     }]
+ *   }
+ * }
+ * }}}
  *
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
@@ -74,16 +94,6 @@ case class DebugTransformer(override val name: String = "debug", override val de
     // return
     df
   }
-
-  /**
-   * This functionality is included in Java 17, e.g. string.indent(n). It's implemented here to be compatible with Java 8.
-   */
-  private def indent(s: String, n: Int) = {
-    assert(n > 0)
-    val prefix = StringUtils.repeat(' ', n)
-    s.linesIterator.map(prefix + _).mkString(System.lineSeparator())
-  }
-  override def factory: FromConfigFactory[GenericDfTransformer] = DebugTransformer
 }
 
 object DebugTransformer extends FromConfigFactory[GenericDfTransformer] {

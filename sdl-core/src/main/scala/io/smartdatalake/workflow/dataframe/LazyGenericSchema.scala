@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,12 +16,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe
 import io.smartdatalake.config.SdlConfigObject
 import io.smartdatalake.util.misc.SchemaUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
 
 import scala.reflect.runtime.universe
 
@@ -39,7 +37,7 @@ case class LazyGenericSchema(schemaConfig: String) extends GenericSchema {
    */
   def get = schema
 
-  override def diffSchema(schema: GenericSchema): Option[GenericSchema] = schema.diffSchema(schema)
+  override def diffSchema(other: GenericSchema): Option[GenericSchema] = schema.diffSchema(other)
   override def columns: Seq[String] = schema.columns
   override def fields: Seq[GenericField] = schema.fields
   override def sql: String = schema.sql

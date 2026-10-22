@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.expectation
 
 import com.typesafe.config.Config
@@ -24,17 +23,37 @@ import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkColumn
 import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericColumn}
 import io.smartdatalake.workflow.dataobject.expectation.ExpectationSeverity.ExpectationSeverity
 import io.smartdatalake.workflow.dataobject.expectation.{ActionExpectation, ExpectationFractionMetricDefaultImpl, ExpectationSeverity}
-import org.apache.spark.sql.Column
 
 
 /**
  * Definition of expectation on transfer rate.
  * Transfer rate is calculated as the fraction of main output count over main input count.
  *
+ * Use this Action level expectation to detect records unintentionally lost (or multiplied) by the transformation of an Action,
+ * e.g. by a join that does not match, or a filter that is too restrictive. In contrast to [[CompletenessExpectation]],
+ * which always compares the count of the whole table (scope `All`), the transfer rate compares the number of records
+ * processed by the current job, e.g. only the incrementally loaded records.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     expectations = [
+ *       { type = TransferRateExpectation, expectation = "> 0.95", failedSeverity = Warn }
+ *     ]
+ *   }
+ * }
+ * }}}
+ *
+ * @note The metric is only available for Actions with a main input and a main output, e.g. [[io.smartdatalake.workflow.action.CopyAction]]
+ *       or [[io.smartdatalake.workflow.action.CustomDataFrameAction]].
+ * @see [[CompletenessExpectation]]
  * @param expectation Optional SQL comparison operator and literal to define expected value for validation. Default is '= 1".
  *                    Together with the result of the aggExpression evaluation on the left side, it forms the condition to validate the expectation.
  *                    If no expectation is defined, the aggExpression evaluation result is just recorded in metrics.
@@ -52,14 +71,13 @@ case class TransferRateExpectation(
   override def getAggExpressionColumns(dataObjectId: DataObjectId)(implicit functions: DataFrameFunctions, context: ActionPipelineContext): Seq[GenericColumn] = {
     Seq() // no additional aggregate expressions needed
   }
-  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[SparkColumn],Map[String,_]) = {
+  def getValidationErrorColumn(dataObjectId: DataObjectId, metrics: Map[String,_], partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): (Seq[GenericColumn],Map[String,_]) = {
     val countOutput = getMetric[Long](dataObjectId,metrics,"count")
     val countInput = getMetric[Long](dataObjectId,metrics,"count#mainInput")
-    val (col, pct) = getValidationErrorColumn(dataObjectId, countOutput, countInput)
+    val (col, pct) = getValidationErrorColumnSql(dataObjectId, countOutput, countInput)
     val updatedMetrics = metrics + (name -> pct)
-    (col.map(SparkColumn).toSeq, updatedMetrics)
+    (col.toSeq, updatedMetrics)
   }
-  override def factory: FromConfigFactory[ActionExpectation] = TransferRateExpectation
 }
 
 object TransferRateExpectation extends FromConfigFactory[ActionExpectation] {

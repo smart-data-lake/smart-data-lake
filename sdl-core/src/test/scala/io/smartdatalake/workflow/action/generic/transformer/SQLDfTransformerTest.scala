@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,56 +16,34 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.InstanceRegistry
-import io.smartdatalake.testutils.TestUtil
+import io.smartdatalake.testutils.SQLDfTransformerBehaviour
+import io.smartdatalake.testutils.plainScala.ScalaTestUtil
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.action.CopyAction
-import io.smartdatalake.workflow.connection.jdbc.JdbcTableConnection
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import io.smartdatalake.workflow.dataobject.{JdbcTableDataObject, Table}
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaSubFeed
 import org.scalatest.funsuite.AnyFunSuite
 
-class SQLDfTransformerTest extends AnyFunSuite {
+import scala.reflect.runtime.universe.{Type, typeOf}
 
-  protected implicit val session: SparkSession = TestUtil.session
-  import session.implicits._
+// SQLDfTransformer uses DataFrameFunctions.sql, which is not implemented for ScalaSubFeed
+class SQLDfTransformerTest extends AnyFunSuite with SQLDfTransformerBehaviour {
 
-  implicit val instanceRegistry = new InstanceRegistry()
-  implicit val context: ActionPipelineContext = TestUtil.getDefaultActionPipelineContext
+  override def subFeedType: Type = typeOf[ScalaSubFeed]
+  implicit val instanceRegistry: InstanceRegistry = new InstanceRegistry()
+  implicit val context: ActionPipelineContext = ScalaTestUtil.getDefaultActionPipelineContext
 
-  val con1 = JdbcTableConnection("con1", url = "123", driver = "driver") // dummy
-  instanceRegistry.register(con1)
-
-  val srcTable1 = Table(Some("default"), "src1")
-  val srcDO1 = JdbcTableDataObject("src1", table = srcTable1, connectionId = "con1")
-  instanceRegistry.register(srcDO1)
-
-  val tgtTable1 = Table(Some("default"), "tgt1")
-  val tgtDO1 = JdbcTableDataObject("tgt1", table = tgtTable1, connectionId = "con1")
-  instanceRegistry.register(tgtDO1)
-
-  val action1 = CopyAction("action1", srcDO1.id, tgtDO1.id)
-  instanceRegistry.register(action1)
-
-  val emptyDf = Seq((1,"a")).toDF("num","str")
-
-  test("options and view name token are replaced") {
-    val customTransformer = SQLDfTransformer(code = Some(s"select num, %{option1} from %{inputViewName_src1}"))
-    customTransformer.transformWithOptions(action1.id, Seq(), SparkDataFrame(emptyDf), srcDO1.id, Map("option1" -> "str"))
+  ignore("options and view name token are replaced") {
+    testOptionsAndViewNameTokenAreReplaced()
   }
 
-  test("view name token without input name is replaced") {
-    val customTransformer = SQLDfTransformer(code = Some(s"select num, %{option1} from %{inputViewName}"))
-    customTransformer.transformWithOptions(action1.id, Seq(), SparkDataFrame(emptyDf), srcDO1.id, Map("option1" -> "str"))
+  ignore("view name token without input name is replaced") {
+    testViewNameTokenWithoutInputNameIsReplaced()
   }
 
-  test("legacy view name without postfix is still supported") {
-    val customTransformer = SQLDfTransformer(code = Some(s"select src1.num, %{option1} from src1"))
-    customTransformer.transformWithOptions(action1.id, Seq(), SparkDataFrame(emptyDf), srcDO1.id, Map("option1" -> "str"))
+  ignore("legacy view name without postfix is still supported") {
+    testLegacyViewNameWithoutPostfixIsStillSupported()
   }
 
 }

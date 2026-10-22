@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 Schweizerische Bundesbahnen SBB (<https://www.sbb.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 
 import com.snowflake.snowpark
@@ -24,19 +23,21 @@ import com.snowflake.snowpark.SaveMode
 import com.snowflake.snowpark.types.StructType
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.SDLSaveMode._
 import io.smartdatalake.definitions.{Environment, SDLSaveMode, SaveModeOptions}
-import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{SQLUtil, SchemaUtil}
+import io.smartdatalake.util.misc.SQLUtil
+import io.smartdatalake.util.spark.{SparkSchemaUtil, SparkStageMetricsListener}
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.generic.transformer.GenericDfTransformer
 import io.smartdatalake.workflow.connection.SnowflakeConnection
 import io.smartdatalake.workflow.dataframe.snowflake.{SnowparkDataFrame, SnowparkSchema, SnowparkSubFeed}
 import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, SparkSubFeed}
-import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
+import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema, GenericSchemaUtil}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic._
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame, SparkSaveMode}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 import net.snowflake.spark.snowflake.Utils
 import net.snowflake.spark.snowflake.Utils.SNOWFLAKE_SOURCE_NAME
@@ -48,7 +49,9 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * [[DataObject]] of type SnowflakeTableDataObject.
  * Provides details to access Snowflake tables via an action
  * Can be used both for interacting with Snowflake through Spark with JDBC,
- * as well as for actions written in the Snowpark API that run directly on Snowflake
+ * as well as for actions written in the Snowpark API that run directly on Snowflake.
+ * An Action uses Snowpark if its `engineConnectionId` references the SnowflakeConnection of its DataObjects,
+ * otherwise the DataObject is read and written with the Snowflake Spark connector.
  *
  * Note 1: Snowflake does not support partitioning.
  * But SDLB emulates partitions through the `virtualPartitions` attribute.
@@ -60,6 +63,22 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  *
  * Note 3: case-insensitive column names are all uppercase in Snowflake tables. This is opposite from Spark when Spark is in case-insensitive mode (see also `Environment.caseSensitive`)
  * If `Environment.caseSensitive=false` then SDLB converts all case-insensitive column names to lowercase when reading from Snowflake with Spark Connector.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   tgt-airports {
+ *     type = SnowflakeTableDataObject
+ *     connectionId = sf-con
+ *     table {
+ *       db = "test_schema"
+ *       name = "airports"
+ *     }
+ *     virtualPartitions = [dt]
+ *     saveMode = Append
+ *   }
+ * }
+ * }}}
  *
  * @param id           unique name of this data object
  * @param table        Snowflake table to be written by this output
@@ -73,11 +92,10 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param connectionId The SnowflakeTableConnection to use for the table
  * @param virtualPartitions Virtual partition columns. Note that Snowflake has no partition concept, and SDLB is emulating partitions on its own.
  * @param readTransformer   An optional transformer that is applied on read. This is often used to adapt Snowflakes Decimal datatype to more accurate IntegralTypes like Long, Integer, Byte.
- * @param syncComments   Defines if the comments defined in the schema should be synched the Snowflake table. Please note that this can be an expensive operation and it only works if using Spark as an execution engine.
  * @param expectedPartitionsCondition Optional definition of partitions expected to exist.
  *                                    Define a Spark SQL expression that is evaluated against a [[PartitionValues]] instance and returns true or false
  *                                    Default is to expect all partitions to exist.
- * @param sparkOptions Options for the Snowflake Spark Connector, see https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options.
+ * @param sparkOptions Options for the Snowflake Spark Connector.
  *                     These options override connection.options.
  * @param metadata     meta data
  */
@@ -92,14 +110,15 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
                                     override val postWriteSql: Option[String] = None,
                                     saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
                                     connectionId: ConnectionId,
+                                    @LibraryOptions("https://docs.snowflake.com/en/user-guide/spark-connector-use#additional-options", "net.snowflake.spark.snowflake.Parameters.KNOWN_PARAMETERS")
                                     sparkOptions: Map[String, String] = Map(),
                                     virtualPartitions: Seq[String] = Seq(),
                                     readTransformer: Option[GenericDfTransformer] = None,
-                                    syncComments: Boolean = false,
                                     override val expectedPartitionsCondition: Option[String] = None,
                                     override val metadata: Option[DataObjectMetadata] = None)
                                    (@transient implicit val instanceRegistry: InstanceRegistry)
   extends TransactionalTableDataObject with CanCreateSparkDataFrame with CanWriteSparkDataFrame
+    with CanHandleCatalogMetadata
     with CanHandlePartitions with ExpectationValidation with CanHandleConstraints {
 
   val connection: SnowflakeConnection = getConnection[SnowflakeConnection](connectionId)
@@ -127,11 +146,10 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
 
   private val instanceSparkOptions = connection.sparkOptions ++ sparkOptions
 
-  private var columnComments: Map[String, String] = Map()
 
   override def prepare(implicit context: ActionPipelineContext): Unit = {
     super.prepare
-    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame(), role = "prepare", obj = "Existing table")
+    if (isTableExisting) validateSchemaHasPrimaryKeyCols(getSparkDataFrame().columns.toIndexedSeq, role = "prepare", obj = "Existing table")
   }
 
   // Get a Spark DataFrame with the table contents for Spark transformations
@@ -147,7 +165,7 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   }
 
   private def sparkLoad(queryOrTableOption: Map[String,String])(implicit context: ActionPipelineContext): spark.DataFrame = {
-    val df = context.sparkSession
+    val df = SparkSubFeed.getSparkSession
       .read
       .format(SNOWFLAKE_SOURCE_NAME)
       .options(connection.getJdbcAuthOptions(table.db.get))
@@ -164,10 +182,9 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     val dfTarget = if (schemaMin.isDefined) {
       validateSchemaMin(SparkSchema(df.schema), role = "write") //needed for merging the schemas
       val sparkSchemaMin = schemaMin.get.asInstanceOf[SparkSchema] //writeSparkDataFrame is only done with SparkSubFeeds
-      val targetSchemaWithMetadata = SchemaUtil.mergeSchemaMetadata(sparkSchemaMin.inner, df.schema)
-      context.sparkSession.createDataFrame(df.rdd, targetSchemaWithMetadata)//workaround to replace the schema in the DF
+      val targetSchemaWithMetadata = SparkSchemaUtil.mergeSchemaMetadata(sparkSchemaMin.inner, df.schema)
+      SparkSubFeed.getSparkSession.createDataFrame(df.rdd, targetSchemaWithMetadata)//workaround to replace the schema in the DF
     } else df
-    columnComments = SchemaUtil.columnsComments(dfTarget.schema).map(kv => (kv._1.mkString("."), kv._2))
     var finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
     // TODO: merge mode not yet implemented
@@ -191,12 +208,6 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
         .mode(SparkSaveMode.from(finalSaveMode))
         .save()
     )
-    
-    //table comment
-    metadata.flatMap(_.description).foreach { comment =>
-      val sql = s"comment on table ${table.fullName} is '$comment';"
-      connection.execJdbcStatement(sql)
-    }
 
 
     // return
@@ -207,12 +218,12 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     df match {
       // TODO: initSparkDataFrame has empty implementation
       case sparkDf: SparkDataFrame => initSparkDataFrame(sparkDf.inner, partitionValues, saveModeOptions)
-      case sparkDf: SnowparkDataFrame => ()
+      case _: SnowparkDataFrame => ()
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method init")
     }
   }
 
-  override private[smartdatalake] def getSubFeed(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+  override def getSubFeed(partitionValues: Seq[PartitionValues] = Seq(), subFeedType: Type)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     if (subFeedType =:= typeOf[SparkSubFeed]) SparkSubFeed(Some(SparkDataFrame(getSparkDataFrame(partitionValues))), id, partitionValues)
     else if (subFeedType =:= typeOf[SnowparkSubFeed]) SnowparkSubFeed(Some(SnowparkDataFrame(getSnowparkDataFrame(partitionValues))), id, partitionValues)
     else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
@@ -222,16 +233,16 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
     else if (subFeedType =:= typeOf[SnowparkSubFeed]) SnowparkDataFrame(getSnowparkDataFrame(partitionValues))
     else throw new IllegalStateException(s"($id) Unknown subFeedType ${subFeedType.typeSymbol.name}")
   }
-  private[smartdatalake] override def getSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SnowparkSubFeed], typeOf[SparkSubFeed]) // order matters... if possible Snowpark is preferred to Spark
+  override def getSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SnowparkSubFeed], typeOf[SparkSubFeed]) // order matters... if possible Snowpark is preferred to Spark
 
   override def writeDataFrame(df: GenericDataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean, saveModeOptions: Option[SaveModeOptions])(implicit context: ActionPipelineContext): MetricsMap = {
     df match {
       case sparkDf: SparkDataFrame => writeSparkDataFrame(sparkDf.inner, partitionValues, isRecursiveInput, saveModeOptions)
-      case snowparkDf: SnowparkDataFrame => writeSnowparkDataFrame(snowparkDf.inner, partitionValues, isRecursiveInput, saveModeOptions)
+      case snowparkDf: SnowparkDataFrame => writeSnowparkDataFrame(df = snowparkDf.inner, partitionValues = partitionValues, saveModeOptions = saveModeOptions)
       case _ => throw new IllegalStateException(s"($id) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeDataFrame")
     }
   }
-  private[smartdatalake] override def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SnowparkSubFeed], typeOf[SparkSubFeed]) // order matters... if possible Snowpark is preferred to Spark
+  override def writeSubFeedSupportedTypes: Seq[Type] = Seq(typeOf[SnowparkSubFeed], typeOf[SparkSubFeed]) // order matters... if possible Snowpark is preferred to Spark
 
 
   // cache response to avoid jdbc query.
@@ -251,14 +262,10 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
       existing
     }
   }
-  // cache response to avoid schema query.
-  private var cachedExistingSchema: Option[SnowparkSchema] = None
 
   override def dropTable(implicit context: ActionPipelineContext): Unit = {
     connection.execJdbcStatement(s"drop table if exists ${table.fullName}")
   }
-
-  override def factory: FromConfigFactory[DataObject] = SnowflakeTableDataObject
 
   private def applyReadTransformer(partitionValues: Seq[PartitionValues], df: GenericDataFrame)(implicit context: ActionPipelineContext): GenericDataFrame = {
     readTransformer
@@ -268,9 +275,22 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   }
 
   /**
+   * Snowpark DataFrames of different sessions can not be combined, so an Action using the Snowpark engine must only
+   * read and write SnowflakeTableDataObjects of its engine connection.
+   */
+  private def validateSnowparkEngineConnection()(implicit context: ActionPipelineContext): Unit = {
+    context.engineConnection.filterNot(_.id == connection.id).foreach { engineConnection =>
+      throw ConfigurationException(s"($id) The Snowpark engine executes on the Snowflake session of its engine connection" +
+        s" ${engineConnection.id.id}, but this SnowflakeTableDataObject uses connection ${connection.id.id}." +
+        " All inputs and outputs of an Action using the Snowpark engine must use its engine connection.")
+    }
+  }
+
+  /**
    * Read the contents of a table as a Snowpark DataFrame
    */
   def getSnowparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): snowpark.DataFrame = {
+    validateSnowparkEngineConnection()
     //val helper: DataFrameSubFeedCompanion = SnowparkSubFeed
     var df = SnowparkDataFrame(snowparkSession.table(table.fullName))
     if (!context.isExecPhase) df = df.limit(1)
@@ -283,8 +303,9 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   /**
    * Write a Snowpark DataFrame to Snowflake, used in Snowpark actions
    */
-  def writeSnowparkDataFrame(df: snowpark.DataFrame, partitionValues: Seq[PartitionValues], isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
+  def writeSnowparkDataFrame(df: snowpark.DataFrame, partitionValues: Seq[PartitionValues], saveModeOptions: Option[SaveModeOptions] = None)
                             (implicit context: ActionPipelineContext): MetricsMap = {
+    validateSnowparkEngineConnection()
     validateSchemaMin(SnowparkSchema(df.schema), role = "write")
     var finalSaveMode = saveModeOptions.map(_.saveMode).getOrElse(saveMode)
 
@@ -341,13 +362,13 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
    * @param partitionValues nonempty list of partition values
    */
   private def deletePartitionsStatement(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): String = {
-    SQLUtil.createDeletePartitionStatement(table.fullName, partitionValues, quoteCaseSensitiveColumn(_))
+    SQLUtil.createDeletePartitionStatement(table.fullName, partitionValues, quoteCaseSensitiveColumn)
   }
 
   /**
-   * if we generate sql statements with column names we need to care about quoting them properly
+   * if we generate SQL statements with column names we need to care about quoting them properly
    */
-  private def quoteCaseSensitiveColumn(column: String)(implicit context: ActionPipelineContext): String = {
+  private def quoteCaseSensitiveColumn(column: String): String = {
     if (Environment.caseSensitive) Utils.quotedName(column)
     // quote identifier if it contains special characters
     else if (SQLUtil.hasIdentifierSpecialChars(column)) Utils.quotedName(column)
@@ -363,11 +384,29 @@ case class SnowflakeTableDataObject(override val id: DataObjectId,
   def createPrimaryKeyConstraint(tableName: String, constraintName: String, cols: Seq[String])(implicit context: ActionPipelineContext): Unit =
     connection.catalog.createPrimaryKeyConstraint(tableName, constraintName, cols)
 
+  // Note that table metadata (table comment, column comments, primary key) is not applied here anymore,
+  // it is applied at deployment time by CatalogSchemaUpdater, see CanHandleCatalogMetadata.
   override def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     super.postWrite(partitionValues)
-    if (table.createAndReplacePrimaryKey) createOrReplacePrimaryKeyConstraint
-    if (syncComments) {
-      columnComments.foreach(columnComment => connection.execJdbcStatement(s"comment on column ${table.fullName}.${columnComment._1} is '${columnComment._2}';"))
+  }
+
+  override def getTableComment(implicit context: ActionPipelineContext): Option[String] = {
+    val catalogConstraint = table.catalog.map(c => s" and TABLE_CATALOG = '$c'").getOrElse("")
+    val schemaConstraint = table.db.map(d => s" and TABLE_SCHEMA = '$d'").getOrElse("")
+    val query = s"select COMMENT from INFORMATION_SCHEMA.TABLES where TABLE_NAME = '${table.name}'" +
+      schemaConstraint + catalogConstraint
+    connection.execJdbcQuery(query, rs => if (rs.next()) Option(rs.getString(1)) else None)
+  }
+
+  override def setTableComment(comment: String)(implicit context: ActionPipelineContext): Unit = {
+    connection.execJdbcStatement(s"comment on table ${table.fullName} is '${SQLUtil.escapeSqlStringLiteral(comment)}'")
+  }
+
+  override def setColumnComments(comments: Map[Seq[String], String])(implicit context: ActionPipelineContext): Unit = {
+    comments.foreach { case (columnPath, comment) =>
+      connection.execJdbcStatement(
+        s"comment on column ${table.fullName}.${GenericSchemaUtil.formatColumnPath(columnPath)} is '${SQLUtil.escapeSqlStringLiteral(comment)}'"
+      )
     }
   }
 }
@@ -385,7 +424,7 @@ object SnowflakeUtils {
     val functions = DataFrameSubFeed.getFunctions(df.subFeedType)
     import functions._
     val targetCols = df.schema.columns.map { n =>
-      // if name is all uppercase, SDLB assumes it is not case sensitive and will convert it to lowercase.
+      // if name is all uppercase, SDLB assumes it is not case-sensitive and will convert it to lowercase.
       if (isAllUppercase(n)) col(n.toLowerCase)
       else col(n)
     }
@@ -395,7 +434,7 @@ object SnowflakeUtils {
   def convertColNamesLowercase(schema: SnowparkSchema): SnowparkSchema = {
     SnowparkSchema(StructType(
       schema.fields.map(f =>
-        // if name is all uppercase, SDLB assumes it is not case sensitive and will convert it to lowercase.
+        // if name is all uppercase, SDLB assumes it is not case-sensitive and will convert it to lowercase.
         if (isAllUppercase(f.name)) f.toLowerCase.inner
         else f.inner
       )))
@@ -415,7 +454,7 @@ object SnowflakeUtils {
       if (f.dataType != targetType) spark.functions.col(f.name).cast(targetType)
       else spark.functions.col(f.name)
     }
-    df.select(targetCols: _*)
+    df.select(targetCols.toIndexedSeq: _*)
   }
 }
 

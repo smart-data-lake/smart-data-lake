@@ -1,3 +1,21 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package io.smartdatalake.meta
 
 import scala.reflect.runtime.universe.{ClassSymbol, Type}
@@ -11,9 +29,19 @@ private[smartdatalake] case class GenericTypeDef(
                                                   tpe: Type,
                                                   description: Option[String],
                                                   isFinal: Boolean,
+                                                  isDeprecated: Boolean,
                                                   superTypes: Set[Type],
-                                                  attributes: Seq[GenericAttributeDef]
+                                                  attributes: Seq[GenericAttributeDef],
+                                                  subFeedTypes: Option[SubFeedTypesDef] = None
                          )
+
+/**
+ * SubFeed types supported by an Action or DataObject, see [[SubFeedTypeUtil]].
+ *
+ * @param read SubFeed types a DataObject can be read with. For Actions the SubFeed types it can process.
+ * @param write SubFeed types a DataObject can be written with. For Actions the same as read.
+ */
+private[smartdatalake] case class SubFeedTypesDef(read: Seq[Type], write: Seq[Type])
 
 /**
  * Generic definition of attributes of SDL configuration elements
@@ -24,5 +52,14 @@ private[smartdatalake] case class GenericAttributeDef(
                          description: Option[String],
                          isRequired: Boolean,
                          isDeprecated: Boolean,
-                         isOverride: Boolean
+                         isOverride: Boolean,
+                         libraryOptions: Option[LibraryOptionsDef] = None
                        ) extends Serializable
+
+/**
+ * Options of an underlying library an attribute is passed to, see [[io.smartdatalake.config.LibraryOptions]].
+ *
+ * @param docUrl URL of the documentation of the options.
+ * @param optionNames option names known by the options provider, empty if there is no provider.
+ */
+private[smartdatalake] case class LibraryOptionsDef(docUrl: String, optionNames: Seq[String]) extends Serializable

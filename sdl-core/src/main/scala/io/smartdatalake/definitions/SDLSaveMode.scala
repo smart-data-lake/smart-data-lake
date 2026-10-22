@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,13 +19,11 @@
 package io.smartdatalake.definitions
 
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
-import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import org.apache.spark.sql.functions.expr
-import org.apache.spark.sql.{DataFrameWriterV2, Row, SaveMode}
+import io.smartdatalake.workflow.DataFrameSubFeed
+import io.smartdatalake.workflow.dataframe.{GenericColumn, GenericDataFrame}
 
 import scala.language.implicitConversions
+import scala.reflect.runtime.universe.Type
 
 /**
  * SDL supports more SaveModes than Spark, that's why there is an own definition of SDLSaveMode.
@@ -35,25 +33,26 @@ object SDLSaveMode extends Enumeration {
 
   // Standard Spark SaveMode's
   /**
-   * @see [[SaveMode]]
+   * @see Spark SaveMode
    */
   val Overwrite: Value = Value("Overwrite")
   /**
-   * @see [[SaveMode]]
+   * @see Spark SaveMode
    */
   val Append: Value = Value("Append")
   /**
-   * @see [[SaveMode]]
+   * @see Spark SaveMode
    */
   val ErrorIfExists: Value = Value("Error")
   /**
-   * @see [[SaveMode]]
+   * @see Spark SaveMode
    */
   val Ignore: Value = Value("Ignore")
 
   /**
    * Spark only optimization.
-   * This is like SDLSaveMode.Overwrite but doesnt delete the directory of the DataObject and its partition, but only the files
+   * This is like SDLSaveMode.Overwrite
+   * but does not delete the directory of the DataObject and its partition, but only the files
    * inside. Then it uses Sparks append mode to add the new files.
    * Like that ACLs set on the base directory are preserved.
    *
@@ -87,16 +86,6 @@ object SDLSaveMode extends Enumeration {
    * Note that only few DataObjects are able to merge new data, e.g. DeltaLakeTableDataObject and JdbcTableDataObject
    */
   val Merge: Value = Value("Merge")
-
-  private[smartdatalake] def execV2(saveMode: SDLSaveMode.Value, writer: DataFrameWriterV2[Row], partitionValues: Seq[PartitionValues], partitionOverwriteModeDynamic: Boolean = false): Unit = {
-    implicit val helper: SparkSubFeed.type = SparkSubFeed
-    saveMode match {
-      case SDLSaveMode.Append => writer.append()
-      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.nonEmpty => writer.overwrite(expr(partitionValues.map(_.getFilterExpr).reduce(_ or _).exprSql))
-      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty && partitionOverwriteModeDynamic => writer.overwritePartitions()
-      case SDLSaveMode.Overwrite | SDLSaveMode.OverwriteOptimized if partitionValues.isEmpty => writer.replace()
-    }
-  }
 }
 
 /**
@@ -134,23 +123,72 @@ case class SaveModeMergeOptions(deleteCondition: Option[String] = None,
                                 insertValuesOverride: Map[String, String] = Map(),
                                 additionalMergePredicate: Option[String] = None
                                ) extends SaveModeOptions {
-  override private[smartdatalake] val saveMode = SDLSaveMode.Merge
-  private[smartdatalake] val deleteConditionExpr = deleteCondition.map(expr)
-  private[smartdatalake] val updateConditionExpr = updateCondition.map(expr)
-  private[smartdatalake] val updateExistingConditionExpr = updateExistingCondition.map(expr)
-  private[smartdatalake] val insertConditionExpr = insertCondition.map(expr)
-  private[smartdatalake] val insertValuesOverrideExpr = insertValuesOverride.mapValues(expr)
-  private[smartdatalake] val additionalMergePredicateExpr = additionalMergePredicate.map(expr)
-  private[smartdatalake] val updateColumnsOpt = if (updateColumns.nonEmpty) Some(updateColumns) else None
+  override val saveMode: SDLSaveMode = SDLSaveMode.Merge
 
-  override private[smartdatalake] def convertToTargetSchema[D <: GenericDataFrame](df: D): D = insertColumnsToIgnore.foldLeft(df) {
+  def getExpressions(subFeedType: Type, existingAliasReplacement: Option[String] = None): SaveModeMergeExpressions = SaveModeMergeExpressions(this, subFeedType, existingAliasReplacement)
+
+  val updateColumnsOpt: Option[Seq[String]] = if (updateColumns.nonEmpty) Some(updateColumns) else None
+
+  override def convertToTargetSchema[D <: GenericDataFrame](df: D): D = insertColumnsToIgnore.foldLeft(df) {
     case (df, col) => df.drop(col).asInstanceOf[D]
   }
 }
 object SaveModeMergeOptions {
   def fromSaveModeOptions(saveModeOptions: SaveModeOptions): SaveModeMergeOptions = saveModeOptions match {
     case m: SaveModeMergeOptions => m
-    case m: SaveModeGenericOptions if (m.saveMode == SDLSaveMode.Merge) => SaveModeMergeOptions()
+    case m: SaveModeGenericOptions if m.saveMode == SDLSaveMode.Merge => SaveModeMergeOptions()
     case m => throw new IllegalStateException(s"Cannot convert ${m.getClass.getSimpleName} $m to SaveModeMergeOptions")
+  }
+}
+
+case class SaveModeMergeExpressions(saveMode: SaveModeMergeOptions, subFeedType: Type, existingAliasReplacement: Option[String] = None) {
+  private val functions = DataFrameSubFeed.getFunctions(subFeedType)
+  def replaceExistingAlias(s: String): String = {
+    existingAliasReplacement.map(replacement => SaveModeMergeExpressions.replaceAlias(s, "existing", replacement)).getOrElse(s)
+  }
+  import functions._
+  val deleteConditionExpr: Option[GenericColumn] = saveMode.deleteCondition.map(c => expr(replaceExistingAlias(c)))
+  val updateConditionExpr: Option[GenericColumn] = saveMode.updateCondition.map(c => expr(replaceExistingAlias(c)))
+  val updateExistingConditionExpr: Option[GenericColumn] = saveMode.updateExistingCondition.map(c => expr(replaceExistingAlias(c)))
+  val insertConditionExpr: Option[GenericColumn] = saveMode.insertCondition.map(c => expr(replaceExistingAlias(c)))
+  val insertValuesOverrideExpr: Map[String, GenericColumn] = saveMode.insertValuesOverride.view.mapValues(expr).toMap
+  val additionalMergePredicateExpr: Option[GenericColumn] = saveMode.additionalMergePredicate.map(c => expr(replaceExistingAlias(c)))
+}
+
+object SaveModeMergeExpressions {
+
+  /**
+   * Replace references to a table alias, e.g. `existing.col`, with another alias.
+   * Quoted string literals and identifiers are left unchanged, as well as names only ending with the alias.
+   */
+  private[smartdatalake] def replaceAlias(expression: String, alias: String, replacement: String): String = {
+    val aliasPattern = s"(?<![\\w.])${java.util.regex.Pattern.quote(alias)}\\.".r
+    def replaceUnquoted(part: String) = aliasPattern.replaceAllIn(part, java.util.regex.Matcher.quoteReplacement(replacement + "."))
+    val result = new StringBuilder
+    var unquotedStart = 0
+    var i = 0
+    while (i < expression.length) {
+      val quote = expression(i)
+      if (quote == '\'' || quote == '"' || quote == '`') {
+        result.append(replaceUnquoted(expression.substring(unquotedStart, i)))
+        // find end of quoted part, handling backslash escapes and doubled quotes
+        var j = i + 1
+        var closed = false
+        while (j < expression.length && !closed) {
+          if (expression(j) == '\\' && quote != '`') j += 2
+          else if (expression(j) == quote) {
+            if (j + 1 < expression.length && expression(j + 1) == quote) j += 2
+            else closed = true
+            if (closed) j += 1
+          } else j += 1
+        }
+        val end = math.min(j, expression.length)
+        result.append(expression.substring(i, end))
+        i = end
+        unquotedStart = end
+      } else i += 1
+    }
+    result.append(replaceUnquoted(expression.substring(unquotedStart)))
+    result.toString
   }
 }

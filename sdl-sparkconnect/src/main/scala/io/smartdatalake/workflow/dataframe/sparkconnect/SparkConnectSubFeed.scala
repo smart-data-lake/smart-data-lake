@@ -1,0 +1,503 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+package io.smartdatalake.workflow.dataframe.sparkconnect
+
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.definitions.Environment
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.workflow._
+import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
+import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
+import io.smartdatalake.workflow.connection.SparkConnectConnection
+import io.smartdatalake.workflow.dataframe._
+import io.smartdatalake.workflow.dataframe.sparkconnect.SparkConnectSubFeed.getSparkSession
+import org.apache.spark.sql._
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.types._
+
+import java.time.Duration
+import scala.jdk.CollectionConverters._
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe
+import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
+import scala.util.Try
+
+/**
+ * A SparkConnectSubFeed is used to transport [[DataFrame]]'s of a Spark Connect session between Actions.
+ *
+ * @param dataFrame Spark Connect [[DataFrame]] to be processed. DataFrame should not be saved to state (@transient).
+ * @param dataObjectId id of the DataObject this SubFeed corresponds to
+ * @param partitionValues Values of Partitions transported by this SubFeed
+ * @param isDAGStart true if this subfeed is a start node of the dag
+ * @param isSkipped true if this subfeed is the result of a skipped action
+ * @param filters column-bound filters to be applied when the DataFrame is (re)created, see [[ColumnFilter]].
+ * @param keptSchema schema transported by this SubFeed if it holds no DataFrame. Use `schema`/`schemaOpt` to read it.
+ */
+case class SparkConnectSubFeed(@transient override val dataFrame: Option[SparkConnectDataFrame],
+                               override val dataObjectId: DataObjectId,
+                               override val partitionValues: Seq[PartitionValues],
+                               override val isDAGStart: Boolean = false,
+                               override val isSkipped: Boolean = false,
+                               override val filters: Seq[ColumnFilter] = Seq(),
+                               @transient override val observation: Option[DataFrameObservation] = None,
+                               override val metrics: Option[MetricsMap] = None,
+                               override val expectationsResult: Option[Map[String, String]] = None,
+                               @transient override val keptSchema: Option[GenericSchema] = None,
+                               override val executionModeResultOptions: Map[String, String] = Map()
+                              )
+  extends DataFrameSubFeed {
+  @transient override val tpe: Type = typeOf[SparkConnectSubFeed]
+  override def toOutput(dataObjectId: DataObjectId): SparkConnectSubFeed = {
+    this.copy(dataFrame = None, filters = Seq(), isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, expectationsResult = None, keptSchema = None, executionModeResultOptions = Map())
+  }
+  override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
+    val (dataFrame, schema) = other match {
+      // both subfeeds have a DataFrame to reuse -> union DataFrames
+      case subFeed: SparkConnectSubFeed if this.dataFrame.isDefined && subFeed.dataFrame.isDefined =>
+        (this.dataFrame.map(_.unionByName(subFeed.dataFrame.get)), None)
+      // at least one subfeed can not be reused -> transport only the schema, the DataFrame is read again from the DataObject
+      case subFeed: SparkConnectSubFeed =>
+        (None, this.schemaOpt.orElse(subFeed.schemaOpt))
+      case _ =>
+        (None, this.schemaOpt)
+    }
+    this.copy( dataFrame = dataFrame
+      , keptSchema = if (dataFrame.isDefined) None else schema
+      , partitionValues = unionPartitionValues(other.partitionValues)
+      , isDAGStart = this.isDAGStart || other.isDAGStart
+      , isSkipped = this.isSkipped && other.isSkipped
+      , filters = unionFilters(other)
+      , executionModeResultOptions = unionExecutionModeResultOptions(other)
+    )
+  }
+  override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SparkConnectSubFeed = {
+    // apply input filters
+    val inputFilters = result.filtersForInput(this.dataObjectId == mainInputId)
+    // the execution mode changed partition values and filters, so an existing DataFrame no longer matches them and is
+    // dropped by breakLineage. Its schema is kept, see SubFeed.breakLineage.
+    this.copy(partitionValues = result.inputPartitionValues, filters = inputFilters, isSkipped = false, executionModeResultOptions = result.options).breakLineage
+      .asInstanceOf[SparkConnectSubFeed]
+  }
+  override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SparkConnectSubFeed = {
+    // filters of the output are set from the main input SubFeed after the transformation, see DataFrameActionImpl.updateOutputFilters
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filters = Seq(), isSkipped = false, dataFrame = None, keptSchema = None, executionModeResultOptions = result.options)
+  }
+  override def withDataFrame(dataFrame: Option[GenericDataFrame]): SparkConnectSubFeed = this.copy(
+    dataFrame = dataFrame.map(_.asInstanceOf[SparkConnectDataFrame]),
+    keptSchema = if (dataFrame.isDefined) None else this.schemaOpt
+  )
+  override def withSchema(schema: Option[GenericSchema]): SparkConnectSubFeed = this.copy(dataFrame = None, keptSchema = schema)
+}
+
+object SparkConnectSubFeed extends DataFrameSubFeedCompanion {
+  /**
+   * This method is used to pass an output SubFeed as input SparkConnectSubFeed to the next Action. SubFeed type might need conversion.
+   */
+  override def fromSubFeed( subFeed: SubFeed )(implicit context: ActionPipelineContext): SparkConnectSubFeed = {
+    subFeed match {
+      case subFeed: SparkConnectSubFeed => subFeed.copy(executionModeResultOptions = Map()) // no executionModeResultOptions are passed between actions. Filters are kept, only propagating filters can be present here.
+      case _ => SparkConnectSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
+    }
+  }
+  @transient override def subFeedType: universe.Type = typeOf[SparkConnectSubFeed]
+  override def canCacheDataFrame: Boolean = true
+  override def canUncacheDataFrame: Boolean = true
+  override def col(colName: String): GenericColumn = {
+    SparkConnectColumn(functions.col(colName))
+  }
+  override def lit(value: Any): GenericColumn = {
+    SparkConnectColumn(functions.lit(value))
+  }
+  override def min(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.min(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def max(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.max(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def first(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.first(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def abs(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.abs(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def count(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.count(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def countDistinct(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.countDistinct(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def approxCountDistinct(column: GenericColumn, rsd: Option[Double] = None): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn =>
+        if (rsd.isDefined) SparkConnectColumn(functions.approx_count_distinct(sparkColumn.inner, rsd.get))
+        else SparkConnectColumn(functions.approx_count_distinct(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def size(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.size(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def least(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SparkConnectColumn(functions.least(columns.map(_.asInstanceOf[SparkConnectColumn].inner):_*))
+  }
+  override def greatest(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SparkConnectColumn(functions.greatest(columns.map(_.asInstanceOf[SparkConnectColumn].inner):_*))
+  }
+  override def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.substring(sparkColumn.inner, pos, len))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def timestampAdd(column: GenericColumn, duration: Duration): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn =>
+        // Spark timestamps have microsecond resolution
+        SparkConnectColumn(functions.timestamp_add("MICROSECOND", functions.lit(duration.toNanos / 1000), sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def explode(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.explode(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def getEmptyDataFrame(schema: GenericSchema, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): SparkConnectDataFrame = {
+    val sparkSchema = SchemaConverter.convert(schema, subFeedType).asInstanceOf[SparkConnectSchema]
+    SparkConnectDataFrame(getSparkSession.createDataFrame(List.empty[Row].asJava, sparkSchema.inner))
+  }
+  override def getSubFeed(df: GenericDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    df match {
+      case sparkDf: SparkConnectDataFrame => SparkConnectSubFeed(Some(sparkDf), dataObjectId, partitionValues)
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(df)
+    }
+  }
+  override def getSchemaSubFeed(dataObjectId: DataObjectId, schema: GenericSchema, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    SparkConnectSubFeed(None, dataObjectId, partitionValues, keptSchema = Some(schema))
+  }
+  override def stringType: GenericDataType = SparkConnectDataType(StringType)
+
+  override def arrayType(dataType: GenericDataType): SparkConnectArrayDataType = {
+    dataType match {
+      case sparkDataType: SparkConnectDataType => SparkConnectArrayDataType(ArrayType(sparkDataType.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataType)
+    }
+  }
+
+  override def structType(fields: Map[String, GenericDataType]): SparkConnectStructDataType = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, fields.values.toSeq)
+    val sparkFields = fields.map{ case (name, dataType) => StructField(name, dataType.asInstanceOf[SparkConnectDataType].inner)}.toSeq
+    SparkConnectStructDataType(StructType(sparkFields))
+  }
+
+  override def structType(fields: Seq[GenericField]): SparkConnectStructDataType = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, fields)
+    SparkConnectStructDataType(StructType(fields.map(_.asInstanceOf[SparkConnectField].inner)))
+  }
+
+  override def mapType(keyType: GenericDataType, valueType: GenericDataType): SparkConnectMapDataType = {
+    (keyType, valueType) match {
+      case (sparkKeyType: SparkConnectDataType, sparkValueType: SparkConnectDataType) => SparkConnectMapDataType(MapType(sparkKeyType.inner, sparkValueType.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(keyType)
+    }
+  }
+
+  override def field(name: String, dataType: GenericDataType, nullable: Boolean): GenericField = {
+    dataType match {
+      case sparkDataType: SparkConnectDataType => SparkConnectField(StructField(name, sparkDataType.inner, nullable))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataType)
+    }
+  }
+  override def array_construct_compact(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SparkConnectColumn(functions.array_compact(functions.array(columns.map(_.asInstanceOf[SparkConnectColumn].inner):_*)))
+  }
+  override def array(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SparkConnectColumn(functions.array(columns.map(_.asInstanceOf[SparkConnectColumn].inner):_*))
+  }
+  override def struct(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SparkConnectColumn(functions.struct(columns.map(_.asInstanceOf[SparkConnectColumn].inner):_*))
+  }
+  override def map(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SparkConnectColumn(functions.map(columns.map(_.asInstanceOf[SparkConnectColumn].inner):_*))
+  }
+  override def expr(sqlExpr: String): GenericColumn = SparkConnectColumn(functions.expr(sqlExpr))
+
+  override def when(condition: GenericColumn, value: GenericColumn): GenericColumn with GenericWhen = {
+    (condition, value) match {
+      case (sparkCondition: SparkConnectColumn, sparkValue: SparkConnectColumn) => new SparkConnectColumn(functions.when(sparkCondition.inner, sparkValue.inner)) with SparkConnectWhen
+      case _ => throw new IllegalStateException(s"Unsupported subFeedType ${condition.subFeedType.typeSymbol.name}, ${value.subFeedType.typeSymbol.name} in method when")
+    }
+  }
+  override def not(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.not(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def concat(exprs: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, exprs)
+    SparkConnectColumn(functions.concat(exprs.map(_.asInstanceOf[SparkConnectColumn].inner):_*))
+  }
+  override def regexp_extract(column: GenericColumn, regexp: String, groupIdx: Int): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.regexp_extract(sparkColumn.inner, regexp, groupIdx))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def raise_error(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.raise_error(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+
+  override def from_json(column: GenericColumn, dataType: GenericDataType): GenericColumn = {
+    (column, dataType) match {
+      case (sparkColumn: SparkConnectColumn, sparkDataType: SparkConnectDataType) => SparkConnectColumn(functions.from_json(sparkColumn.inner, sparkDataType.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+
+  /**
+   * Spark Hash Functions ignores null values, e.g. adding a null column to a row does not change the hash value of the row.
+   * As Spark Connect can not use custom catalyst expressions on the client side, null values are made significant
+   * by hashing the json representation including null fields.
+   * Note that hash values created with SparkConnectSubFeed are not comparable to hash values created with SparkSubFeed.
+   */
+  def nullAwareHash(cols: Column*): Column = {
+    functions.hash(functions.to_json(functions.struct(cols: _*), Map("ignoreNullFields" -> "false")))
+  }
+
+  override def hash(column: GenericColumn): GenericColumn = {
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(nullAwareHash(sparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+
+  override def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame = {
+    SparkConnectDataFrame(getSparkSession.sql(query))
+  }
+  override def createSchema(fields: Seq[GenericField]): GenericSchema = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, fields)
+    SparkConnectSchema(StructType(fields.map(_.asInstanceOf[SparkConnectField].inner)))
+  }
+
+  override def createSchemaFromDdl(ddl: String): GenericSchema = SparkConnectSchema(StructType.fromDDL(ddl))
+
+  def apply(dataFrame: SparkConnectDataFrame, dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues]): SparkConnectSubFeed = {
+    SparkConnectSubFeed(Some(dataFrame), dataObjectId: DataObjectId, partitionValues)
+  }
+
+  override def coalesce(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    SparkConnectColumn(functions.coalesce(columns.map(_.asInstanceOf[SparkConnectColumn].inner):_*))
+  }
+
+  override def row_number: GenericColumn = SparkConnectColumn(functions.row_number())
+
+  override def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn = {
+
+    partitionBy.foreach(c => assert(c.isInstanceOf[SparkConnectColumn], DataFrameSubFeed.throwIllegalSubFeedTypeException(c)))
+
+    assert(orderBy.isInstanceOf[SparkConnectColumn], DataFrameSubFeed.throwIllegalSubFeedTypeException(orderBy))
+
+    aggFunction.apply() match {
+      case sparkAggFunctionColumn: SparkConnectColumn => SparkConnectColumn(sparkAggFunctionColumn
+        .inner.over(
+          Window.partitionBy(partitionBy.map(_.asInstanceOf[SparkConnectColumn].inner).toIndexedSeq: _*)
+            .orderBy(orderBy.asInstanceOf[SparkConnectColumn].inner))
+      )
+      case generic => DataFrameSubFeed.throwIllegalSubFeedTypeException(generic)
+    }
+  }
+
+  override def transform(column: GenericColumn, func: GenericColumn => GenericColumn): GenericColumn = {
+    val sparkFunc = (column: Column) => func(SparkConnectColumn(column)).asInstanceOf[SparkConnectColumn].inner
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.transform(sparkColumn.inner, sparkFunc))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+
+  override def transform_keys(column: GenericColumn, func: (GenericColumn, GenericColumn) => GenericColumn): GenericColumn = {
+    val sparkFunc = (keyColumn: Column, valueColumn: Column) => func(SparkConnectColumn(keyColumn), SparkConnectColumn(valueColumn)).asInstanceOf[SparkConnectColumn].inner
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.transform_keys(sparkColumn.inner, sparkFunc))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+
+  override def transform_values(column: GenericColumn, func: (GenericColumn, GenericColumn) => GenericColumn): GenericColumn = {
+    val sparkFunc = (keyColumn: Column, valueColumn: Column) => func(SparkConnectColumn(keyColumn), SparkConnectColumn(valueColumn)).asInstanceOf[SparkConnectColumn].inner
+    column match {
+      case sparkColumn: SparkConnectColumn => SparkConnectColumn(functions.transform_values(sparkColumn.inner, sparkFunc))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+
+  override def rowFromSeq(values: Seq[Any]): GenericRow = {
+    SparkConnectRow(Row.fromSeq(values))
+  }
+
+  override def widerSimpleType(left: GenericDataType, right: GenericDataType): Option[GenericDataType] = (left, right) match {
+    case (l: SparkConnectSimpleDataType, r: SparkConnectSimpleDataType) => SparkConnectTypeWidening.widerSimpleType(l.inner, r.inner).map(SparkConnectDataType(_))
+    case _ => None
+  }
+
+  override def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf = (srcType, tgtType) match {
+    case (srcType, tgtType) if srcType.isSameType(tgtType) => SparkConnectUnaryUdf(x => x)
+    case (_: SparkConnectSimpleDataType, tgtType: SparkConnectSimpleDataType) => SparkConnectUnaryUdf(x => x.cast(tgtType.inner))
+    case (_: SparkConnectStructDataType, _: SparkConnectStructDataType) =>
+      throw new NotImplementedError("Schema evolution of struct types is not yet supported by SparkConnectSubFeed, as it needs custom catalyst expressions which can not be created on a Spark Connect client")
+    case (srcType: SparkConnectArrayDataType, tgtType: SparkConnectArrayDataType) => new GenericUnaryUdf {
+      override def subFeedType: universe.Type = SparkConnectSubFeed.subFeedType
+
+      override def convert(col: GenericColumn): GenericColumn = {
+        transform(col, schemaEvolutionUdf(srcType.elementDataType, tgtType.elementDataType).convert _)
+      }
+    }
+    case (srcType: SparkConnectMapDataType, tgtType: SparkConnectMapDataType) => new GenericUnaryUdf {
+      override def subFeedType: universe.Type = SparkConnectSubFeed.subFeedType
+
+      override def convert(col: GenericColumn): GenericColumn = {
+        transform_values(
+          transform_keys(col, (k, _) => schemaEvolutionUdf(srcType.keyDataType, tgtType.keyDataType).convert(k)),
+          (_, v) => schemaEvolutionUdf(srcType.valueDataType, tgtType.valueDataType).convert(v)
+        )
+      }
+    }
+  }
+
+  override def createField(name: String, dataType: GenericDataType, nullable: Boolean, comment: Option[String]): GenericField = {
+    var field = StructField(name, dataType.asInstanceOf[SparkConnectDataType].inner, nullable)
+    comment.foreach(c => field = field.withComment(c))
+    SparkConnectField(field)
+  }
+
+  override def createSimpleDataType(tpe: String): GenericDataType with GenericSimpleDataType = {
+    SparkConnectSimpleDataType(DataType.fromJson(s""""$tpe""""))
+  }
+
+  override def createStructDataType(fields: Seq[GenericField]): GenericDataType with GenericStructDataType = {
+    SparkConnectStructDataType(StructType(fields.map(_.asInstanceOf[SparkConnectField].inner)))
+  }
+
+  override def createArrayDataType(valueTpe: GenericDataType): GenericDataType with GenericArrayDataType = {
+    SparkConnectArrayDataType(ArrayType(valueTpe.asInstanceOf[SparkConnectDataType].inner))
+  }
+
+  override def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType = {
+    SparkConnectMapDataType(MapType(keyTpe.asInstanceOf[SparkConnectDataType].inner, valueTpe.asInstanceOf[SparkConnectDataType].inner))
+  }
+
+  override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A])(implicit context: ActionPipelineContext): GenericDataFrame = {
+    implicit val encoder: Encoder[A] = Encoders.product[A]
+    val session = getSparkSession
+    import session.implicits._
+    SparkConnectDataFrame(rows.toDF())
+  }
+
+  override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+    implicit val encoder: Encoder[A] = Encoders.product[A]
+    val session = getSparkSession
+    import session.implicits._
+    SparkConnectDataFrame(rows.toDF(colNames:_*))
+  }
+
+  def getSparkSession(implicit context: ActionPipelineContext): SparkSession = {
+    val frameRequired = "Spark Connect connection is required to create DataFrame!"
+    context.engineConnection match {
+      case Some(null) =>
+        throw new IllegalStateException(s"context.currentAction: ${context.currentAction.map(_.id.toString)} context.engineConnection = Some(null). $frameRequired")
+      case Some(connection) if connection.isInstanceOf[SparkConnectConnection] =>
+        connection.asInstanceOf[SparkConnectConnection].sparkSession
+      case Some(connection) => throw new IllegalStateException(frameRequired +
+        s" But got ${connection.id} of type ${connection.getClass.getSimpleName} in context")
+      case _ =>
+        Try(context.instanceRegistry.get[SparkConnectConnection](ConnectionId(Environment.defaultEngineConnectionId)))
+          .toOption.map(_.sparkSession)
+          .orElse(_defaultSparkSession) // for testing only
+          .getOrElse(throw new IllegalStateException(s"No connection available in context. $frameRequired"))
+    }
+  }
+
+  override def getStreamingQueryNames(implicit context: ActionPipelineContext): Seq[String] = {
+    getSparkSession.streams.active.map(_.name)
+  }
+
+  override def awaitAnyStreamingQueryTermination(timeoutMs: Option[Long] = None)(implicit context: ActionPipelineContext): Unit = {
+    timeoutMs match {
+      case Some(t) => getSparkSession.streams.awaitAnyTermination(t)
+      case None => getSparkSession.streams.awaitAnyTermination()
+    }
+  }
+
+  override def stopStreamingQueries()(implicit context: ActionPipelineContext): Unit = {
+    getSparkSession.streams.active.foreach(_.stop())
+  }
+
+  // This is for testing/lab only: define a default spark connect session
+  private[smartdatalake] var _defaultSparkSession: Option[SparkSession] = None
+}
+
+trait SparkConnectWhen extends GenericWhen {
+  col: SparkConnectColumn =>
+  override def when(condition: GenericColumn, value: GenericColumn): GenericColumn with GenericWhen = {
+    (condition, value) match {
+      case (condition: SparkConnectColumn, value: SparkConnectColumn) => new SparkConnectColumn(col.inner.when(condition.inner, value.inner)) with SparkConnectWhen
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(condition)
+    }
+  }
+
+  override def otherwise(value: GenericColumn): GenericColumn = {
+    value match {
+      case value: SparkConnectColumn => SparkConnectColumn(col.inner.otherwise(value.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(value)
+    }
+  }
+}

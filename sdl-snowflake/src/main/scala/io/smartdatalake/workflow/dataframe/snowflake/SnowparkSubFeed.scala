@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.snowflake
 
 import com.snowflake.snowpark._
@@ -28,89 +27,91 @@ import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.action.executionMode.ExecutionModeResult
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
+import io.smartdatalake.workflow.{ActionPipelineContext, ColumnFilter, DataFrameSubFeed, DataFrameSubFeedCompanion, SubFeed}
 
+import java.time.Duration
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
-import scala.reflect.runtime.universe.{Type, typeOf}
+import scala.reflect.runtime.universe.{Type, TypeTag, typeOf}
 
 case class SnowparkSubFeed(@transient override val dataFrame: Option[SnowparkDataFrame],
                            override val dataObjectId: DataObjectId,
                            override val partitionValues: Seq[PartitionValues],
                            override val isDAGStart: Boolean = false,
                            override val isSkipped: Boolean = false,
-                           override val isDummy: Boolean = false,
-                           override val filter: Option[String] = None,
+                           override val filters: Seq[ColumnFilter] = Seq(),
                            @transient override val observation: Option[DataFrameObservation] = None,
-                           override val metrics: Option[MetricsMap] = None
+                           override val metrics: Option[MetricsMap] = None,
+                           override val expectationsResult: Option[Map[String, String]] = None,
+                           @transient override val keptSchema: Option[GenericSchema] = None,
+                           override val executionModeResultOptions: Map[String, String] = Map()
                           )
   extends DataFrameSubFeed {
   @transient
   override val tpe: Type = typeOf[SnowparkSubFeed]
 
   override def toOutput(dataObjectId: DataObjectId): SnowparkSubFeed = {
-    this.copy(dataFrame = None, filter = None, isDAGStart = false, isSkipped = false, isDummy = false, dataObjectId = dataObjectId, observation = None, metrics = None)
+    this.copy(dataFrame = None, filters = Seq(), isDAGStart = false, isSkipped = false, dataObjectId = dataObjectId, observation = None, metrics = None, expectationsResult = None, keptSchema = None, executionModeResultOptions = Map())
   }
 
   override def union(other: SubFeed)(implicit context: ActionPipelineContext): SubFeed = {
-    val (dataFrame, dummy) = other match {
+    val (dataFrame, schema) = other match {
       // both subfeeds have a DataFrame to reuse -> union DataFrames
-      case sparkSubFeed: SnowparkSubFeed if this.hasReusableDataFrame && sparkSubFeed.hasReusableDataFrame =>
-        (this.dataFrame.map(_.unionByName(sparkSubFeed.dataFrame.get)), false)
-      // both subfeeds have DataFrames, but they are not reusable, e.g. they just transport the schema
-      case sparkSubFeed: SnowparkSubFeed if this.dataFrame.isDefined || sparkSubFeed.dataFrame.isDefined =>
-        (this.dataFrame.orElse(sparkSubFeed.dataFrame), true) // if only one subfeed is defined, we need to get a fresh DataFrame and convert this to a dummy
-      // otherwise no dataframe
+      case snowparkSubFeed: SnowparkSubFeed if this.dataFrame.isDefined && snowparkSubFeed.dataFrame.isDefined =>
+        (this.dataFrame.map(_.unionByName(snowparkSubFeed.dataFrame.get)), None)
+      // at least one subfeed can not be reused -> transport only the schema, the DataFrame is read again from the DataObject
+      case snowparkSubFeed: SnowparkSubFeed =>
+        (None, this.schemaOpt.orElse(snowparkSubFeed.schemaOpt))
       case _ =>
-        (None, false)
+        (None, this.schemaOpt)
     }
-    var resultSubfeed = this.copy(dataFrame = dataFrame
+    this.copy(dataFrame = dataFrame
+      , keptSchema = if (dataFrame.isDefined) None else schema
       , partitionValues = unionPartitionValues(other.partitionValues)
       , isDAGStart = this.isDAGStart || other.isDAGStart
       , isSkipped = this.isSkipped && other.isSkipped
+      , filters = unionFilters(other)
+      , executionModeResultOptions = unionExecutionModeResultOptions(other)
     )
-    if (dummy) resultSubfeed = resultSubfeed.convertToDummy(dataFrame.get.schema)
-    // return
-    resultSubfeed
   }
 
-  override def persist: SnowparkSubFeed = {
-    logger.warn("Persist is not implemented by Snowpark")
-    // TODO: should we use "dataFrame.map(_.inner.cacheResult())"
-    this
-  }
 
-  override def unpersist: DataFrameSubFeed = this // not implemented, see persist
-
-  override def hasReusableDataFrame: Boolean = dataFrame.isDefined && !isDummy && !isStreaming.getOrElse(false)
-
-  private[smartdatalake] def convertToDummy(schema: SnowparkSchema)(implicit context: ActionPipelineContext): SnowparkSubFeed = {
-    val dummyDf = dataFrame.map(_ => schema.getEmptyDataFrame(dataObjectId))
-    this.copy(dataFrame = dummyDf, isDummy = true)
-  }
   override def applyExecutionModeResultForInput(result: ExecutionModeResult, mainInputId: DataObjectId)(implicit context: ActionPipelineContext): SnowparkSubFeed = {
-    // apply input filter
-    val inputFilter = if (this.dataObjectId == mainInputId) result.filter else None
-    this.copy(partitionValues = result.inputPartitionValues, filter = inputFilter, isSkipped = false).breakLineage // breaklineage keeps DataFrame schema without content
+    // apply input filters
+    val inputFilters = result.filtersForInput(this.dataObjectId == mainInputId)
+    // the execution mode changed partition values and filters, so an existing DataFrame no longer matches them and is
+    // dropped by breakLineage. Its schema is kept, see SubFeed.breakLineage.
+    this.copy(partitionValues = result.inputPartitionValues, filters = inputFilters, isSkipped = false, executionModeResultOptions = result.options).breakLineage
       .asInstanceOf[SnowparkSubFeed]
   }
   override def applyExecutionModeResultForOutput(result: ExecutionModeResult, partitionValuesTransform: Seq[PartitionValues] => Map[PartitionValues, PartitionValues])(implicit context: ActionPipelineContext): SnowparkSubFeed = {
-    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filter = result.filter, isSkipped = false, dataFrame = None)
+    // filters of the output are set from the main input SubFeed after the transformation, see DataFrameActionImpl.updateOutputFilters
+    this.copy(partitionValues = result.getOutputPartitionValues(partitionValuesTransform), filters = Seq(), isSkipped = false, dataFrame = None, keptSchema = None, executionModeResultOptions = result.options)
   }
-  override def withDataFrame(dataFrame: Option[GenericDataFrame]): SnowparkSubFeed = this.copy(dataFrame = dataFrame.map(_.asInstanceOf[SnowparkDataFrame]))
-  override def isStreaming: Option[Boolean] = Some(false) // no spark streaming with Snowpark
+  override def withDataFrame(dataFrame: Option[GenericDataFrame]): SnowparkSubFeed = this.copy(
+    dataFrame = dataFrame.map(_.asInstanceOf[SnowparkDataFrame]),
+    keptSchema = if (dataFrame.isDefined) None else this.schemaOpt
+  )
+  override def withSchema(schema: Option[GenericSchema]): SnowparkSubFeed = this.copy(dataFrame = None, keptSchema = schema)
 }
 
 object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogger {
   override def fromSubFeed(subFeed: SubFeed)(implicit context: ActionPipelineContext): SnowparkSubFeed = {
     subFeed match {
-      case snowparkSubFeed: SnowparkSubFeed => snowparkSubFeed
+      // executionModeResultOptions are not passed on to the next Action
+      case snowparkSubFeed: SnowparkSubFeed => snowparkSubFeed.copy(executionModeResultOptions = Map())
       case dataFrameSubFeed: DataFrameSubFeed =>
-        val convertedSchema = dataFrameSubFeed.schema.map(_.convert(subFeedType))
-        SnowparkSubFeed(convertedSchema.map(s => getEmptyDataFrame(s, subFeed.dataObjectId)), subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped, isDummy = convertedSchema.isDefined)
+        // transport only the schema, the DataFrame is read again from the DataObject where it is needed
+        SnowparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped,
+          keptSchema = DataFrameSubFeed.convertSchema(dataFrameSubFeed, subFeedType))
       case _ => SnowparkSubFeed(None, subFeed.dataObjectId, subFeed.partitionValues, subFeed.isDAGStart, subFeed.isSkipped)
     }
   }
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
+  // Snowpark cacheResult() materializes eagerly into a temporary table.
+  // The table can only be released by closing the session, so it can not be uncached.
+  override def canCacheDataFrame: Boolean = true
+  override def canUncacheDataFrame: Boolean = false
   override def col(colName: String): SnowparkColumn = {
     SnowparkColumn(functions.col(colName))
   }
@@ -129,16 +130,26 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
+  override def first(column: GenericColumn): GenericColumn = {
+    throw new NotImplementedError("function first/first_value is not implemented in Snowpark")
+  }
+  override def abs(column: GenericColumn): GenericColumn = {
+    column match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.abs(snowparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
   override def count(column: GenericColumn): SnowparkColumn = {
     column match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.count(snowparkColumn.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
-  override def countDistinct(columns: GenericColumn*): SnowparkColumn = {
-    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
-    val innerColumns = columns.map(_.asInstanceOf[SnowparkColumn].inner)
-    SnowparkColumn(functions.count_distinct(innerColumns.head, innerColumns.tail:_*))
+  override def countDistinct(column: GenericColumn): SnowparkColumn = {
+    column match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.countDistinct(snowparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
   }
   override def approxCountDistinct(column: GenericColumn, rsd: Option[Double] = None): SnowparkColumn = {
     column match {
@@ -154,6 +165,14 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
     }
   }
+  override def least(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SnowparkColumn(functions.least(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
+  }
+  override def greatest(columns: GenericColumn*): GenericColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    SnowparkColumn(functions.greatest(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
+  }
   override def explode(column: GenericColumn): SnowparkColumn = {
     // TODO: check if this can be done by a udf?
     throw new NotImplementedError("explode array is not implemented in Snowpark")
@@ -168,6 +187,9 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
       case snowparkDf: SnowparkDataFrame => SnowparkSubFeed(Some(snowparkDf), dataObjectId, partitionValues)
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(df)
     }
+  }
+  override def getSchemaSubFeed(dataObjectId: DataObjectId, schema: GenericSchema, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): SnowparkSubFeed = {
+    SnowparkSubFeed(None, dataObjectId, partitionValues, keptSchema = Some(schema))
   }
   override def stringType: SnowparkDataType = SnowparkDataType(StringType)
 
@@ -217,6 +239,13 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
     SnowparkColumn(functions.object_construct(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
   }
+  /**
+   * Snowflake has no map type, the nearest equivalent is an OBJECT with the given key/value pairs (Snowpark API)
+   */
+  override def map(columns: GenericColumn*): SnowparkColumn = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns.toSeq)
+    SnowparkColumn(functions.object_construct(columns.map(_.asInstanceOf[SnowparkColumn].inner):_*))
+  }
   override def expr(sqlExpr: String): SnowparkColumn = SnowparkColumn(functions.sqlExpr(sqlExpr))
 
   override def when(condition: GenericColumn, value: GenericColumn): SnowparkColumn with SnowparkWhen = {
@@ -234,6 +263,19 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
   override def concat(exprs: GenericColumn*): GenericColumn = {
     DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, exprs.toSeq)
     SnowparkColumn(functions.concat(exprs.map(_.asInstanceOf[SnowparkColumn].inner):_*))
+  }
+  override def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn = {
+    column match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(functions.substring(snowparkColumn.inner, pos, len))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
+  }
+  override def timestampAdd(column: GenericColumn, duration: Duration): GenericColumn = {
+    column match {
+      case snowparkColumn: SnowparkColumn =>
+        SnowparkColumn(functions.dateadd("microsecond", functions.lit(duration.toNanos / 1000), snowparkColumn.inner))
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(column)
+    }
   }
   override def regexp_extract(column: GenericColumn, pattern: String, groupIdx: Int): GenericColumn = {
     column match {
@@ -286,7 +328,7 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
     aggFunction.apply() match {
       case snowparkAggFunctionColumn: SnowparkColumn => SnowparkColumn(snowparkAggFunctionColumn
         .inner.over(
-          Window.partitionBy(partitionBy.map(_.asInstanceOf[SnowparkColumn].inner): _*)
+          Window.partitionBy(partitionBy.map(_.asInstanceOf[SnowparkColumn].inner).toIndexedSeq: _*)
             .orderBy(orderBy.asInstanceOf[SnowparkColumn].inner))
       )
       case generic => DataFrameSubFeed.throwIllegalSubFeedTypeException(generic)
@@ -308,7 +350,7 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
   }
 
   override def rowFromSeq(values: Seq[Any]): GenericRow = {
-    SnowparkRow(Row(values: _*))
+    SnowparkRow(Row(values.toIndexedSeq: _*))
   }
 
   override def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf = {
@@ -323,8 +365,9 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
 
   override def createSimpleDataType(tpe: String): GenericDataType with GenericSimpleDataType = {
     val decimalPattern = "decimal\\(([0-9]+),([0-9]+)\\)".r
+    val stringPattern = "(var)?char\\([0-9]+\\)".r
     val snowparkType = tpe.toLowerCase.replace(" ", "") match {
-      case "string" => StringType
+      case "string" | stringPattern(_) => StringType
       case "boolean" => BooleanType
       case "byte" => ByteType
       case "short" => ShortType
@@ -334,9 +377,10 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
       case "double" => DoubleType
       case decimalPattern(precision, scale) => DecimalType(precision.toInt, scale.toInt)
       case "date" => DateType
-      case "timestamp" => TimestampType
+      case "timestamp" | "timestamp_ntz" => TimestampType
       case "binary" => BinaryType
       case "variant" => StringType
+      case _ => throw new IllegalArgumentException(s"Data type $tpe is not supported by Snowpark")
     }
     SnowparkSimpleDataType(snowparkType)
   }
@@ -351,6 +395,14 @@ object SnowparkSubFeed extends DataFrameSubFeedCompanion with SmartDataLakeLogge
 
   override def createMapDataType(keyTpe: GenericDataType, valueTpe: GenericDataType): GenericDataType with GenericMapDataType = {
     SnowparkMapDataType(MapType(keyTpe.asInstanceOf[SnowparkDataType].inner, valueTpe.asInstanceOf[SnowparkDataType].inner))
+  }
+
+  override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A])(implicit context: ActionPipelineContext): GenericDataFrame = {
+    throw new NotImplementedError("createDataFrame from rows is not implemented in Snowpark")
+  }
+
+  override def createDataFrame[A <: Product: ClassTag: TypeTag](rows: Seq[A], colNames: Seq[String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+    throw new NotImplementedError("createDataFrame from rows is not implemented in Snowpark")
   }
 }
 

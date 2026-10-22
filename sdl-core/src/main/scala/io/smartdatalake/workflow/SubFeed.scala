@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,10 +37,31 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
   def metrics: Option[MetricsMap]
 
   /**
+   * Result of validating the expectations of the DataObject this SubFeed was written to, e.g. "ok", "warn" or "error"
+   * per expectation name, see [[io.smartdatalake.workflow.dataobject.expectation.ExpectationResult]].
+   * Expectations without a compare value configured (attribute `expectation`) are not validated and not listed.
+   */
+  def expectationsResult: Option[Map[String, String]]
+
+  /**
+   * Options returned by the ExecutionMode of the Action which created this SubFeed.
+   * They are set when the [[ExecutionModeResult]] is applied to the SubFeed and are passed on to the transformers
+   * and the Input/Output DataObjects of that Action. They are not passed on to the next Action, see `fromSubFeed`.
+   */
+  def executionModeResultOptions: Map[String, String]
+
+  /**
    * Break lineage.
-   * This means to discard an existing DataFrame or List of FileRefs, so that it is requested again from the DataObject.
-   * On one side this is usable to break long DataFrame Lineages over multiple Actions and instead reread the data from
-   * an intermediate table. On the other side it is needed if partition values or filter condition are changed.
+   * This means to discard the data transported by this SubFeed, so that it is requested again from the DataObject.
+   *
+   * What is broken is the lineage of the *engine*, e.g. the Spark or Snowpark logical plan. On one side this is usable to
+   * truncate long plans spanning multiple Actions and instead reread the data from an intermediate table. On the other
+   * side it is needed if partition values or filter conditions are changed, as the existing data no longer matches them.
+   *
+   * This does *not* break the lineage of Actions and DataObjects known to SDLB: a [[DataFrameSubFeed]] keeps its schema
+   * (see [[DataFrameSubFeed.keptSchema]]), so that subsequent Actions can still be validated in init phase.
+   * Which data is discarded is implementation specific: [[DataFrameSubFeed]] drops its DataFrame, [[FileSubFeed]] drops
+   * its FileRefs, while [[ParameterSubFeed]] and [[InitSubFeed]] transport no data and are left unchanged.
    */
   def breakLineage(implicit context: ActionPipelineContext): SubFeed
 
@@ -73,10 +94,25 @@ trait SubFeed extends DAGResult with SmartDataLakeLogger {
 
   def appendMetrics(metrics: MetricsMap): SubFeed = withMetrics(this.metrics.getOrElse(Map()) ++ metrics)
 
+  def withExpectationsResult(expectationsResult: Map[String, String]): SubFeed =
+    ProductUtil.dynamicCopy(this, "expectationsResult", Some(expectationsResult))
+
+  def appendExpectationsResult(expectationsResult: Map[String, String]): SubFeed =
+    withExpectationsResult(this.expectationsResult.getOrElse(Map()) ++ expectationsResult)
+
+  def withExecutionModeResultOptions(options: Map[String, String]): SubFeed =
+    ProductUtil.dynamicCopy(this, "executionModeResultOptions", options)
+
+  /**
+   * Union of executionModeResultOptions when merging two SubFeeds for the same DataObject.
+   */
+  def unionExecutionModeResultOptions(other: SubFeed): Map[String, String] =
+    this.executionModeResultOptions ++ other.executionModeResultOptions
+
 }
 object SubFeed {
   def filterPartitionValues(partitionValues: Seq[PartitionValues], partitions: Seq[String]): Seq[PartitionValues] = {
-    partitionValues.map( pvs => PartitionValues(pvs.elements.filterKeys(partitions.contains).toMap)).filter(_.nonEmpty)
+    partitionValues.map( pvs => PartitionValues(pvs.elements.view.filterKeys(partitions.contains).toMap)).filter(_.nonEmpty)
   }
 }
 

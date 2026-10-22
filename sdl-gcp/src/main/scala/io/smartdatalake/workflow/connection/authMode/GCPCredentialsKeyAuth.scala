@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.connection.authMode
 
 import com.typesafe.config.Config
@@ -27,6 +26,25 @@ import io.smartdatalake.util.secrets.StringOrSecret
  * Authorization parameters to access a GCP-ressource using Service Account Keys.
  * A Service Account Key can be either read as Base64-encoded JSON file (String),
  * or as a path containing the JSON-File with the key, as described by Google. Only one of the options should be provided.
+ *
+ * Exactly one of `serviceAccountKey` and `serviceAccountKeyFile` must be set. Configuring both is rejected with a
+ * ConfigurationException in the prepare phase, configuring none already fails while BigQueryTableConnection is
+ * instantiated during config parsing. Currently supported by BigQueryTableConnection only.
+ *
+ * Example:
+ * {{{
+ * connections = {
+ *   google-playground {
+ *     type = BigQueryTableConnection
+ *     parentProject = "playground-223717"
+ *     authMode = {
+ *       type = GCPCredentialsKeyAuth
+ *       serviceAccountKeyFile = "/etc/secrets/playground-223717-7baadcb4cfef.json"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
  * @param serviceAccountKey A String that represents the Service Account Key encoded in Base64.
  * @param serviceAccountKeyFile A path that represents the location of the JSON-file with the service account key.
  */
@@ -44,8 +62,6 @@ case class GCPCredentialsKeyAuth(private val serviceAccountKey: Option[StringOrS
   private[smartdatalake] def getAuthCredentials(): (String, String) = {
     if (serviceAccountKey.isDefined) ("credentials", serviceAccountKey.get.resolve()) else ("credentialsFile", serviceAccountKeyFile.get.resolve())
   }
-
-  override def factory: FromConfigFactory[AuthMode] = GCPCredentialsKeyAuth
 }
 
 object GCPCredentialsKeyAuth extends FromConfigFactory[AuthMode] {

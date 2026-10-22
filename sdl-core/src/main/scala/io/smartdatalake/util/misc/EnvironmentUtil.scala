@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,11 +16,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.misc
 
 import io.smartdatalake.definitions.Environment
-import org.apache.spark.sql.SparkSession
 
 object EnvironmentUtil {
 
@@ -29,13 +27,6 @@ object EnvironmentUtil {
    */
   def isWindowsOS: Boolean = {
     sys.env.get("OS").exists(_.toLowerCase.startsWith("windows"))
-  }
-
-  /**
-   * check if Spark AQE (Spark 3.0) is enabled
-   */
-  def isSparkAdaptiveQueryExecEnabled(implicit session: SparkSession): Boolean = {
-    session.version.takeWhile(_ != '.').toInt >= 3 && session.conf.get("spark.sql.adaptive.enabled").toBoolean
   }
 
   /**

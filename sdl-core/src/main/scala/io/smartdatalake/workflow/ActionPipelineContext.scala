@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,19 +18,18 @@
  */
 package io.smartdatalake.workflow
 
-import io.smartdatalake.app.{AppUtil, GlobalConfig, SmartDataLakeBuilderConfig}
+import io.smartdatalake.app.{GlobalConfig, SmartDataLakeBuilderConfig}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SerializableHadoopConfiguration, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
-import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
+import io.smartdatalake.workflow.action.{Action, RuntimeInfo, SDLExecutionId}
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.sql.SparkSession
 
 import java.time.LocalDateTime
-import scala.collection.mutable
 
 /**
  * ActionPipelineContext contains start and runtime information about a SmartDataLake run.
@@ -39,80 +38,79 @@ import scala.collection.mutable
  * @param application application name of the run
  * @param executionId SDLExecutionId of this runs. Contains runId and attemptId. Both stay 1 if state is not enabled.
  * @param instanceRegistry registry of all SmartDataLake objects parsed from the config
- * @param referenceTimestamp timestamp used as reference in certain actions (e.g. HistorizeAction)
  * @param appConfig the command line parameters parsed into a [[SmartDataLakeBuilderConfig]] object
- * @param runStartTime start time of the run
- * @param attemptStartTime start time of attempt
+ * @param runStartTime start time of the run. On recovery of a failed run this is restored from the
+ *                     state file, so it stays stable over all attempts of the same run.
+ * @param attemptStartTime start time of the current attempt of the run
  * @param simulation true if this is a simulation run
  * @param phase current execution phase
- * @param dataFrameReuseStatistics Counter how many times a DataFrame of a SparkSubFeed is reused by an Action later in the pipeline.
- *                                 The counter is increased during ExecutionPhase.Init when preparing the SubFeeds for an Action and it is
- *                                 decreased in ExecutionPhase.Exec to unpersist the DataFrame after there is no need for it anymore.
+ * @param cacheRegistry Keeps track of DataFrames cached by Actions with cacheOutput=true, so that they can be released
+ *                      again once no Action needs them anymore. Consumers are registered during ExecutionPhase.Init,
+ *                      the caches are created and released during ExecutionPhase.Exec.
+ * @param runtimeRegistry Keeps the runtime state (events & metrics) of all Actions of this execution. As `copy` is
+ *                        shallow, all derived contexts share the same registry instance, so runtime information of an
+ *                        Action is visible to all Actions executed afterwards.
  * @param actionsSelected actions selected for execution by command line parameter --feed-sel
- * @param actionsSkipped actions selected but skipped in current attempt because they already succeeded in a previous attempt.
+ * @param actionsSkipped actions skipped in the current attempt because they already completed in a previous attempt,
+ *                       with the [[RuntimeInfo]] of the attempt they completed in. This is the channel through
+ *                       which runtime information of previous attempts reaches the current attempt: it is merged into
+ *                       the state file by [[ActionDAGRun.saveState]], reported as previous attempt statistics by
+ *                       [[ActionDAGRun.getStatistics]] and exposed to expressions by [[ActionExpressionData]].
+ * @param currentAction the Action currently being executed, set by [[withAction]].
+ * @param predecessorActions all Actions the currentAction transitively depends on in the DAG, set by [[withAction]].
+ *                           These have all finished when the currentAction runs, so their runtime information is
+ *                           complete and independent of the scheduling order of parallel branches.
  */
-@DeveloperApi
 case class ActionPipelineContext (
                                    feed: String, application: String, executionId: SDLExecutionId,
                                    @transient
                                    instanceRegistry: InstanceRegistry,
-                                   referenceTimestamp: Option[LocalDateTime] = None,
                                    appConfig: SmartDataLakeBuilderConfig, // application config is needed to persist action dag state for recovery
-                                   runStartTime: LocalDateTime = LocalDateTime.now(),
-                                   attemptStartTime: LocalDateTime = LocalDateTime.now(),
+                                   runStartTime: LocalDateTime,
+                                   attemptStartTime: LocalDateTime,
                                    simulation: Boolean = false,
                                    phase: ExecutionPhase = ExecutionPhase.Prepare,
-                                   dataFrameReuseStatistics: mutable.Map[(DataObjectId, Seq[PartitionValues]), Seq[ActionId]] = mutable.Map(),
+                                   cacheRegistry: DataFrameCacheRegistry = new DataFrameCacheRegistry(),
+                                   schemaExportRegistry: SchemaExportRegistry = new SchemaExportRegistry(),
+                                   columnLineageExportRegistry: ColumnLineageExportRegistry = new ColumnLineageExportRegistry(),
+                                   runtimeRegistry: ActionsRuntimeRegistry = new ActionsRuntimeRegistry(),
                                    actionsSelected: Seq[ActionId] = Seq(),
-                                   actionsSkipped: Seq[ActionId] = Seq(),
-                                   @transient // Prevent polluting output with contents of classLoader field
-                                   serializableHadoopConf: SerializableHadoopConfiguration,
+                                   actionsSkipped: Map[ActionId, RuntimeInfo] = Map(),
                                    globalConfig: GlobalConfig,
-                                   currentAction: Option[Action] = None
+                                   currentAction: Option[Action] = None,
+                                   @transient
+                                   predecessorActions: Seq[Action] = Seq(),
                                  ) extends SmartDataLakeLogger {
-  private[smartdatalake] def getReferenceTimestampOrNow: LocalDateTime = referenceTimestamp.getOrElse(LocalDateTime.now)
 
-  private[smartdatalake] def rememberDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionId): Int = dataFrameReuseStatistics.synchronized {
-    val key = (dataObjectId, partitionValues)
-    val newValue = dataFrameReuseStatistics.getOrElse(key, Seq()) :+ actionId
-    dataFrameReuseStatistics.update(key, newValue)
-    newValue.size
+  def withAction(action: Action, predecessorActions: Seq[Action] = Seq()): ActionPipelineContext =
+    this.copy(currentAction = Some(action), predecessorActions = predecessorActions)
+
+  def engineConnection: Option[Connection with EngineConnection] = {
+    currentAction.map(_.getEngineConnection(instanceRegistry))
   }
 
-  private[smartdatalake] def forgetDataFrameReuse(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], actionId: ActionId): Option[Int] = dataFrameReuseStatistics.synchronized {
-    val key = (dataObjectId, partitionValues)
-    val existingValue = dataFrameReuseStatistics.get(key)
-    existingValue.map { v =>
-      val newValue = v.diff(Seq(actionId))
-      if (v.size == newValue.size) logger.warn(s"Could not find $actionId in dataFrame reuse list!")
-      dataFrameReuseStatistics.update(key, newValue)
-      newValue.size
-    }
-  }
+  /**
+   * Timestamp used as reference in certain actions, e.g. the value written to the captured column by
+   * [[io.smartdatalake.workflow.action.HistorizeAction]] and
+   * [[io.smartdatalake.workflow.action.UpsertAction]].
+   *
+   * This defaults to `runStartTime`, so it stays stable over all attempts of the same run. It can be
+   * overridden by the SDLB parameter `referenceTimestamp`, see [[Environment.referenceTimestamp]].
+   */
+  val referenceTimestamp: LocalDateTime = Environment.referenceTimestamp.getOrElse(runStartTime)
 
-  def isExecPhase = phase == ExecutionPhase.Exec
+  def isExecPhase: Boolean = phase == ExecutionPhase.Exec
 
   // manage executionId
-  private[smartdatalake] def incrementRunId = this.copy(executionId = this.executionId.incrementRunId, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now)
+  def incrementRunId: ActionPipelineContext = this.copy(executionId = this.executionId.incrementRunId, runStartTime = LocalDateTime.now, attemptStartTime = LocalDateTime.now)
 
-  private[smartdatalake] def incrementAttemptId = this.copy(executionId = this.executionId.incrementAttemptId, attemptStartTime = LocalDateTime.now)
+  def incrementAttemptId: ActionPipelineContext = this.copy(executionId = this.executionId.incrementAttemptId, attemptStartTime = LocalDateTime.now)
 
   /**
    * helper method to access hadoop configuration
    */
   def hadoopConf: Configuration = serializableHadoopConf.get
 
-  /**
-   * helper method to access spark session
-   */
-  def sparkSession: SparkSession = {
-    val session = globalConfig.sparkSession(appConfig.appName, appConfig.master, appConfig.deployMode)
-    AppUtil.applySdlbRunLoggerContext(session)
-    session
-  }
+  val serializableHadoopConf: SerializableHadoopConfiguration = new SerializableHadoopConfiguration(globalConfig.getHadoopConfiguration)
 
-  /**
-   * True if a SparkSession has been created in this job
-   */
-  def hasSparkSession: Boolean = globalConfig.hasSparkSession
 }

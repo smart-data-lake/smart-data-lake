@@ -1,0 +1,77 @@
+name: Deploy documentation to GitHub Pages
+
+# The documentation site lives in docs/ and is developed on develop-spark4.
+# It is published only from master-spark4, so that the public site always reflects
+# the released state and no two branches race to publish the same site.
+on:
+  push:
+    branches: [master-spark4]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/deploy-docs.yml'
+
+  # allow for manual releases of the documentation
+  workflow_dispatch:
+
+# Two concurrent runs would both publish to the same Pages site. Serialize them
+# and let the newer run win rather than cancelling mid-publish.
+concurrency:
+  group: deploy-docs
+  cancel-in-progress: false
+
+defaults:
+  run:
+    # create-schema-index.js resolves static/json-schema-viewer/schemas/ relative
+    # to the working directory, so the build has to run inside docs.
+    working-directory: docs
+
+jobs:
+  build:
+    name: Build website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build website
+        run: |
+          # --ignore-scripts: do not run dependency lifecycle scripts, so a
+          # compromised package cannot execute code in the deploy job (Sonar S6505)
+          yarn install --frozen-lockfile --ignore-scripts
+          yarn build
+        env:
+          # required by docs/.npmrc to read @smart-data-lake/sdlb-schema-viewer
+          # from the GitHub package registry
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          # Build output to publish.
+          # NOTE: defaults.run.working-directory does not apply to `uses:` steps,
+          # so this path is relative to the workspace root and must include docs.
+          path: ./docs/build
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    # The github-pages environment is what the Pages deployment API deploys to;
+    # its url is surfaced in the Actions UI and on the repository home page.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    # Deployment via actions/deploy-pages requires an OIDC token (id-token) and
+    # write access to the Pages deployment API. No write access to repository
+    # contents is needed anymore, since nothing is pushed to a gh-pages branch.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      # Docs: https://github.com/actions/deploy-pages
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+

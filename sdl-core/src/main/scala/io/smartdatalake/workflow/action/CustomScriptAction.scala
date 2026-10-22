@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,17 +20,41 @@ package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, ParsableFromConfig}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.workflow.action.script.ParsableScriptDef
-import io.smartdatalake.workflow.dataobject.{CanReceiveScriptNotification, DataObject}
-import io.smartdatalake.workflow.{ActionPipelineContext, ScriptSubFeed}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.CanReceiveParameterNotification
+import io.smartdatalake.workflow.{ActionPipelineContext, ParameterSubFeed}
 
 /**
  * [[Action]] execute script after multiple input DataObjects are ready, notifying multiple output DataObjects when script succeeded.
  *
  * Note that this action can also be used to give your data pipeline additional structure, e.g. adding a decision point after several actions have been executed.
  *
+ * No data is read or written by this Action: the input DataObjects are only used as dependencies to order the DAG,
+ * and the output DataObjects just receive a notification once all scripts succeeded. The last line of a script's
+ * standard output is parsed as `key=value` pairs and passed on as parameters to the next script and output SubFeeds.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   refresh-dashboard {
+ *     type = CustomScriptAction
+ *     inputIds = [int-airports]
+ *     outputIds = [ext-dashboard]
+ *     scripts = [{
+ *       type = CmdScript
+ *       linuxCmd = "./scripts/refresh-dashboard.sh"
+ *       winCmd = "scripts\\refresh-dashboard.cmd"
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note Output DataObjects must implement [[io.smartdatalake.workflow.dataobject.generic.CanReceiveParameterNotification]]
+ *       to be able to receive the notification, e.g. MLflowDataObject or a custom DataObject implementation.
+ *       Otherwise the Action fails with a ConfigurationException when the configuration is parsed.
  * @param inputIds               input DataObject's
  * @param outputIds              output DataObject's
  * @param scripts                definition of scripts to execute
@@ -41,14 +65,14 @@ case class CustomScriptAction(override val id: ActionId,
                               scripts: Seq[ParsableScriptDef] = Seq(),
                               override val executionCondition: Option[Condition] = None,
                               override val metadata: Option[ActionMetadata] = None
-                       )(implicit instanceRegistry: InstanceRegistry) extends ScriptActionImpl {
+                       )(implicit val instanceRegistry: InstanceRegistry) extends ScriptActionImpl {
 
   override val inputs: Seq[DataObject] = inputIds.map(getInputDataObject[DataObject])
-  override val outputs: Seq[DataObject with CanReceiveScriptNotification] = outputIds.map(getOutputDataObject[DataObject with CanReceiveScriptNotification])
+  override val outputs: Seq[DataObject with CanReceiveParameterNotification] = outputIds.map(getOutputDataObject[DataObject with CanReceiveParameterNotification])
 
   validateConfig()
 
-  override protected def execScript(inputSubFeeds: Seq[ScriptSubFeed], outputSubFeeds: Seq[ScriptSubFeed])(implicit context: ActionPipelineContext): Seq[ScriptSubFeed] = {
+  override protected def execScript(inputSubFeeds: Seq[ParameterSubFeed], outputSubFeeds: Seq[ParameterSubFeed])(implicit context: ActionPipelineContext): Seq[ParameterSubFeed] = {
     val inputParameters = inputSubFeeds.flatMap(_.parameters).reduceLeftOption(_ ++ _).getOrElse(Map())
     val mainPartitionValues = getMainPartitionValues(inputSubFeeds)
     val outputParameters = scripts.foldLeft(inputParameters) {
@@ -60,11 +84,9 @@ case class CustomScriptAction(override val id: ActionId,
   }
 
   private def parseLastLine(stdOut: String): Map[String,String] = {
-    val lastLine = stdOut.linesIterator.toIterable.lastOption
+    val lastLine = stdOut.linesIterator.toList.lastOption
     lastLine.map(_.split(' ').map(_.split('=')).filter(_.length==2).map{case Array(k,v) => (k,v)}.toMap).getOrElse(Map())
   }
-
-  override def factory: FromConfigFactory[Action] = CustomScriptAction
 
 }
 

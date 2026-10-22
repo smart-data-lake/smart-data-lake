@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,21 +16,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{GenericSchemaUtil,SchemaUtil,SQLUtil,StringUtil}
-import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
+import io.smartdatalake.util.misc.{GenericSchemaUtil, SQLUtil, SchemaUtil, StringUtil}
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, DataFrameSubFeedCompanion}
 import org.json4s.JsonAST.{JBool, JObject}
 import org.json4s.jackson.Serialization
 import org.json4s.{Formats, JArray, JNothing, JString, JValue, NoTypeHints}
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.Type
 
 /**
- * Interface for all Generic objects defining it's subfeed type
+ * Interface for all Generic objects defining its subfeed type
  */
 trait GenericTypedObject {
   def subFeedType: Type
@@ -53,11 +53,17 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def select(column: GenericColumn): GenericDataFrame = select(Seq(column))
 
+  def select(column: String, columns: String*): GenericDataFrame = select((column +: columns).map(functions.col))
+
   def groupBy(columns: Seq[GenericColumn]): GenericGroupedDataFrame
 
   def agg(columns: Seq[GenericColumn]): GenericDataFrame
 
-  def unionByName(other: GenericDataFrame): GenericDataFrame
+  /**
+   * Note that unionByName does not deduplicate rows (according to Apache Spark). It is like UNION ALL in SQL, but resolving columns by name instead of position.
+   * @param allowMissingColumns if true, columns that are missing in one of the data frames will be filled with null values, otherwise an exception will be thrown if there are missing columns.
+   */
+  def unionByName(other: GenericDataFrame, allowMissingColumns: Boolean = false): GenericDataFrame
 
   def except(other: GenericDataFrame): GenericDataFrame
 
@@ -67,7 +73,11 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def limit(n: Int): GenericDataFrame
 
+  def orderBy(columns: Seq[GenericColumn]): GenericDataFrame
+
   def collect: Seq[GenericRow]
+
+  def collect[A: ClassTag]: Seq[A] = collect.map(_.getAs[A](0))
 
   def distinct: GenericDataFrame
 
@@ -78,6 +88,10 @@ trait GenericDataFrame extends GenericTypedObject {
   def drop(colName: String): GenericDataFrame
 
   def drop(col: GenericColumn): GenericDataFrame
+
+  def drop(cols: Seq[String]): GenericDataFrame = {
+    cols.foldLeft(this)((df, colName) => df.drop(colName))
+  }
 
   def createOrReplaceTempView(viewName: String): Unit
 
@@ -98,6 +112,23 @@ trait GenericDataFrame extends GenericTypedObject {
 
   def as(alias: String): GenericDataFrame
 
+  /**
+   * Add column comments from the ScalaDoc of case classes returned by user defined functions used in this DataFrame.
+   * Existing comments are never overwritten.
+   * The default implementation is a no-op, as this is only implemented for the Spark engine.
+   */
+  def enrichColumnCommentsFromUdfs: GenericDataFrame = this
+
+  /**
+   * Get the column level lineage of this DataFrame with respect to the DataFrames it was created from, see
+   * [[ColumnLineage]].
+   * The default implementation returns None, as this is implemented for the Spark and the plain-Scala engine only.
+   *
+   * @param inputs the DataFrames read from the input DataObjects, with the id of the DataObject they belong to.
+   * @return None if the engine can not analyze column level lineage.
+   */
+  def getColumnLineage(inputs: Seq[(DataObjectId, GenericDataFrame)]): Option[ColumnLineage] = None
+
   // instantiate subfeed helper
   private lazy val functions = DataFrameSubFeed.getFunctions(subFeedType)
 
@@ -108,12 +139,18 @@ trait GenericDataFrame extends GenericTypedObject {
    */
   def showString(options: Map[String, String] = Map()): String
 
+  def show(options: Map[String, String] = Map()): Unit = println(showString(options))
+
+  def printSchema(): Unit = schema.printSchema()
+
   /**
    * Get a formatted execution plan of the DataFrame using explain method.
    *
    * @param options options for explain method, possible keys are dependent on the subFeedType.
    */
   def explainString(options: Map[String, String] = Map()): String
+
+  def explain(options: Map[String, String] = Map()): Unit = println(explainString(options))
 
   /**
    * Create an Observation of metrics on this DataFrame.
@@ -256,12 +293,17 @@ trait GenericDataFrame extends GenericTypedObject {
   /**
    * Create an empty SubFeed for this subFeedType.
    */
-  def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed
-
   def apply(columnName: String): GenericColumn
 
   def isStreaming: Boolean = false
 
+}
+
+/**
+ * An interface to get generic access to wrapped DataFrame for Spark or Snowflake
+ */
+trait DataFrameWrapper {
+  def inner: Any
 }
 
 /**
@@ -283,8 +325,8 @@ trait GenericSchema extends GenericTypedObject {
     SchemaConverter.convert(this, toSubFeedType)
   }
 
-  def equalsSchema(schema: GenericSchema): Boolean = {
-    diffSchema(schema).isEmpty && schema.diffSchema(this).isEmpty
+  def equalsSchema(that: GenericSchema): Boolean = {
+    this.diffSchema(that).isEmpty && that.diffSchema(this).isEmpty
   }
 
   def diffSchema(schema: GenericSchema): Option[GenericSchema]
@@ -325,6 +367,8 @@ trait GenericSchema extends GenericTypedObject {
 
   def treeString(level: Int = Int.MaxValue): String
 
+  def printSchema(level: Int = Int.MaxValue): Unit = println(treeString(level))
+
   def apply(colName: String): GenericField = fields.find(_.name == colName)
     .getOrElse(throw new IllegalArgumentException("field $colName not found"))
 }
@@ -332,57 +376,79 @@ trait GenericSchema extends GenericTypedObject {
 object GenericSchema {
 
   /**
-   * Parsing schema export created by DataObjectSchemaExporter
+   * Parsing schema export created by a dry-run with schema export or CatalogStatsExporter, see [[GenericSchema.toJson]].
+   * The Json is engine-neutral, so it can be parsed for another subFeedType than the one it was created with.
+   * Simple data types are given by their Spark type name, e.g. `string`, `integer` or `decimal(10,2)`,
+   * and are created with `createSimpleDataType` of the companion of the subFeedType.
    */
   def fromJson(json: JArray, subFeedType: Type): GenericSchema = {
-    implicit val formats: Formats = Serialization.formats(NoTypeHints)
     val companion = DataFrameSubFeed.getCompanion(subFeedType)
-
-    def createDataType(json: JValue): GenericDataType = json match {
-      // simple type
-      case JString(str) => companion.createSimpleDataType(str)
-      // struct
-      case j: JObject if (j \ "dataType") == JString("struct") =>
-        val fields = j \ "fields" match {
-          case jFields: JArray => jFields.arr.map { case jsonField: JObject => parseField(jsonField) }
-        }
-        companion.createStructDataType(fields)
-      // array
-      case j: JObject if (j \ "dataType") == JString("array") =>
-        val valueType = createDataType(j \ "elementType")
-        companion.createArrayDataType(valueType)
-      // map
-      case j: JObject if (j \ "dataType") == JString("map") =>
-        val keyType = createDataType(j \ "keyType")
-        val valueType = createDataType(j \ "valueType")
-        companion.createMapDataType(keyType, valueType)
+    val fields = json.arr.map {
+      case jsonField: JObject => fieldFromJson(jsonField, companion)
+      case t =>
+        throw new IllegalArgumentException(s"Unexpected type $t in schema fields array, expected JObject for each field")
     }
-
-    def parseField(json: JObject): GenericField = {
-      companion.createField(
-        (json \ "name").extract[String],
-        createDataType(json \ "dataType"),
-        (json \ "nullable").extract[Boolean],
-        (json \ "comment").toOption.map(_.extract[String])
-      )
-    }
-
-    val fields = json.arr.map { case jsonField: JObject => parseField(jsonField) }
     companion.createSchema(fields)
+  }
+
+  /**
+   * Parsing a data type of a schema export, see [[GenericDataType.toJson]] and [[fromJson]].
+   */
+  def dataTypeFromJson(json: JValue, subFeedType: Type): GenericDataType =
+    dataTypeFromJson(json, DataFrameSubFeed.getCompanion(subFeedType))
+
+  private def dataTypeFromJson(json: JValue, companion: DataFrameSubFeedCompanion): GenericDataType = json match {
+    // simple type
+    case JString(str) => companion.createSimpleDataType(str)
+    // struct
+    case j: JObject if (j \ "dataType") == JString("struct") =>
+      val fields = j \ "fields" match {
+        case jFields: JArray => jFields.arr.map {
+          case jsonField: JObject => fieldFromJson(jsonField, companion)
+          case _ => throw new IllegalArgumentException("Unexpected type for schema field, expected JObject")
+        }
+        case _ =>
+          throw new IllegalArgumentException("Unexpected type for 'fields' in struct schema, expected JArray")
+      }
+      companion.createStructDataType(fields)
+    // array
+    case j: JObject if (j \ "dataType") == JString("array") =>
+      companion.createArrayDataType(dataTypeFromJson(j \ "elementType", companion))
+    // map
+    case j: JObject if (j \ "dataType") == JString("map") =>
+      companion.createMapDataType(dataTypeFromJson(j \ "keyType", companion), dataTypeFromJson(j \ "valueType", companion))
+    case t =>
+      throw new IllegalArgumentException(s"Unexpected data type format $t in schema definition: ${json.toString}")
+  }
+
+  private def fieldFromJson(json: JObject, companion: DataFrameSubFeedCompanion): GenericField = {
+    implicit val formats: Formats = Serialization.formats(NoTypeHints)
+    companion.createField(
+      (json \ "name").extract[String],
+      dataTypeFromJson(json \ "dataType", companion),
+      (json \ "nullable").extract[Boolean],
+      (json \ "comment").toOption.map(_.extract[String])
+    )
   }
 }
 
-/**
- * Interface for the columns of a GenericDataFrame
- */
+ /**
+  * Interface for the columns of a GenericDataFrame
+  */
 trait GenericColumn extends GenericTypedObject {
   def ===(other: GenericColumn): GenericColumn
 
   def =!=(other: GenericColumn): GenericColumn
 
+  def <=>(other: GenericColumn): GenericColumn
+
   def >(other: GenericColumn): GenericColumn
 
   def <(other: GenericColumn): GenericColumn
+
+  def >=(other: GenericColumn): GenericColumn
+
+  def <=(other: GenericColumn): GenericColumn
 
   def +(other: GenericColumn): GenericColumn
 
@@ -420,6 +486,38 @@ trait GenericColumn extends GenericTypedObject {
 }
 
 /**
+ * A GenericColumn that wraps a SQL expression string.
+ * Only exprSql is supported; all other operations throw UnsupportedOperationException.
+ * Used internally for expectation validation where only the SQL string is needed.
+ */
+private[smartdatalake] case class SqlExpressionColumn(sql: String) extends GenericColumn {
+  override def exprSql: String = sql
+  override def getName: Option[String] = None
+  private def unsupported(op: String) = throw new UnsupportedOperationException(s"SqlExpressionColumn does not support '$op'")
+  override def ===(other: GenericColumn): GenericColumn = unsupported("===")
+  override def =!=(other: GenericColumn): GenericColumn = unsupported("=!=")
+  override def <=>(other: GenericColumn): GenericColumn = unsupported("<=>")
+  override def >(other: GenericColumn): GenericColumn = unsupported(">")
+  override def <(other: GenericColumn): GenericColumn = unsupported("<")
+  override def >=(other: GenericColumn): GenericColumn = unsupported(">=")
+  override def <=(other: GenericColumn): GenericColumn = unsupported("<=")
+  override def +(other: GenericColumn): GenericColumn = unsupported("+")
+  override def -(other: GenericColumn): GenericColumn = unsupported("-")
+  override def /(other: GenericColumn): GenericColumn = unsupported("/")
+  override def *(other: GenericColumn): GenericColumn = unsupported("*")
+  override def and(other: GenericColumn): GenericColumn = unsupported("and")
+  override def or(other: GenericColumn): GenericColumn = unsupported("or")
+  override def isin(list: Any*): GenericColumn = unsupported("isin")
+  override def isNull: GenericColumn = unsupported("isNull")
+  override def isNotNull: GenericColumn = unsupported("isNotNull")
+  override def as(name: String): GenericColumn = unsupported("as")
+  override def cast(dataType: GenericDataType): GenericColumn = unsupported("cast")
+  override def desc: GenericColumn = unsupported("desc")
+  override def apply(extraction: Any): GenericColumn = unsupported("apply")
+  override def subFeedType: scala.reflect.runtime.universe.Type = throw new UnsupportedOperationException("SqlExpressionColumn.subFeedType")
+}
+
+/**
  * Interface for the fields of a GenericSchema or struct type
  */
 trait GenericField extends GenericTypedObject {
@@ -437,6 +535,11 @@ trait GenericField extends GenericTypedObject {
 
   def removeMetadata: GenericField
 
+  /**
+   * Returns a copy of this field with another data type and nullability, keeping its name and metadata (e.g. comment).
+   */
+  def withDataType(dataType: GenericDataType, nullable: Boolean): GenericField
+
   def toJson: JObject = {
     JObject(
       "name" -> JString(name),
@@ -448,7 +551,7 @@ trait GenericField extends GenericTypedObject {
 }
 
 /**
- * Interface for the data type of a GenericField
+ * Interface for the data type of GenericField
  */
 trait GenericDataType extends GenericTypedObject {
   def isSortable: Boolean
@@ -481,6 +584,8 @@ trait GenericDataType extends GenericTypedObject {
  */
 trait GenericSimpleDataType {
   def isNumeric: Boolean
+
+  def isImpreciseNumeric: Boolean
 
   def getDecimalSpec: Option[(Int, Int)]
 }
@@ -555,7 +660,7 @@ trait GenericRow extends GenericTypedObject {
 
   def getStruct(index: Int): GenericRow
 
-  def getAs[T](index: Int): T
+  def getAs[T: ClassTag](index: Int): T
 
   //Note: getAs[T](fieldName: String) can not be implemented as in Snowpark a Row does not know the names of its fields!
   def toSeq: Seq[Any]

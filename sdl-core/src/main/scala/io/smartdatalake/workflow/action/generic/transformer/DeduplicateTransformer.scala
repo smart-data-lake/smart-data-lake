@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import com.typesafe.config.Config
@@ -26,13 +25,33 @@ import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.workflow.action.DataFrameActionImpl
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataobject.TableDataObject
+import io.smartdatalake.workflow.dataobject.generic.TableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**
  * Returns dataframe with only unique columns based on a primary key.
  *
  * If primaryKeyColumns is left empty, the primaryKey of the Actions output DataObject must be defined.
+ *
+ * With a rankingExpression the record with the largest value of that expression is kept per primary key
+ * (the ranking is applied in descending order), which is the usual way to keep the most recent version of
+ * a record. Without it an arbitrary record per primary key is kept.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   dedup-ratings {
+ *     type = CopyAction
+ *     inputId = stg-ratings
+ *     outputId = int-ratings
+ *     transformers = [{
+ *       type = DeduplicateTransformer
+ *       primaryKeyColumns = [id]
+ *       rankingExpression = "coalesce(updated_at, created_at)"
+ *     }]
+ *   }
+ * }
+ * }}}
  *
  * @param name              Name of the transformer
  * @param description       Optional description of the transformer
@@ -41,7 +60,8 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * @param primaryKeyColumns Optional list of primary key columns.
  *                          If left empty the primary key of the Actions output DataObject is used.
  */
-case class DeduplicateTransformer(override val name: String = "DeduplicateTransformer", override val description: Option[String] = None, rankingExpression: Option[String] = None, primaryKeyColumns: Option[Seq[String]] = Option.empty[Seq[String]]) extends GenericDfTransformer {
+case class DeduplicateTransformer(override val name: String = "DeduplicateTransformer", override val description: Option[String] = None, rankingExpression: Option[String] = None, primaryKeyColumns: Option[Seq[String]] = Option.empty[Seq[String]])
+  extends GenericDfTransformer {
 
   override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): GenericDataFrame = {
 
@@ -49,7 +69,7 @@ case class DeduplicateTransformer(override val name: String = "DeduplicateTransf
     import functions._
 
     val primaryKey: Seq[String] = primaryKeyColumns.orElse {
-      val action = Environment.instanceRegistry.get[DataFrameActionImpl](actionId)
+      val action = context.instanceRegistry.get[DataFrameActionImpl](actionId)
       action.mainOutput match {
         case dataObject: TableDataObject => dataObject.table.primaryKey
         case _ => None
@@ -64,8 +84,6 @@ case class DeduplicateTransformer(override val name: String = "DeduplicateTransf
       df.dropDuplicates(primaryKey)
     }
   }
-
-  override def factory: FromConfigFactory[GenericDfTransformer] = DeduplicateTransformer
 }
 
 object DeduplicateTransformer extends FromConfigFactory[GenericDfTransformer] {

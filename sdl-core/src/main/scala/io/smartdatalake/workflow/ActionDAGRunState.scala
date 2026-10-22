@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,25 +16,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow
 
 import io.smartdatalake.app.SmartDataLakeBuilderConfig
 import io.smartdatalake.config.ConfigParser
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{DateUtil, ReflectionUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.misc.{ReflectionUtil, SmartDataLakeLogger}
+import io.smartdatalake.util.json.SdlJsonUtils
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.{ExecutionId, RuntimeEventState, RuntimeInfo, SDLExecutionId}
-import org.apache.spark.util.Json4sCompat
-import org.json4s.Extraction.decompose
 import org.json4s._
-import org.json4s.ext.EnumNameSerializer
 import org.json4s.jackson.JsonMethods
 import org.json4s.jackson.Serialization.{write, writePretty}
 import org.reflections.Reflections
 
-import java.time.{Duration, LocalDateTime}
+import java.time.LocalDateTime
 
 /**
  * ActionDAGRunState contains all configuration and state of an ActionDAGRun needed to start a recovery run in case of failure.
@@ -45,7 +41,18 @@ case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, 
 
   def toJson: String = ActionDAGRunState.toJson(this)
 
-  def isFailed: Boolean = actionsState.exists(_._2.state == RuntimeEventState.FAILED)
+  /**
+   * Actions which did not reach a successful end state and which a recovery run would execute again.
+   *
+   * This mirrors [[RuntimeInfo.hasCompleted]], the condition used to decide which Actions are skipped on recovery,
+   * so that a run is considered failed exactly if there is something left for a recovery to do. Note that STREAMING
+   * is excluded: asynchronous streaming Actions report this state in the final state file of a run which stopped
+   * gracefully, and such a run must not be recovered.
+   */
+  def unfinishedActionsState: Map[ActionId, RuntimeInfo] =
+    actionsState.filterNot { case (_, info) => info.hasCompleted || info.state == RuntimeEventState.STREAMING }
+
+  def isFailed: Boolean = unfinishedActionsState.nonEmpty
 
   def isSucceeded: Boolean = isFinal && !isFailed
 
@@ -53,7 +60,7 @@ case class ActionDAGRunState(appConfig: SmartDataLakeBuilderConfig, runId: Int, 
     actionsState.filter(_._2.executionId.isInstanceOf[SDLExecutionId]).forall(_._2.state == RuntimeEventState.SKIPPED)
 
   def getDataObjectsState: Seq[DataObjectState] = {
-    val dataObjectsState = actionsState.toSeq.flatMap { case (actionId, info) => info.dataObjectsState }
+    val dataObjectsState = actionsState.toSeq.flatMap { case (_, info) => info.dataObjectsState }
     val duplicateDataObjectState = dataObjectsState.groupBy(_.dataObjectId).filter(_._2.size > 1)
     assert(duplicateDataObjectState.isEmpty, s"${duplicateDataObjectState.mkString(", ")} is read from multiple Actions with DataObjectStateIncrementalMode. This is not supported.")
     // return
@@ -81,49 +88,14 @@ case class DataObjectState(dataObjectId: DataObjectId, state: String) {
 private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
 
   // Note: if increasing this version, please check if a StateMigrator is needed to read files of older versions. See also stateMigrators below.
-  val runStateFormatVersion: Int = 5
-
-  private val durationSerializer = Json4sCompat.getCustomSerializer[Duration](formats => (
-    {
-      case json: JString => Duration.parse(json.s)
-      case json: JInt => Duration.ofSeconds(json.num.toLong)
-    },
-    {case obj: Duration => JString(obj.toString)}
-  ))
-  private val localDateTimeToUtcSerializer = Json4sCompat.getCustomSerializer[LocalDateTime](formats => ( {
-    case json: JString => DateUtil.parseDateTimeToLocalDateTime(json.s)
-  }, {
-    case obj: LocalDateTime => JString(DateUtil.convertLocalDateTimeToUtcISOString(obj))
-  }
-  ))
-  private val actionIdKeySerializer = Json4sCompat.getCustomKeySerializer[ActionId](formats => (
-    {case s: String => ActionId(s)},
-    {case obj: ActionId => obj.id}
-  ))
-  private val dataObjectIdKeySerializer = Json4sCompat.getCustomKeySerializer[DataObjectId](formats => (
-    {case s: String => DataObjectId(s)},
-    {case obj: DataObjectId => obj.id}
-  ))
-  private val dataObjectIdSerializer = Json4sCompat.getCustomSerializer[DataObjectId](formats => (
-    {case json: JString => DataObjectId(json.s)},
-    {case obj: DataObjectId => JString(obj.id)}
-  ))
-  private val runtimeEventStateKeySerializer = Json4sCompat.getCustomKeySerializer[RuntimeEventState](formats => (
-    {case s: String => RuntimeEventState.withName(s)},
-    {case obj: RuntimeEventState => obj.toString}
-  ))
-  private val partitionValuesSerializer = Json4sCompat.getCustomSerializer[PartitionValues](implicit formats => (
-    {case json: JObject => PartitionValues(json.values)},
-    {case obj: PartitionValues => JObject(obj.elements.map(e => JField(e._1, decompose(e._2))).toList)}
-  ))
+  val runStateFormatVersion: Int = 6
 
   implicit private lazy val workflowReflections: Reflections = ReflectionUtil.getReflections(ConfigParser.WORKFLOW_PACKAGE)
 
   private lazy val typeHints = ShortTypeHints(ReflectionUtil.getTraitImplClasses[SubFeed].toList ++ ReflectionUtil.getSealedTraitImplClasses[ExecutionId], "type")
-  implicit val formats: Formats = Json4sCompat.getStrictSerializationFormat(typeHints) + new EnumNameSerializer(RuntimeEventState) +
-    actionIdKeySerializer + dataObjectIdKeySerializer + dataObjectIdSerializer + durationSerializer + localDateTimeToUtcSerializer + runtimeEventStateKeySerializer + partitionValuesSerializer
+  implicit val formats: Formats = SdlJsonUtils.getFormats(typeHints).strict
 
-  // write state to Json
+  // write state to JSON
   def toJson(actionDAGRunState: ActionDAGRunState): String = {
     writePretty(actionDAGRunState)
   }
@@ -137,7 +109,7 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
     write(entry)
   }
 
-  // read state from json
+  // read state from JSON
   def fromJson(stateJson: String): ActionDAGRunState = {
     try{
       val jObj = JsonMethods.parse(stateJson).asInstanceOf[JObject]
@@ -149,26 +121,34 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
     }
   }
 
-  def checkStateFormatVersionAndMigrate(json: JObject): Option[JObject] = {
-    // convert old format versions
-    val formatVersion = json \ "runStateFormatVersion" match {
-      case JInt(i) => i.toInt
-      case _ => 0 // runStateFormatVersion was missing in first format version
-    }
-    val appName = json \ "appConfig" \ "applicationName" match {
-      case JString(s) => s
-      case _ => json \ "appConfig" \ "feedSel" match {
-        case JString(s) => s
+    def checkStateFormatVersionAndMigrate(json: JObject): Option[JObject] = {
+      // convert old format versions
+      val formatVersion = json \ "runStateFormatVersion" match {
+        case JInt(i) => i.toInt
+        case _ => 0 // runStateFormatVersion was missing in first format version
       }
-    }
-    val runId = json \ "runId" match {
-      case JInt(i) => i.toInt
-    }
-    val attemptId = json \ "attemptId" match {
-      case JInt(i) => i.toInt
-    }
-    assert(formatVersion <= runStateFormatVersion, s"Cannot read state file with formatVersion=${formatVersion} newer than the version of this build (${runStateFormatVersion}). Check state file app=$appName runId=$runId attemptId=$attemptId and that your SDLB version is up-to-date!")
-    val migrators = stateMigrators.dropWhile(m => m.versionFrom <= formatVersion)
+      val appName = json \ "appConfig" \ "applicationName" match {
+        case JString(s) => s
+        case _ => json \ "appConfig" \ "feedSel" match {
+          case JString(s) => s
+          case _ => throw new IllegalStateException("Unable to extract applicationName from state json," +
+            " neither 'applicationName' nor 'feedSel' field found")
+        }
+      }
+      val runId = json \ "runId" match {
+        case JInt(i) => i.toInt
+        case _ => throw new IllegalStateException("Expected runId to be an integer in state json")
+      }
+      val attemptId = json \ "attemptId" match {
+        case JInt(i) => i.toInt
+        case _ => throw new IllegalStateException("Expected attemptId to be an integer in state json")
+      }
+     assert(formatVersion <= runStateFormatVersion,
+       s"Cannot read state file with formatVersion=$formatVersion newer than the version of this build ($runStateFormatVersion)." +
+         s" Check state file app=$appName runId=$runId attemptId=$attemptId and that your SDLB version is up-to-date!")
+    // a migrator has to be applied if the state file is not newer than the version it migrates from,
+    // e.g. a state file with formatVersion=5 still needs the migrator 5 -> 6.
+    val migrators = stateMigrators.dropWhile(m => m.versionFrom < formatVersion)
     if (migrators.nonEmpty) {
       logger.info(s"Applying state migrators ${migrators.mkString(", ")} to state json for app=$appName runId=$runId attemptId=$attemptId")
       Some(migrators.foldLeft(json)((v, m) => m.migrate(v)))
@@ -178,7 +158,8 @@ private[smartdatalake] object ActionDAGRunState extends SmartDataLakeLogger {
   // list of state migrators, sorted in ascending order
   private val stateMigrators: Seq[StateMigratorDef] = Seq(
     new StateMigratorDef3To4(),
-    new StateMigratorDef4To5()
+    new StateMigratorDef4To5(),
+    new StateMigratorDef5To6()
   ).sortBy(_.versionFrom) // force ordering
   assert(stateMigrators.groupBy(_.versionFrom).forall(_._2.size == 1)) // check that versionFrom is unique
   assert(stateMigrators.forall(m => m.versionFrom + 1 == m.versionTo)) // check that a state migrator always converts to the next version, without skipping a version.
@@ -212,4 +193,11 @@ private[smartdatalake] trait ActionDAGRunStateStore[A <: StateId] extends SmartD
 private[smartdatalake] trait StateId {
   def runId: Int
   def attemptId: Int
+
+  /**
+   * True if this state was accepted, meaning that the run must not be recovered even if it contains failed Actions.
+   * See [[HadoopFileActionDAGRunStateStore]], where a state file is accepted by moving it into the 'succeeded'
+   * directory.
+   */
+  def isAccepted: Boolean = false
 }

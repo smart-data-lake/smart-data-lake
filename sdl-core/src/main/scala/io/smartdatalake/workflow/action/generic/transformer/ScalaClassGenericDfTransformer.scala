@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,15 +16,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.CustomCodeUtil
-import io.smartdatalake.util.spark.DefaultExpressionData
+import io.smartdatalake.util.misc.{CustomCodeUtil, DefaultExpressionData}
 import io.smartdatalake.workflow.action.generic.customlogic.CustomGenericDfTransformer
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
@@ -33,6 +31,36 @@ import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
  * Configuration of a custom Spark-DataFrame transformation between one input and one output (1:1) as Java/Scala Class.
  * Define a transform function which receives a DataObjectId, a DataFrame and a map of options and has to return a
  * DataFrame. The Java/Scala class has to implement interface [[CustomGenericDfTransformer]].
+ *
+ * The class is instantiated by reflection through its no-argument constructor, so it must be on the classpath of the
+ * SDLB job. Because it works on [[GenericDataFrame]] and receives the matching
+ * [[io.smartdatalake.workflow.dataframe.DataFrameFunctions]], the transformation stays engine independent.
+ * Use `options`/`runtimeOptions` to parameterize the code instead of hard-coding values.
+ *
+ * Instead of overwriting the standard transform function, the class can also implement any transform method using
+ * parameters of type DataFrameFunctions, Map[String,String], GenericDataFrame and any primitive data type. It is then
+ * called dynamically by looking for the parameter values in the Options, see [[CustomGenericDfTransformer]].
+ * The id of the input DataObject is passed as option `dataObjectId`.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     transformers = [{
+ *       type = ScalaClassGenericDfTransformer
+ *       className = com.sample.MyAirportsTransformer
+ *       options = { maxLatitude = "60" }
+ *       runtimeOptions = { runId = "runId" }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @see [[ScalaClassGenericDfsTransformer]] for the n:m variant, and [[SQLDfTransformer]] if the transformation can
+ *      be expressed in SQL.
  *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
@@ -52,8 +80,6 @@ case class ScalaClassGenericDfTransformer(override val name: String = "scalaTran
   override def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
     customTransformer.transformPartitionValues(options, partitionValues)
   }
-
-  override def factory: FromConfigFactory[GenericDfTransformer] = ScalaClassGenericDfTransformer
 }
 
 object ScalaClassGenericDfTransformer extends FromConfigFactory[GenericDfTransformer] {

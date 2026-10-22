@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,12 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.workflow.ActionPipelineContext
 
+import java.time.Duration
 import scala.reflect.runtime.universe
 
 /**
@@ -38,19 +38,42 @@ trait DataFrameFunctions {
   def lit(value: Any): GenericColumn
   def min(column: GenericColumn): GenericColumn
   def max(column: GenericColumn): GenericColumn
+  def first(column: GenericColumn): GenericColumn
   def size(column: GenericColumn): GenericColumn
   def explode(column: GenericColumn): GenericColumn
+  def abs(column: GenericColumn): GenericColumn
+  def least(columns: GenericColumn*): GenericColumn
+  def greatest(columns: GenericColumn*): GenericColumn
+  def substring(column: GenericColumn, pos: Int, len: Int): GenericColumn
+
+  /**
+   * Add a fixed duration to a timestamp column. The duration might be negative.
+   * Note that the resolution of the duration is limited to microseconds by most engines.
+   */
+  def timestampAdd(column: GenericColumn, duration: Duration): GenericColumn
+
+  /**
+   * Subtract a fixed duration from a timestamp column.
+   * Note that the resolution of the duration is limited to microseconds by most engines.
+   */
+  def timestampSubtract(column: GenericColumn, duration: Duration): GenericColumn = timestampAdd(column, duration.negated)
+
   /**
    * Construct array from given columns and removing null values
    */
   def array_construct_compact(columns: GenericColumn*): GenericColumn
   def array(columns: GenericColumn*): GenericColumn
   def struct(columns: GenericColumn*): GenericColumn
+
+  /**
+   * Construct a map from given columns, alternating between key and value, e.g. map('k1', v1, 'k2', v2).
+   */
+  def map(columns: GenericColumn*): GenericColumn
   def expr(sqlExpr: String): GenericColumn
   def not(column: GenericColumn): GenericColumn
   def count(column: GenericColumn): GenericColumn
-  def countDistinct(columns: GenericColumn*): GenericColumn
-  def approxCountDistinct(columns: GenericColumn, rsd: Option[Double] = None): GenericColumn
+  def countDistinct(column: GenericColumn): GenericColumn
+  def approxCountDistinct(column: GenericColumn, rsd: Option[Double] = None): GenericColumn
   def coalesce(columns: GenericColumn*): GenericColumn
 
   def when(condition: GenericColumn, value: GenericColumn): GenericColumn with GenericWhen
@@ -72,11 +95,31 @@ trait DataFrameFunctions {
   def from_json(column: GenericColumn, dataType: GenericDataType): GenericColumn
 
   def hash(column: GenericColumn): GenericColumn
+
   /**
-   * Get a DataFrame with the result of the given sql statement.
+   * Create a column expression to compare a list of columns between rows.
+   * If useHash is true, the expression will use a hash function to reduce the size of the value to compare, otherwise the columns are compared as is, normally as struct of the columns.
+   * The default implementation below can be overridden by implementations if needed, e.g. because they do not support struct or hash functions, but the default implementation should work for most cases.
+   */
+  def colscomparisonExpr(cols: Seq[GenericColumn], useHash: Boolean = false): GenericColumn = {
+    assert(cols.forall(_.getName.nonEmpty), "All columns must have a name for colscomparisonExpr, otherwise the generated expression is not deterministic. Please check that all columns used for comparison are named.")
+    if (useHash) hash(struct(cols.sortBy(_.getName.get):_*))
+    else struct(cols.sortBy(_.getName.get):_*)
+  }
+
+  /**
+   * Get a DataFrame with the result of the given SQL statement.
    * @param dataObjectId Snowpark implementation needs to get the Snowpark-Session from the DataObject. This should not be used otherwise.
    */
   def sql(query: String, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): GenericDataFrame
+
+  /**
+   * Create a DataFrame from an SQL query written in the given SQL dialect, e.g. `spark` or `postgres`.
+   * Only engines translating the query for the database consider the dialect, e.g. the SQL engine of sdl-sql.
+   * The default implementation ignores it, and expects the query in the SQL dialect of the engine.
+   */
+  def sql(query: String, dataObjectId: DataObjectId, sqlDialect: String)(implicit context: ActionPipelineContext): GenericDataFrame =
+    sql(query, dataObjectId)
 
   def window(aggFunction: () => GenericColumn, partitionBy: Seq[GenericColumn], orderBy: GenericColumn): GenericColumn
 
@@ -89,6 +132,14 @@ trait DataFrameFunctions {
   def rowFromSeq(values: Seq[Any]): GenericRow
 
   def schemaEvolutionUdf(srcType: GenericDataType, tgtType: GenericDataType): GenericUnaryUdf
+
+  /**
+   * Returns the wider of two simple data types, e.g. a data type that can hold the values of both data types,
+   * or None if there is no such data type or it is not known to the engine.
+   * Schema evolution uses the wider data type if the data type of a column changes, so that existing data is not
+   * converted to a narrower data type.
+   */
+  def widerSimpleType(left: GenericDataType, right: GenericDataType): Option[GenericDataType] = None
 
 }
 

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.lab
 
 import io.smartdatalake.lab.DataFrameBaseBuilder.DEFAULT_DATAOBJECT_ID
@@ -54,6 +53,7 @@ abstract class DataFrameBaseBuilder[R] {
 
   /**
    * Spark Filter expression to be applied on all DataFrames that contain the given column.
+   * The column is matched case-insensitive, unless Environment.caseSensitive is set.
    * @param colName column name
    * @param expr a Spark expression returning a boolean value
    */
@@ -61,6 +61,7 @@ abstract class DataFrameBaseBuilder[R] {
 
   /**
    * SQL Filter expression to be applied on all DataFrames that contain the given column.
+   * The column is matched case-insensitive, unless Environment.caseSensitive is set.
    * @param colName column name
    * @param sqlExpr a Spark SQL expression returning a boolean value
    */

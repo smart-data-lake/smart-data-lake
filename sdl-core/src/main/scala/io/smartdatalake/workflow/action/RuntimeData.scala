@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
@@ -32,7 +31,7 @@ import scala.collection.mutable
  */
 private[smartdatalake] trait RuntimeData {
   // collect execution data
-  protected val executions: mutable.Buffer[ExecutionData[ExecutionId]] = mutable.Buffer()
+  val executions: mutable.Buffer[ExecutionData[ExecutionId]] = mutable.Buffer()
   protected var currentExecution: Option[ExecutionData[ExecutionId]] = None
   protected var lastExecution: Option[ExecutionData[ExecutionId]] = None
   // the number of executions to keep to implement housekeeping
@@ -308,4 +307,6 @@ case class RuntimeInfo(
    */
   def hasCompleted: Boolean = state==RuntimeEventState.SUCCEEDED || state==RuntimeEventState.SKIPPED
   override def toString: String = duration.map(d => s"$state $d").getOrElse(state.toString)
+  def debugString: String = s"RuntimeInfo(executionId=$executionId, " +
+    s"${inputIds.length} inputIds: ${inputIds.mkString(",")}, ${outputIds.length} outputIds: ${outputIds.mkString(",")})"
 }

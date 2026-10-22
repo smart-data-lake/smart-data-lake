@@ -1,0 +1,160 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+package io.smartdatalake.workflow.dataobject
+
+import com.typesafe.config.Config
+import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, LibraryOptions}
+import io.smartdatalake.definitions.DateColumnType.DateColumnType
+import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
+import io.smartdatalake.definitions.{DateColumnType, SDLSaveMode}
+import io.smartdatalake.util.misc.ProductUtil
+import io.smartdatalake.util.spark.SparkRepartitionDef
+import io.smartdatalake.workflow.ActionPipelineContext
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic.{Constraint, HousekeepingMode}
+import io.smartdatalake.workflow.dataobject.spark.SparkFileDataObject
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.types.{DateType, StringType}
+
+/**
+ * A [[DataObject]] backed by a comma-separated value (CSV) data source.
+ *
+ * It manages read and write access and configurations required for
+ * [[io.smartdatalake.workflow.action.Action]]s to work on CSV formatted files.
+ *
+ * CSV reading and writing details are delegated to Apache Spark
+ * [[org.apache.spark.sql.DataFrameReader]] and [[org.apache.spark.sql.DataFrameWriter]]
+ * respectively.
+ *
+ * Read Schema specifications:
+ *
+ * If a data object schema is not defined via the `schema` attribute (default) and `inferSchema`
+ * option is disabled (default) in `csvOptions`, then all column types are set to String and the
+ * first row of the CSV file is read to determine the column names and the number of fields.
+ *
+ * If the `header` option is disabled in `csvOptions` (it is enabled by default, see note below),
+ * then the header is defined as "_c#" for each column where "#" is the column index. Otherwise the
+ * first row of the CSV file is not included in the DataFrame content and its entries are used as
+ * the column names for the schema.
+ *
+ * If a data object schema is not defined via the `schema` attribute and `inferSchema` is enabled in
+ * `csvOptions`, then the `samplingRatio` (default: 1.0) option in `csvOptions` is used to extract a
+ * sample from the CSV file in order to determine the input schema automatically.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   stg-airports {
+ *     type = CsvFileDataObject
+ *     path = ${env.basedir}"/stg_airports"
+ *     csvOptions {
+ *       delimiter = ";"
+ *       inferSchema = true
+ *     }
+ *     partitions = [dt]
+ *     saveMode = Append
+ *   }
+ * }
+ * }}}
+ *
+ * @note
+ *   This data object sets the following default values for `csvOptions`: header = true,
+ *   inferSchema = false, delimiter = ",", and quote = null. All other `csvOption` default to the
+ *   values defined by Apache Spark. Note that either `header` or `inferSchema` must be enabled in
+ *   `csvOptions`, or an explicit `schema` must be defined.
+ *
+ * @see
+ *   [[org.apache.spark.sql.DataFrameReader]]
+ * @see
+ *   [[org.apache.spark.sql.DataFrameWriter]]
+ *
+ * @param csvOptions
+ *   Options of the Spark CSV data source for reading and writing.
+ * @param dateColumnType
+ *   how to convert columns of Spark type date before writing (default: date). With `date` they are
+ *   cast to timestamp, with `string` they are cast to string. See
+ *   [[io.smartdatalake.definitions.DateColumnType]].
+ */
+case class CsvFileDataObject(
+    override val id: DataObjectId,
+    override val path: String,
+    @LibraryOptions("https://spark.apache.org/docs/latest/sql-data-sources-csv.html#data-source-option", "org.apache.spark.sql.catalyst.csv.CSVOptions")
+    csvOptions: Map[String, String] = Map(),
+    override val partitions: Seq[String] = Seq(),
+    override val schema: Option[GenericSchema] = None,
+    override val schemaMin: Option[GenericSchema] = None,
+    dateColumnType: DateColumnType = DateColumnType.Date,
+    override val saveMode: SDLSaveMode = SDLSaveMode.Overwrite,
+    override val sparkRepartition: Option[SparkRepartitionDef] = None,
+    override val connectionId: Option[ConnectionId] = None,
+    override val filenameColumn: Option[String] = None,
+    override val expectedPartitionsCondition: Option[String] = None,
+    override val housekeepingMode: Option[HousekeepingMode] = None,
+    override val constraints: Seq[Constraint] = Seq(),
+    override val expectations: Seq[Expectation] = Seq(),
+    override val metadata: Option[DataObjectMetadata] = None
+)(@transient implicit override val instanceRegistry: InstanceRegistry)
+    extends SparkFileDataObject with io.smartdatalake.util.spark.dataset.Transform {
+
+  def toDebugString: String = ProductUtil.toDebugString(obj = this)
+
+  override val format = "com.databricks.spark.csv"
+
+  // this is only needed for FileRef actions
+  override val fileName: String = "*.csv*"
+
+  private val formatOptionsDefault = Map(
+    "header"         -> "true",
+    "inferSchema"    -> "false",
+    "delimiter"      -> ",",
+    "quote"          -> null,
+    "pathGlobFilter" -> fileName
+  )
+
+  /**
+   * @inheritdoc
+   */
+  override val options: Map[String, String] = formatOptionsDefault ++ csvOptions
+
+  require(
+    options("header").toBoolean || options("inferSchema").toBoolean || schema.isDefined,
+    s"($id) Custom schema must be set or either csvOptions { header = true } or csvOptions { inferSchema = true } must be set."
+  )
+
+  /**
+   * Formats date type column values according to the specified `dateColumnType` before writing to
+   * CSV file.
+   */
+  override def beforeWrite(df: DataFrame)(implicit context: ActionPipelineContext): DataFrame = {
+    val dfSuper = super.beforeWrite(df)
+    // standardize date column types
+    dateColumnType match {
+      case DateColumnType.String =>
+        dfSuper.castColumnsOfTypeTo(DateType)(StringType)
+      case DateColumnType.Date => dfSuper.castAllDate2Timestamp
+    }
+  }
+}
+
+object CsvFileDataObject extends FromConfigFactory[DataObject] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CsvFileDataObject =
+    extract[CsvFileDataObject](config)
+}

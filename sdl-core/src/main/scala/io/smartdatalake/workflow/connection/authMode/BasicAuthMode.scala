@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,32 +16,51 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.connection.authMode
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.secrets.{SecretsUtil, StringOrSecret}
+import io.smartdatalake.util.secrets.StringOrSecret
 
 import java.util.Base64
-
 
 /**
  * Authenticate using basic user/pwd authentication.
  *
  * For http connection this will create a basic authentication header.
+ *
+ * This is the most commonly used authentication mode. It is the only AuthMode supported by JdbcConnection and
+ * DebeziumConnection, and one of the supported modes of SFtpFileRefConnection, SnowflakeConnection and HTTP based
+ * DataObjects. Note that no connection falls back to it implicitly - authMode has to be configured explicitly.
+ * Both user and password support secret providers, so credentials do not have to be stored in clear text in the
+ * configuration.
+ *
+ * Example:
+ * {{{
+ * connections = {
+ *   sftp-src {
+ *     type = SFtpFileRefConnection
+ *     host = "sftp.example.com"
+ *     authMode = {
+ *       type = BasicAuthMode
+ *       user = "###ENV#SFTP_USER###"
+ *       password = "###ENV#SFTP_PWD###"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @param user     user to login with (supports secret providers, e.g. "###ENV#SFTP_USER###")
+ * @param password password to login with (supports secret providers)
  */
-case class BasicAuthMode(private val user: Option[StringOrSecret],
-                         private val password: Option[StringOrSecret],
-                         @Deprecated @deprecated("Use `user` instead", "2.5.0") private val userVariable: Option[String] = None,
-                         @Deprecated @deprecated("Use `password` instead", "2.5.0") private val passwordVariable: Option[String] = None)
-  extends HttpAuthMode {
-  private val _user: StringOrSecret = user.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(userVariable.get))
-  private val _password: StringOrSecret = password.getOrElse(SecretsUtil.convertSecretVariableToStringOrSecret(passwordVariable.get))
+case class BasicAuthMode(
+    private val user: StringOrSecret,
+    private val password: StringOrSecret
+) extends HttpAuthMode {
 
-  def userSecret: StringOrSecret = _user
+  def userSecret: StringOrSecret = user
 
-  def passwordSecret: StringOrSecret = _password
+  def passwordSecret: StringOrSecret = password
 
   def basicAuthValue(user: String, password: String): String = {
     val c = new String(Base64.getEncoder.encode(s"$user:$password".getBytes("utf-8")), "utf-8")
@@ -49,12 +68,9 @@ case class BasicAuthMode(private val user: Option[StringOrSecret],
   }
   override def getHeaders: Map[String, String] = Map("Authorization" -> basicAuthValue(userSecret.resolve(), passwordSecret.resolve()))
 
-  override def factory: FromConfigFactory[HttpAuthMode] = BasicAuthMode
-
 }
 
 object BasicAuthMode extends FromConfigFactory[HttpAuthMode] {
-  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): BasicAuthMode = {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): BasicAuthMode =
     extract[BasicAuthMode](config)
-  }
 }

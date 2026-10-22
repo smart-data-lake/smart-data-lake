@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.connection.authMode
 
 import com.typesafe.config.Config
@@ -37,12 +36,38 @@ import sttp.model.{Header, MediaType, Uri}
  * This first calls AWS Cognito InitiateAuth endpoint from the selected region to authenticate the user.
  * The tokens returned can then be refreshed with the corresponding token endpoint of the user pool.
  *
+ * Use this for HTTP endpoints protected by an AWS Cognito user pool, e.g. the SDLB UI backend.
+ * The authentication flow used is USER_PASSWORD_AUTH, so the app client of the user pool must have it enabled.
+ *
+ * Example:
+ * {{{
+ * global {
+ *   uiBackend {
+ *     baseUrl = "https://xxxxxxxxxx.execute-api.eu-central-1.amazonaws.com/DEV/api/v1"
+ *     repo = my-project
+ *     authMode = {
+ *       type = AWSUserPwdAuthMode
+ *       region = eu-central-1
+ *       userPool = sdlb-ui
+ *       clientId = "###FILE#ui-auth;clientId###"
+ *       user = "###FILE#ui-auth;user###"
+ *       password = "###FILE#ui-auth;pwd###"
+ *       useIdToken = true
+ *     }
+ *   }
+ * }
+ * }}}
+ *
  * @param region     AWS region
+ * @param userPool   Cognito domain prefix of the AWS Cognito user pool, e.g. "sdlb-ui" (not the user pool name and
+ *                   not the user pool id). It is used to build the token endpoint
+ *                   https://{userPool}.auth.{region}.amazoncognito.com/oauth2/token used to refresh tokens.
  * @param clientId   client id of the AWS application
  * @param user       user to login
  * @param password   password to use for login.
  * @param useIdToken If true, id_token is used for Http Authorization header, otherwise access_token. Default is false.
  * @param timeouts   configuration of HTTP timeouts. Default is connectionTimeout=500ms, readTimeout=1s.
+ * @param proxy      optional configuration of an HTTP proxy used for the Cognito and token requests.
  */
 case class AWSUserPwdAuthMode(region: String, userPool: String, clientId: StringOrSecret, user: StringOrSecret, password: StringOrSecret, useIdToken: Boolean = false,
                               timeouts: HttpTimeoutConfig = HttpTimeoutConfig(500, 1000),
@@ -91,8 +116,6 @@ case class AWSUserPwdAuthMode(region: String, userPool: String, clientId: String
   override def getHeaders: Map[String, String] = {
     Some(oAuth2Service.getToken.getAuthHeader(useIdToken)).toMap
   }
-
-  override def factory: FromConfigFactory[HttpAuthMode] = AWSUserPwdAuthMode
 
 }
 

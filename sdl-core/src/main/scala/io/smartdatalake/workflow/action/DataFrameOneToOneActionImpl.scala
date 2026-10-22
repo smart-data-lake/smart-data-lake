@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,8 +19,8 @@
 package io.smartdatalake.workflow.action
 
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfTransformerDef, SQLDfTransformer}
-import io.smartdatalake.workflow.dataframe.spark.SparkSubFeed
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed, SubFeed}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
@@ -40,6 +40,11 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
    */
   def output: DataObject with CanWriteDataFrame
 
+  // A 1:1 Action has exactly one DataFrame input and output, so they need not be declared by subclasses.
+  // Note: these must be lazy, as input & output are lazy in some subclasses.
+  override lazy val dataFrameInputs: Seq[DataObject with CanCreateDataFrame] = Seq(input)
+  override lazy val dataFrameOutputs: Seq[DataObject with CanWriteDataFrame] = Seq(output)
+
   /**
    * SubFeed types of DataFrame transformers to apply with this action
    * Override by subclasses if there are transformers.
@@ -49,7 +54,7 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
   override lazy val transformerSubFeedType: Option[Type] = {
     val transformerTypeStats = transformerSubFeedSupportedTypes
       .filterNot(_ =:= typeOf[DataFrameSubFeed]) // ignore generic transformers
-      .groupBy(identity).mapValues(_.size).toSeq.sortBy(_._2)
+      .groupBy(identity).view.mapValues(_.size).toMap.toSeq.sortBy(_._2)
     assert(transformerTypeStats.size <= 1, s"($id) No common transformer subFeedType type found: ${transformerTypeStats.map { case (tpe, cnt) => s"${tpe.typeSymbol.name}: $cnt" }.mkString(",")}")
     transformerTypeStats.map(_._1).headOption
   }
@@ -57,7 +62,7 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
   /**
    * Prepares list of transformers
    */
-  private[smartdatalake] def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef]
+  def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfTransformerDef]
 
   /**
    * Transform a [[SparkSubFeed]].
@@ -77,11 +82,14 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
   }
 
   override final def postExec(inputSubFeeds: Seq[SubFeed], outputSubFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
-    assert(inputSubFeeds.size == 1, s"($id) Only one inputSubFeed allowed")
-    assert(outputSubFeeds.size == 1, s"($id) Only one outputSubFeed allowed")
+    // Note: the SubFeeds of additional inputs & outputs are filtered out, only the DataFrame ones are 1:1.
+    val dataFrameInputSubFeeds = inputSubFeeds.filter(subFeed => dataFrameInputs.exists(_.id == subFeed.dataObjectId))
+    val dataFrameOutputSubFeeds = outputSubFeeds.filter(subFeed => dataFrameOutputs.exists(_.id == subFeed.dataObjectId))
+    assert(dataFrameInputSubFeeds.size == 1, s"($id) Only one inputSubFeed allowed")
+    assert(dataFrameOutputSubFeeds.size == 1, s"($id) Only one outputSubFeed allowed")
     if (isAsynchronousProcessStarted) return
     super.postExec(inputSubFeeds, outputSubFeeds)
-    postExecSubFeed(inputSubFeeds.head, outputSubFeeds.head)
+    postExecSubFeed(dataFrameInputSubFeeds.head, dataFrameOutputSubFeeds.head)
   }
 
   /**
@@ -93,11 +101,11 @@ abstract class DataFrameOneToOneActionImpl extends DataFrameActionImpl {
   /**
    * apply transformer to SubFeed
    */
-  private[smartdatalake] def applyTransformers(transformers: Seq[GenericDfTransformerDef], inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+  def applyTransformers(transformers: Seq[GenericDfTransformerDef], inputSubFeed: DataFrameSubFeed, outputSubFeed: DataFrameSubFeed)(implicit context: ActionPipelineContext): DataFrameSubFeed = {
     val duplicateTransformerNames = transformers.groupBy(_.name).values.filter(_.size > 1).map(_.head.name)
     assert(!transformers.exists(_.isInstanceOf[SQLDfTransformer]) || duplicateTransformerNames.isEmpty, s"($id) transformers.name must be unique if SQLDfTransformer is used, but duplicate (default?) names ${duplicateTransformerNames.mkString(", ")} where detected")
     val (transformedSubFeed, _) = transformers.foldLeft((inputSubFeed, Option.empty[String])) {
-      case ((subFeed, previousTransformerName), transformer) => (transformer.applyTransformation(id, subFeed, previousTransformerName, executionModeResultOptions), Some(transformer.name))
+      case ((subFeed, previousTransformerName), transformer) => (transformer.applyTransformation(id, subFeed, previousTransformerName, inputSubFeed.executionModeResultOptions), Some(transformer.name))
     }
     // Note that transformed partition values are set by execution mode.
     outputSubFeed.withDataFrame(transformedSubFeed.dataFrame)

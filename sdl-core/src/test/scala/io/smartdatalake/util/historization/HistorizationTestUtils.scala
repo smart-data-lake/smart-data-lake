@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,16 +16,20 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.historization
 
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
-import io.smartdatalake.workflow.dataframe.{DataFrameFunctions, GenericDataFrame}
-import org.apache.spark.sql.{Encoder, SparkSession}
+import io.smartdatalake.workflow.dataframe.GenericDataFrame
+import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeedCompanion}
+import org.slf4j.Logger
 
 import java.sql.Timestamp
 import java.time.{Duration, LocalDateTime}
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe.TypeTag
+
+case class NameAgeHealth(id: Int, name: String, age: Int, health_state: String)
+case class NameAgeHealthNewCol(id: Int, name: String, age: Int, health_state: String, new_col1: Option[String] = None)
 
 object HistorizationTestUtils {
 
@@ -51,14 +55,27 @@ object HistorizationTestUtils {
   private[historization] val ersetztTimestampOldDeletedHist = LocalDateTime.now.minusDays(23)
   private[historization] val ersetztTimestampOldDeletedHistTs = Timestamp.valueOf(ersetztTimestampOldDeletedHist)
   private[historization] val colNames = Seq("id", "name", "age", "health_state")
-  private[historization] val primaryKeyColumns = Array("id", "name")
+  private[historization] val primaryKeyColumns = List("id", "name")
   private[historization] val referenceTimestampNew = LocalDateTime.now
   private[historization] val referenceTimestampNewTs = Timestamp.valueOf(referenceTimestampNew)
 
-  private[smartdatalake] def getReferenceTimestampOldTs(timeUnitAxis: Option[Duration] = defaultTimeAxisUnit) = Timestamp.valueOf(timeUnitAxis.map(referenceTimestampNew.minus(_)).getOrElse(referenceTimestampNew))
+  private[smartdatalake] def getReferenceTimestampOldTs(timeUnitAxis: Option[Duration] = defaultTimeAxisUnit): Timestamp =
+    Timestamp.valueOf(timeUnitAxis.map(referenceTimestampNew.minus(_)).getOrElse(referenceTimestampNew))
 
-  def toHistorizedDf[T <: Product : Encoder](records: Seq[T], phase: HistorizationPhase.HistorizationPhase, colNames: Seq[String] = this.colNames, withHashCol: Boolean = false, withOperation: Boolean = false, timeUnitAxis: Option[Duration] = defaultTimeAxisUnit)
-                                            (implicit session: SparkSession, functions: DataFrameFunctions): GenericDataFrame = {
+  def toHistorizedDf[T <: Product: ClassTag: TypeTag](
+      records: Seq[T],
+      phase: HistorizationPhase.HistorizationPhase,
+      colNames: Seq[String] = this.colNames,
+      withHashCol: Boolean = false,
+      withOperation: Boolean = false,
+      timeUnitAxis: Option[Duration] = defaultTimeAxisUnit
+  )(implicit
+      actionPipelineContext: ActionPipelineContext,
+      functions: DataFrameSubFeedCompanion,
+      logger: Logger
+  ): GenericDataFrame = {
+    logger.debug(s"toHistorizedDf: phase=$phase , records.size=${records.size} , withHashCol=$withHashCol ," +
+      s" withOperation=$withOperation , timeUnitAxis=$timeUnitAxis , colNames=${colNames.mkString(",")}")
     import functions._
     val referenceTimestampOldTs = getReferenceTimestampOldTs(timeUnitAxis)
     var operation: Option[String] = None
@@ -88,15 +105,21 @@ object HistorizationTestUtils {
           .withColumn(s"${Environment.capturedColumnName}", lit(erfasstTimestampOldDeletedHistTs))
           .withColumn(s"${Environment.delimitedColumnName}", lit(ersetztTimestampOldDeletedHistTs))
     }
-    if (withHashCol) dfHist = Historization.addHashCol(dfHist, None, None, useHash = true, colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName))
-    if (withOperation) dfHist = dfHist.withColumn(Historization.historizeOperationColName, operation.map(lit).getOrElse(lit(null)))
+    if (withHashCol)
+      dfHist = Historization.addHashCol(dfHist, None, None, useHash = true,
+        colsToIgnore = Seq(Environment.capturedColumnName, Environment.delimitedColumnName))
+    if (withOperation) dfHist = dfHist
+      .withColumn(Historization.historizeOperationColName, operation.map(lit).getOrElse(lit(null)))
+    if (logger.isDebugEnabled) {
+      logger.debug(s"toHistorizedDf: result schema:")
+      dfHist.printSchema()
+    }
     dfHist
   }
 
-  def toDataDf[T <: Product : Encoder](records: Seq[T], colNames: Seq[String] = this.colNames)
-                                      (implicit session: SparkSession): GenericDataFrame = {
-    import session.sqlContext.implicits._
-    SparkDataFrame(records.toDF(colNames: _*))
-  }
+  def toDataDf[T <: Product: ClassTag: TypeTag](records: Seq[T], colNames: Seq[String] = this.colNames)(implicit
+      functions: DataFrameSubFeedCompanion,
+      actionPipelineContext: ActionPipelineContext
+  ): GenericDataFrame = functions.createDataFrame(records, colNames)
 
 }

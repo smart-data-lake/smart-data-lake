@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 import com.typesafe.config.Config
 import io.debezium.embedded.Connect
@@ -24,12 +23,15 @@ import io.debezium.engine.{ChangeEvent, DebeziumEngine}
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.debezium.{DebeziumChangeConsumer, DebeziumCompletionCallback, DebeziumSchemaConsumer, SdlbDebeziumChangeConsumerState}
+import io.smartdatalake.definitions.{CdcChangeType, Environment}
 import io.smartdatalake.util.concurrent.Await
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
 import io.smartdatalake.workflow.connection.DebeziumConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanCreateIncrementalOutput, SchemaValidation, Table}
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
 import org.apache.kafka.connect.data.Schema.Type
 import org.apache.kafka.connect.data.{Field, Schema, Struct}
@@ -49,26 +51,49 @@ import scala.jdk.CollectionConverters._
  * Provides details to access Change data over Debezium Engine.
  * Note that this implementation is not yet tested on production, and must therefore be seen as experimental.
  *
+ * The DataObject runs an embedded Debezium engine to read the change events of one database table. The returned
+ * DataFrame contains the columns of the changed row, followed by three SDLB metadata columns: `_change_type`
+ * (insert, update_preimage, update_postimage, delete or read), `_commit_timestamp` and `_change_ordinal`.
+ * The naming of the metadata columns follows the change data feed of Delta Lake and Iceberg, see [[CdcChangeType]].
+ * The result can be historized without further configuration by using HistorizeAction, see its documentation.
+ * Debezium's own envelope
+ * fields (before, after, source, op, ...) are not part of the result. Read offsets are stored in SDLBs state, so it
+ * supports incremental output and should be used together with DataObjectStateIncrementalMode. Reading stops once no
+ * more events arrive within `maxWaitTimeAfterLastBatchMilliSeconds`. If no event arrives at all, `schemaMin` is used
+ * as fallback schema for the empty DataFrame.
+ *
+ * Example:
+ * {{{
+ * connections = {
+ *   dbz-postgres {
+ *     type = DebeziumConnection
+ *     dbEngine = "postgresql"
+ *     hostname = "localhost"
+ *     port = 5432
+ *     db = "demo"
+ *     authMode = { type = BasicAuthMode, user = "###ENV#PG_USER###", password = "###ENV#PG_PWD###" }
+ *   }
+ * }
+ * dataObjects = {
+ *   src-test {
+ *     type = DebeziumCdcDataObject
+ *     connectionId = dbz-postgres
+ *     table = { db = "demo", name = "test" }
+ *     debeziumProperties = {
+ *       "plugin.name" = "pgoutput"
+ *       "schema.history.internal" = "io.debezium.storage.file.history.FileSchemaHistory"
+ *       "schema.history.internal.file.filename" = "/tmp/schemahistory.dat"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
  * @param id unique name of this data object
  * @param connectionId optional id of [[io.smartdatalake.workflow.connection.DebeziumConnection]]
  * @param table Source table to get change data from
  * @param debeziumProperties Properties for the specific Debezium connector
  * @param metadata (optional) data object metadata
  * @param maxWaitTimeAfterLastBatchMilliSeconds (optional) Waiting time interval for debezium to finish (when a batch arrived, the engine waits the defined interval for completion), default = 10 seconds
- *
- * Example config:
- *
- * Source {
- *	type = DebeziumCdcDataObject
- *	connectionId = "connection1"
- *	table = "Test"
- *	debeziumProperties = {
- *		"database.server.id" = "1234345345"
- *		"plugin.name" = "pgoutput"
- *		"schema.history.internal" = "io.debezium.storage.file.history.FileSchemaHistory"
- *		"schema.history.internal.file.filename" = "C://TEMP/schemahistory.dat"
- *	}
- * }
  */
 case class DebeziumCdcDataObject(override val id: DataObjectId,
                                  connectionId: ConnectionId,
@@ -115,16 +140,14 @@ case class DebeziumCdcDataObject(override val id: DataObjectId,
     // Always overwrite table.include.list property to include only the changes of the table specified in the data object
     props = props ++ Map("table.include.list" -> table.fullName)
 
-    val propsForEngine = new Properties();
+    val propsForEngine = new Properties()
     props.foreach { case (key, value) => propsForEngine.setProperty(key, value) }
     propsForEngine
   }
 
-  override def factory: FromConfigFactory[DataObject] = DebeziumCdcDataObject
-
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
 
-    implicit val spark: SparkSession = context.sparkSession
+    implicit val spark: SparkSession = SparkSubFeed.getSparkSession
 
     def getRecordsFromDebeziumEngine(
                                       properties: Properties,
@@ -294,12 +317,16 @@ object DebeziumCdcDataObject extends FromConfigFactory[DataObject] {
 /**
  * Helper object to convert from debezium events in SourceRecord format to sdlb compatible spark dataframe
  */
-private object DebeziumEventConverter {
+private[smartdatalake] object DebeziumEventConverter {
 
   def convert(records: Seq[SourceRecord])(implicit spark: SparkSession): DataFrame = {
 
+    // the ordinal is added to preserve the order in which debezium delivered the events, e.g. the order in which they
+    // were committed in the source database. It is needed because extractCdcEvents unions the events by type, and
+    // because the commit timestamp is not precise enough to separate changes committed within the same millisecond.
     val sparkSchema = inferSparkSchema(records.head.valueSchema())
-    val rows = records.map(recordToRow)
+      .add(StructField(Environment.cdcChangeOrdinalColumnName, LongType, nullable = false))
+    val rows = records.zipWithIndex.map { case (record, ordinal) => recordToRow(record, ordinal) }
 
     val df = spark.createDataFrame(rows.asJava, sparkSchema)
     extractCdcEvents(df)
@@ -318,17 +345,15 @@ private object DebeziumEventConverter {
         case Type.BOOLEAN => BooleanType
         case Type.STRING => StringType
         case Type.BYTES => BinaryType
-        case Type.MAP => {
+        case Type.MAP =>
           // Infer key and value types for MapType
           val keyType = inferSparkSchema(field.schema().keySchema())
           val valueType = inferSparkSchema(field.schema().valueSchema())
           MapType(keyType, valueType)
-        }
-        case Type.ARRAY => {
+        case Type.ARRAY =>
           // Infer the element type for ArrayType
           val elementType = inferSparkSchema(field.schema().valueSchema())
           ArrayType(elementType)
-        }
         case Type.STRUCT => inferSparkSchema(field.schema())
         case _ => StringType
       }
@@ -338,10 +363,10 @@ private object DebeziumEventConverter {
     StructType(fields.toArray)
   }
 
-  private def recordToRow(record: SourceRecord): Row = {
+  private def recordToRow(record: SourceRecord, ordinal: Int): Row = {
 
     val valueStruct = record.value().asInstanceOf[org.apache.kafka.connect.data.Struct]
-    structToRow(valueStruct)
+    Row.fromSeq(structToRow(valueStruct).toSeq :+ ordinal.toLong)
   }
 
   // Helper function to extract data from a Struct
@@ -354,7 +379,7 @@ private object DebeziumEventConverter {
       }
     }.toSeq
 
-    Row(values: _*)
+    Row(values.toIndexedSeq: _*)
 
   }
 
@@ -376,7 +401,7 @@ private object DebeziumEventConverter {
 
   private def reorderCdcColumns(df: DataFrame): DataFrame = {
 
-    val colsToMove = Seq(COMMIT_TYPE_COLUMN_NAME, COMMIT_TIMESTAMP_COLUMN_NAME)
+    val colsToMove = Seq(CHANGE_TYPE_COLUMN_NAME, COMMIT_TIMESTAMP_COLUMN_NAME, CHANGE_ORDINAL_COLUMN_NAME)
 
     val allColumns = df.columns
 
@@ -386,32 +411,34 @@ private object DebeziumEventConverter {
     val newColumnOrder = remainingColumns ++ colsToMove
 
     // Reorder DataFrame by selecting columns in the new order
-    val reorderedDF = df.select(newColumnOrder.head, newColumnOrder.tail: _*)
+    val reorderedDF = df.select(newColumnOrder.head, newColumnOrder.tail.toIndexedSeq: _*)
 
     reorderedDF
   }
 
-  private val COMMIT_TYPE_COLUMN_NAME = "__commit_event"
-  private val COMMIT_TIMESTAMP_COLUMN_NAME = "__event_timestamp"
+  private def CHANGE_TYPE_COLUMN_NAME = Environment.cdcChangeTypeColumnName
+  private def COMMIT_TIMESTAMP_COLUMN_NAME = Environment.cdcCommitTimestampColumnName
+  private def CHANGE_ORDINAL_COLUMN_NAME = Environment.cdcChangeOrdinalColumnName
   private def extractCdcEvents(df: DataFrame): DataFrame = {
 
     val updateBeforeDf = df.filter(col("op") === "u")
       .withColumn("event_data", col("before"))
-      .withColumn(COMMIT_TYPE_COLUMN_NAME, lit("update_preimage"))
+      .withColumn(CHANGE_TYPE_COLUMN_NAME, lit(CdcChangeType.updatePreimage))
 
     val updateAfterDf = df.filter(col("op") === "u")
       .withColumn("event_data", col("after"))
-      .withColumn(COMMIT_TYPE_COLUMN_NAME, lit("update_postimage"))
+      .withColumn(CHANGE_TYPE_COLUMN_NAME, lit(CdcChangeType.updatePostimage))
 
     val otherOperationsDf = df.filter(col("op") =!= "u")
       .withColumn("event_data", coalesce(col("after"), col("before")))
-      .withColumn(COMMIT_TYPE_COLUMN_NAME,
-        when(col("op") === "c", lit("create"))
-          .when(col("op") === "d", lit("delete"))
-          .otherwise(lit("read")))
+      .withColumn(CHANGE_TYPE_COLUMN_NAME,
+        when(col("op") === "c", lit(CdcChangeType.insert))
+          .when(col("op") === "d", lit(CdcChangeType.delete))
+          .otherwise(lit(CdcChangeType.read)))
 
     val unionDf = updateBeforeDf.union(updateAfterDf).union(otherOperationsDf)
-      .withColumn(COMMIT_TIMESTAMP_COLUMN_NAME, from_unixtime(col("source.ts_ms") / 1000).cast(TimestampType))
+      // note that from_unixtime would lose the milliseconds of the commit timestamp
+      .withColumn(COMMIT_TIMESTAMP_COLUMN_NAME, timestamp_millis(col("source.ts_ms")))
       .drop("before", "after", "source", "op", "ts_ms", "ts_us", "ts_ns", "transaction")
 
     reorderCdcColumns(flattenDebeziumDf(unionDf))

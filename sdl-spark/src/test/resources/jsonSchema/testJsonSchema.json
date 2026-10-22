@@ -1,0 +1,146 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "testSchema",
+  "type": "object",
+  "additionalProperties": false,
+  "title": "Root schema.",
+  "description": "schema.json for testing schema converter",
+  "name": "/",
+  "properties": {
+    "object": {
+      "id": "testSchema/object",
+      "type": "object",
+      "additionalProperties": false,
+      "title": "Test object schema.",
+      "name": "object",
+      "properties": {
+        "item1": {
+          "id": "testSchema/object/item1",
+          "type": "string",
+          "title": "Test item 1 schema.",
+          "name": "item1"
+        },
+        "item2": {
+          "id": "testSchema/object/item2",
+          "type": "string",
+          "title": "Test item 2 schema.",
+          "name": "item2"
+        }
+      }
+    },
+    "array": {
+      "id": "testSchema/array",
+      "type": "array",
+      "title": "Test array schema.",
+      "name": "array",
+      "items": {
+        "id": "testSchema/array/0",
+        "type": "object",
+        "additionalProperties": true,
+        "title": "Test 0 schema.",
+        "name": "0",
+        "properties": {
+          "itemProperty1": {
+            "id": "testSchema/array/0/itemProperty1",
+            "type": "string",
+            "title": "Test item property 1 schema.",
+            "name": "itemProperty1"
+          },
+          "itemProperty2": {
+            "id": "testSchema/array/0/itemProperty2",
+            "type": "number",
+            "title": "Test item property 2 schema.",
+            "name": "itemProperty2"
+          }
+        }
+      }
+    },
+    "structure": {
+      "id": "testSchema/structure",
+      "type": "object",
+      "additionalProperties": false,
+      "title": "Test structure schema.",
+      "name": "structure",
+      "properties": {
+        "nestedArray": {
+          "id": "testSchema/structure/nestedArray",
+          "type": "array",
+          "title": "Test nested array schema.",
+          "name": "nestedArray",
+          "items": {
+            "id": "testSchema/structure/nestedArray/0",
+            "type": "object",
+            "additionalProperties": false,
+            "title": "Test 0 schema.",
+            "name": "0",
+            "properties": {
+              "key": {
+                "id": "testSchema/structure/nestedArray/0/key",
+                "type": "string",
+                "title": "Test nested array key schema.",
+                "name": "key",
+                "enum": [
+                  "KEY1",
+                  "KEY2"
+                ]
+              },
+              "value": {
+                "id": "testSchema/structure/nestedArray/0/value",
+                "type": "integer",
+                "title": "Test nested array value schema.",
+                "name": "value"
+              }
+            }
+          }
+        }
+      }
+    },
+    "integer": {
+      "id": "testSchema/integer",
+      "type": "integer",
+      "title": "Test integer schema.",
+      "name": "integer"
+    },
+    "string": {
+      "id": "testSchema/string",
+      "type": "string",
+      "title": "Test string schema.",
+      "name": "string"
+    },
+    "number": {
+      "id": "testSchema/number",
+      "type": "number",
+      "title": "Test number schema.",
+      "name": "number"
+    },
+    "floatRequired": {
+      "id": "testSchema/float",
+      "type": "float",
+      "title": "Test float schema.",
+      "name": "floatRequired"
+    },
+    "nullable": {
+      "id": "testSchema/nullable",
+      "type": ["number", "null"],
+      "title": "Test nullable schema, overriding required",
+      "name": "nullable"
+    },
+    "boolean": {
+      "id": "testSchema/booleanWithComment",
+      "type": "boolean",
+      "title": "Test boolean schema.",
+      "description": "todo",
+      "name": "booleanWithComment"
+    },
+    "additionalProperty": {
+      "id": "testSchema/additionalProperty",
+      "type": "string",
+      "title": "Test additional property schema",
+      "name": "additionalProperty"
+    }
+  },
+  "required": [
+    "floatRequired",
+    "nullable"
+  ]
+}

@@ -1,0 +1,190 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+package io.smartdatalake.util.spark.json
+
+import com.jayway.jsonpath.{Configuration, JsonPath}
+import com.typesafe.config.{Config, ConfigRenderOptions}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.{DateUtil, ProductUtil}
+import io.smartdatalake.workflow.action.RuntimeEventState
+import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
+import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
+import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
+import org.apache.spark.sql.types._
+import org.apache.spark.util.Json4sCompat
+import org.json4s.Extraction.decompose
+import org.json4s.JsonAST._
+import org.json4s.ext.EnumNameSerializer
+import org.json4s.jackson.{JsonMethods, Serialization, compactJson}
+import org.json4s.{Formats, JField, JInt, JObject, JString, JValue, TypeHints}
+
+import java.sql.Timestamp
+import java.time.{Duration, LocalDate, LocalDateTime, OffsetDateTime}
+import scala.util.Try
+
+object JsonUtils {
+
+  /**
+   * Convert a Json value to Json String
+   */
+  def jsonToString(json: JValue)(implicit formats: Formats): String =
+    JsonMethods.compact(json)
+
+  /**
+   * Convert a case class to a Json String
+   */
+  def caseClassToJsonString(instance: AnyRef)(implicit formats: Formats): String =
+    Serialization.write(instance)
+
+  /**
+   * Convert a Hocon config to a Json String
+   */
+  def configToJsonString(config: Config): String =
+    config.root().render(ConfigRenderOptions.concise())
+
+  /**
+   * Convert a Json4s JObject into a Scala Map using a given MapType.
+   */
+  def convertObjectToMap(obj: JObject, dataType: MapType): Map[String, _] =
+    obj.obj.map {
+      case (k, v) => (k, convertToCatalyst(v, dataType.valueType))
+    }.toMap
+
+  /**
+   * Convert a Json4s JObject into InternalRows using a given Schema. InternalRows can be used to
+   * create an RDD/DataFrame very efficiently.
+   */
+  def convertObjectToCatalyst(obj: JObject, schema: StructType): InternalRow = {
+    val row = new GenericInternalRow(schema.length)
+    schema.zipWithIndex.foreach {
+      case (field, idx) => row.update(idx, convertToCatalyst(obj \ field.name, field.dataType))
+    }
+    row
+  }
+
+  /**
+   * Convert a Product (including nested JValues) into InternalRows using a given Schema.
+   * InternalRows can be used to create an RDD/DataFrame very efficiently.
+   */
+  def convertProductToCatalyst(x: Product, schema: StructType): InternalRow = {
+    val row = new GenericInternalRow(schema.length)
+    val values = ProductUtil.attributesWithValuesForCaseClass(x).toMap
+    schema.zipWithIndex.foreach {
+      case (field, idx) => row.update(idx, convertToCatalyst(values.get(field.name).orElse(null), field.dataType))
+    }
+    row
+  }
+
+  private def convertToCatalyst(value: Any, dataType: DataType): Any = {
+    val scalaValue = (value, dataType) match {
+      case (json: JObject, tpe: StructType) => convertObjectToCatalyst(json, tpe)
+      case (json: JObject, tpe: MapType)    => convertObjectToMap(json, tpe)
+      case (json: JArray, tpe: ArrayType)   => json.arr.map(convertToCatalyst(_, tpe.elementType))
+      case (json: JString, StringType)      => json.s
+      case (json: JLong, LongType)          => json.num
+      case (json: JLong, IntegerType)       => json.num.toInt
+      case (json: JInt, LongType)           => json.num.toLong
+      case (json: JInt, IntegerType)        => json.num.toInt
+      case (json: JInt, _: DecimalType)     => BigDecimal(json.num)
+      case (json: JDecimal, _: DecimalType) => json.num
+      case (json: JDecimal, DoubleType)     => json.num.toDouble
+      case (json: JDouble, _: DecimalType)  => BigDecimal(json.num)
+      case (json: JDouble, DoubleType)      => json.num
+      case (json: JDouble, FloatType)       => json.num.toFloat
+      case (json: JBool, BooleanType)       => json.value
+      case (json: JString, TimestampType)   =>
+        Try(OffsetDateTime.parse(json.s).toInstant).toOption
+          .getOrElse(Timestamp.valueOf(LocalDateTime.parse(json.s)))
+      case (json: JString, TimestampNTZType) => LocalDateTime.parse(json.s)
+      case (json: JString, DateType)         => LocalDate.parse(json.s)
+      case (x: Product, tpe: StructType)     => convertProductToCatalyst(x, tpe)
+      case (x: JValue, StringType)           => compactJson(x)
+      case (x: Any, StringType)              => x.toString
+      case (JNothing | JNull | null, _)      => null
+    }
+    CatalystTypeConverters.convertToCatalyst(scalaValue)
+  }
+
+  /**
+   * Evaluate a JsonPath expression on a Json4s json tree.
+   */
+  def evaluateJsonPath(json: JValue, jsonPath: String): JValue = {
+    val jsonPathExpr = JsonPath.compile(jsonPath)
+    jsonPathExpr.read(json, jsonPathConfig)
+  }
+
+  private[smartdatalake] val jsonPathConfig =
+    Configuration.builder.jsonProvider(new Json4sJsonPathProvider()).mappingProvider(new DummyMappingProvider).build()
+
+  private val durationSerializer = Json4sCompat.getCustomSerializer[Duration](_ =>
+    (
+      {
+        case json: JString => Duration.parse(json.s)
+        case json: JInt    => Duration.ofSeconds(json.num.toLong)
+      },
+      { case obj: Duration => JString(obj.toString) }
+    )
+  )
+  private val localDateTimeToUtcSerializer = Json4sCompat.getCustomSerializer[LocalDateTime](_ =>
+    (
+      {
+        case json: JString => DateUtil.parseDateTimeToLocalDateTime(json.s)
+      },
+      {
+        case obj: LocalDateTime => JString(DateUtil.convertLocalDateTimeToUtcISOString(obj))
+      }
+    )
+  )
+  private val actionIdKeySerializer = Json4sCompat.getCustomKeySerializer[ActionId](_ =>
+    (
+      { case s: String => ActionId(s) },
+      { case obj: ActionId => obj.id }
+    )
+  )
+  private val dataObjectIdKeySerializer = Json4sCompat.getCustomKeySerializer[DataObjectId](_ =>
+    (
+      { case s: String => DataObjectId(s) },
+      { case obj: DataObjectId => obj.id }
+    )
+  )
+  private val dataObjectIdSerializer = Json4sCompat.getCustomSerializer[DataObjectId](_ =>
+    (
+      { case json: JString => DataObjectId(json.s) },
+      { case obj: DataObjectId => JString(obj.id) }
+    )
+  )
+  private val runtimeEventStateKeySerializer = Json4sCompat.getCustomKeySerializer[RuntimeEventState](_ =>
+    (
+      { case s: String => RuntimeEventState.withName(s) },
+      { case obj: RuntimeEventState => obj.toString }
+    )
+  )
+  private val partitionValuesSerializer = Json4sCompat.getCustomSerializer[PartitionValues](implicit formats =>
+    (
+      { case json: JObject => PartitionValues(json.values) },
+      { case obj: PartitionValues => JObject(obj.elements.map(e => JField(e._1, decompose(e._2))).toList) }
+    )
+  )
+
+  def getFormats(typeHints: TypeHints): Formats = Serialization.formats(typeHints) + new EnumNameSerializer(RuntimeEventState) +
+    actionIdKeySerializer + dataObjectIdKeySerializer + dataObjectIdSerializer + durationSerializer + localDateTimeToUtcSerializer +
+    runtimeEventStateKeySerializer + partitionValuesSerializer
+
+}

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@ import configs.ConfigReader
  * A factory object that fulfils the contract for a static factory method that parses (case) classes from [[Config]]s.
  *
  * This trait is (usually) implemented by companion objects of SDL config objects (DataObjects, Actions, ...).
+ * [[ConfigParser]] finds the companion object by reflection and invokes its `fromConfig` method.
  *
  * @see [[ParsableFromConfig]]
  *

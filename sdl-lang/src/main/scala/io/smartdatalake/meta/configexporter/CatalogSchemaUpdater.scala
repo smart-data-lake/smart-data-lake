@@ -1,0 +1,243 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+package io.smartdatalake.meta.configexporter
+
+import io.smartdatalake.app.SmartDataLakeBuilderConfig
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.exporter.{ColumnDescriptionParser, ExportWriter}
+import io.smartdatalake.config.{ConfigToolbox, ConfigurationException}
+import io.smartdatalake.util.misc._
+import io.smartdatalake.workflow.action.{Action, SDLExecutionId}
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.{CatalogMetadataApplier, CatalogMetadataChanges, TableDataObject}
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import org.apache.hadoop.conf.Configuration
+import scopt.OptionParser
+
+import java.time.LocalDateTime
+import scala.annotation.tailrec
+
+/**
+ * What CatalogSchemaUpdater should do.
+ */
+object UpdaterMode extends Enumeration {
+  type UpdaterMode = Value
+
+  /**
+   * Only report the changes which would be applied, without changing the catalog.
+   */
+  val Plan: UpdaterMode = Value("plan")
+
+  /**
+   * Create or update the tables in the catalog: missing tables, schema changes, comments,
+   * primary and foreign keys, and the views.
+   */
+  val Apply: UpdaterMode = Value("apply")
+}
+
+case class CatalogSchemaUpdaterConfig(configPaths: Seq[String] = null,
+                                      mode: UpdaterMode.Value = UpdaterMode.Plan,
+                                      source: Option[String] = None,
+                                      descriptionPath: Option[String] = None,
+                                      includeRegex: String = ".*",
+                                      excludeRegex: Option[String] = None,
+                                      stopOnError: Boolean = true
+                                     )
+
+/**
+ * Create and update the tables defined in the SDLB configuration and in the exported schemas in the catalog.
+ * Views are created or replaced with the query exported by the dry-run, see ViewDataObject.
+ *
+ * This is the deployment time counterpart of an SDLB run with "--test dry-run-with-schema-export", which
+ * exports the schemas this tool reads. Table metadata can only change when the configuration or the code
+ * changes, so it is not written during a normal SDLB run.
+ */
+object CatalogSchemaUpdater extends SmartDataLakeLogger {
+
+  val appType: String = getClass.getSimpleName.replaceAll("\\$$", "") // remove $ from object name and use it as appType
+
+  protected val parser: OptionParser[CatalogSchemaUpdaterConfig] = new OptionParser[CatalogSchemaUpdaterConfig](appType) {
+    override def showUsageOnError: Option[Boolean] = Some(true)
+    opt[String]('c', "config")
+      .required()
+      .action((value, c) => c.copy(configPaths = value.split(',').toIndexedSeq))
+      .text("One or multiple configuration files or directories containing configuration files for SDLB, separated by comma.")
+    opt[String]("mode")
+      .validate(value => if (UpdaterMode.values.exists(_.toString == value)) success
+        else failure(s"mode must be one of ${UpdaterMode.values.mkString("|")}"))
+      .action((value, c) => c.copy(mode = UpdaterMode.withName(value)))
+      .valueName("<plan|apply>")
+      .text("plan: report the changes 'apply' would make, without changing the catalog (default). " +
+        "apply: create and update the tables of the configuration in the catalog, including schema changes, comments, primary and foreign keys, and create or replace the views.")
+    opt[String]("source")
+      .action((value, c) => c.copy(source = Some(value)))
+      .text("Source URI to read exported schemas from. Defaults to global.dataObjectsSchemaSource.")
+    opt[String]('d', "descriptionPath")
+      .action((value, c) => c.copy(descriptionPath = Some(value)))
+      .text("Path of the directory containing the Markdown description files of the DataObjects. Column descriptions defined there with @column are applied as column comments. Defaults to global.descriptionPath.")
+    opt[String]('i', "includeRegex")
+      .action((value, c) => c.copy(includeRegex = value))
+      .text("Regular expression used to include DataObjects, matching DataObject ids. Default: .*")
+    opt[String]('e', "excludeRegex")
+      .action((value, c) => c.copy(excludeRegex = Some(value)))
+      .text("Regular expression used to exclude DataObjects, matching DataObject ids. `excludeRegex` is applied after `includeRegex`. Default: no excludes")
+    opt[String]('s', "stopOnError")
+      .action((value, c) => c.copy(stopOnError = value.toBoolean))
+      .text("If true, processing is stopped as soon as there is an error. Otherwise the error is logged and the next DataObject is processed. Default: true")
+    help("help").text("Create and update the tables of the SDLB configuration in the catalog: missing tables, " +
+      "schema changes, table and column comments, primary and foreign keys, and views. The schemas are read from the files " +
+      "exported by an SDLB run with '--test dry-run-with-schema-export'.")
+  }
+
+  def main(args: Array[String]): Unit = {
+    // Parse all command line arguments
+    parser.parse(args, CatalogSchemaUpdaterConfig()) match {
+      case Some(updaterConfig) =>
+
+        logger.info(s"starting with configuration ${ProductUtil.formatObj(updaterConfig)}")
+        updateCatalog(updaterConfig)
+
+      case None =>
+        logAndThrowException(s"Aborting $appType after error", new ConfigurationException("Couldn't set command line parameters correctly."))
+    }
+  }
+
+  /**
+   * Create and update the tables defined in the configuration and in the exported schemas in the catalog,
+   * or report the changes which would be applied in mode plan.
+   *
+   * The schemas are read from `source`, which defaults to `global.dataObjectsSchemaSource`. They are
+   * created by an SDLB dry-run using "--test dry-run-with-schema-export", so that the schema and the column
+   * comments are available even if the tables do not exist yet in the environment where the dry-run is executed.
+   */
+  def updateCatalog(config: CatalogSchemaUpdaterConfig): Unit = {
+
+    val isPlan = config.mode == UpdaterMode.Plan
+
+    // get DataObjects
+    val (registry, globalConfig) = ConfigToolbox.loadAndParseConfig(config.configPaths)
+    implicit val hadoopConf: Configuration = globalConfig.getHadoopConfiguration
+    val startTime = LocalDateTime.now()
+    implicit val context: ActionPipelineContext = ActionPipelineContext("feedTest", "appTest", SDLExecutionId.executionId1, registry, SmartDataLakeBuilderConfig(appType, Some(appType)), runStartTime = startTime, attemptStartTime = startTime, phase = ExecutionPhase.Init, globalConfig = globalConfig)
+    val dataObjects = registry.getDataObjects
+      .filter(d => d.id.id.matches(config.includeRegex) && (config.excludeRegex.isEmpty || !d.id.id.matches(config.excludeRegex.get)))
+
+    // schemas exported by a previous dry-run, used to create and evolve the tables and to get the column comments
+    val source = config.source.orElse(globalConfig.dataObjectsSchemaSource)
+    val schemaWriter = source.map(ExportWriter.apply(_, config.configPaths, globalConfig.uiBackend.map(_.client), Some(hadoopConf)))
+    if (schemaWriter.isEmpty) logger.warn("Neither --source nor global.dataObjectsSchemaSource is defined," +
+      " no tables will be created and no schema changes and column comments will be applied")
+    def readSchema(dataObjectId: DataObjectId): Option[GenericSchema] =
+      schemaWriter.flatMap(_.readLatestSchema(dataObjectId)).map(ExportWriter.parseSchema(_)._1)
+    def readViewQuery(dataObjectId: DataObjectId): Option[String] =
+      schemaWriter.flatMap(_.readLatestSchema(dataObjectId)).flatMap(ExportWriter.parseViewQuery)
+
+    // column descriptions from the Markdown description files override the exported schema comments.
+    // Note that schemas exported with global.descriptionPath already contain them.
+    // The description of an array element, e.g. "addresses.[]", has no column to be set on in the catalog, it would
+    // override the comment of the array column itself.
+    val columnDescriptions = config.descriptionPath.orElse(globalConfig.descriptionPath)
+      .map(path => ColumnDescriptionParser.parse(path)).getOrElse(Map())
+      .map { case (dataObjectId, descriptions) =>
+        dataObjectId -> descriptions.filterNot(_._1.endsWith(".[]"))
+          .map { case (name, d) => ColumnDescriptionParser.toColumnPath(name) -> d }
+      }
+
+    val applier = new CatalogMetadataApplier(readSchema, columnDescriptions, readViewQuery)
+    logger.info(s"${if (isPlan) "Planning" else "Applying"} catalog metadata for ${dataObjects.size} DataObjects")
+
+    def onError(dataObject: DataObject)(ex: Exception): Option[Nothing] = {
+      logger.error(s"(${dataObject.id}) ${ex.getClass.getSimpleName}: ${ex.getMessage}")
+      if (config.stopOnError) throw ex else None
+    }
+
+    // plan all DataObjects
+    val plans = dataObjects.flatMap { dataObject =>
+      try {
+        applier.plan(dataObject).filterNot(_.isEmpty).map(changes => (dataObject, changes))
+      } catch {
+        case ex: Exception => onError(dataObject)(ex)
+      }
+    }
+
+    // a foreign key references a DataObject of the configuration, which is looked up to get the name of the
+    // referenced table, see CanHandleForeignKeys.getReferencedTable. It can only be created if that table
+    // exists with its primary key, which is not guaranteed if the DataObject is not processed in this run.
+    val processedIds = dataObjects.map(_.id).toSet
+    plans.filter { case (_, changes) => changes.hasForeignKeyChanges }.foreach { case (dataObject, _) =>
+      val notProcessed = referencedDataObjectIds(dataObject).filterNot(processedIds.contains)
+      if (notProcessed.nonEmpty) logger.warn(s"(${dataObject.id}) foreign keys reference the DataObjects" +
+        s" ${notProcessed.map(_.id).mkString(", ")}, which are not included in this run. Their tables must already" +
+        " exist with the referenced primary key, otherwise creating the foreign keys will fail.")
+    }
+
+    // apply in three phases: the tables including their primary keys first, then the views reading them, and then the
+    // foreign keys referencing the tables, see CanHandleForeignKeys. The views are applied in the order of the DAG,
+    // as a view can read another view.
+    def applyPhase(describe: CatalogMetadataChanges => Seq[String],
+                   apply: (DataObject, CatalogMetadataChanges) => Unit,
+                   order: Seq[(DataObject, CatalogMetadataChanges)] => Seq[(DataObject, CatalogMetadataChanges)] = identity): Seq[DataObjectId] = {
+      order(plans.filter { case (_, changes) => describe(changes).nonEmpty }).flatMap { case (dataObject, changes) =>
+        try {
+          logger.info(s"(${dataObject.id}) ${if (isPlan) "would apply" else "applying"}:\n  ${describe(changes).mkString("\n  ")}")
+          if (!isPlan) apply(dataObject, changes)
+          Some(dataObject.id)
+        } catch {
+          case ex: Exception => onError(dataObject)(ex)
+        }
+      }
+    }
+    val changedTables = applyPhase(_.describeTableChanges, applier.applyTableChanges)
+    val changedViews = applyPhase(_.describeView, applier.applyView, orderByDependencies(_, registry.getActions))
+    val changedForeignKeys = applyPhase(_.describeForeignKeys, applier.applyForeignKeys)
+
+    val changed = (changedTables ++ changedViews ++ changedForeignKeys).distinct
+    if (changed.isEmpty) logger.info("Catalog metadata is up to date, nothing to apply")
+    else logger.info(s"${if (isPlan) "Would change" else "Changed"} catalog metadata of ${changed.size} DataObjects: ${changed.map(_.id).mkString(", ")}")
+  }
+
+  /**
+   * Order DataObjects so that each comes after the DataObjects it is created from, i.e. the inputs of the Actions
+   * writing it. This is needed for views reading other views. DataObjects in a cycle keep their order.
+   */
+  private[configexporter] def orderByDependencies[T](elements: Seq[(DataObject, T)], actions: Seq[Action]): Seq[(DataObject, T)] = {
+    val ids = elements.map(_._1.id).toSet
+    val dependencies = elements.map { case (dataObject, _) =>
+      dataObject.id -> actions.filter(_.outputs.exists(_.id == dataObject.id)).flatMap(_.inputs.map(_.id)).filter(ids.contains).toSet
+    }.toMap
+    @tailrec
+    def order(remaining: Seq[(DataObject, T)], done: Seq[(DataObject, T)]): Seq[(DataObject, T)] = {
+      val doneIds = done.map(_._1.id).toSet
+      val (ready, notReady) = remaining.partition { case (dataObject, _) => (dependencies(dataObject.id) - dataObject.id).subsetOf(doneIds) }
+      if (notReady.isEmpty) done ++ ready
+      else if (ready.isEmpty) done ++ notReady // cycle
+      else order(notReady, done ++ ready)
+    }
+    order(elements, Seq())
+  }
+
+  /**
+   * The DataObjects referenced by the foreign keys defined in the configuration of a DataObject.
+   */
+  private def referencedDataObjectIds(dataObject: DataObject): Seq[DataObjectId] = dataObject match {
+    case tableDataObject: TableDataObject => tableDataObject.table.foreignKeys.toSeq.flatten.map(_.dataObjectId)
+    case _ => Seq()
+  }
+}

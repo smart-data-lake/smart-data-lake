@@ -1,0 +1,1015 @@
+{
+  "configuration" : { },
+  "description" : "Description",
+  "documentation" : { },
+  "id" : 1,
+  "lastModifiedAgent" : "structurizr/diagrams/60409451-135d-45f4-94a0-871a98ae66a1",
+  "lastModifiedDate" : "2026-10-02T12:41:11Z",
+  "lastModifiedUser" : "1372036768",
+  "model" : {
+    "customElements" : [ {
+      "description" : "Main and Environment config files",
+      "id" : "2",
+      "metadata" : "Hocon",
+      "name" : "Config Files",
+      "properties" : {
+        "structurizr.dsl.identifier" : "config"
+      },
+      "tags" : "Element,folder"
+    }, {
+      "description" : "Parsed and resolved Config as one Json-file",
+      "id" : "3",
+      "metadata" : "Json",
+      "name" : "Config Export",
+      "properties" : {
+        "structurizr.dsl.identifier" : "parsedConfig"
+      },
+      "tags" : "Element,file"
+    }, {
+      "description" : "State of SDLB Jobs stored as Json Files",
+      "id" : "4",
+      "metadata" : "Json",
+      "name" : "State Files",
+      "properties" : {
+        "structurizr.dsl.identifier" : "state"
+      },
+      "tags" : "Element,folder"
+    }, {
+      "description" : "Data that is read and written by SDLB Jobs, accessed through DataObjects",
+      "id" : "5",
+      "metadata" : "Many formats and technologies",
+      "name" : "Data",
+      "properties" : {
+        "structurizr.dsl.identifier" : "data"
+      },
+      "tags" : "Element,database"
+    }, {
+      "description" : "Tables, views, comments, primary and foreign keys",
+      "id" : "6",
+      "metadata" : "Metastore, Unity Catalog, Database",
+      "name" : "Catalog",
+      "properties" : {
+        "structurizr.dsl.identifier" : "catalog"
+      },
+      "tags" : "Element,database"
+    }, {
+      "description" : "Schemas, statistics and column lineage of DataObjects, exported by dry-runs and the Schema Exporter",
+      "id" : "7",
+      "metadata" : "Json",
+      "name" : "Schemas, Statistics and Lineage",
+      "properties" : {
+        "structurizr.dsl.identifier" : "schemas"
+      },
+      "tags" : "Element,folder"
+    } ],
+    "people" : [ {
+      "id" : "1",
+      "name" : "User or System",
+      "properties" : {
+        "structurizr.dsl.identifier" : "user"
+      },
+      "relationships" : [ {
+        "description" : "launches",
+        "destinationId" : "10",
+        "id" : "53",
+        "sourceId" : "1",
+        "tags" : "Relationship"
+      }, {
+        "description" : "launches",
+        "destinationId" : "9",
+        "id" : "54",
+        "linkedRelationshipId" : "53",
+        "sourceId" : "1"
+      }, {
+        "description" : "launches",
+        "destinationId" : "50",
+        "id" : "55",
+        "sourceId" : "1",
+        "tags" : "Relationship"
+      }, {
+        "description" : "launches",
+        "destinationId" : "51",
+        "id" : "56",
+        "sourceId" : "1",
+        "tags" : "Relationship"
+      }, {
+        "description" : "launches on deployment",
+        "destinationId" : "52",
+        "id" : "57",
+        "sourceId" : "1",
+        "tags" : "Relationship"
+      } ],
+      "tags" : "Element,Person"
+    } ],
+    "softwareSystems" : [ {
+      "description" : "Visualizes configuration, lineage and runs (sdl-visualization)",
+      "documentation" : { },
+      "id" : "8",
+      "name" : "SDLB UI",
+      "properties" : {
+        "structurizr.dsl.identifier" : "ui"
+      },
+      "relationships" : [ {
+        "description" : "visualizes",
+        "destinationId" : "3",
+        "id" : "79",
+        "sourceId" : "8",
+        "tags" : "Relationship"
+      }, {
+        "description" : "visualizes",
+        "destinationId" : "4",
+        "id" : "80",
+        "sourceId" : "8",
+        "tags" : "Relationship"
+      }, {
+        "description" : "visualizes",
+        "destinationId" : "7",
+        "id" : "81",
+        "sourceId" : "8",
+        "tags" : "Relationship"
+      } ],
+      "tags" : "Element,Software System,external"
+    }, {
+      "containers" : [ {
+        "components" : [ {
+          "description" : "is responsible to parse the config files and translate them into Scala case classes.",
+          "documentation" : { },
+          "id" : "11",
+          "name" : "Config Parser",
+          "properties" : {
+            "structurizr.dsl.identifier" : "configParser"
+          },
+          "relationships" : [ {
+            "description" : "uses",
+            "destinationId" : "20",
+            "id" : "49",
+            "sourceId" : "11",
+            "tags" : "Relationship"
+          }, {
+            "description" : "reads",
+            "destinationId" : "2",
+            "id" : "58",
+            "sourceId" : "11",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component"
+        }, {
+          "description" : "define the transformation between DataObjects",
+          "documentation" : { },
+          "group" : "Top-level Configuration Objects",
+          "id" : "12",
+          "name" : "Actions",
+          "properties" : {
+            "structurizr.dsl.identifier" : "actions"
+          },
+          "relationships" : [ {
+            "description" : "read/write",
+            "destinationId" : "13",
+            "id" : "37",
+            "sourceId" : "12",
+            "tags" : "Relationship"
+          }, {
+            "description" : "apply",
+            "destinationId" : "17",
+            "id" : "38",
+            "sourceId" : "12",
+            "tags" : "Relationship"
+          }, {
+            "description" : "applies",
+            "destinationId" : "16",
+            "id" : "39",
+            "sourceId" : "12",
+            "tags" : "Relationship"
+          }, {
+            "description" : "select engine by",
+            "destinationId" : "14",
+            "id" : "40",
+            "sourceId" : "12",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component,extendable"
+        }, {
+          "description" : "define the location and format of data",
+          "documentation" : { },
+          "group" : "Top-level Configuration Objects",
+          "id" : "13",
+          "name" : "DataObjects",
+          "properties" : {
+            "structurizr.dsl.identifier" : "dataObjects"
+          },
+          "relationships" : [ {
+            "description" : "use",
+            "destinationId" : "14",
+            "id" : "41",
+            "sourceId" : "13",
+            "tags" : "Relationship"
+          }, {
+            "description" : "validates",
+            "destinationId" : "19",
+            "id" : "42",
+            "sourceId" : "13",
+            "tags" : "Relationship"
+          }, {
+            "description" : "applies",
+            "destinationId" : "21",
+            "id" : "43",
+            "sourceId" : "13",
+            "tags" : "Relationship"
+          }, {
+            "description" : "reads/writes",
+            "destinationId" : "5",
+            "id" : "67",
+            "sourceId" : "13",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component,extendable"
+        }, {
+          "description" : "Some DataObjects require a Connection to access remote data. Engine connections select and configure the execution engine of an Action.",
+          "documentation" : { },
+          "group" : "Top-level Configuration Objects",
+          "id" : "14",
+          "name" : "Connections",
+          "properties" : {
+            "structurizr.dsl.identifier" : "connections"
+          },
+          "relationships" : [ {
+            "description" : "use",
+            "destinationId" : "18",
+            "id" : "44",
+            "sourceId" : "14",
+            "tags" : "Relationship"
+          }, {
+            "description" : "configure",
+            "destinationId" : "22",
+            "id" : "45",
+            "sourceId" : "14",
+            "tags" : "Relationship"
+          }, {
+            "description" : "configure",
+            "destinationId" : "23",
+            "id" : "46",
+            "sourceId" : "14",
+            "tags" : "Relationship"
+          }, {
+            "description" : "configure",
+            "destinationId" : "24",
+            "id" : "47",
+            "sourceId" : "14",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component,extendable"
+        }, {
+          "description" : "Executes a set of Actions as a `Directed Acyclic Graph`, which is executed by the SDLB Job. Independent Actions are executed in parallel according to the `parallelism` cmd line option.",
+          "documentation" : { },
+          "group" : "Concepts",
+          "id" : "15",
+          "name" : "DAG",
+          "properties" : {
+            "structurizr.dsl.identifier" : "dag"
+          },
+          "relationships" : [ {
+            "description" : "executes",
+            "destinationId" : "12",
+            "id" : "48",
+            "sourceId" : "15",
+            "tags" : "Relationship"
+          }, {
+            "description" : "uses",
+            "destinationId" : "4",
+            "id" : "61",
+            "sourceId" : "15",
+            "tags" : "Relationship"
+          }, {
+            "description" : "exports in dry-run",
+            "destinationId" : "7",
+            "id" : "64",
+            "sourceId" : "15",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component"
+        }, {
+          "description" : "are responsible to select the data to be processed by the SDLB Job",
+          "documentation" : { },
+          "group" : "Concepts",
+          "id" : "16",
+          "name" : "Execution Mode",
+          "properties" : {
+            "structurizr.dsl.identifier" : "executionMode"
+          },
+          "tags" : "Element,Component,extendable"
+        }, {
+          "description" : "implement the transformation logic of an Action in SQL, Scala or Python",
+          "documentation" : { },
+          "group" : "Concepts",
+          "id" : "17",
+          "name" : "Transformers",
+          "properties" : {
+            "structurizr.dsl.identifier" : "transformers"
+          },
+          "tags" : "Element,Component,extendable"
+        }, {
+          "description" : "are responsible to authenticate with external ressources",
+          "documentation" : { },
+          "group" : "Concepts",
+          "id" : "18",
+          "name" : "Authentication Mode",
+          "properties" : {
+            "structurizr.dsl.identifier" : "authMode"
+          },
+          "tags" : "Element,Component,extendable"
+        }, {
+          "description" : "can be used to ensure Data Quality",
+          "documentation" : { },
+          "group" : "Concepts",
+          "id" : "19",
+          "name" : "Constraints and Expectations",
+          "properties" : {
+            "structurizr.dsl.identifier" : "constraintsExpectations"
+          },
+          "tags" : "Element,Component,extendable"
+        }, {
+          "description" : "are responsible to replace secret values in the configuration using different key stores.",
+          "documentation" : { },
+          "group" : "Concepts",
+          "id" : "20",
+          "name" : "Secret Providers",
+          "properties" : {
+            "structurizr.dsl.identifier" : "secretProviders"
+          },
+          "tags" : "Element,Component,extendable"
+        }, {
+          "description" : "is responsible to cleanup or archive outdated data",
+          "documentation" : { },
+          "group" : "Concepts",
+          "id" : "21",
+          "name" : "Housekeeping Mode",
+          "properties" : {
+            "structurizr.dsl.identifier" : "housekeepingMode"
+          },
+          "tags" : "Element,Component,extendable"
+        }, {
+          "description" : "sdl-spark: Spark DataFrames in a Spark session inside the SDLB Job",
+          "documentation" : { },
+          "group" : "Execution Engines",
+          "id" : "22",
+          "name" : "Spark",
+          "properties" : {
+            "structurizr.dsl.identifier" : "sparkEngine"
+          },
+          "tags" : "Element,Component,engine"
+        }, {
+          "description" : "sdl-sparkconnect: Spark DataFrames on a remote Spark Connect server",
+          "documentation" : { },
+          "group" : "Execution Engines",
+          "id" : "23",
+          "name" : "Spark Connect",
+          "properties" : {
+            "structurizr.dsl.identifier" : "sparkConnectEngine"
+          },
+          "tags" : "Element,Component,engine"
+        }, {
+          "description" : "sdl-sql: SQL statements rendered with SQLGlot and executed in the database",
+          "documentation" : { },
+          "group" : "Execution Engines",
+          "id" : "24",
+          "name" : "SQL",
+          "properties" : {
+            "structurizr.dsl.identifier" : "sqlEngine"
+          },
+          "tags" : "Element,Component,engine"
+        }, {
+          "description" : "sdl-snowflake: Snowpark DataFrames executed in Snowflake",
+          "documentation" : { },
+          "group" : "Execution Engines",
+          "id" : "25",
+          "name" : "Snowpark",
+          "properties" : {
+            "structurizr.dsl.identifier" : "snowparkEngine"
+          },
+          "tags" : "Element,Component,engine"
+        }, {
+          "description" : "sdl-core: lightweight engine without Spark",
+          "documentation" : { },
+          "group" : "Execution Engines",
+          "id" : "26",
+          "name" : "Plain Scala",
+          "properties" : {
+            "structurizr.dsl.identifier" : "scalaEngine"
+          },
+          "tags" : "Element,Component,engine"
+        }, {
+          "description" : "sdl-core: byte streams of files",
+          "documentation" : { },
+          "group" : "Execution Engines",
+          "id" : "27",
+          "name" : "File",
+          "properties" : {
+            "structurizr.dsl.identifier" : "fileEngine"
+          },
+          "tags" : "Element,Component,engine"
+        }, {
+          "description" : "sdl-deltalake: Spark implementation of DeltaLakeTableDataObject",
+          "documentation" : { },
+          "group" : "Connector Modules",
+          "id" : "28",
+          "name" : "Delta Lake",
+          "properties" : {
+            "structurizr.dsl.identifier" : "771f7f90-d3e6-461a-8fc3-63d1a412ee18"
+          },
+          "tags" : "Element,Component,connector"
+        }, {
+          "description" : "sdl-iceberg: Spark implementation of IcebergTableDataObject",
+          "documentation" : { },
+          "group" : "Connector Modules",
+          "id" : "29",
+          "name" : "Iceberg",
+          "properties" : {
+            "structurizr.dsl.identifier" : "573b8af9-ff91-4c23-9d7d-909473bf1cd2"
+          },
+          "tags" : "Element,Component,connector"
+        }, {
+          "description" : "sdl-kafka: KafkaTopicDataObject",
+          "documentation" : { },
+          "group" : "Connector Modules",
+          "id" : "30",
+          "name" : "Kafka",
+          "properties" : {
+            "structurizr.dsl.identifier" : "500a0a7d-70f2-4831-9f0b-ce6f309d7ec5"
+          },
+          "tags" : "Element,Component,connector"
+        }, {
+          "description" : "sdl-debezium: DebeziumCdcDataObject for change data capture",
+          "documentation" : { },
+          "group" : "Connector Modules",
+          "id" : "31",
+          "name" : "Debezium",
+          "properties" : {
+            "structurizr.dsl.identifier" : "4eab288b-26ac-4a3f-91fb-ec3fb5bda5b6"
+          },
+          "tags" : "Element,Component,connector"
+        }, {
+          "description" : "sdl-snowflake: SnowflakeTableDataObject",
+          "documentation" : { },
+          "group" : "Connector Modules",
+          "id" : "32",
+          "name" : "Snowflake",
+          "properties" : {
+            "structurizr.dsl.identifier" : "5eae579f-d253-426f-8ade-a7508048d5e6"
+          },
+          "tags" : "Element,Component,connector"
+        }, {
+          "description" : "sdl-azure: helpers to access Azure ressources like LogAnalytics",
+          "documentation" : { },
+          "group" : "Connector Modules",
+          "id" : "33",
+          "name" : "Azure",
+          "properties" : {
+            "structurizr.dsl.identifier" : "5c5c7431-fd34-4223-88be-3b71d371ea0a"
+          },
+          "tags" : "Element,Component,connector"
+        }, {
+          "description" : "sdl-gcp: BigQueryTableDataObject",
+          "documentation" : { },
+          "group" : "Connector Modules",
+          "id" : "34",
+          "name" : "Google Cloud",
+          "properties" : {
+            "structurizr.dsl.identifier" : "a23947f7-ec9e-48f9-92a2-efac3515c105"
+          },
+          "tags" : "Element,Component,connector"
+        }, {
+          "description" : "is a hook to add additional startup or shutdown logic, like dynamic log configuration.",
+          "documentation" : { },
+          "group" : "Customization Hooks",
+          "id" : "35",
+          "name" : "Init Plugin",
+          "properties" : {
+            "structurizr.dsl.identifier" : "initPlugin"
+          },
+          "tags" : "Element,Component,extendable"
+        }, {
+          "description" : "is a hook to recieve and distribute state updates, e.g. writing it to separate tables for reporting.",
+          "documentation" : { },
+          "group" : "Customization Hooks",
+          "id" : "36",
+          "name" : "State Listeners",
+          "properties" : {
+            "structurizr.dsl.identifier" : "stateListener"
+          },
+          "tags" : "Element,Component,extendable"
+        } ],
+        "documentation" : { },
+        "id" : "10",
+        "name" : "SDLB Job",
+        "properties" : {
+          "structurizr.dsl.identifier" : "sdlbJob"
+        },
+        "relationships" : [ {
+          "description" : "reads",
+          "destinationId" : "2",
+          "id" : "59",
+          "linkedRelationshipId" : "58",
+          "sourceId" : "10"
+        }, {
+          "description" : "uses",
+          "destinationId" : "4",
+          "id" : "62",
+          "linkedRelationshipId" : "61",
+          "sourceId" : "10"
+        }, {
+          "description" : "exports in dry-run",
+          "destinationId" : "7",
+          "id" : "65",
+          "linkedRelationshipId" : "64",
+          "sourceId" : "10"
+        }, {
+          "description" : "reads/writes",
+          "destinationId" : "5",
+          "id" : "68",
+          "linkedRelationshipId" : "67",
+          "sourceId" : "10"
+        } ],
+        "tags" : "Element,Container",
+        "technology" : "Java, Scala"
+      }, {
+        "description" : "Helper command line tool to parse and export a given configuration",
+        "documentation" : { },
+        "id" : "50",
+        "name" : "Config Exporter",
+        "properties" : {
+          "structurizr.dsl.identifier" : "configExporter"
+        },
+        "relationships" : [ {
+          "description" : "reads",
+          "destinationId" : "2",
+          "id" : "70",
+          "sourceId" : "50",
+          "tags" : "Relationship"
+        }, {
+          "description" : "write",
+          "destinationId" : "3",
+          "id" : "71",
+          "sourceId" : "50",
+          "tags" : "Relationship"
+        } ],
+        "tags" : "Element,Container,helper"
+      }, {
+        "description" : "Helper command line tool to export DataObject schemas and statistics",
+        "documentation" : { },
+        "id" : "51",
+        "name" : "Schema Exporter",
+        "properties" : {
+          "structurizr.dsl.identifier" : "schemaExporter"
+        },
+        "relationships" : [ {
+          "description" : "reads",
+          "destinationId" : "2",
+          "id" : "73",
+          "sourceId" : "51",
+          "tags" : "Relationship"
+        }, {
+          "description" : "write",
+          "destinationId" : "7",
+          "id" : "74",
+          "sourceId" : "51",
+          "tags" : "Relationship"
+        } ],
+        "tags" : "Element,Container,helper"
+      }, {
+        "description" : "Helper command line tool to create and evolve tables and views, and apply comments and keys at deploy time",
+        "documentation" : { },
+        "id" : "52",
+        "name" : "Catalog Schema Updater",
+        "properties" : {
+          "structurizr.dsl.identifier" : "catalogUpdater"
+        },
+        "relationships" : [ {
+          "description" : "reads",
+          "destinationId" : "2",
+          "id" : "75",
+          "sourceId" : "52",
+          "tags" : "Relationship"
+        }, {
+          "description" : "reads",
+          "destinationId" : "7",
+          "id" : "76",
+          "sourceId" : "52",
+          "tags" : "Relationship"
+        }, {
+          "description" : "creates/updates",
+          "destinationId" : "6",
+          "id" : "77",
+          "sourceId" : "52",
+          "tags" : "Relationship"
+        } ],
+        "tags" : "Element,Container,helper"
+      } ],
+      "documentation" : { },
+      "id" : "9",
+      "name" : "SmartDataLakeBuilder",
+      "properties" : {
+        "structurizr.dsl.identifier" : "sdlb"
+      },
+      "relationships" : [ {
+        "description" : "reads",
+        "destinationId" : "2",
+        "id" : "60",
+        "linkedRelationshipId" : "58",
+        "sourceId" : "9"
+      }, {
+        "description" : "uses",
+        "destinationId" : "4",
+        "id" : "63",
+        "linkedRelationshipId" : "61",
+        "sourceId" : "9"
+      }, {
+        "description" : "exports in dry-run",
+        "destinationId" : "7",
+        "id" : "66",
+        "linkedRelationshipId" : "64",
+        "sourceId" : "9"
+      }, {
+        "description" : "reads/writes",
+        "destinationId" : "5",
+        "id" : "69",
+        "linkedRelationshipId" : "67",
+        "sourceId" : "9"
+      }, {
+        "description" : "write",
+        "destinationId" : "3",
+        "id" : "72",
+        "linkedRelationshipId" : "71",
+        "sourceId" : "9"
+      }, {
+        "description" : "creates/updates",
+        "destinationId" : "6",
+        "id" : "78",
+        "linkedRelationshipId" : "77",
+        "sourceId" : "9"
+      } ],
+      "tags" : "Element,Software System"
+    } ]
+  },
+  "name" : "Name",
+  "properties" : {
+    "structurizr.inspection.info" : "0",
+    "structurizr.inspection.ignore" : "0",
+    "structurizr.inspection.error" : "68",
+    "structurizr.inspection.warning" : "0"
+  },
+  "views" : {
+    "componentViews" : [ {
+      "containerId" : "10",
+      "dimensions" : {
+        "height" : 4622,
+        "width" : 5475
+      },
+      "elements" : [ {
+        "id" : "2",
+        "x" : 435,
+        "y" : 215
+      }, {
+        "id" : "4",
+        "x" : 2095,
+        "y" : 215
+      }, {
+        "id" : "5",
+        "x" : 2369,
+        "y" : 3765
+      }, {
+        "id" : "7",
+        "x" : 2770,
+        "y" : 215
+      }, {
+        "id" : "11",
+        "x" : 435,
+        "y" : 760
+      }, {
+        "id" : "12",
+        "x" : 2369,
+        "y" : 1136
+      }, {
+        "id" : "13",
+        "x" : 2369,
+        "y" : 1850
+      }, {
+        "id" : "14",
+        "x" : 1744,
+        "y" : 1505
+      }, {
+        "id" : "15",
+        "x" : 2369,
+        "y" : 761
+      }, {
+        "id" : "16",
+        "x" : 3114,
+        "y" : 1344
+      }, {
+        "id" : "17",
+        "x" : 3114,
+        "y" : 969
+      }, {
+        "id" : "18",
+        "x" : 1110,
+        "y" : 1505
+      }, {
+        "id" : "19",
+        "x" : 3114,
+        "y" : 2064
+      }, {
+        "id" : "20",
+        "x" : 1110,
+        "y" : 761
+      }, {
+        "id" : "21",
+        "x" : 3114,
+        "y" : 1709
+      }, {
+        "id" : "22",
+        "x" : 874,
+        "y" : 2595
+      }, {
+        "id" : "23",
+        "x" : 1415,
+        "y" : 2595
+      }, {
+        "id" : "24",
+        "x" : 1955,
+        "y" : 2595
+      }, {
+        "id" : "25",
+        "x" : 874,
+        "y" : 2960
+      }, {
+        "id" : "26",
+        "x" : 1415,
+        "y" : 2960
+      }, {
+        "id" : "27",
+        "x" : 1955,
+        "y" : 2960
+      }, {
+        "id" : "28",
+        "x" : 3765,
+        "y" : 761
+      }, {
+        "id" : "29",
+        "x" : 3765,
+        "y" : 1131
+      }, {
+        "id" : "30",
+        "x" : 3765,
+        "y" : 1495
+      }, {
+        "id" : "31",
+        "x" : 3765,
+        "y" : 2215
+      }, {
+        "id" : "32",
+        "x" : 3765,
+        "y" : 2590
+      }, {
+        "id" : "33",
+        "x" : 3765,
+        "y" : 2959
+      }, {
+        "id" : "34",
+        "x" : 3765,
+        "y" : 1850
+      }, {
+        "id" : "35",
+        "x" : 3114,
+        "y" : 2960
+      }, {
+        "id" : "36",
+        "x" : 3114,
+        "y" : 2595
+      } ],
+      "externalContainerBoundariesVisible" : false,
+      "generatedKey" : true,
+      "key" : "Component-001",
+      "name" : "Component View: SmartDataLakeBuilder - SDLB Job",
+      "order" : 2,
+      "relationships" : [ {
+        "id" : "37"
+      }, {
+        "id" : "38"
+      }, {
+        "id" : "39"
+      }, {
+        "id" : "40"
+      }, {
+        "id" : "41"
+      }, {
+        "id" : "42"
+      }, {
+        "id" : "43"
+      }, {
+        "id" : "44"
+      }, {
+        "id" : "45"
+      }, {
+        "id" : "46"
+      }, {
+        "id" : "47"
+      }, {
+        "id" : "48"
+      }, {
+        "id" : "49"
+      }, {
+        "id" : "58"
+      }, {
+        "id" : "61"
+      }, {
+        "id" : "64"
+      }, {
+        "id" : "67"
+      } ],
+      "title" : "Components of an SDLB Job"
+    } ],
+    "configuration" : {
+      "lastSavedView" : "Component-001",
+      "metadataSymbols" : "SquareBrackets",
+      "styles" : {
+        "elements" : [ {
+          "color" : "#438dd5",
+          "tag" : "Boundary:Container"
+        }, {
+          "color" : "#1168bd",
+          "tag" : "Boundary:SoftwareSystem"
+        }, {
+          "background" : "#85bbf0",
+          "color" : "#ffffff",
+          "tag" : "Component"
+        }, {
+          "background" : "#85bb65",
+          "tag" : "connector"
+        }, {
+          "background" : "#438dd5",
+          "color" : "#ffffff",
+          "tag" : "Container"
+        }, {
+          "shape" : "Cylinder",
+          "tag" : "database"
+        }, {
+          "shape" : "RoundedBox",
+          "tag" : "Element"
+        }, {
+          "background" : "#85bb65",
+          "tag" : "engine"
+        }, {
+          "icon" : "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAQAAABKfvVzAAAAqklEQVR4Xr1TQQqDMBCcN/gAv6NPFmzxA/birfRQ0B/UiwHBGishu2MiobQz5LIzQ5LdBPgaOS4Y15VrIYQay8ZaCyFMe2DSQggfu2UEBQbPqDmg1IEnmSR7HZjJovn3wBU3GDJFAhYZKrL5NDz97GSXg+nfySL5kvbEHZLu0KR2SYoGD4pHAtV6OD5gMGA2u4VsgULvhM6rdq5Kr7V0/6H1qu1eO/gPv8QbKcUXn/QX54YAAAAASUVORK5CYII=",
+          "tag" : "extendable"
+        }, {
+          "background" : "#999999",
+          "tag" : "external"
+        }, {
+          "shape" : "Folder",
+          "tag" : "file"
+        }, {
+          "shape" : "Folder",
+          "tag" : "folder"
+        }, {
+          "background" : "#6bc4eb",
+          "tag" : "helper"
+        }, {
+          "background" : "#08427b",
+          "color" : "#ffffff",
+          "shape" : "Person",
+          "tag" : "Person"
+        }, {
+          "background" : "#1168bd",
+          "color" : "#ffffff",
+          "tag" : "Software System"
+        } ]
+      },
+      "terminology" : { }
+    },
+    "containerViews" : [ {
+      "dimensions" : {
+        "height" : 2265,
+        "width" : 4925
+      },
+      "elements" : [ {
+        "id" : "1",
+        "x" : 1765,
+        "y" : 159
+      }, {
+        "id" : "2",
+        "x" : 1993,
+        "y" : 1239
+      }, {
+        "id" : "3",
+        "x" : 1429,
+        "y" : 1239
+      }, {
+        "id" : "4",
+        "x" : 865,
+        "y" : 1239
+      }, {
+        "id" : "5",
+        "x" : 200,
+        "y" : 689
+      }, {
+        "id" : "6",
+        "x" : 3225,
+        "y" : 689
+      }, {
+        "id" : "7",
+        "x" : 2557,
+        "y" : 1239
+      }, {
+        "id" : "8",
+        "x" : 1760,
+        "y" : 1724
+      }, {
+        "id" : "10",
+        "x" : 867,
+        "y" : 689
+      }, {
+        "id" : "50",
+        "x" : 1431,
+        "y" : 689
+      }, {
+        "id" : "51",
+        "x" : 1995,
+        "y" : 689
+      }, {
+        "id" : "52",
+        "x" : 2560,
+        "y" : 689
+      } ],
+      "externalSoftwareSystemBoundariesVisible" : false,
+      "generatedKey" : true,
+      "key" : "Container-001",
+      "name" : "Container View: SmartDataLakeBuilder",
+      "order" : 1,
+      "relationships" : [ {
+        "id" : "53",
+        "vertices" : [ {
+          "x" : 1365,
+          "y" : 559
+        } ]
+      }, {
+        "id" : "55",
+        "vertices" : [ {
+          "x" : 1790,
+          "y" : 579
+        } ]
+      }, {
+        "id" : "56",
+        "vertices" : [ {
+          "x" : 2110,
+          "y" : 614
+        } ]
+      }, {
+        "id" : "57",
+        "vertices" : [ {
+          "x" : 2435,
+          "y" : 524
+        } ]
+      }, {
+        "id" : "59",
+        "vertices" : [ {
+          "x" : 1585,
+          "y" : 1155
+        } ]
+      }, {
+        "id" : "62"
+      }, {
+        "id" : "65",
+        "vertices" : [ {
+          "x" : 1760,
+          "y" : 1135
+        }, {
+          "x" : 2485,
+          "y" : 1205
+        } ]
+      }, {
+        "id" : "68"
+      }, {
+        "id" : "70"
+      }, {
+        "id" : "71"
+      }, {
+        "id" : "73"
+      }, {
+        "id" : "74"
+      }, {
+        "id" : "75"
+      }, {
+        "id" : "76"
+      }, {
+        "id" : "77"
+      }, {
+        "id" : "79"
+      }, {
+        "id" : "80"
+      }, {
+        "id" : "81"
+      } ],
+      "softwareSystemId" : "9",
+      "title" : "Context"
+    } ]
+  }
+}

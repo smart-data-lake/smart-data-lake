@@ -1,0 +1,235 @@
+name: Snapshot Build
+
+on:
+  push:
+    branches:
+      - 'develop-spark*'
+    # documentation only changes do not need a build, keep in sync with the job 'changes' below
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.github/workflows/deploy-docs.yml'
+      - '.github/workflows/test-deploy-docs.yml'
+  pull_request:
+    branches:
+      - 'develop-spark*'
+    types: [ opened, synchronize ]
+  # allow for manual snapshot releases from bugfix & feature branches
+  # this extracts issue number from branch name as additional attribute in the created version, e.g. <mvnVersion>-<issueNb>-SNAPSHOT
+  workflow_dispatch:
+    branches:
+      - 'bugfix/*'
+      - 'feature/*'
+      - 'develop-spark*'
+    inputs:
+      skipBuild:
+        description: 'skip build job'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  # Pull requests changing only documentation (e.g. dependabot updates of the docs site) skip the build.
+  # This can not be done with paths-ignore as for push: 'build' is a required check, and a workflow that does not run
+  # leaves it pending, while a skipped job counts as successful.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.filter.outputs.build }}
+    steps:
+      - id: filter
+        name: check build needed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "build=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          FILES=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --jq '.[].filename')
+          if grep -vqE '^docs/|\.md$|^\.github/workflows/(test-)?deploy-docs\.yml$' <<< "$FILES"; then
+            echo "build=true" >> $GITHUB_OUTPUT
+          else
+            echo "only documentation changed, skipping build"
+            echo "build=false" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: changes
+    if: ${{ !inputs.skipBuild && needs.changes.outputs.build == 'true' }}
+    # a newer commit supersedes a running build, also on develop branches: the deploy of the newer run publishes anyway
+    concurrency:
+      group: ${{ github.workflow }}-build-${{ github.ref }}
+      cancel-in-progress: true
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 17
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      - name: Extract Spark version from pom.xml
+        id: get_spark_version
+        run: |
+          SPARK_VERSION=$(grep -oPm1 '(?<=<spark.version>)[^<]+' pom.xml)
+          echo "Found Spark Version $SPARK_VERSION"
+          echo "spark_version=$SPARK_VERSION" >> $GITHUB_OUTPUT
+          echo "SPARK_VERSION=$SPARK_VERSION" >> $GITHUB_ENV
+      - name: Cache Maven
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}
+      - name: Cache Spark distribution
+        uses: actions/cache@v5
+        with:
+          path: sdl-sparkconnect/spark-${{ steps.get_spark_version.outputs.spark_version }}-bin-hadoop3
+          key: ${{ runner.os }}-spark-${{ steps.get_spark_version.outputs.spark_version }}-bin
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: sdl-sql/uv.lock
+      - name: Create the Python environment of sdl-sql
+        # The SQL engine (sdl-sql) runs SQLGlot in an embedded Python interpreter (jep), without it the tests of sdl-sql cancel themselves.
+        # jep is compiled against the JDK on installation, it finds it through JAVA_HOME set by setup-java.
+        # uv's --no-build cannot be used: jep publishes no wheel, so it always has to be built from its sdist.
+        # uv.lock pins that sdist by sha256, so the security risk is limited.
+        run: |
+          uv sync --frozen --project sdl-sql
+          echo "SDL_PYTHON_PATH=$PWD/sdl-sql/.venv/bin/python" >> $GITHUB_ENV
+      - name: Run the Python tests of sdl-sql
+        working-directory: sdl-sql
+        run: uv run --frozen pytest
+
+      - name: Build with Maven for Scala 2.13 and Sonar Cloud analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        # to avoid running tests twice, phase 'compile' instead of 'test' is used, as tests are also executed by scoverage:report
+        run: mvn -P test-sonar -B -ntp -Daether.dependencyCollector.impl=bf clean compile scoverage:report -f pom.xml org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=smart-data-lake_smart-data-lake  -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
+
+      - name: Upload compiled classes for the deploy job
+        # The deploy job reuses the classes compiled by phase 'compile' above, instead of compiling everything again.
+        # They are not instrumented: scoverage compiles to target/scoverage-classes with its own zinc analysis.
+        # Test classes are not uploaded, as they are compiled against the instrumented classes and are recompiled anyway.
+        # Zinc detects changes by content hash, so the timestamps lost by the artifact do not trigger a recompilation.
+        if: ${{ startsWith(github.ref_name, 'develop') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: compiled-classes
+          path: |
+            **/target/classes
+            **/target/analysis/compile
+            **/target/maven-status
+          retention-days: 1
+          if-no-files-found: error
+          include-hidden-files: true
+
+  deploy:
+    needs: build
+    # a running deploy is never cancelled, so that no partial snapshot is published to sonatype;
+    # a newer deploy waits for it instead (and replaces any deploy already waiting)
+    concurrency:
+      group: ${{ github.workflow }}-deploy-${{ github.ref }}
+      cancel-in-progress: false
+    if: ${{ !cancelled() && (inputs.skipBuild || (needs.build.result == 'success' && startsWith(github.ref_name, 'develop'))) }}
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          # PAT token needed to trigger documentation deploy workflow (GITHUB_TOKEN wont trigger other workflows to avoid loops)
+          token: ${{ secrets.PAT_ACTIONS }}          
+      - name: Git Config
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"          
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 17
+          server-id: sonatype-central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - name: Extract Spark version from pom.xml
+        id: get_spark_version
+        run: |
+          SPARK_VERSION=$(grep -oPm1 '(?<=<spark.version>)[^<]+' pom.xml)
+          echo "Found Spark Version $SPARK_VERSION"
+          echo "spark_version=$SPARK_VERSION" >> $GITHUB_OUTPUT
+      - name: Cache Maven
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-${{ steps.get_spark_version.outputs.spark_version }}
+
+      - name: Download compiled classes of the build job
+        # not available if the build job was skipped (workflow_dispatch with skipBuild), then everything is compiled
+        id: download_classes
+        if: ${{ needs.build.result == 'success' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: compiled-classes
+
+      - name: Update version for SNAPSHOT releases from feature/bugfix branches with issue number from branch name
+        if: ${{ startsWith(github.ref_name, 'feature') || startsWith(github.ref_name, 'bugfix')}}
+        run: |
+          MVN_CURRENT_VERSION=$(mvn -B -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec)
+          BRANCH_ISSUE_NB_STR=$(echo $GITHUB_REF_NAME | sed -n 's/^.*\(feature\|bugfix\)\/\([0-9]*\).*$/-\2/p')
+          MVN_NEW_VERSION=$(echo $MVN_CURRENT_VERSION | sed -n "s/-SNAPSHOT$/${BRANCH_ISSUE_NB_STR}-SNAPSHOT/p")
+          if [ -z "$MVN_NEW_VERSION" ]; then exit -1; fi
+          echo "setting version to $MVN_NEW_VERSION"
+          mvn versions:set -B -DnewVersion=${MVN_NEW_VERSION} -f pom.xml
+
+      - name: Maven deploy to sonatype for Scala 2.13
+        # scaladoc is skipped for snapshots: nobody consumes it, and the javadoc jars dominate the upload to sonatype central
+        # without 'clean' if the compiled classes of the build job were downloaded, so that they are reused
+        timeout-minutes: 60
+        run: mvn -P release-sonatype -B -ntp -Daether.dependencyCollector.impl=bf -Dmaven.scaladoc.skip=true -f pom.xml ${{ steps.download_classes.outcome == 'success' && 'deploy' || 'clean deploy' }} -DskipTests -pl '!sdl-debezium/debezium-connector-mysql-shaded,!sdl-debezium/debezium-connector-mariadb-shaded,!sdl-kafka/embedded-kafka-schema-registry-shaded'
+        env:
+          MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Maven Get Version
+        run: echo MVN_CURRENT_VERSION=$(mvn -B -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
+
+      - name: Push new sdl-schema.json to documentation site
+        if: ${{ contains(github.base_ref, 'develop-spark') || contains(github.ref, 'develop-spark')}}
+        run: |
+          # The documentation site lives in docs/ on this same branch, so no
+          # cross-branch checkout is needed. Guarded because branches that do not
+          # carry the documentation site (e.g. develop-spark3) would otherwise fail.
+          SCHEMA_DIR=docs/static/json-schema-viewer/schemas
+          if [ ! -d "$SCHEMA_DIR" ]; then
+            echo "$SCHEMA_DIR not present on this branch - skipping schema publication"
+            exit 0
+          fi
+          # note that sdl-schema.json should be available in the location below from the previous maven build.
+          mv sdl-lang/target/classes/sdl-schema.json $SCHEMA_DIR/sdl-schema-${MVN_CURRENT_VERSION}.json
+          git add $SCHEMA_DIR/sdl-schema-${MVN_CURRENT_VERSION}.json
+          git diff-index --quiet HEAD || git commit -m "Update sdl-schema-${MVN_CURRENT_VERSION}.json" # only if there is something to commit
+          # rebase onto commits pushed in the meantime; only after committing, as pull refuses to rebase unstaged changes
+          git pull --rebase
+          git push

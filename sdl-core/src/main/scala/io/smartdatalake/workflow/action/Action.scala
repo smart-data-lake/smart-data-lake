@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,18 +18,19 @@
  */
 package io.smartdatalake.workflow.action
 
-import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, AgentId, ConnectionId, DataObjectId}
 import io.smartdatalake.config._
 import io.smartdatalake.definitions._
 import io.smartdatalake.util.dag.{DAGNode, TaskSkippedDontStopWarning}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.SmartDataLakeLogger
-import io.smartdatalake.util.spark.SparkExpressionUtil
+import io.smartdatalake.util.misc.{ExpressionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.ExecutionPhase.ExecutionPhase
 import io.smartdatalake.workflow._
 import io.smartdatalake.workflow.action.RuntimeEventState.RuntimeEventState
 import io.smartdatalake.workflow.action.executionMode.{DataObjectStateIncrementalMode, ExecutionMode}
-import io.smartdatalake.workflow.dataobject.{CanCreateIncrementalOutput, DataObject, TransactionalTableDataObject}
+import io.smartdatalake.workflow.connection.{Connection, EngineConnection}
+import io.smartdatalake.workflow.dataobject.DataObject
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, TransactionalTableDataObject}
 
 import java.time.LocalDateTime
 import scala.reflect.ClassTag
@@ -39,7 +40,7 @@ import scala.reflect.runtime.universe._
  * An action defines a [[DAGNode]], that is, a transformation from input [[DataObject]]s to output [[DataObject]]s in
  * the DAG of actions.
  */
-trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNode with SmartDataLakeLogger with AtlasExportable {
+trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNode with SmartDataLakeLogger {
 
   /**
    * A unique identifier for this instance.
@@ -60,9 +61,9 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Recursive Inputs are DataObjects that are used as Output and Input in the same or different action.
    * This is usually prohibited as it creates loops in the DAG.
-   * In special cases this makes sense, i.e. when building a complex comparision/update logic.
+   * In special cases this makes sense, i.e. when building a complex comparison/update logic.
    * Recursive inputs are allowed in the same Action if the DataObject implements TransactionalSparkTableDataObject.
-   * For special cases this is to restrictive. To allow special DataObjects for recursive use within two different actions,
+   * For special cases this is too restrictive. To allow special DataObjects for recursive use within two different actions,
    * see also [[GlobalConfig.allowAsRecursiveInput]].
    *
    * Usage: add DataObjects that are used both as Output and Input as outputIds and recursiveInputIds, but do not add them as inputIds.
@@ -71,9 +72,9 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
 
   /**
    * Define if recursive inputs should be prepared as input SubFeed by ActionDAG or if this is handled by the action internally.
-   * Default is to prepare & expect it as input SubFeed, but this can be overriden by subclasses
+   * Default is to prepare & expect it as input SubFeed, but this can be overridden by subclasses
    */
-  private[smartdatalake] def handleRecursiveInputsAsSubFeeds: Boolean = true
+  def handleRecursiveInputsAsSubFeeds: Boolean = true
 
   /**
    * Output [[DataObject]]s
@@ -82,15 +83,19 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   def outputs: Seq[DataObject]
 
   /**
-   * Hook to define main input in sub classes
+   * Hook to define main input in subclasses
    */
   def mainInputId: Option[DataObjectId] = None
 
   /**
-   * Hook to define main output in sub classes
+   * Hook to define main output in subclasses
    */
   def mainOutputId: Option[DataObjectId] = None
 
+  /**
+   * The instance registry is needed to get the DataObjects defined as input and output in the Action config.
+   */
+  def instanceRegistry: InstanceRegistry
 
   /**
    * Optional execution condition for this action.
@@ -104,6 +109,17 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    *     executionCondition = {
    *       description = "execute if input stg-src1 is not skipped"
    *       expression = "!inputSubFeeds.stg-src1.isSkipped"
+   *     }
+   * }}}
+   *
+   * Besides the input SubFeeds, the runtime information of all Actions this Action transitively depends on is
+   * available through [[SubFeedsExpressionData.predecessorActions]], see [[ActionExpressionData]].
+   *
+   * Example:
+   * {{{
+   *     executionCondition = {
+   *       description = "execute if the previous action loaded data"
+   *       expression = "predecessorActions['loadAction'].metrics['stg-src1']['records_written'] > 0"
    *     }
    * }}}
    */
@@ -130,7 +146,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * If this Action should be run as asynchronous streaming process
    */
-  private[smartdatalake] def isAsynchronous: Boolean = false
+  def isAsynchronous: Boolean = false
 
   private[smartdatalake] def isAsynchronousProcessStarted: Boolean = false
 
@@ -159,7 +175,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * Prepare DataObjects prerequisites.
    * In this step preconditions are prepared & tested:
    * - connections can be created
-   * - needed structures exist, e.g Kafka topic or Jdbc table
+   * - needed structures exist, e.g. Kafka topic or Jdbc table
    *
    * This runs during the "prepare" phase of the DAG.
    */
@@ -179,11 +195,11 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     executionCondition.foreach(_.syntaxCheck[SubFeedsExpressionData](id, Some("executionCondition")))
 
     // validate metricsFailCondition
-    metricsFailCondition.foreach(c => SparkExpressionUtil.syntaxCheck[Metric,Boolean](id, Some("metricsFailCondition"), c))
+    metricsFailCondition.foreach(c => ExpressionUtil.syntaxCheck[Metric,Boolean](id, Some("metricsFailCondition"), c))
   }
 
   /**
-   * Checks before initalization of Action
+   * Checks before initialization of Action
    * In this step execution condition is evaluated and Action init is skipped if result is false.
    */
   def preInit(subFeeds: Seq[SubFeed], dataObjectsState: Seq[DataObjectState])(implicit context: ActionPipelineContext): Unit = {
@@ -238,7 +254,7 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     // check execution condition
     checkExecutionCondition(subFeeds)
     // init spark jobGroupId to identify metrics
-    setSparkJobMetadata() // TODO: this triggers creating spark session
+    context.engineConnection.foreach(_.activate(Some(s"${context.phase.id} $id")))
     // otherwise continue processing
     (inputs ++ recursiveInputs).foreach(input => input.preRead(findSubFeedPartitionValues(input.id, subFeeds)))
     outputs.foreach(_.preWrite) // Note: transformed subFeeds don't exist yet, that's why no partition values can be passed as parameters.
@@ -268,9 +284,9 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   }
 
   /**
-   * Executes operations needed to cleanup after executing an action failed (this includes NoDataToProcessWarning).
+   * Executes operations needed to clean up after executing an action failed (this includes NoDataToProcessWarning).
    */
-  def postExecFailed(ex: Exception)(implicit context: ActionPipelineContext): Unit = {
+  def postExecFailed(ex: Exception): Unit = {
     ex match {
       case ex: NoDataToProcessWarning if ex.results.isDefined =>
         // evaluate metrics fail condition if defined
@@ -282,10 +298,10 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Get potential state of input DataObjects when executionMode is DataObjectStateIncrementalMode.
    */
-  def getDataObjectsState: Seq[DataObjectState] = {
+  def getDataObjectsState(implicit context: ActionPipelineContext): Seq[DataObjectState] = {
     // only get state if incremental execution mode *and* action was successfully executed or skipped
     if (executionMode.exists(_.isInstanceOf[DataObjectStateIncrementalMode])
-        && runtimeData.getLatestEventState.exists(state => Seq(RuntimeEventState.SUCCEEDED,RuntimeEventState.INITIALIZED).contains(state))) {
+        && getLatestRuntimeEventState.exists(state => Seq(RuntimeEventState.SUCCEEDED,RuntimeEventState.INITIALIZED).contains(state))) {
       inputs.collect {
         case input: CanCreateIncrementalOutput => input.getState.map(DataObjectState(input.id, _))
       }.flatten
@@ -295,8 +311,8 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   /**
    * Evaluates a condition against latest metrics and throws an MetricsCheckFailed if there is a match.
    */
-  private def evaluateMetricsFailCondition(condition: String, subFeeds: Seq[SubFeed])(implicit context: ActionPipelineContext): Unit = {
-    val conditionEvaluator = Environment.expressionEvaluatorFactory.getEvaluator[Metric, Boolean](condition)
+  private def evaluateMetricsFailCondition(condition: String, subFeeds: Seq[SubFeed]): Unit = {
+    val conditionEvaluator = Environment.expressionEvaluatorFactory().getEvaluator[Metric, Boolean](condition)
     val metrics = subFeeds.flatMap{ subFeed =>
       val metricsRaw = subFeed.metrics.getOrElse(Map()) + ("skipped" -> subFeed.isSkipped.toString) // add additional "skipped=true|false" metric
       metricsRaw.map{
@@ -312,19 +328,6 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * provide an implementation of the DAG node id
    */
   def nodeId: String = id.id
-
-  /**
-   * Sets the util job description for better traceability in the Spark UI
-   *
-   * Note: This sets Spark local properties, which are propagated to the respective executor tasks.
-   * We rely on this to match metrics back to Actions and DataObjects.
-   * As writing to a DataObject on the Driver happens uninterrupted in the same exclusive thread, this is suitable.
-   *
-   * @param operation phase description (be short...)
-   */
-  def setSparkJobMetadata(operation: Option[String] = None)(implicit context: ActionPipelineContext) : Unit = {
-    context.sparkSession.sparkContext.setJobGroup(s"${context.appConfig.appName} $id runId=${context.executionId.runId} attemptId=${context.executionId.attemptId}", operation.getOrElse("").take(255))
-  }
 
   /**
    * Helper to find partition values for a specific DataObject in list of subFeeds
@@ -348,35 +351,65 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
   protected def getInputDataObject[T <: DataObject: ClassTag: TypeTag](id: DataObjectId)(implicit registry: InstanceRegistry): T = getDataObject[T](id, "input")
   protected def getOutputDataObject[T <: DataObject: ClassTag: TypeTag](id: DataObjectId)(implicit registry: InstanceRegistry): T = getDataObject[T](id, "output")
 
+  /**
+   * Actions needing an engine to execute, e.g. Spark, can override this method to provide the connection to the engine.
+   */
+  def engineConnectionId: Option[ConnectionId] = None
+
+  def getEngineConnection(implicit registry: InstanceRegistry): Connection with EngineConnection = {
+    val connectionId = engineConnectionId.getOrElse(ConnectionId(Environment.defaultEngineConnectionId))
+    val logPrefix = s"getEngineConnection ($id):"
+    val failureMsg = s"$logPrefix FAILED! registry.getActions: ${registry.getActions.map(_.toStringMedium).mkString(",")}"
+    try {
+      registry.get[Connection with EngineConnection](connectionId)
+    } catch {
+      case _: NoSuchElementException =>
+        logger.error(failureMsg)
+        throw new NoSuchElementException(s"$logPrefix $connectionId not found in instance registry")
+      case TypeMismatchException(_, currentClass, expectedType) =>
+        logger.error(failureMsg)
+        throw ConfigurationException(s"$logPrefix $connectionId of type ${currentClass.getSimpleName}" +
+          s" does not implement expected connection type $expectedType")
+    }
+  }
 
   /**
-   * Runtime metrics & events
-   * Implementation of runtimeData can be overridden by subclasses
+   * Runtime metrics & events.
+   *
+   * The state itself is not kept on the Action, but in the [[ActionsRuntimeRegistry]] of the
+   * [[ActionPipelineContext]], so that it is scoped to the execution and not to the lifetime of this
+   * configuration object. Subclasses can choose the [[RuntimeData]] implementation by overriding
+   * [[createRuntimeData]].
    */
-  private[smartdatalake] val runtimeData: RuntimeData = getRuntimeDataImpl
-  protected def getRuntimeDataImpl: RuntimeData = {
+  private[smartdatalake] def createRuntimeData: RuntimeData = {
     SynchronousRuntimeData(Environment.runtimeDataNumberOfExecutionsToKeep)
   }
 
   /**
    * Adds a runtime event for this Action
    */
-  def addRuntimeEvent(executionId: ExecutionId, phase: ExecutionPhase, state: RuntimeEventState, msg: Option[String] = None, results: Seq[SubFeed] = Seq(), tstmp: LocalDateTime = LocalDateTime.now): Unit = {
-    runtimeData.addEvent(executionId, RuntimeEvent(tstmp, phase, state, msg, results))
+  def addRuntimeEvent(executionId: ExecutionId,
+                      phase: ExecutionPhase,
+                      state: RuntimeEventState,
+                      msg: Option[String] = None,
+                      results: Seq[SubFeed] = Seq(),
+                      tstmp: LocalDateTime = LocalDateTime.now)(implicit context: ActionPipelineContext): Unit = {
+    context.runtimeRegistry(this).addEvent(executionId, RuntimeEvent(tstmp, phase, state, msg, results))
   }
 
   /**
    * Get latest runtime state
    */
-  def getLatestRuntimeEventState: Option[RuntimeEventState] = runtimeData.getLatestEventState
+  def getLatestRuntimeEventState(implicit context: ActionPipelineContext): Option[RuntimeEventState] =
+    context.runtimeRegistry.get(id).flatMap(_.getLatestEventState)
 
   /**
    * Adds a runtime metric for this Action
    */
-  def addAsyncMetrics(executionId: Option[ExecutionId], dataObjectId: Option[DataObjectId], metric: ActionMetrics): Unit = {
+  def addAsyncMetrics(executionId: Option[ExecutionId], dataObjectId: Option[DataObjectId], metric: ActionMetrics)(implicit context: ActionPipelineContext): Unit = {
     if (dataObjectId.isDefined) {
       if (outputs.exists(_.id == dataObjectId.get)) try {
-        runtimeData.addMetric(executionId, dataObjectId.get, metric)
+        context.runtimeRegistry(this).addMetric(executionId, dataObjectId.get, metric)
       } catch {
         case e: AssertionError => logger.error(s"($id) ${e.getMessage}")
       }
@@ -389,26 +422,37 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
    * Get summarized runtime information for a given ExecutionId.
    * @param executionId ExecutionId to get runtime information for. If empty runtime information for last ExecutionId are returned.
    */
-  def getRuntimeInfo(executionId: Option[ExecutionId] = None) : Option[RuntimeInfo] = {
-    runtimeData.getRuntimeInfo((inputs ++ recursiveInputs).map(_.id), outputs.map(_.id), getDataObjectsState, executionId)
-  }
+  def getRuntimeInfo(executionId: Option[ExecutionId] = None)(implicit context: ActionPipelineContext): Option[RuntimeInfo] =
+    context.runtimeRegistry.get(id).flatMap(
+      _.getRuntimeInfo(
+        inputIds = (inputs ++ recursiveInputs).map(_.id),
+        outputIds = outputs.map(_.id),
+        dataObjectsState = getDataObjectsState,
+        executionIdOpt = executionId
+      )
+    )
+
+  /**
+   * Get the latest asynchronous metrics collected for one of the outputs of this Action.
+   * Note that metrics of synchronous Actions are passed on in the corresponding SubFeed and are not found here.
+   */
+  def getRuntimeMetrics(dataObjectId: DataObjectId, executionId: Option[ExecutionId] = None)(implicit context: ActionPipelineContext): Option[ActionMetrics] =
+    context.runtimeRegistry.get(id).flatMap(_.getMetrics(dataObjectId, executionId))
 
   /**
    * Resets the runtime state of this Action
    * This is mainly used for testing
    */
   private[smartdatalake] def reset(implicit context: ActionPipelineContext): Unit = {
-    runtimeData.clear()
+    context.runtimeRegistry.reset(id)
   }
+
+  final override def toString: String = nodeId
 
   /**
    * This is displayed in ascii graph visualization
    */
-  final override def toString: String = {
-   nodeId + getRuntimeInfo().map(" "+_).getOrElse("")
-  }
-
-  final def toString(executionId: Option[ExecutionId]): String = {
+  final def toString(executionId: Option[ExecutionId])(implicit context: ActionPipelineContext): String = {
     nodeId + getRuntimeInfo(executionId).map(" "+_).getOrElse("")
   }
 
@@ -422,7 +466,6 @@ trait Action extends SdlConfigObject with ParsableFromConfig[Action] with DAGNod
     s"$toStringShort Inputs: $inputStr Outputs: $outputStr"
   }
 
-  override def atlasName: String = id.id
 }
 
 /**

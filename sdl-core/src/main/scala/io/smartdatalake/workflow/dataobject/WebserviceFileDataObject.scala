@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,6 +30,7 @@ import io.smartdatalake.util.webservice.WebserviceMethod.WebserviceMethod
 import io.smartdatalake.util.webservice._
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.authMode.HttpAuthMode
+import io.smartdatalake.workflow.dataobject.file.{CanCreateInputStream, CanCreateOutputStream, FileRef, FileRefDataObject}
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, InputStream, OutputStream}
 import scala.util.{Failure, Success, Try}
@@ -52,6 +53,23 @@ case class WebservicePartitionDefinition(name: String, values: Seq[String])
  *
  * Query parameter (partitions) and possible values can be configured through `partitionDefs` attribute.
  * If no values are given for a query parameter, the values are taken from the partition values of the input SubFeed, e.g. the command line if it is the first Action in the DAG.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-departures {
+ *     type = WebserviceFileDataObject
+ *     url = "https://opensky-network.org/api/flights/departure"
+ *     authMode = { type = BasicAuthMode, user = "###ENV#API_USER###", password = "###ENV#API_PWD###" }
+ *     followRedirects = true
+ *     retries = 3
+ *     partitionDefs = [
+ *       { name = airport, values = [LSZB, EDDF] }
+ *     ]
+ *     partitionLayout = "?airport=%airport%"
+ *   }
+ * }
+ * }}}
  *
  * @param url URL of the webservice
  * @param additionalHeaders Additional headers to pass with the http request
@@ -258,8 +276,6 @@ case class WebserviceFileDataObject(override val id: DataObjectId,
   override def path: String = ""
 
   override def relativizePath(filePath: String)(implicit context: ActionPipelineContext): String = filePath
-
-  override def factory: FromConfigFactory[DataObject] = WebserviceFileDataObject
 }
 
 object WebserviceFileDataObject extends FromConfigFactory[DataObject] with SmartDataLakeLogger {

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,9 +18,8 @@
  */
 package io.smartdatalake.communication.statusinfo.api
 
+import jakarta.servlet.ServletContext
 import org.eclipse.jetty.server.handler.ContextHandler
-
-import javax.servlet.ServletContext
 
 /**
  * Singleton Object that provides the "glue" between :

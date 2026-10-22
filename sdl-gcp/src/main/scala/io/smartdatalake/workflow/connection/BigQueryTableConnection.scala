@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,16 +32,37 @@ import java.util.Base64
 import scala.io.Source
 
 /**
- * Connection information for GCP BigQuery Tables
+ * Connection information for GCP BigQuery Tables.
+ *
+ * It holds the GCP project used for billing/API access and the service account credentials shared by all
+ * BigQueryTableDataObjects referencing it through `connectionId`. The credentials are also used to build a
+ * BigQuery client for metadata operations (e.g. checking table existence), so a connection is required to read
+ * or write BigQuery tables.
+ *
+ * Example:
+ * {{{
+ * connections {
+ *   google-playground {
+ *     type = BigQueryTableConnection
+ *     parentProject = "playground-223717"
+ *     authMode = {
+ *       type = GCPCredentialsKeyAuth
+ *       serviceAccountKeyFile = ${env.basedir}"/playground-223717-key.json"
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note authentication is only supported with [[GCPCredentialsKeyAuth]]; any other AuthMode is rejected on
+ *       instantiation.
  *
  * @param id unique id of this connection
- * @param parentProject project used for this connection. It is defined as the GCP Project ID of the table
- *                      to bull for the export. It defaults to the project of the Service Account being used
- *                      in the credentials.
+ * @param parentProject GCP Project ID to be billed for the BigQuery jobs of this connection. It is passed to the
+ *                      BigQuery Spark connector as `parentProject` option and is mandatory, e.g. it is not
+ *                      derived from the Service Account of the credentials.
  * @param authMode Credentials to be used for this connection using [[GCPCredentialsKeyAuth]]
  *                 As of now, only Service Account keys (either as encoded Strings or as json-files)
  *                 are supported as an authentication method.
- * @param metadata
  */
 case class BigQueryTableConnection(override val id: ConnectionId,
                                    val authMode: AuthMode,
@@ -73,8 +94,6 @@ case class BigQueryTableConnection(override val id: ConnectionId,
   //evaluate lazily (only once per connection) to let prepare() catch configuration errors
   lazy val bigQueryObject = getBigQueryObject
 
-
-  override def factory: FromConfigFactory[Connection] = BigQueryTableConnection
 
 }
 

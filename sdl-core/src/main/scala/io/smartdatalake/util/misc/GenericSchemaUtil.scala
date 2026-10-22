@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2023 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.misc
 
 import io.smartdatalake.definitions.Environment
@@ -27,7 +26,16 @@ object GenericSchemaUtil {
 
   def columnExists(schema: GenericSchema, colName: String): Boolean = {
     if (Environment.caseSensitive) schema.columns.contains(colName)
-    else schema.columns.contains(colName.toLowerCase)
+    else schema.columns.map(_.toLowerCase).contains(colName.toLowerCase)
+  }
+
+  /**
+   * Check if a column has a timestamp data type.
+   * Note that this returns true if the column does not exist, use [[columnExists]] to check that.
+   */
+  def columnIsTimestamp(schema: GenericSchema, colName: String): Boolean = {
+    schema.fields.filter(f => if (Environment.caseSensitive) f.name == colName else f.name.equalsIgnoreCase(colName))
+      .forall(_.dataType.typeName.toLowerCase.startsWith("timestamp"))
   }
 
   /**

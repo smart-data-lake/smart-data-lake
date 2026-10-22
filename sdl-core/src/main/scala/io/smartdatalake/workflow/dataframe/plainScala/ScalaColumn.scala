@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.plainScala
 
 import io.smartdatalake.util.misc.SmartDataLakeLogger
@@ -31,7 +30,7 @@ import scala.reflect.ClassTag
  * @param data       the actual data of the column
  * @tparam A the Scala type of the column
  */
-case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], data: IndexedSeq[A]) extends ScalaAbstractColumn with SmartDataLakeLogger {
+case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], var data: IndexedSeq[Option[A]]) extends ScalaAbstractColumn with SmartDataLakeLogger {
 
   override def dataType: ScalaDataType[A] = definition.dataType
 
@@ -39,27 +38,66 @@ case class ScalaColumn[A: ClassTag](definition: ScalaColumnDefinition[A], data: 
 
   override def toScalaColumn(df: ScalaDataFrame): ScalaColumn[_] = this
 
+  override def describe: String = definition.getFullName()
+
   override def apply(extraction: Any): ScalaColumn[A] = throw new NotImplementedError("The 'apply' method is not applicable for a ScalaColumn instance")
 
   // Support methods for DataFrame operations
   def append(other: ScalaColumn[A]): ScalaColumn[A] = copy(data = data ++ other.data)
 
-  def unsafeAppend(other: ScalaColumn[_]): ScalaColumn[A] = append(other.asInstanceOf[ScalaColumn[A]])
-
   def limit(n: Int): ScalaColumn[A] = copy(data = data.take(n))
 
   def length: Int = data.length
+
+  def withDataFrameAlias(alias: Option[String]): ScalaColumn[A] = copy(definition = definition.withDataFrameAlias(alias))
+
+  override def markForDataReset(): Unit = needsDataReset = true
+  private var needsDataReset: Boolean = false
+
+  override def setInputData(inputData: Map[String, ScalaColumn[_]], size: Int): Unit = {
+    // reset input data if we get new data for this column -
+    // this might be needed in joins where we have to update
+    // the input data for the resolved columns after left/right data have been combined.
+    // note that data delivery is triggered through markForDataReset() and inputColumns method.
+    // if we get no data, we do not need to update.
+    inputData.get(definition.getFullName())
+      .foreach(col => data = col.data.asInstanceOf[IndexedSeq[Option[A]]])
+  }
+
+  override def inputColumns: Set[String] = {
+    if (needsDataReset) {
+      needsDataReset = false
+      Set(definition.getFullName())
+    } else Set()
+  }
 
 }
 
 
 object ScalaColumn {
 
-  def apply[A: ClassTag](name: String, data: Seq[A]) = new ScalaColumn[A](ScalaColumnDefinition[A](name = name), data = data.toIndexedSeq)
+  def apply[A: ClassTag](name: String, data: Seq[A]): ScalaColumn[A] = {
+    fromDataOpt(name, data.map(Option(_)))
+  }
+
+  def fromDataOpt[A: ClassTag](name: String, data: Seq[Option[A]]): ScalaColumn[A] = {
+    val (alias, colName) = name.split('.') match {
+      case Array(a, c) => (Some(a), c)
+      case Array(c) => (None, c)
+    }
+    new ScalaColumn[A](ScalaColumnDefinition[A](name = colName, dataFrameAlias = alias), data = data.toIndexedSeq)
+  }
 
   private val colCounter = new java.util.concurrent.atomic.AtomicLong(0)
 
   def nextColName = s"col${colCounter.incrementAndGet()}"
 
+  def optionalizeUnaryFunc[T](func: Any => T): Option[Any] => Option[T] = {
+    a => if (a.isEmpty) None else Some(func(a.get))
+  }
+
+  def optionalizeBinaryFunc[T](func: (Any, Any) => T): (Option[Any], Option[Any]) => Option[T] = {
+    (a, b) => if (a.isEmpty || b.isEmpty) None else Some(func(a.get, b.get))
+  }
 }
 

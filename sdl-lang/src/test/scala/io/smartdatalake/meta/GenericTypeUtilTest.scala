@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.meta
 
 import org.scalatest.funsuite.AnyFunSuite
@@ -38,6 +37,13 @@ class GenericTypeUtilTest extends AnyFunSuite {
       ("overrideTestSecondMethod",true,false,true)
     )
     assert(testObjectTypeDef.attributes.map(a => (a.name,a.isRequired,a.isDeprecated,a.isOverride)) == attrsExpected)
+  }
+
+  test ("handle deprecated class") {
+    // scala annotations are *not* kept for runtime, only the java @Deprecated annotation is reflected in the type def
+    assert(!GenericTypeUtil.typeDefForClass(typeOf[TestObject]).isDeprecated)
+    assert(!GenericTypeUtil.typeDefForClass(typeOf[TestScalaDeprecatedObject]).isDeprecated)
+    assert(GenericTypeUtil.typeDefForClass(typeOf[TestDeprecatedObject]).isDeprecated)
   }
 
   test("scala doc from case class attribute and from overridden method as fallback") {
@@ -109,6 +115,7 @@ case class TestCodeBlocks() {
  *
  * @see [[OverrideTest]] for details
  */
+@annotation.nowarn("cat=deprecation")
 case class TestObject (
                        id: String,
                        @Deprecated javaDeprecated: String,
@@ -117,6 +124,13 @@ case class TestObject (
                        override val overrideTestFirstMethod: String,
                        override val overrideTestSecondMethod: String
                      ) extends OverrideTest
+
+@Deprecated
+@deprecated("use TestObject instead", "3.0.0")
+case class TestDeprecatedObject (id: String)
+
+@deprecated("use TestObject instead", "3.0.0")
+case class TestScalaDeprecatedObject (id: String)
 
 trait OverrideTest {
   /**

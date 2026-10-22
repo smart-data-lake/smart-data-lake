@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,4 +18,11 @@
  */
 package io.smartdatalake.util.evolution
 
-private[smartdatalake] case class SchemaEvolutionException(message: String) extends RuntimeException(message) {}
+/**
+ * Thrown if the schema of a DataFrame can not be evolved to another schema, e.g. because a data type change is not supported.
+ */
+class SchemaEvolutionException(message: String, cause: Throwable = null) extends RuntimeException(message, cause)
+
+object SchemaEvolutionException {
+  def apply(message: String, cause: Throwable = null): SchemaEvolutionException = new SchemaEvolutionException(message, cause)
+}

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2025 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,23 +16,24 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataobject
 
 import com.google.cloud.spark.bigquery.repackaged.com.google.cloud.bigquery.{BigQuery, BigQueryFactory, BigQueryOptions, BigQuerySQLException, QueryJobConfiguration, TableId, TableResult}
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.SDLSaveMode.SDLSaveMode
 import io.smartdatalake.definitions.{SDLSaveMode, SaveModeOptions}
-import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.spark.SparkStageMetricsListener
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.BigQueryTableConnection
 import io.smartdatalake.workflow.dataframe.GenericSchema
-import io.smartdatalake.workflow.dataframe.spark.SparkSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.expectation.Expectation
+import io.smartdatalake.workflow.dataobject.generic.{Constraint, ExpectationValidation, Table, TransactionalTableDataObject}
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanWriteSparkDataFrame, SparkSaveMode}
 import org.apache.spark.sql.DataFrame
 
 /**
@@ -40,6 +41,32 @@ import org.apache.spark.sql.DataFrame
  * Provides details to access BigQuery Tables to an Action.
  * The object uses the official Spark-connector by Google see: [[https://github.com/GoogleCloudDataproc/spark-bigquery-connector]].
  * As of now, the only authentication mode supported is a Service Account Key.
+ *
+ * A [[io.smartdatalake.workflow.connection.BigQueryTableConnection]] is required, as it holds the service account key
+ * used to authenticate. The table can either be read directly (table.name/table.db) or through a SQL query
+ * (table.query), in which case viewsEnabled must be true and BigQuery materializes a temporary table.
+ *
+ * Example:
+ * {{{
+ * connections = {
+ *   google-playground {
+ *     type = BigQueryTableConnection
+ *     parentProject = "playground-223717"
+ *     authMode = { type = GCPCredentialsKeyAuth, serviceAccountKeyFile = "/secrets/playground-sa-key.json" }
+ *   }
+ * }
+ * dataObjects = {
+ *   int-test-table {
+ *     type = BigQueryTableDataObject
+ *     connectionId = google-playground
+ *     project = "playground-223717"
+ *     table = { db = "sdl_playground", name = "test_table" }
+ *     writeMethod = "indirect"
+ *     temporaryGcsBucket = "sdl-playground-tmp"
+ *   }
+ * }
+ * }}}
+ *
  * @param id unique name of this data object
  * @param table BigQuery table to by written by this output. BigQuery requires a table name and a dataset.
  * @param viewsEnabled Required if the table is being read with a query, as BigQuery will create a temporary table in the background.
@@ -52,8 +79,7 @@ import org.apache.spark.sql.DataFrame
  * @param persistentGcsBucket Persistent Bucket to store data if saving with "indirect" mode.
  * @param persistentGcsPath Temporary GSC Path to store data if saving with "indirect" mode.
  * @param project Defaults to the project of the project Id of the service account being used
- * @param options Additional Spark options provided by the connector.
- *                Please see [[https://github.com/GoogleCloudDataproc/spark-bigquery-connector]] for more information.
+ * @param options Additional Spark options provided by the BigQuery connector.
  * @param schemaMin An optional, minimal schema that this DataObject must have to pass schema validation on reading and writing.
  *                  Define schema by using a DDL-formatted string, which is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param constraints List of row-level [[Constraint]]s to enforce when writing to this data object.
@@ -71,6 +97,7 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
                                    persistentGcsBucket: Option[String] = None,
                                    persistentGcsPath: Option[String] = None,
                                    project: Option[String] = None,
+                                   @LibraryOptions("https://github.com/GoogleCloudDataproc/spark-bigquery-connector#properties")
                                    override val options: Map[String, String] = Map(),
                                    override val schemaMin: Option[GenericSchema] = None,
                                    override val constraints: Seq[Constraint] = Seq(),
@@ -86,7 +113,8 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
 
   private val connection = getConnection[BigQueryTableConnection](connectionId)
 
-  private val bigquery = connection.bigQueryObject
+  // evaluate lazily, so that credentials are not evaluated when parsing the configuration but in prepare
+  @transient private lazy val bigquery = connection.bigQueryObject
 
   lazy val bigQueryTable = bigquery.getTable(table.db.get, table.name)
 
@@ -139,7 +167,7 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): DataFrame = {
     require(isTableExisting, f"The provided table ${table.name} doesn't exist")
-    val df = context.sparkSession
+    val df = SparkSubFeed.getSparkSession
       .read
       .format("bigquery")
       .options(sparkOptions)
@@ -171,8 +199,6 @@ case class BigQueryTableDataObject(override val id: DataObjectId,
       }
     )
   }
-
-  override def factory: FromConfigFactory[DataObject] = BigQueryTableDataObject
 }
 
 object BigQueryTableDataObject extends FromConfigFactory[DataObject] {

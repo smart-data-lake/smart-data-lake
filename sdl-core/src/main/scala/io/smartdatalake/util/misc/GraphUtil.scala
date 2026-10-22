@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.util.misc
 
 /**
@@ -32,12 +31,12 @@ object GraphUtil {
     /**
      * Map of inbound connected nodes per node from a list of edges.
      */
-    private lazy val outboundEdgeMap: Map[A, Set[A]] = edges.groupBy(_._1).mapValues(_.map(_._2)).toMap
+    private lazy val outboundEdgeMap: Map[A, Set[A]] = edges.groupBy(_._1).view.mapValues(_.map(_._2)).toMap
 
     /**
      * Map of outbound connected nodes per node from a list of edges.
      */
-    private lazy val inboundEdgeMap: Map[A, Set[A]] = edges.groupBy(_._2).mapValues(_.map(_._1)).toMap
+    private lazy val inboundEdgeMap: Map[A, Set[A]] = edges.groupBy(_._2).view.mapValues(_.map(_._1)).toMap
 
     /**
      * Search all connected nodes from a given node

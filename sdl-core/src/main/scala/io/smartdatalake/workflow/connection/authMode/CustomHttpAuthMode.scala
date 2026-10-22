@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.connection.authMode
 
 import com.typesafe.config.Config
@@ -28,6 +27,27 @@ import io.smartdatalake.util.secrets.StringOrSecret
 /**
  * Connect with custom HTTP-header based authentication
  *
+ * The configured class implements [[CustomHttpAuthModeLogic]] and returns the HTTP headers to add to every
+ * request; `options` are handed over once in the prepare phase, e.g. to acquire a token.
+ *
+ * Deprecated since 2.7.1: implement [[HttpAuthMode]] (or [[AuthMode]]) directly instead, which gives access
+ * to typed configuration attributes rather than an untyped option map.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-departures {
+ *     type = WebserviceFileDataObject
+ *     url = "https://opensky-network.org/api/flights/departure"
+ *     authMode = {
+ *       type = CustomHttpAuthMode
+ *       className = "com.example.auth.MyCustomHttpAuthMode"
+ *       options = { apiKey = "###ENV#API_KEY###" }
+ *     }
+ *   }
+ * }
+ * }}}
+ *
  * @param className class name implementing trait [[CustomHttpAuthModeLogic]]
  * @param options   Options to pass to the custom auth mode logic in prepare function.
  */
@@ -35,14 +55,13 @@ import io.smartdatalake.util.secrets.StringOrSecret
 case class CustomHttpAuthMode(className: String, options: Map[String, StringOrSecret]) extends HttpAuthMode with HttpHeaderAuth {
   private val impl = CustomCodeUtil.getClassInstanceByName[CustomHttpAuthModeLogic](className)
 
-  private[smartdatalake] override def prepare(): Unit = impl.prepare(options)
+  override def prepare(): Unit = impl.prepare(options)
 
   override def getHeaders: Map[String, String] = impl.getHeaders
-
-  override def factory: FromConfigFactory[HttpAuthMode] = CustomHttpAuthMode
 }
 
 object CustomHttpAuthMode extends FromConfigFactory[HttpAuthMode] {
+  @scala.annotation.nowarn("cat=deprecation")
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): CustomHttpAuthMode = {
     extract[CustomHttpAuthMode](config)
   }

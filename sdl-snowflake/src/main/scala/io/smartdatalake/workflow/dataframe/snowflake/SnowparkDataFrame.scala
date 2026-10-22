@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.dataframe.snowflake
 
 import com.snowflake.snowpark.custom.SnowparkUtils
@@ -25,19 +24,20 @@ import com.snowflake.snowpark.types._
 import com.snowflake.snowpark.{Column, DataFrame, RelationalGroupedDataFrame, Row}
 import io.smartdatalake.config.SdlConfigObject.DataObjectId
 import io.smartdatalake.definitions.Environment
-import io.smartdatalake.util.evolution.SchemaEvolution.listFind
+import io.smartdatalake.util.misc.SchemaUtil.findByName
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.{SchemaUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.dataframe._
 import io.smartdatalake.workflow.dataobject.SnowflakeTableDataObject
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
-import org.json4s.JString
+import org.json4s.{JBool, JObject, JString}
 import org.json4s.JsonAST.JValue
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with SmartDataLakeLogger {
+case class SnowparkDataFrame(override val inner: DataFrame) extends GenericDataFrame with DataFrameWrapper with SmartDataLakeLogger {
   override def subFeedType: universe.Type = typeOf[SnowparkSubFeed]
   override def schema: SnowparkSchema = SnowparkSchema(inner.schema)
 
@@ -68,9 +68,10 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
     val snowparkCols = columns.map(_.asInstanceOf[SnowparkColumn].inner)
     SnowparkDataFrame(inner.agg(snowparkCols.head, snowparkCols.tail:_*))
   }
-  override def unionByName(other: GenericDataFrame): SnowparkDataFrame= {
+  override def unionByName(other: GenericDataFrame, allowMissingColumns: Boolean = false): SnowparkDataFrame= {
+    assert(!allowMissingColumns, "unionByName with allowMissingColumns=true is not supported by Snowpark")
     other match {
-      case snowparkOther: SnowparkDataFrame => SnowparkDataFrame(inner.unionByName(snowparkOther.inner))
+      case snowparkOther: SnowparkDataFrame => SnowparkDataFrame(inner.unionAllByName(snowparkOther.inner))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
@@ -91,11 +92,14 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
     SnowparkDataFrame(inner.limit(n))
   }
 
-  override def collect: Seq[GenericRow] = inner.collect().map(SnowparkRow)
-  override def distinct: SnowparkDataFrame = SnowparkDataFrame(inner.distinct())
-  override def getDataFrameSubFeed(dataObjectId: DataObjectId, partitionValues: Seq[PartitionValues], filter: Option[String]): DataFrameSubFeed = {
-    SnowparkSubFeed(Some(this), dataObjectId, partitionValues, filter = filter)
+  override def orderBy(columns: Seq[GenericColumn]): SnowparkDataFrame = {
+    DataFrameSubFeed.assertCorrectSubFeedType(subFeedType, columns)
+    val snowparkCols = columns.map(_.asInstanceOf[SnowparkColumn].inner)
+    SnowparkDataFrame(inner.sort(snowparkCols))
   }
+
+  override def collect: Seq[GenericRow] = inner.collect().toIndexedSeq.map(SnowparkRow)
+  override def distinct: SnowparkDataFrame = SnowparkDataFrame(inner.distinct())
   override def withColumn(colName: String, expression: GenericColumn): GenericDataFrame = {
     expression match {
       case snowparkExpression: SnowparkColumn => SnowparkDataFrame(inner.withColumn(colName,snowparkExpression.inner))
@@ -119,7 +123,7 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
   }
 
   override def dropDuplicates(cols: Seq[String]): SnowparkDataFrame = {
-    SnowparkDataFrame(inner.dropDuplicates(cols: _*))
+    SnowparkDataFrame(inner.dropDuplicates(cols.toIndexedSeq: _*))
   }
   override def isEmpty: Boolean = inner.count() == 0
   override def count: Long = inner.count()
@@ -137,8 +141,9 @@ case class SnowparkDataFrame(inner: DataFrame) extends GenericDataFrame with Sma
   override def setupObservation(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean, forceGenericObservation: Boolean = false): (GenericDataFrame, DataFrameObservation) = {
     // Snowpark has no method to observe metrics. They need to be calculated.
     val observation = GenericCalculatedObservation(this, aggregateColumns:_*)
-    // Cache the DataFrame to avoid duplicate calculation. If cache is not needed, create a GenericCalculationObservation directly.
-    (this.cache, observation)
+    // Cache the DataFrame to avoid duplicate calculation, but only in exec phase: in init phase the DataFrame is
+    // empty and materializing it would be pure overhead (on Snowpark it even creates a temporary table).
+    (if (isExecPhase) this.cache else this, observation)
   }
   override def observe(name: String, aggregateColumns: Seq[GenericColumn], isExecPhase: Boolean): GenericDataFrame = {
     throw new NotImplementedError("Can not create observation '$name'. Observing DataFrames is not supported in Snowpark.")
@@ -168,7 +173,7 @@ case class SnowparkSchema(inner: StructType) extends GenericSchema {
     else None
   }
   override def columns: Seq[String] = inner.names
-  override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
+  override def fields: Seq[SnowparkField] = inner.fields.toIndexedSeq.map(SnowparkField)
   override def sql: String = fields.map(f => s"${f.name} ${f.dataType.sql}").mkString(", ")
   override def add(colName: String, dataType: GenericDataType): SnowparkSchema = {
     val snowparkDataType = SchemaConverter.convertDatatype(dataType, subFeedType).asInstanceOf[SnowparkDataType]
@@ -192,11 +197,10 @@ case class SnowparkSchema(inner: StructType) extends GenericSchema {
   }
 
   override def getDataType(colName: String): GenericDataType = {
-    SnowparkDataType(listFind[StructField](inner, colName, _.name, Environment.caseSensitive)
+    SnowparkDataType(findByName[StructField](inner, colName, _.name, Environment.caseSensitive)
       .getOrElse(throw new IllegalArgumentException(s"Column $colName does not exists. Available: ${inner.names.mkString(", ")}")).dataType
     )
   }
-
 
   override def makeNullable: SnowparkSchema = SnowparkSchema(StructType(fields.map(_.makeNullable.inner)))
   override def toLowerCase: SnowparkSchema = SnowparkSchema(StructType(fields.map(_.toLowerCase.inner)))
@@ -219,6 +223,14 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
+
+  override def <=>(other: GenericColumn): SnowparkColumn = {
+    other match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(inner <=> snowparkColumn.inner)
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
   override def >(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner > snowparkColumn.inner)
@@ -231,6 +243,22 @@ case class SnowparkColumn(inner: Column) extends GenericColumn {
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
+
+
+  override def >=(other: GenericColumn): GenericColumn = {
+    other match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(inner >= snowparkColumn.inner)
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
+  override def <=(other: GenericColumn): SnowparkColumn = {
+    other match {
+      case snowparkColumn: SnowparkColumn => SnowparkColumn(inner <= snowparkColumn.inner)
+      case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
+    }
+  }
+
   override def +(other: GenericColumn): SnowparkColumn = {
     other match {
       case snowparkColumn: SnowparkColumn => SnowparkColumn(inner + snowparkColumn.inner)
@@ -296,9 +324,19 @@ case class SnowparkField(inner: StructField) extends GenericField {
   override def dataType: SnowparkDataType = SnowparkDataType(inner.dataType)
   override def nullable: Boolean = inner.nullable
   override def comment: Option[String] = None
+  /**
+   * The name is written in lower case, as Snowflake stores unquoted identifiers in upper case,
+   * see GenericSchema.toJson for converting schemas to other engines.
+   */
+  override def toJson: JObject = JObject("name" -> JString(name.toLowerCase), "dataType" -> dataType.toJson, "nullable" -> JBool(nullable))
   override def makeNullable: SnowparkField = SnowparkField(inner.copy(dataType = dataType.makeNullable.inner, nullable = true))
   override def toLowerCase: SnowparkField = SnowparkField(inner.copy(dataType = dataType.toLowerCase.inner, columnIdentifier = ColumnIdentifier(inner.name.toLowerCase)))
   override def removeMetadata: SnowparkField = this // metadata is not existing in Snowpark
+
+  override def withDataType(dataType: GenericDataType, nullable: Boolean): SnowparkField = dataType match {
+    case d: SnowparkDataType => SnowparkField(inner.copy(dataType = d.inner, nullable = nullable))
+    case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(dataType)
+  }
 }
 
 trait SnowparkDataType extends GenericDataType {
@@ -329,22 +367,31 @@ case class SnowparkSimpleDataType(inner: DataType) extends SnowparkDataType with
 
   override def isNumeric: Boolean = SnowparkUtils.isNumeric(inner)
 
+  override def isImpreciseNumeric: Boolean = inner == FloatType || inner == DoubleType
+
   override def getDecimalSpec: Option[(Int, Int)] = inner match {
     case d: DecimalType => Some((d.precision, d.scale))
     case _ => None
   }
-  def toJson: JValue = JString(inner.typeName)
+  /**
+   * The Spark type name, which is the engine-neutral name of simple types in the Json representation of a schema,
+   * see GenericSchema.toJson. Types without Spark equivalent, e.g. variant, are given by their lower case type name.
+   */
+  def toJson: JValue = JString(inner match {
+    case d: DecimalType => s"decimal(${d.precision},${d.scale})"
+    case t => t.typeName.toLowerCase
+  })
 }
 case class SnowparkStructDataType(override val inner: StructType) extends SnowparkDataType with GenericStructDataType {
   override def makeNullable: SnowparkDataType = SnowparkStructDataType(SnowparkSchema(inner).makeNullable.inner)
   override def toLowerCase: SnowparkDataType = SnowparkStructDataType(SnowparkSchema(inner).toLowerCase.inner)
   override def withOtherFields[T](other: GenericStructDataType with GenericDataType, func: (Seq[GenericField], Seq[GenericField]) => T): T = {
     other match {
-      case snowparkOther: SnowparkStructDataType => func(inner.fields.map(SnowparkField), snowparkOther.inner.fields.map(SnowparkField))
+      case snowparkOther: SnowparkStructDataType => func(inner.fields.toIndexedSeq.map(SnowparkField), snowparkOther.inner.fields.toIndexedSeq.map(SnowparkField))
       case _ => DataFrameSubFeed.throwIllegalSubFeedTypeException(other)
     }
   }
-  override def fields: Seq[SnowparkField] = inner.fields.map(SnowparkField)
+  override def fields: Seq[SnowparkField] = inner.fields.toIndexedSeq.map(SnowparkField)
 
   override def fieldIndex(fieldName: String): Int = inner.indexWhere(_.name == fieldName)
 }
@@ -393,6 +440,6 @@ case class SnowparkRow(inner: Row) extends GenericRow {
   override def get(index: Int): Any = inner.get(index)
 
   override def getStruct(index: Int): GenericRow = throw new NotImplementedError("Snowpark row.getStruct not supported by Snowflake")
-  override def getAs[T](index: Int): T = get(index).asInstanceOf[T]
+  override def getAs[T: ClassTag](index: Int): T = get(index).asInstanceOf[T]
   override def toSeq: Seq[Any] = inner.toSeq
 }

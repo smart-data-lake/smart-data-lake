@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,24 +21,38 @@ package io.smartdatalake.workflow.connection
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.ConnectionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
-import io.smartdatalake.util.misc.AclDef
 
 /**
- * Connection information for files on hadoop
+ * Connection information for files on hadoop.
+ *
+ * It centralizes the schema, authority and base directory (`pathPrefix`) of a hadoop compatible filesystem
+ * (local filesystem, HDFS, ADLS, S3, ...). File based DataObjects referencing this connection through
+ * `connectionId` only configure a relative `path`, which is resolved against `pathPrefix`. Use it to keep
+ * environment specific storage locations out of the DataObject definitions, so the same DataObjects can be
+ * deployed to different environments by exchanging the connection only.
+ *
+ * Example:
+ * {{{
+ * connections {
+ *   cloud-staging {
+ *     type = HadoopFileConnection
+ *     pathPrefix = "abfs://staging@mystorage.dfs.core.windows.net/data"
+ *   }
+ * }
+ * }}}
  *
  * @param id unique id of this connection
  * @param pathPrefix schema, authority and base path for accessing files on hadoop
- * @param acl permissions for files created with this connection
- * @param metadata
+ * @param sparkConnectionId optional id of a Spark engine connection (e.g. `SparkClassicConnection`).
+ *                          Note that this attribute is currently not evaluated by SDLB. The engine connection
+ *                          used is selected per Action through its `engineConnectionId`, which falls back to
+ *                          `Environment.defaultEngineConnectionId`.
  */
 case class HadoopFileConnection(override val id: ConnectionId,
                                 pathPrefix: String,
-                                acl: Option[AclDef] = None,
+                                sparkConnectionId: Option[ConnectionId] = None,
                                 override val metadata: Option[ConnectionMetadata] = None
-                               ) extends Connection {
-
-  override def factory: FromConfigFactory[Connection] = HadoopFileConnection
-}
+                               ) extends Connection
 
 object HadoopFileConnection extends FromConfigFactory[Connection] {
   override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): HadoopFileConnection = {

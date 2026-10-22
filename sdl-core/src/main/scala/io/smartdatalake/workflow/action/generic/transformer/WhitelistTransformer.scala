@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import com.typesafe.config.Config
@@ -28,7 +27,33 @@ import io.smartdatalake.workflow.dataframe.GenericDataFrame
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 /**
- * Apply a column whitelist to a DataFrame.
+ * Apply a column whitelist to a DataFrame: only the columns listed in `columnWhitelist` are kept, all others are
+ * dropped. Use it to project a wide source down to the attributes a pipeline really needs, e.g. to exclude
+ * confidential columns, without writing a SQL select statement.
+ *
+ * Column names are matched case-insensitively unless case sensitivity is enabled globally
+ * (`global.environment.caseSensitive`). In the default case-insensitive mode the output keeps the column order
+ * of the input DataFrame; with case sensitivity enabled the order of the selected columns is undefined.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   copy-airports {
+ *     type = CopyAction
+ *     inputId = stg-airports
+ *     outputId = int-airports
+ *     transformers = [{
+ *       type = WhitelistTransformer
+ *       columnWhitelist = [ident, name, latitude_deg, longitude_deg]
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
+ * @note Names in `columnWhitelist` which do not exist in the input DataFrame are logged as warning and ignored,
+ *       they do not fail the Action.
+ * @see [[BlacklistTransformer]] to instead drop a list of columns and keep the rest.
+ *
  * @param name         name of the transformer
  * @param description  Optional description of the transformer
  * @param columnWhitelist List of columns to keep from DataFrame
@@ -44,8 +69,6 @@ case class WhitelistTransformer(override val name: String = "whitelist", overrid
     val colsToSelect = df.schema.filterColumns(columnWhitelist)
     df.select(colsToSelect.map(SQLUtil.sparkQuoteSQLIdentifier).map(col))
   }
-
-  override def factory: FromConfigFactory[GenericDfTransformer] = WhitelistTransformer
 }
 
 object WhitelistTransformer extends FromConfigFactory[GenericDfTransformer] {

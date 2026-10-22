@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,76 +16,133 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
-import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig, SdlConfigObject}
+import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{DefaultExpressionData, ExpressionUtil, SmartDataLakeLogger}
 import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfTransformer.PREVIOUS_TRANSFORMER_NAME
-import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.IS_EXEC
+import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.{IS_EXEC, NB_OF_PARTITIONS}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
-import org.apache.spark.sql.DataFrame
 
-import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
-trait Transformer
+trait Transformer extends SmartDataLakeLogger {
+
+  /**
+   * Evaluate runtimeOptions expressions against [[DefaultExpressionData]].
+   * An option whose expression evaluates to null is left undefined and a warning is logged.
+   */
+  protected def evaluateRuntimeOptions(actionId: ActionId, transformerName: String, runtimeOptions: Map[String, String], partitionValues: Seq[PartitionValues])(implicit
+      context: ActionPipelineContext
+  ): Map[String, String] = {
+    lazy val data = DefaultExpressionData.from(context, partitionValues)
+    val evaluatedOptions = runtimeOptions.map {
+      case (key, expr) => (key, expr, ExpressionUtil.evaluateString(actionId, Some(s"transformations.$transformerName.runtimeOptions"), expr, data))
+    }
+    // an option whose expression evaluates to null is left undefined. Log this, as a later substitution of %{key} fails.
+    evaluatedOptions.filter(_._3.isEmpty).foreach { case (key, expr, _) =>
+      logger.warn(s"($actionId) runtimeOption '$key' of transformation $transformerName is not defined," +
+        s" because its expression \"$expr\" evaluated to null in phase ${context.phase}." +
+        " Note that metrics of previous Actions are only available in the exec phase." +
+        s" Use coalesce(<expression>, <default>) if $key should be defined in all phases.")
+    }
+    evaluatedOptions.collect { case (key, _, Some(value)) => (key, value) }.toMap
+  }
+}
 
 trait PartitionValueTransformer extends Transformer {
-  /**
-   * Optional function to define the transformation of input to output partition values.
-   * For example this enables to implement aggregations where multiple input partitions are combined into one output partition.
-   * Note that the default value is input = output partition values, which should be correct for most use cases.
-   * @param actionId id of the action which executes this transformation. This is mainly used to prefix error messages.
-   * @param partitionValues partition values to transform
-   * @return Map of input to output partition values. This allows to map partition values forward and backward, which is needed in execution modes. Return None if mapping is 1:1.
-   */
-  def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = None
 
-  private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValuesMap: Map[PartitionValues,PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
-    val thisPartitionValuesMap = transformPartitionValues(actionId, partitionValuesMap.values.toStream.distinct, executionModeResultOptions) // toStream is lazy: distinct is only calculated if transformPartitionValues creates a mapping.
+  /**
+   * Optional function to define the transformation of input to output partition values. For example
+   * this enables to implement aggregations where multiple input partitions are combined into one
+   * output partition. Note that the default value is input = output partition values, which should
+   * be correct for most use cases.
+   * @param actionId
+   *   id of the action which executes this transformation. This is mainly used to prefix error
+   *   messages.
+   * @param partitionValues
+   *   partition values to transform
+   * @return
+   *   Map of input to output partition values. This allows to map partition values forward and
+   *   backward, which is needed in execution modes. Return None if mapping is 1:1.
+   */
+  def transformPartitionValues(
+      actionId: ActionId,
+      partitionValues: Seq[PartitionValues],
+      executionModeResultOptions: Map[String, String]
+  )(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = None
+
+  private[smartdatalake] def applyTransformation(
+      actionId: ActionId,
+      partitionValuesMap: Map[PartitionValues, PartitionValues],
+      executionModeResultOptions: Map[String, String]
+  )(implicit context: ActionPipelineContext): Map[PartitionValues, PartitionValues] = {
+    val thisPartitionValuesMap = transformPartitionValues(actionId, partitionValuesMap.values.to(LazyList).distinct,
+      executionModeResultOptions) // toStream is lazy: distinct is only calculated if transformPartitionValues creates a mapping.
     thisPartitionValuesMap.map { newMapping =>
       // transform is mapping is defined
       def lookupNewValue(key: PartitionValues) =
-        newMapping.getOrElse(key, throw new IllegalStateException(s"($actionId) No entry found for partitionValues=$key in mapping returned from ${this.getClass.getSimpleName}.transformPartitionValues"))
+        newMapping.getOrElse(
+          key,
+          throw new IllegalStateException(s"($actionId) No entry found for partitionValues=$key" +
+            s" in mapping returned from ${this.getClass.getSimpleName}.transformPartitionValues")
+        )
 
-      partitionValuesMap.mapValues(lookupNewValue).toMap
+      partitionValuesMap.view.mapValues(lookupNewValue).toMap
     }.getOrElse(partitionValuesMap)
   }
 }
 
 /**
  * Interface to implement GenericDataFrame transformers working with one input and one output (1:1)
- * Note that this interface cannot be parsed from config, it's only used for programmatically defined transformers.
- * Check GenericDfTransformer trait to implement transformers that should be parsed from config.
+ * Note that this interface cannot be parsed from config, it's only used for programmatically
+ * defined transformers. Check GenericDfTransformer trait to implement transformers that should be
+ * parsed from config.
  */
 trait GenericDfTransformerDef extends PartitionValueTransformer {
   def name: String
 
   def description: Option[String] = None
+
   /**
    * Optional function to implement validations in prepare phase.
    */
   def prepare(actionId: ActionId)(implicit context: ActionPipelineContext): Unit = ()
-  /**
-   * Function to be implemented to define the transformation between an input and output DataFrame (1:1)
-   */
-  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame
 
   /**
-   * Declare supported Language for transformation.
-   * Can be DataFrameSubFeed to work with GenericDataFrame, or SparkSubFeed to work with Spark-DataFrames
+   * Function to be implemented to define the transformation between an input and output DataFrame
+   * (1:1)
    */
-  private[smartdatalake] def getSubFeedSupportedType: Type = typeOf[DataFrameSubFeed]
+  def transform(
+      actionId: ActionId,
+      partitionValues: Seq[PartitionValues],
+      df: GenericDataFrame,
+      dataObjectId: DataObjectId,
+      previousTransformerName: Option[String],
+      executionModeResultOptions: Map[String, String]
+  )(implicit context: ActionPipelineContext): GenericDataFrame
 
-  private[smartdatalake] def applyTransformation(actionId: ActionId, subFeed: DataFrameSubFeed, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): DataFrameSubFeed = {
-    val transformedDf = subFeed.dataFrame.map(df => transform(actionId, subFeed.partitionValues, df, subFeed.dataObjectId, previousTransformerName, executionModeResultOptions))
-    val transformedPartitionValues = transformPartitionValues(actionId, subFeed.partitionValues, executionModeResultOptions).map(_.values.toSeq.distinct)
-      .getOrElse(subFeed.partitionValues)
+  /**
+   * Declare supported Language for transformation. Can be DataFrameSubFeed to work with
+   * GenericDataFrame, or SparkSubFeed to work with Spark-DataFrames
+   */
+  def getSubFeedSupportedType: Type = typeOf[DataFrameSubFeed]
+
+  private[smartdatalake] def applyTransformation(
+      actionId: ActionId,
+      subFeed: DataFrameSubFeed,
+      previousTransformerName: Option[String],
+      executionModeResultOptions: Map[String, String]
+  )(implicit context: ActionPipelineContext): DataFrameSubFeed = {
+    val transformedDf = subFeed.dataFrame.map(df =>
+      transform(actionId, subFeed.partitionValues, df, subFeed.dataObjectId, previousTransformerName, executionModeResultOptions)
+    )
+    val transformedPartitionValues =
+      transformPartitionValues(actionId, subFeed.partitionValues, executionModeResultOptions).map(_.values.toSeq.distinct)
+        .getOrElse(subFeed.partitionValues)
     subFeed.withDataFrame(transformedDf).withPartitionValues(transformedPartitionValues)
   }
 }
@@ -96,113 +153,82 @@ trait GenericDfTransformerDef extends PartitionValueTransformer {
 trait GenericDfTransformer extends GenericDfTransformerDef with ParsableFromConfig[GenericDfTransformer] with ConfigHolder
 
 /**
- * Interface to implement Spark-DataFrame transformers working with one input and one output (1:1)
- */
-trait SparkDfTransformer extends GenericDfTransformer {
-  def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId)(implicit context: ActionPipelineContext): DataFrame
-  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    df match {
-      case sparkDf: SparkDataFrame => SparkDataFrame(transform(actionId, partitionValues, sparkDf.inner, dataObjectId))
-      case _ => throw new IllegalStateException(s"($actionId) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method transform")
-    }
-  }
-  override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
-}
-
-/**
- * Interface to implement GenericDataFrame transformers working with one input and one output (1:1) and options.
- * This trait extends GenericDfTransformerDef to pass a map of options as parameter to the transform function.
- * This is mainly used by custom transformers.
+ * Interface to implement GenericDataFrame transformers working with one input and one output (1:1)
+ * and options. This trait extends GenericDfTransformerDef to pass a map of options as parameter to
+ * the transform function. This is mainly used by custom transformers.
  */
 trait OptionsGenericDfTransformer extends GenericDfTransformer {
-  def options: Map[String,String]
-  def runtimeOptions: Map[String,String]
+  def options: Map[String, String]
+  def runtimeOptions: Map[String, String]
 
   /**
-   * Function to be implemented to define the transformation between an input and output DataFrame (1:1)
-   * @param options Options specified in the configuration for this transformation, including evaluated runtimeOptions
+   * Function to be implemented to define the transformation between an input and output DataFrame
+   * (1:1)
+   * @param options
+   *   Options specified in the configuration for this transformation, including evaluated
+   *   runtimeOptions
    */
-  def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, options: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame
+  def transformWithOptions(
+      actionId: ActionId,
+      partitionValues: Seq[PartitionValues],
+      df: GenericDataFrame,
+      dataObjectId: DataObjectId,
+      options: Map[String, String]
+  )(implicit context: ActionPipelineContext): GenericDataFrame
 
   /**
-   * Optional function to define the transformation of input to output partition values.
-   * For example this enables to implement aggregations where multiple input partitions are combined into one output partition.
-   * Note that the default value is input = output partition values, which should be correct for most use cases.
-   * @param options Options specified in the configuration for this transformation, including evaluated runtimeOptions
+   * Optional function to define the transformation of input to output partition values. For example
+   * this enables to implement aggregations where multiple input partitions are combined into one
+   * output partition. Note that the default value is input = output partition values, which should
+   * be correct for most use cases.
+   * @param options
+   *   Options specified in the configuration for this transformation, including evaluated
+   *   runtimeOptions
    */
-  def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String,String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = None
+  def transformPartitionValuesWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], options: Map[String, String])(implicit
+      context: ActionPipelineContext
+  ): Option[Map[PartitionValues, PartitionValues]] = None
 
-  final override def transformPartitionValues(actionId: ActionId, partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): Option[Map[PartitionValues,PartitionValues]] = {
+  final override def transformPartitionValues(
+      actionId: ActionId,
+      partitionValues: Seq[PartitionValues],
+      executionModeResultOptions: Map[String, String]
+  )(implicit context: ActionPipelineContext): Option[Map[PartitionValues, PartitionValues]] = {
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // transform
     transformPartitionValuesWithOptions(actionId, partitionValues, options ++ runtimeOptionsReplaced ++ executionModeResultOptions)
   }
-  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
+  final override def transform(
+      actionId: ActionId,
+      partitionValues: Seq[PartitionValues],
+      df: GenericDataFrame,
+      dataObjectId: DataObjectId,
+      previousTransformerName: Option[String],
+      executionModeResultOptions: Map[String, String]
+  )(implicit context: ActionPipelineContext): GenericDataFrame = {
     // replace runtime options
     val runtimeOptionsReplaced = prepareRuntimeOptions(actionId, partitionValues)
     // prepare default options
     val defaultOptions = Seq(
-      IS_EXEC -> context.isExecPhase.toString
+      IS_EXEC -> context.isExecPhase.toString,
+      NB_OF_PARTITIONS -> partitionValues.size.toString
     ).toMap
     // transform
-    transformWithOptions(actionId, partitionValues, df, dataObjectId, defaultOptions ++ options ++ runtimeOptionsReplaced ++ executionModeResultOptions ++ previousTransformerName.map(PREVIOUS_TRANSFORMER_NAME -> _))
+    transformWithOptions(
+      actionId,
+      partitionValues,
+      df,
+      dataObjectId,
+      defaultOptions ++ options ++ runtimeOptionsReplaced ++ executionModeResultOptions ++
+        previousTransformerName.map(PREVIOUS_TRANSFORMER_NAME -> _)
+    )
   }
-  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
-    lazy val data = DefaultExpressionData.from(context, partitionValues)
-    runtimeOptions.mapValues {
-      expr => SparkExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
-    }.filter(_._2.isDefined).mapValues(_.get).toMap
-  }
+
+  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit
+      context: ActionPipelineContext
+  ): Map[String, String] = evaluateRuntimeOptions(actionId, name, runtimeOptions, partitionValues)
 }
 object OptionsGenericDfTransformer {
   private[smartdatalake] val PREVIOUS_TRANSFORMER_NAME = "previousTransformerName"
 }
-
-/**
- * Interface to implement Spark-DataFrame transformers working with one input and one output (1:1) and options.
- * This trait extends OptionsGenericDfTransformer and passes a map of options as parameter to the transform function.
- * This is mainly used by custom transformers.
- */
-trait OptionsSparkDfTransformer extends OptionsGenericDfTransformer {
-  def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: DataFrame, dataObjectId: DataObjectId, options: Map[String,String])(implicit context: ActionPipelineContext): DataFrame
-  final override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: DataObjectId, options: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    df match {
-      case sparkDf: SparkDataFrame => SparkDataFrame(transformWithOptions(actionId, partitionValues, sparkDf.inner, dataObjectId, options))
-      case _ => throw new IllegalStateException(s"($actionId) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method transformWithOptions")
-    }
-  }
-  override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
-}
-
-/**
- * Legacy wrapper for pure Spark-DataFrame transformation function
- */
-case class SparkDfTransformerFunctionWrapper(override val name: String, fn: DataFrame => DataFrame) extends GenericDfTransformerDef {
-  override val description: Option[String] = None
-  override def transform(actionId: SdlConfigObject.ActionId, partitionValues: Seq[PartitionValues], df: GenericDataFrame, dataObjectId: SdlConfigObject.DataObjectId, previousTransformerName: Option[String], executionModeResultOptions: Map[String,String])(implicit context: ActionPipelineContext): GenericDataFrame = {
-    df match {
-      case sparkDf: SparkDataFrame => SparkDataFrame(fn(sparkDf.inner))
-      case _ => throw new IllegalStateException(s"($actionId) Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method transform")
-    }
-  }
-  override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

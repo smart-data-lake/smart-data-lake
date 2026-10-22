@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ trait AuthMode extends ParsableFromConfig[AuthMode] with ConfigHolder {
    * This method is called in prepare phase through the data object.
    * It allows to check configuration and setup variables.
    */
-  private[smartdatalake] def prepare(): Unit = ()
+  def prepare(): Unit = ()
 
   /**
    * This method is called after exec phase through the postExec method of the data object.

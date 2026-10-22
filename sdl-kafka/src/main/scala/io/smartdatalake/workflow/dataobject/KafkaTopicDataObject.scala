@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,12 +20,12 @@ package io.smartdatalake.workflow.dataobject
 
 import com.typesafe.config.Config
 import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
-import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry, LibraryOptions}
 import io.smartdatalake.definitions.SaveModeOptions
-import io.smartdatalake.metrics.SparkStageMetricsListener
 import io.smartdatalake.util.LogUtils.debugLog
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
+import io.smartdatalake.util.spark.SparkStageMetricsListener
+import io.smartdatalake.util.spark.dataset.{Transform, getEmptyDataFrame}
 import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.action.ActionSubFeedsImpl.MetricsMap
 import io.smartdatalake.workflow.connection.KafkaConnection
@@ -33,16 +33,20 @@ import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSchema, S
 import io.smartdatalake.workflow.dataframe.{GenericDataFrame, GenericSchema}
 import io.smartdatalake.workflow.dataobject.KafkaColumnType.{AvroSchemaRegistry, JsonSchemaRegistry, KafkaColumnType}
 import io.smartdatalake.workflow.dataobject.TopicPartitionOffsets.getOffsetForSpark
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, CanEvolveSchema, CanHandlePartitions, SchemaValidation}
+import io.smartdatalake.workflow.dataobject.spark.{CanCreateSparkDataFrame, CanCreateStreamingDataFrame, CanWriteSparkDataFrame, DataStreamWriterOptions}
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer, OffsetAndMetadata}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.ByteArrayDeserializer
 import org.apache.spark.sql._
+import org.apache.spark.sql.avro.SchemaConverters
+import org.apache.spark.sql.classic.ColumnConversions._
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
-import org.apache.spark.sql.confluent.avro.{AvroSchemaConverter, ConfluentAvroConnector}
+import org.apache.spark.sql.confluent.avro.{AvroHelper, ConfluentAvroConnector}
 import org.apache.spark.sql.confluent.json.ConfluentJsonConnector
 import org.apache.spark.sql.confluent.{ConfluentConnector, SubjectType}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.streaming.{OutputMode, StreamingQuery, Trigger}
+import org.apache.spark.sql.streaming.StreamingQuery
 import org.apache.spark.sql.types._
 import org.slf4j.Logger
 
@@ -65,20 +69,20 @@ import scala.jdk.CollectionConverters._
  *                                But it might be useful to export all data before a scheduled maintenance.
  */
 case class DatePartitionColumnDef(colName: String, timeFormat: String = "yyyyMMdd", timeUnit: String = "days", timeZone: Option[String] = None, includeCurrentPartition: Boolean = false) {
-  @transient lazy private[smartdatalake] val formatter = DateTimeFormatter.ofPattern(timeFormat) // not serializable -> transient lazy to use in udf
-  private[smartdatalake] val chronoUnit = ChronoUnit.valueOf(timeUnit.toUpperCase)
-  private[smartdatalake] val zoneId = timeZone.map(ZoneId.of).getOrElse(ZoneId.systemDefault)
-  private[smartdatalake] def parse(value: String ): LocalDateTime = {
+  def formatter: DateTimeFormatter = DateTimeFormatter.ofPattern(timeFormat) // not serializable -> transient lazy to use in udf
+  def chronoUnit: ChronoUnit = ChronoUnit.valueOf(timeUnit.toUpperCase)
+  def zoneId: ZoneId = timeZone.map(ZoneId.of).getOrElse(ZoneId.systemDefault)
+  def parse(value: String ): LocalDateTime = {
     formatter.parseBest(value, TemporalQueries.LocalDateTimeQuery, TemporalQueries.LocalDateQuery, TemporalQueries.LocalYearMonthQuery ) match {
       case d: LocalDateTime => d
       case d: LocalDate => d.atStartOfDay()
       case d: YearMonth => d.atDay(1).atStartOfDay()
     }
   }
-  private[smartdatalake] def format( dateTime: LocalDateTime ) = dateTime.format(formatter)
-  private[smartdatalake] def next(dateTime: LocalDateTime, units: Int = 1) = dateTime.plus(units, chronoUnit)
-  private[smartdatalake] def previous(dateTime: LocalDateTime, units: Int = 1) = dateTime.minus(units, chronoUnit)
-  private[smartdatalake] def current = LocalDateTime.now().truncatedTo(chronoUnit)
+  def format( dateTime: LocalDateTime ): String = dateTime.format(formatter)
+  def next(dateTime: LocalDateTime, units: Int = 1): LocalDateTime = dateTime.plus(units, chronoUnit)
+  def previous(dateTime: LocalDateTime, units: Int = 1): LocalDateTime = dateTime.minus(units, chronoUnit)
+  def current: LocalDateTime = LocalDateTime.now().truncatedTo(chronoUnit)
 }
 
 private object TemporalQueries {
@@ -92,28 +96,52 @@ private object TemporalQueries {
  * Provides details to an action to read from Kafka Topics using either
  * [[org.apache.spark.sql.DataFrameReader]] or [[org.apache.spark.sql.streaming.DataStreamReader]]
  *
- * Key & value schema can be automatically read from and written to confluent schema registry for Json and Avro.
- * Json and Avro can also be parsed with a fixed schema.
+ * Key & value schema can be automatically read from and written to confluent schema registry for JSON and Avro.
+ * JSON and Avro can also be parsed with a fixed schema.
  *
  * Can interpret record timestamp as SDLB partition values by setting datePartitionCol attribute. This allows to use this DataObject as input for PartitionDiffMode.
  * The DataObject does not support writing with SDLB partition values, as timestamp is autogenerated by Kafka using current time.
  *
  * Support incremental output and use with DataObjectStateIncrementalMode.
  *
+ * Example:
+ * {{{
+ * connections = {
+ *   kafka-con {
+ *     type = KafkaConnection
+ *     brokers = "localhost:9092"
+ *     schemaRegistry = "http://localhost:8081"
+ *   }
+ * }
+ * dataObjects = {
+ *   stg-departures {
+ *     type = KafkaTopicDataObject
+ *     topicName = "departures"
+ *     connectionId = kafka-con
+ *     valueType = AvroSchemaRegistry
+ *     selectCols = ["value.*", "timestamp"]
+ *   }
+ * }
+ * }}}
+ *
  * @param topicName The name of the topic to read
+ * @param connectionId id of the [[io.smartdatalake.workflow.connection.KafkaConnection]] defining brokers, schema registry and authentication.
+ *                     A schemaRegistry must be configured in the connection if keyType or valueType is set to Json/AvroSchemaRegistry.
  * @param keyType    Optional type the key column should be converted to. If none is given it will be interpreted as string.
- * @param keySchema  An optional schema for parsing the key column. This can be used if keyType = Json or Avro to parse the corresponding content.
+ * @param keySchema  An optional schema for parsing the key column. This can be used if keyType = JSON or Avro to parse the corresponding content.
  *                   Define the schema by using one of the schema providers DDL, jsonSchemaFile, avroSchemaFile, xsdFile or caseClassName.
  *                   The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
  *                   A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
  * @param valueType  Optional type the value column should be converted to. If none is given it will be interpreted as string.
- * @param valueSchema An optional schema for parsing the value column. This has to be specified if valueType = Json or Avro to parse the corresponding content.
+ * @param valueSchema An optional schema for parsing the value column. This has to be specified if valueType = JSON or Avro to parse the corresponding content.
  *                    Define the schema by using one of the schema providers DDL, jsonSchemaFile, avroSchemaFile, xsdFile or caseClassName.
  *                    The schema provider and its configuration value must be provided in the format <PROVIDERID>#<VALUE>.
  *                    A DDL-formatted string is a comma separated list of field definitions, e.g., a INT, b STRING.
- * @param allowSchemaEvolution If set to true schema evolution within schema registry will automatically occur when writing to this DataObject with different key or value schema, otherwise SDL will stop with error.
+ * @param allowSchemaEvolution If set to true schema evolution within schema registry will automatically occur
+ *                             when writing to this DataObject with different key or value schema, otherwise SDL will stop with error.
  *                             This only applies if keyType or valueType is set to Json/AvroSchemaRegistry.
- *                             Kafka Schema Evolution implementation will update schema if existing records with old schema can be read with new schema (backward compatible). Otherwise an IncompatibleSchemaException is thrown.
+ *                             Kafka Schema Evolution implementation will update schema if existing records with old schema can be read with new schema (backward compatible).
+ *                             Otherwise an IncompatibleSchemaException is thrown.
  * @param selectCols Columns to be selected when reading the DataFrame. Available columns are key, value, topic,
  *                   partition, offset, timestamp, timestampType. If key/valueType is AvroSchemaRegistry the key/value column are
  *                   convert to a complex type according to the avro schema. To expand it select "value.*".
@@ -122,7 +150,7 @@ private object TemporalQueries {
  *                   This is used to list existing partition and is added as additional column on batch read.
  * @param batchReadConsecutivePartitionsAsRanges Set to true if consecutive partitions should be combined as one range of offsets when batch reading from topic. This results in less tasks but can be a performance problem when reading many partitions. (default=false)
  * @param batchReadMaxOffsetsPerTask Set number of offsets per Spark task when batch reading from topic.
- * @param options    Options for the Kafka stream reader (see https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html).
+ * @param options    Options for the Kafka stream reader.
  *                   These options override connection.options.
  */
 case class KafkaTopicDataObject(override val id: DataObjectId,
@@ -137,18 +165,18 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
                                 datePartitionCol: Option[DatePartitionColumnDef] = None,
                                 batchReadConsecutivePartitionsAsRanges: Boolean = false,
                                 batchReadMaxOffsetsPerTask: Option[Int] = None,
+                                @LibraryOptions("https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html")
                                 override val options: Map[String, String] = Map(),
                                 override val metadata: Option[DataObjectMetadata] = None
-                           )(implicit instanceRegistry: InstanceRegistry)
+                           )(implicit val instanceRegistry: InstanceRegistry)
   extends DataObject with CanCreateIncrementalOutput with CanCreateSparkDataFrame with CanCreateStreamingDataFrame
     with CanWriteSparkDataFrame with CanHandlePartitions with SchemaValidation with CanEvolveSchema
-    with io.smartdatalake.util.spark.dataset.Transform {
+    with Transform {
 
   private implicit val loggImpl: Logger = logger
 
   override val partitions: Seq[String] = datePartitionCol.map(_.colName).toSeq
   override val expectedPartitionsCondition: Option[String] = None // expect all partitions to exist
-  private val udfFormatPartition = udf((ts:Timestamp) => ts.toLocalDateTime.truncatedTo(datePartitionCol.get.chronoUnit).format(datePartitionCol.get.formatter))
 
   override def schemaMin: Option[GenericSchema] = None // minimal schema doesn't make sense, as schema is always fully defined.
 
@@ -164,13 +192,13 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   if (allowSchemaEvolution && Seq(keyType,valueType).intersect(Seq(JsonSchemaRegistry,AvroSchemaRegistry)).isEmpty) logger.warn(s"($id) allowSchemaEvolution=true is ignored if keyType or valueType is not set to Json/AvroSchemaRegistry")
   require(batchReadMaxOffsetsPerTask.isEmpty || batchReadMaxOffsetsPerTask.exists(_>0), s"($id) batchReadMaxOffsetsPerTask must be greater than 0")
 
-  @transient lazy val keyConfluentConnector: Option[ConfluentConnector] = keyType match {
+  @transient private lazy val keyConfluentConnector: Option[ConfluentConnector] = keyType match {
     case KafkaColumnType.JsonSchemaRegistry => connection.schemaRegistry.map(ConfluentJsonConnector(_))
     case KafkaColumnType.AvroSchemaRegistry => connection.schemaRegistry.map(ConfluentAvroConnector(_))
     case _ => None
   }
 
-  @transient lazy val valueConfluentConnector: Option[ConfluentConnector] = valueType match {
+  @transient private lazy val valueConfluentConnector: Option[ConfluentConnector] = valueType match {
     case KafkaColumnType.JsonSchemaRegistry => connection.schemaRegistry.map(ConfluentJsonConnector(_))
     case KafkaColumnType.AvroSchemaRegistry => connection.schemaRegistry.map(ConfluentAvroConnector(_))
     case _ => None
@@ -188,7 +216,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
       props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, classOf[ByteArrayDeserializer].getName)
       instanceOptions.get("groupIdPrefix").foreach(prefix => props.put(ConsumerConfig.GROUP_ID_CONFIG, prefix + context.application))
       instanceOptions
-        .filter { case (k,v) => k.startsWith(connection.KafkaConfigOptionPrefix)} // only kafka specific options
+        .filter { case (k, _) => k.startsWith(connection.KafkaConfigOptionPrefix)} // only kafka specific options
         .foreach { case (k,v) => props.put(k.stripPrefix(connection.KafkaConfigOptionPrefix),v)}
       _consumer = Some(new KafkaConsumer(props))
     }
@@ -215,7 +243,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def getStreamingDataFrame(options: Map[String,String], schema: Option[StructType])(implicit context: ActionPipelineContext): DataFrame = {
-    val dfRaw = context.sparkSession
+    val dfRaw = SparkSubFeed.getSparkSession
       .readStream
       .format("kafka")
       .options(instanceOptions ++ options) // options override kafkaOptions override connection.kafkaOptions
@@ -227,10 +255,16 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   private def convertToReadDataFrame(dfRaw: DataFrame): DataFrame = {
     // convert key & value
     val colsToSelect = ((if (selectCols.nonEmpty) selectCols else Seq("kafka.*")) ++ partitions).distinct.map(col)
-    dfRaw
-      .withOptionalColumn(datePartitionCol.map(_.colName), udfFormatPartition(col("timestamp")))
+    var dfRead = dfRaw
+    if (datePartitionCol.isDefined) {
+      val colDef = datePartitionCol.get
+      val udfFormatPartition = udf((ts:Timestamp) => ts.toLocalDateTime.truncatedTo(colDef.chronoUnit).format(colDef.formatter))
+      dfRead = dfRead
+        .withColumn(colDef.colName, udfFormatPartition(col("timestamp")))
+    }
+    dfRead
       .as("kafka")
-      .select(colsToSelect: _*)
+      .select(colsToSelect.toIndexedSeq: _*)
   }
 
   private def decodeKeyValue(dfRaw: DataFrame): DataFrame = {
@@ -241,7 +275,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   }
 
   override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
-    implicit val session: SparkSession = context.sparkSession
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
 
     // get DataFrame from topic
     val dfRaw = if (_kafkaStateIncrementalModeEnabled && context.isExecPhase) {
@@ -337,10 +371,11 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
    * @return a DataFrame filtered to given offsets.
    */
   def createDataFrameForTopicPartitionOffsets(topicPartitionOffsets: Seq[TopicPartitionOffsets], logInfo: String)(implicit session: SparkSession): DataFrame = {
+    if (topicPartitionOffsets.isEmpty) return createEmptyRawDataFrame
     // split offsets according to maxOffsetsPerTask
     val topicPartitionOffsetsSplitted = topicPartitionOffsets.map( tpo => if (batchReadMaxOffsetsPerTask.isDefined) tpo.split(batchReadMaxOffsetsPerTask.get) else Seq(tpo))
     // ensure that every partition has the same number of tasks by adding empty entries
-    val maxNbOfTasksPerPartition = topicPartitionOffsetsSplitted.map(_.size).max
+    val maxNbOfTasksPerPartition = topicPartitionOffsetsSplitted.map(_.size).maxOption.getOrElse(1)
     val topicPartitionOffsetsBalanced = topicPartitionOffsetsSplitted.map( tpos => tpos ++ tpos.last.getEmptyEndEntries(maxNbOfTasksPerPartition-tpos.size))
     // transpose so that we have a list of tasks for every partition per query
     val topicPartitionOffsetsQueries = topicPartitionOffsetsBalanced.transpose
@@ -369,7 +404,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   override def writeSparkDataFrame(df: DataFrame, partitionValues: Seq[PartitionValues] = Seq(), isRecursiveInput: Boolean = false, saveModeOptions: Option[SaveModeOptions] = None)
                              (implicit context: ActionPipelineContext): MetricsMap = {
     assert(partitionValues.isEmpty, s"($id) KafkaTopicDataObject does not support writing using partition values: partitionValues=${partitionValues.mkString(",")}")
-    SparkStageMetricsListener.execWithMetrics(this.id,
+    var metrics = SparkStageMetricsListener.execWithMetrics(this.id,
       encodeKeyValue(df)
         .write
         .format("kafka")
@@ -377,20 +412,28 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         .option("topic", topicName)
         .save()
     )
+    // Kafka might return 0 for records_written even if writing was successful.
+    // Filter out this metric to avoid NoDataToProcessException and skipping this and subsequent actions.
+    if (metrics.get("records_written").contains(0)) {
+      metrics = metrics - "records_written"
+    }
+    metrics
   }
 
-  override def writeStreamingDataFrame(df: GenericDataFrame, trigger: Trigger, options: Map[String, String], checkpointLocation: String, queryName: String, outputMode: OutputMode, saveModeOptions: Option[SaveModeOptions] = None)
+  override def writeStreamingDataFrame(df: GenericDataFrame,
+                                       options: DataStreamWriterOptions,
+                                       saveModeOptions: Option[SaveModeOptions] = None)
                                       (implicit context: ActionPipelineContext): StreamingQuery = {
     df match {
       case sparkDf: SparkDataFrame =>
         encodeKeyValue(sparkDf.inner)
           .writeStream
           .format("kafka")
-          .trigger(trigger)
-          .queryName(queryName)
-          .outputMode(outputMode)
-          .options(instanceOptions ++ options)
-          .option("checkpointLocation", checkpointLocation)
+          .trigger(options.trigger)
+          .queryName(options.queryName)
+          .outputMode(options.outputMode)
+          .options(instanceOptions ++ options.options)
+          .option("checkpointLocation", options.checkpointLocation)
           .option("topic", topicName)
           .start()
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${df.subFeedType.typeSymbol.name} in method writeStreamingDataFrame")
@@ -428,12 +471,12 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         // reading is done with the specified schema. It needs to be converted to an avro schema for from_avro.
         val sparkSchema = schema.getOrElse(throw new IllegalStateException(s"($id) schema not defined in convertFromKafka"))
           .convert(SparkSubFeed.subFeedType).asInstanceOf[SparkSchema].inner
-        val avroSchema = AvroSchemaConverter.toAvroType(sparkSchema)
+        val avroSchema = AvroHelper.fixNullableDefault(SchemaConverters.toAvroType(sparkSchema))
         from_avro(dataCol, avroSchema.toString)
       case KafkaColumnType.JsonSchemaRegistry | KafkaColumnType.AvroSchemaRegistry =>
         subjectType match {
-          case SubjectType.key => keyConfluentConnector.get.from_confluent(dataCol, topicName, subjectType)
-          case SubjectType.value => valueConfluentConnector.get.from_confluent(dataCol, topicName, subjectType)
+          case SubjectType.key => DatasetHelper.toCol(keyConfluentConnector.get.from_confluent(dataCol.expr, topicName, subjectType))
+          case SubjectType.value => DatasetHelper.toCol(valueConfluentConnector.get.from_confluent(dataCol.expr, topicName, subjectType))
         }
     }
   }
@@ -447,12 +490,12 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         import org.apache.spark.sql.avro.functions.to_avro
         // writing is done with the specified schema. It needs to be converted to an avro schema for to_avro.
         val sparkSchema = schema.getOrElse(throw new IllegalStateException(s"($id) schema not defined in convertFromKafka")).convert(SparkSubFeed.subFeedType).asInstanceOf[SparkSchema].inner
-        val avroSchema = AvroSchemaConverter.toAvroType(sparkSchema)
+        val avroSchema = AvroHelper.fixNullableDefault(SchemaConverters.toAvroType(sparkSchema))
         to_avro(dataCol, avroSchema.toString)
       case KafkaColumnType.JsonSchemaRegistry | KafkaColumnType.AvroSchemaRegistry =>
         subjectType match {
-          case SubjectType.key => keyConfluentConnector.get.to_confluent(dataCol, topicName, subjectType, eagerCheck = eagerCheck, updateAllowed = allowSchemaEvolution)
-          case SubjectType.value => valueConfluentConnector.get.to_confluent(dataCol, topicName, subjectType, eagerCheck = eagerCheck, updateAllowed = allowSchemaEvolution)
+          case SubjectType.key => DatasetHelper.toCol(keyConfluentConnector.get.to_confluent(dataCol.expr, topicName, subjectType, eagerCheck = eagerCheck, updateAllowed = allowSchemaEvolution))
+          case SubjectType.value => DatasetHelper.toCol(valueConfluentConnector.get.to_confluent(dataCol.expr, topicName, subjectType, eagerCheck = eagerCheck, updateAllowed = allowSchemaEvolution))
         }
     }
   }
@@ -479,7 +522,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     // search how many partitions / chrono units back of data we have
     var cntEmptyConsecutive = 0
     // TODO: once Scala 2.12 has been reomved replace Stream by LazyList
-    val detectedPartitions = Stream.from(0).map {
+    val detectedPartitions = LazyList.from(0).map {
       unitsBack =>
         val startTimeIncl = datePartitionCol.get.previous(lastCompletedPartitionStartTime, unitsBack)
         val endTimeExcl = datePartitionCol.get.next(startTimeIncl)
@@ -489,7 +532,7 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
         val isEmpty = minStartTime.isEmpty || minStartTime.exists(_ >= endTimeExcl.atZone(datePartitionCol.get.zoneId).toInstant.toEpochMilli)
         (startTimeIncl, isEmpty, minStartTime)
     }.takeWhile {
-      case (startTimeIncl, isEmpty, minStartTime) =>
+      case (_, isEmpty, _) =>
         cntEmptyConsecutive = if (isEmpty) cntEmptyConsecutive + 1
         else 0
         cntEmptyConsecutive <= maxEmptyConsecutive
@@ -504,18 +547,27 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
   override def createReadSchema(writeSchema: GenericSchema)(implicit context: ActionPipelineContext): GenericSchema = {
     writeSchema match {
       case sparkWriteSchema: SparkSchema =>
-        implicit val session: SparkSession = context.sparkSession
+        implicit val session: SparkSession = SparkSubFeed.getSparkSession
         // add additional columns created by kafka source
-        val readSchemaRaw = sparkWriteSchema.inner
-          .add("topic", StringType)
-          .add("partition", IntegerType)
-          .add("offset", LongType)
-          .add("timestamp", TimestampType)
-          .add("timestampType", IntegerType)
+        val readSchemaRaw = addReadFields(sparkWriteSchema.inner)
         // apply selected columns and return schema
         SparkSchema(convertToReadDataFrame(getEmptyDataFrame(readSchemaRaw)).schema)
       case _ => throw new IllegalStateException(s"Unsupported subFeedType ${writeSchema.subFeedType.typeSymbol.name} in method createReadSchema")
     }
+  }
+
+  private def addReadFields(schema: StructType): StructType = {
+    schema
+      .add("topic", StringType)
+      .add("partition", IntegerType)
+      .add("offset", LongType)
+      .add("timestamp", TimestampType)
+      .add("timestampType", IntegerType)
+  }
+
+  private def createEmptyRawDataFrame(implicit session: SparkSession): DataFrame = {
+    val rawSchema = addReadFields(StructType(Seq(StructField("key", BinaryType), StructField("value", BinaryType))))
+    getEmptyDataFrame(rawSchema)
   }
 
   // Store incremental output state. This is a list of partitionNb and corresponding offset.
@@ -557,15 +609,13 @@ case class KafkaTopicDataObject(override val id: DataObjectId,
     assert(incrementalOutputState.nonEmpty, s"($id) commitIncrementalOutputState called but incrementalOutputState is not defined")
     assert(_kafkaStateIncrementalModeEnabled, s"($id) commitIncrementalOutputState called but enableKafkaStateIncrementalMode is not enabled")
     val offsetsToCommit = incrementalOutputState.get
-      .filter(_._2.nonEmpty) // dont commit empty offset
+      .filter(_._2.nonEmpty) // do not commit empty offset
       .map {
         case (partition, offset) => (new TopicPartition(topicName, partition), new OffsetAndMetadata(offset.get))
       }
     consumer.commitSync(offsetsToCommit.toMap.asJava)
     logger.info(s"($id) committed offsets: ${incrementalOutputState.get.mkString(",")}")
   }
-
-  override def factory: FromConfigFactory[DataObject] = KafkaTopicDataObject
 }
 
 object KafkaColumnType extends Enumeration {
@@ -604,7 +654,7 @@ private case class TopicPartitionOffsets(topicPartition: TopicPartition, startOf
 private object TopicPartitionOffsets {
   // default offset definitions according to spark
   val defaultOffsetEarliest: Int = -2
-  val defaultOffsetLatest: Int = -1
+  private val defaultOffsetLatest: Int = -1
 
   /**
    * Create string to use as starting/endingOffset option for Spark Kafka data source

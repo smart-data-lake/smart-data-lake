@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,12 +23,14 @@ import io.smartdatalake.app.{GlobalConfig, SDLPlugin, StateListener}
 import io.smartdatalake.config.InstanceRegistry
 import io.smartdatalake.util.hdfs.{DefaultFileSystemFactory, FileSystemFactory, UCFileSystemFactory}
 import io.smartdatalake.util.misc._
-import org.apache.spark.sql.SparkSession
+import io.smartdatalake.workflow.dataframe.plainScala.ScalaExpressionEvaluatorFactory
 import org.slf4j.event.Level
 
 import java.net.URI
 import java.sql.Timestamp
 import java.time.LocalDateTime
+import scala.jdk.CollectionConverters._
+import scala.util.Try
 
 /**
  * Environment dependent configurations.
@@ -57,11 +59,12 @@ object Environment extends SmartDataLakeLogger {
         EnvironmentUtil.getSdlParameter("expressionEvaluatorFactory")
           .map(ScalaUtil.companionOf[ExpressionEvaluatorFactory])
           .getOrElse {
-            val defaultFactories = Seq("ch.zzeekk.spark.expressions.SparkExpressionEvaluatorFactory", "org.apache.spark.sql.custom.SparkExpressionEvaluatorFactory")
+            val sparkFactories = Seq("ch.zzeekk.spark.expressions.SparkExpressionEvaluatorFactory", "org.apache.spark.sql.custom.SparkExpressionEvaluatorFactory")
               .flatMap(CustomCodeUtil.getClassByNameIfExists)
-            assert(defaultFactories.nonEmpty, "No ExpressionEvaluatorFactory found. Make sure spark-extensions or spark-expressions-standalone library is in the classpath.")
-            if (defaultFactories.size > 1) logger.warn(s"Multiple ExpressionEvaluatorFactory implementations found. Using ${defaultFactories.head.getName}. Make sure only one of spark-extensions or spark-expressions-standalone library is in the classpath.")
-            ScalaUtil.companionOf[ExpressionEvaluatorFactory](defaultFactories.head.getName)
+            if (sparkFactories.size > 1) logger.warn(s"Multiple ExpressionEvaluatorFactory implementations found. Using ${sparkFactories.head.getName}. Make sure only one of spark-extensions or spark-expressions-standalone library is in the classpath.")
+            // if no Spark expression library is in the classpath, fall back to the plain-Scala expression evaluator with limited expression support
+            val factoryClassName = sparkFactories.headOption.map(_.getName).getOrElse(classOf[ScalaExpressionEvaluatorFactory].getName)
+            ScalaUtil.companionOf[ExpressionEvaluatorFactory](factoryClassName)
           }
       )
     }
@@ -71,79 +74,35 @@ object Environment extends SmartDataLakeLogger {
   var _expressionEvaluatorFactory: Option[ExpressionEvaluatorFactory] = None
 
   /**
-   * List of hadoop authorities for which acls must be configured
-   * The environment parameter can contain multiple authorities separated by comma.
-   * An authority is compared against the filesystem URI with contains(...)
+   * SchemaProviders parse schema definitions given as configuration values, see
+   * [[io.smartdatalake.util.misc.SchemaUtil.readSchemaFromConfigValue]].
+   *
+   * By default all [[SchemaProvider]] implementations are discovered on the classpath (package io.smartdatalake),
+   * similar to [[io.smartdatalake.app.ModulePlugin]] and [[io.smartdatalake.workflow.dataobject.generic.DataObjectEngine]].
+   * Normally there is exactly one engine (and thus one provider) on the classpath, but more than one is supported.
+   *
+   * Alternatively a single concrete implementation can be enforced by setting the global option `schemaProvider` to
+   * its class name (the companion object), similar to [[expressionEvaluatorFactory]].
    */
-  def hadoopAuthoritiesWithAclsRequired: Seq[String] = {
-    if (_hadoopAuthoritiesWithAclsRequired.isEmpty) {
-      _hadoopAuthoritiesWithAclsRequired = Some(
-        EnvironmentUtil.getSdlParameter("hadoopAuthoritiesWithAclsRequired")
-          .toSeq.flatMap(_.split(','))
+  def schemaProviders: Seq[SchemaProvider] = {
+    if (_schemaProviders.isEmpty) {
+      _schemaProviders = Some(
+        EnvironmentUtil.getSdlParameter("schemaProvider")
+          .map(className => Seq(ScalaUtil.companionOf[SchemaProvider](className)))
+          .getOrElse {
+            val providerClasses = ReflectionUtil.getReflections("io.smartdatalake")
+              .getSubTypesOf(classOf[SchemaProvider]).asScala.toSeq
+            // implementations are expected to be Scala objects, resolve their companion instance and skip anything that isn't
+            val providers = providerClasses.flatMap(c => Try(ScalaUtil.companionOf[SchemaProvider](c.getName.stripSuffix("$"))).toOption)
+            logger.info(s"Discovered ${providers.size} SchemaProvider(s) on classpath: ${providers.map(_.getClass.getName).mkString(", ")}")
+            providers
+          }
       )
     }
-    _hadoopAuthoritiesWithAclsRequired.get
+    _schemaProviders.get
   }
-  var _hadoopAuthoritiesWithAclsRequired: Option[Seq[String]] = None
 
-  /**
-   * Modifying ACL's is only allowed below and including the following level (default=2)
-   * See also [[io.smartdatalake.util.misc.AclUtil]]
-   */
-  def hdfsAclsMinLevelPermissionModify: Int = {
-    if (_hdfsAclsMinLevelPermissionModify.isEmpty) {
-      _hdfsAclsMinLevelPermissionModify = Some(
-        EnvironmentUtil.getSdlParameter("hdfsAclsMinLevelPermissionModify")
-          .map(_.toInt).getOrElse(2)
-      )
-    }
-    _hdfsAclsMinLevelPermissionModify.get
-  }
-  var _hdfsAclsMinLevelPermissionModify: Option[Int] = None
-
-  /**
-   * Overwriting ACL's is only allowed below and including the following level (default=5)
-   * See also [[io.smartdatalake.util.misc.AclUtil]]
-   */
-  def hdfsAclsMinLevelPermissionOverwrite: Int = {
-    if (_hdfsAclsMinLevelPermissionOverwrite.isEmpty) {
-      _hdfsAclsMinLevelPermissionOverwrite = Some(
-        EnvironmentUtil.getSdlParameter("hdfsAclsMinLevelPermissionOverwrite")
-         .map(_.toInt).getOrElse(5)
-      )
-    }
-    _hdfsAclsMinLevelPermissionOverwrite.get
-  }
-  var _hdfsAclsMinLevelPermissionOverwrite: Option[Int] = None
-
-  /**
-   * Limit setting ACL's to Basedir (default=true)
-   * See hdfsAclsUserHomeLevel or hdfsBasedir on how the basedir is determined
-   */
-  def hdfsAclsLimitToBasedir: Boolean = {
-    if (_hdfsAclsLimitToBasedir.isEmpty) {
-      _hdfsAclsLimitToBasedir = Some(
-        EnvironmentUtil.getSdlParameter("hdfsAclsLimitToBasedir")
-         .map(_.toBoolean).getOrElse(true)
-      )
-    }
-    _hdfsAclsLimitToBasedir.get
-  }
-  var _hdfsAclsLimitToBasedir: Option[Boolean] = None
-
-  /**
-   * Set path level of user home to determine basedir automatically (Default=2 -> /user/myUserHome)
-   */
-  def hdfsAclsUserHomeLevel: Int = {
-    if (_hdfsAclsUserHomeLevel.isEmpty) {
-      _hdfsAclsUserHomeLevel = Some(
-        EnvironmentUtil.getSdlParameter("hdfsAclsUserHomeLevel")
-         .map(_.toInt).getOrElse(2)
-      )
-    }
-    _hdfsAclsUserHomeLevel.get
-  }
-  var _hdfsAclsUserHomeLevel: Option[Int] = None
+  var _schemaProviders: Option[Seq[SchemaProvider]] = None
 
   /**
    * Set basedir explicitly.
@@ -175,14 +134,30 @@ object Environment extends SmartDataLakeLogger {
   var _hadoopDefaultSchemeAuthority: Option[Option[URI]] = None
 
   /**
+   * Path of the Python executable of the Python environment used by SDLB, e.g. `/opt/venv/bin/python`.
+   * It is used by the SQL engine of sdl-sql, which embeds this Python environment into the JVM, and by the Python
+   * transformations and MLflow Actions of sdl-spark: it is set as Spark configuration `spark.pyspark.python` when SDLB
+   * creates the Spark session, and takes precedence over the environment variable PYSPARK_PYTHON then.
+   * If not set, `python3` (`python` on Windows) is taken from the PATH, respectively PYSPARK_PYTHON for Spark.
+   * Set it with the environment variable SDL_PYTHON_PATH, the java property sdl.pythonPath, or in the environment
+   * section of the global configuration.
+   */
+  def pythonPath: Option[String] = {
+    if (_pythonPath.isEmpty) {
+      _pythonPath = Some(EnvironmentUtil.getSdlParameter("pythonPath").filter(_.nonEmpty))
+    }
+    _pythonPath.get
+  }
+  var _pythonPath: Option[Option[String]] = None
+
+  /**
    * Set to true to enable check for duplicate first class object definitions when loading configuration (default=true).
    * The check fails if Connections, DataObjects or Actions are defined in multiple locations.
    */
   def enableCheckConfigDuplicates: Boolean = {
     if (_enableCheckConfigDuplicates.isEmpty) {
       _enableCheckConfigDuplicates = Some(
-        EnvironmentUtil.getSdlParameter("enableCheckConfigDuplicates")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("enableCheckConfigDuplicates").forall(_.toBoolean)
       )
     }
     _enableCheckConfigDuplicates.get
@@ -197,8 +172,7 @@ object Environment extends SmartDataLakeLogger {
   def schemaEvolutionNewColumnsLast: Boolean = {
     if (_schemaEvolutionNewColumnsLast.isEmpty) {
       _schemaEvolutionNewColumnsLast = Some(
-        EnvironmentUtil.getSdlParameter("schemaEvolutionNewColumnsLast")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("schemaEvolutionNewColumnsLast").forall(_.toBoolean)
       )
     }
     _schemaEvolutionNewColumnsLast.get
@@ -212,8 +186,7 @@ object Environment extends SmartDataLakeLogger {
   def schemaValidationIgnoresNullability: Boolean = {
     if (_schemaValidationIgnoresNullability.isEmpty) {
       _schemaValidationIgnoresNullability = Some(
-        EnvironmentUtil.getSdlParameter("schemaValidationIgnoresNullability")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("schemaValidationIgnoresNullability").forall(_.toBoolean)
       )
     }
     _schemaValidationIgnoresNullability.get
@@ -232,8 +205,7 @@ object Environment extends SmartDataLakeLogger {
   def schemaValidationDeepComarison: Boolean = {
     if (_schemaValidationDeepComarison.isEmpty) {
       _schemaValidationDeepComarison = Some(
-        EnvironmentUtil.getSdlParameter("schemaValidationDeepComarison")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("schemaValidationDeepComarison").forall(_.toBoolean)
       )
     }
     _schemaValidationDeepComarison.get
@@ -241,25 +213,11 @@ object Environment extends SmartDataLakeLogger {
   var _schemaValidationDeepComarison: Option[Boolean] = None
 
   /**
-   * Set to true if you want to enable automatic caching of DataFrames that are used multiple times (default=true).
-   */
-  def enableAutomaticDataFrameCaching: Boolean = {
-    if (_enableAutomaticDataFrameCaching.isEmpty) {
-      _enableAutomaticDataFrameCaching = Some(
-        EnvironmentUtil.getSdlParameter("enableAutomaticDataFrameCaching")
-          .map(_.toBoolean).getOrElse(true)
-      )
-    }
-    _enableAutomaticDataFrameCaching.get
-  }
-  var _enableAutomaticDataFrameCaching: Option[Boolean] = None
-
-  /**
    * Set to true if you want to enable workaround to overwrite unpartitioned SparkFileDataObject on Azure ADLSv2 (default=false).
    */
   def enableOverwriteUnpartitionedSparkFileDataObjectAdls: Boolean = {
     EnvironmentUtil.getSdlParameter("enableOverwriteUnpartitionedSparkFileDataObjectAdls")
-      .map(_.toBoolean).getOrElse(false)
+      .exists(_.toBoolean)
   }
 
   /**
@@ -284,8 +242,7 @@ object Environment extends SmartDataLakeLogger {
   def simplifyFinalExceptionLog: Boolean = {
     if (_simplifyFinalExceptionLog.isEmpty) {
       _simplifyFinalExceptionLog = Some(
-        EnvironmentUtil.getSdlParameter("simplifyFinalExceptionLog")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("simplifyFinalExceptionLog").forall(_.toBoolean)
       )
     }
     _simplifyFinalExceptionLog.get
@@ -303,7 +260,7 @@ object Environment extends SmartDataLakeLogger {
     if (_includeDAGResultExceptionInLog.isEmpty) {
       _includeDAGResultExceptionInLog = Some(
         EnvironmentUtil.getSdlParameter("includeDAGResultExceptionInLog")
-          .map(_.toBoolean).getOrElse(false)
+          .exists(_.toBoolean)
       )
     }
     _includeDAGResultExceptionInLog.get
@@ -334,8 +291,7 @@ object Environment extends SmartDataLakeLogger {
   def replaceSqlTransformersOldTempViewName: Boolean = {
     if (_replaceSqlTransformersOldTempViewName.isEmpty) {
       _replaceSqlTransformersOldTempViewName = Some(
-        EnvironmentUtil.getSdlParameter("replaceSqlTransformersOldTempViewName")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("replaceSqlTransformersOldTempViewName").forall(_.toBoolean)
       )
     }
     _replaceSqlTransformersOldTempViewName.get
@@ -347,11 +303,11 @@ object Environment extends SmartDataLakeLogger {
    * The advantage of updating the sample file on every load is to enable automatic schema evolution.
    * This is disabled by default, as it might have performance impact if file size is big. It can be enabled on demand by setting the corresponding java property or environment variable.
    */
-  def updateSparkFileDataObjectSampleDataFile: Boolean = {
+  def updateSparkFileDataObjectSampleDataFile(): Boolean = {
     if (_updateSparkFileDataObjectSampleDataFile.isEmpty) {
       _updateSparkFileDataObjectSampleDataFile = Some(
         EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSampleDataFile")
-          .map(_.toBoolean).getOrElse(false)
+          .exists(_.toBoolean)
       )
     }
     _updateSparkFileDataObjectSampleDataFile.get
@@ -365,8 +321,7 @@ object Environment extends SmartDataLakeLogger {
   def enableSparkFileDataObjectNoDataCheck: Boolean = {
     if (_enableSparkFileDataObjectNoDataCheck.isEmpty) {
       _enableSparkFileDataObjectNoDataCheck = Some(
-        EnvironmentUtil.getSdlParameter("enableSparkFileDataObjectNoDataCheck")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("enableSparkFileDataObjectNoDataCheck").forall(_.toBoolean)
       )
     }
     _enableSparkFileDataObjectNoDataCheck.get
@@ -381,8 +336,7 @@ object Environment extends SmartDataLakeLogger {
   def enableSparkPlanNoDataCheck: Boolean = {
     if (_enableSparkPlanNoDataCheck.isEmpty) {
       _enableSparkPlanNoDataCheck = Some(
-        EnvironmentUtil.getSdlParameter("enableSparkPlanNoDataCheck")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("enableSparkPlanNoDataCheck").forall(_.toBoolean)
       )
     }
     _enableSparkPlanNoDataCheck.get
@@ -396,8 +350,7 @@ object Environment extends SmartDataLakeLogger {
   def enableInputDataObjectCount: Boolean = {
     if (_enableInputDataObjectCount.isEmpty) {
       _enableInputDataObjectCount = Some(
-        EnvironmentUtil.getSdlParameter("enableInputDataObjectCount")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("enableInputDataObjectCount").forall(_.toBoolean)
       )
     }
     _enableInputDataObjectCount.get
@@ -423,11 +376,10 @@ object Environment extends SmartDataLakeLogger {
    * The advantage of updating the sample file on every load is to enable automatic schema evolution.
    * This is enabled by default, as it has not big impact on performance.
    */
-  def updateSparkFileDataObjectSchemaFile: Boolean = {
+  def updateSparkFileDataObjectSchemaFile(): Boolean = {
     if (_updateSparkFileDataObjectSchemaFile.isEmpty) {
       _updateSparkFileDataObjectSchemaFile = Some(
-        EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSchemaFile")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("updateSparkFileDataObjectSchemaFile").forall(_.toBoolean)
       )
     }
     _updateSparkFileDataObjectSchemaFile.get
@@ -442,12 +394,29 @@ object Environment extends SmartDataLakeLogger {
     if (_parseSchemaFilesLazy.isEmpty) {
       _parseSchemaFilesLazy = Some(
         EnvironmentUtil.getSdlParameter("parseSchemaFilesLazy")
-          .map(_.toBoolean).getOrElse(false)
+          .exists(_.toBoolean)
       )
     }
     _parseSchemaFilesLazy.get
   }
   var _parseSchemaFilesLazy: Option[Boolean] = None
+
+  /**
+   * Collect why the lineage of a column could not be traced back to a column of an input DataObject, and
+   * write it to an additional `<dataObjectId>.lineage-debug.txt` file next to the exported column lineage,
+   * see [[io.smartdatalake.app.TestMode.DryRunWithLineageExport]].
+   * This is diagnostic output for developing the lineage extraction and is disabled by default.
+   */
+  def columnLineageDebug: Boolean = {
+    if (_columnLineageDebug.isEmpty) {
+      _columnLineageDebug = Some(
+        EnvironmentUtil.getSdlParameter("columnLineageDebug")
+          .exists(_.toBoolean)
+      )
+    }
+    _columnLineageDebug.get
+  }
+  var _columnLineageDebug: Option[Boolean] = None
 
   /**
    * Compile scala code of transformations only when used, e.g. lazy.
@@ -457,7 +426,7 @@ object Environment extends SmartDataLakeLogger {
     if (_compileScalaCodeLazy.isEmpty) {
       _compileScalaCodeLazy = Some(
         EnvironmentUtil.getSdlParameter("compileScalaCodeLazy")
-          .map(_.toBoolean).getOrElse(false)
+          .exists(_.toBoolean)
       )
     }
     _compileScalaCodeLazy.get
@@ -493,8 +462,7 @@ object Environment extends SmartDataLakeLogger {
   def failSimulationOnMissingInputSubFeeds: Boolean = {
     if (_failSimulationOnMissingInputSubFeeds.isEmpty) {
       _failSimulationOnMissingInputSubFeeds = Some(
-        EnvironmentUtil.getSdlParameter("failSimulationOnMissingInputSubFeeds")
-          .map(_.toBoolean).getOrElse(true)
+        EnvironmentUtil.getSdlParameter("failSimulationOnMissingInputSubFeeds").forall(_.toBoolean)
       )
     }
     _failSimulationOnMissingInputSubFeeds.get
@@ -560,8 +528,28 @@ object Environment extends SmartDataLakeLogger {
   var _historizationUpperHorizonTimestamp: Option[Timestamp] = None
 
   /**
+   * Override the reference timestamp of a run, e.g. the value written to `capturedColumnName` by
+   * HistorizeAction and UpsertAction. Useful for initial loads, where the data should be dated
+   * to the publishing time of the source instead of the processing time in SDLB.
+   * The value is parsed like `historizationUpperHorizonTimestamp`, e.g. `yyyy-mm-dd hh:mm:ss[.f...]`.
+   * Default is empty, in which case the start time of the run is used, see
+   * [[io.smartdatalake.workflow.ActionPipelineContext.referenceTimestamp]].
+   */
+  def referenceTimestamp: Option[LocalDateTime] = {
+    if (_referenceTimestamp.isEmpty) {
+      _referenceTimestamp = Some(
+        EnvironmentUtil.getSdlParameter("referenceTimestamp")
+          .map(Timestamp.valueOf(_).toLocalDateTime)
+      )
+    }
+    _referenceTimestamp.get
+  }
+
+  var _referenceTimestamp: Option[Option[LocalDateTime]] = None
+
+  /**
    * Name of column that marks the creation date of a record.
-   * Used in HistorizeAction and DeduplicateAction.
+   * Used in HistorizeAction and UpsertAction.
    * Default is `dl_ts_captured`.
    */
   def capturedColumnName: String = {
@@ -588,6 +576,52 @@ object Environment extends SmartDataLakeLogger {
   var _delimitedColumnName: Option[String] = None
 
   /**
+   * Name of column that holds the type of a change-data-capture (CDC) event, see [[CdcChangeType]] for its values.
+   * Produced by CDC DataObjects like DebeziumCdcDataObject and interpreted by HistorizeAction.
+   * The name follows the change data feed of Delta Lake and Iceberg.
+   * Default is `_change_type`.
+   */
+  def cdcChangeTypeColumnName: String = {
+    if (_cdcChangeTypeColumnName.isEmpty) {
+      _cdcChangeTypeColumnName = Some(EnvironmentUtil.getSdlParameter("cdcChangeTypeColumnName").getOrElse("_change_type"))
+    }
+    _cdcChangeTypeColumnName.get
+  }
+
+  var _cdcChangeTypeColumnName: Option[String] = None
+
+  /**
+   * Name of column that holds the timestamp when a change-data-capture (CDC) event was committed in the source system.
+   * Produced by CDC DataObjects like DebeziumCdcDataObject and interpreted by HistorizeAction.
+   * The name follows the change data feed of Delta Lake.
+   * Default is `_commit_timestamp`.
+   */
+  def cdcCommitTimestampColumnName: String = {
+    if (_cdcCommitTimestampColumnName.isEmpty) {
+      _cdcCommitTimestampColumnName = Some(EnvironmentUtil.getSdlParameter("cdcCommitTimestampColumnName").getOrElse("_commit_timestamp"))
+    }
+    _cdcCommitTimestampColumnName.get
+  }
+
+  var _cdcCommitTimestampColumnName: Option[String] = None
+
+  /**
+   * Name of column that holds the position of a change-data-capture (CDC) event within the events received by one run.
+   * It is used to order events of the same primary key, as [[cdcCommitTimestampColumnName]] is not precise enough to
+   * separate changes committed within the same millisecond.
+   * The name follows the changelog view of Iceberg.
+   * Default is `_change_ordinal`.
+   */
+  def cdcChangeOrdinalColumnName: String = {
+    if (_cdcChangeOrdinalColumnName.isEmpty) {
+      _cdcChangeOrdinalColumnName = Some(EnvironmentUtil.getSdlParameter("cdcChangeOrdinalColumnName").getOrElse("_change_ordinal"))
+    }
+    _cdcChangeOrdinalColumnName.get
+  }
+
+  var _cdcChangeOrdinalColumnName: Option[String] = None
+
+  /**
    * Whether SDLB should throw an exception if a SparkListener doesn't get expected notifications.
    * If true SDLB will throw an exception and stop execution, otherwise a Warning is logged.
    * Default is false, e.g. a warning is logged.
@@ -600,6 +634,18 @@ object Environment extends SmartDataLakeLogger {
   }
 
   var _throwExceptionOnSparkListenerError: Option[Boolean] = None
+
+  /**
+   * The id of the default engine connection to use.
+   */
+  def defaultEngineConnectionId: String = {
+    if (_defaultEngineConnectionId.isEmpty) {
+      _defaultEngineConnectionId = Some(EnvironmentUtil.getSdlParameter("defaultEngineConnectionId").getOrElse("default-engine"))
+    }
+    _defaultEngineConnectionId.get
+  }
+
+  var _defaultEngineConnectionId: Option[String] = None
 
   /**
    * Timeout in seconds to wait for DataFrame observation result.
@@ -623,7 +669,7 @@ object Environment extends SmartDataLakeLogger {
       "path", "table.name"
     , "create-sql", "createSql", "pre-read-sql", "preReadSql", "post-read-sql", "postReadSql", "pre-write-sql", "preWriteSql", "post-write-sql", "postWriteSql"
     , "executionMode.checkpointLocation", "execution-mode.checkpoint-location")
-  val runIdPartitionColumnName = "run_id"
+  val runIdPartitionColumnName: String = "run_id"
 
 
   // instantiate sdl plugins if configured. The class names must be separated by a comma.
@@ -644,10 +690,9 @@ object Environment extends SmartDataLakeLogger {
 
   private[smartdatalake] var _sdlPlugins: Seq[SDLPlugin] = Seq()
 
-  // dynamically shared environment for custom code (see also #106)
-  // attention: if JVM is shared between different SDLB jobs (e.g. Databricks cluster), these variables will be overwritten by the current job. Therefore they should not been used in SDLB code, but might be used in custom code on your own risk.
-  def sparkSession: SparkSession = _sparkSession
-  private [smartdatalake] var _sparkSession: SparkSession = _
+
+
+  // dynamically shared environment for custom code
   def instanceRegistry: InstanceRegistry = _instanceRegistry
   private [smartdatalake] var _instanceRegistry: InstanceRegistry = _
   def globalConfig: GlobalConfig = _globalConfig

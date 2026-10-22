@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2024 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.connection.authMode
 
 import com.typesafe.config.Config
@@ -33,6 +32,30 @@ import sttp.model.{Header, MediaType}
 
 /**
  * [[OAuthMode]] contains the coordinates and credentials to gain access to the OData DataSource
+ *
+ * Authenticates with the OAuth2 client_credentials flow: an access token is fetched from `oauthUrl` for the
+ * given `oauthScope` and cached until it expires, then refreshed automatically. Pick this over
+ * [[TokenAuthMode]] whenever tokens are short-lived and must be renewed during a run, e.g. for Microsoft
+ * Dynamics 365 / Dataverse, other OData or REST services, and SnowflakeConnection.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-tasks {
+ *     type = ODataDataObject
+ *     baseUrl = "https://myorg.crm4.dynamics.com/api/data/v9.2/"
+ *     tableName = "tasks"
+ *     schema = "activityid string, subject string, modifiedon string"
+ *     authMode = {
+ *       type = OAuthMode
+ *       oauthUrl = "https://login.microsoftonline.com/{tenant-guid}/oauth2/v2.0/token"
+ *       clientId = "###ENV#CRM_CLIENT_ID###"
+ *       clientSecret = "###ENV#CRM_CLIENT_SECRET###"
+ *       oauthScope = "https://myorg.crm4.dynamics.com/.default"
+ *     }
+ *   }
+ * }
+ * }}}
  *
  * @param oauthUrl URL to the OAuth2 authorization instance like "https://login.microsoftonline.com/{tenant-guid}/oauth2/v2.0/token" (supports secret providers)
  * @param clientId Name of the user (supports secrets providers)
@@ -93,8 +116,6 @@ case class OAuthMode (
   override def getToken: String = {
     oAuth2Service.getToken.token(useIdToken)
   }
-
-  override def factory: FromConfigFactory[HttpAuthMode] = OAuthMode
 }
 
 

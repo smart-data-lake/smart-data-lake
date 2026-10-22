@@ -1,0 +1,267 @@
+/*
+ * Smart Data Lake Builder - Build your data lake the smart way.
+ *
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+package io.smartdatalake.workflow.dataobject
+
+import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.networknt.schema.{JsonSchema, JsonSchemaFactory, SpecVersion, ValidationMessage}
+import com.typesafe.config.Config
+import io.smartdatalake.config.SdlConfigObject.DataObjectId
+import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
+import io.smartdatalake.util.hdfs.PartitionValues
+import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.util.spark.dataset.getEmptyDataFrame
+import io.smartdatalake.util.spark.json.JsonUtils
+import io.smartdatalake.util.spark.json.JsonUtils._
+import io.smartdatalake.workflow.action.script.{CmdScript, DockerRunScript, ParsableScriptDef}
+import io.smartdatalake.workflow.dataframe.GenericSchema
+import io.smartdatalake.workflow.dataframe.spark.{SparkSchema, SparkSubFeed}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateIncrementalOutput, SchemaValidation}
+import io.smartdatalake.workflow.dataobject.spark.CanCreateSparkDataFrame
+import io.smartdatalake.workflow.{ActionPipelineContext, ExecutionPhase}
+import org.apache.spark.sql.confluent.json.JsonSchemaConverter
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, DatasetHelper, SparkSession}
+import org.json4s.Formats
+import org.json4s.jackson.JsonMethods.compact
+
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import scala.jdk.CollectionConverters._
+import scala.reflect.{ClassTag, classTag}
+
+/**
+ * Uses an Airbyte Connector to read data from a data source.
+ * See https://docs.airbyte.com/integrations/sources/ for the list of available sources.
+ *
+ * An Airbyte Connector is started using shell commands and streams json data into the AirbyteDataObject using stdout pipe.
+ * Airbyte Connectors are often written in Python. See https://docs.airbyte.com/connector-development/ for developing a custom connector.
+ *
+ * Limitations: Airbyte Connectors can not be distributed to executors. They run on the driver and have only access to locally mounted directories.
+ * In order to avoid memory problems Spark BlockManager is used to create a new Spark partition after every maxRecordsPerPartition number of records.
+ *
+ * Also note that the getDataFrame method is not lazy in Exec-Phase. It will query the Airbyte Connector before creating the DataFrame.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-users {
+ *     type = AirbyteDataObject
+ *     streamName = "users"
+ *     # the entries of config are connector specific, see the documentation of the connector used
+ *     config {
+ *       host = "db.example.com"
+ *       port = 5432
+ *       database = "postgres"
+ *       username = "sdlb"
+ *       password = "###"
+ *     }
+ *     cmd {
+ *       type = DockerRunScript
+ *       image = "airbyte/source-postgres:latest"
+ *     }
+ *     incrementalCursorFields = ["updated_at"]
+ *   }
+ * }
+ * }}}
+ *
+ * @param id DataObject identifier
+ * @param config Configuration for the source. Its entries are connector specific and are validated against the
+ *               specification reported by the connector itself in prepare phase.
+ * @param streamName The stream name to read. Must match an entry of the catalog of the source.
+ * @param incrementalCursorFields Some sources need a specification of the cursor field for incremental mode
+ * @param maxRecordsPerPartition Maximum number of records to put into one Spark partition.
+ *                               This helps to limit memory usage, as Spark will offload partitions to disk if memory is scarce.
+ * @param cmd command to launch airbyte connector. Normally this is of type [[DockerRunScript]].
+ */
+case class AirbyteDataObject(override val id: DataObjectId,
+                             config: Config,
+                             streamName: String,
+                             cmd: ParsableScriptDef,
+                             incrementalCursorFields: Seq[String] = Seq(),
+                             maxRecordsPerPartition: Int = 100000,
+                             override val schemaMin: Option[GenericSchema] = None,
+                             override val metadata: Option[DataObjectMetadata] = None
+                            )(@transient implicit val instanceRegistry: InstanceRegistry)
+  extends DataObject with CanCreateSparkDataFrame with CanCreateIncrementalOutput with SchemaValidation with SmartDataLakeLogger {
+
+  // these variables will be initialized in prepare phase
+  private var spec: Option[AirbyteConnectorSpecification] = None
+  private var catalog: Option[AirbyteCatalog] = None
+  private var configuredStream: Option[ConfiguredAirbyteStream] = None
+  private var schema: Option[StructType] = None
+  private var state: Option[String] = None
+
+  // the json de/serialization definition to use
+  implicit val jsonFormats: Formats = AirbyteMessage.formats
+
+  override def prepare(implicit context: ActionPipelineContext): Unit = {
+    super.prepare
+    // spec: get connector specification
+    spec = Some(findMsg[AirbyteConnectorSpecification](launchConnector(Operation.spec)))
+
+    val configJson = configToJsonString(config)
+
+    val validationMsgs = JsonValidator.validateJsonSchema(jsonToString(spec.get.connectionSpecification), configJson)
+    if (validationMsgs.nonEmpty) throw AirbyteConnectorException(s"($id) Connector config is invalid: ${validationMsgs.map(_.getMessage).mkString(", ")}"+System.lineSeparator()+"Config specification is:"+System.lineSeparator()+configJson)
+    // check: checks connection
+    val status = findMsg[AirbyteConnectionStatus](launchConnector(Operation.check, Some(config)))
+    if (status.status != AirbyteConnectionStatus.Status.SUCCEEDED) throw AirbyteConnectorException(s"($id) Connection check failed: ${status.message}")
+    // discover: check streamName exists, get schema, prepare catalog for read
+    catalog = Some(findMsg[AirbyteCatalog](launchConnector(Operation.discover, Some(config))))
+    val stream = catalog.get.streams.find(_.name == streamName)
+    if (stream.isEmpty) throw AirbyteConnectorException(s"($id) Stream '$streamName' not found in catalog. Available streams are: ${catalog.get.streams.map(_.name).mkString(", ")}")
+    configuredStream = Some(
+      ConfiguredAirbyteStream(stream.get, SyncModeEnum.full_refresh, if (incrementalCursorFields.nonEmpty) Some(incrementalCursorFields) else None, DestinationSyncModeEnum.append, primary_key = None)
+    )
+    schema = Some(JsonSchemaConverter.convertParsedSchemaToSpark(configuredStream.get.stream.json_schema))
+    logger.info(s"($id) got schema: ${schema.get.simpleString}")
+  }
+
+  override def getSparkDataFrame(partitionValues: Seq[PartitionValues] = Seq())(implicit context: ActionPipelineContext): DataFrame = {
+    assert(configuredStream.nonEmpty, s"($id) prepare must be called before getDataFrame")
+    implicit val session: SparkSession = SparkSubFeed.getSparkSession
+
+    val df = context.phase match {
+      // init phase -> return empty dataframe
+      case ExecutionPhase.Init =>
+        getEmptyDataFrame(schema.get)
+      // exec phase -> read: return data
+      case ExecutionPhase.Exec =>
+        val configuredCatalog = ConfiguredAirbyteCatalog(List(configuredStream.get))
+        // get data iterator
+        val data = launchConnector(Operation.read, Some(config), Some(configuredCatalog), state)
+          .flatMap {
+            case x: AirbyteRecordMessage => Some(x)
+            case x: AirbyteStateMessage =>
+              state = Some(compact(x.data))
+              None
+            case _ => None
+          }
+        val rows = data.map(r => JsonUtils.convertObjectToCatalyst(r.data, schema.get))
+        DatasetHelper.parallelizeInternalRows(rows, schema.get, maxRecordsPerPartition)
+    }
+
+    validateSchemaMin(SparkSchema(df.schema), "read")
+    df
+  }
+
+  override def setState(state: Option[String])(implicit context: ActionPipelineContext): Unit = {
+    assert(configuredStream.nonEmpty, s"($id) prepare must be called before setState")
+    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"$id Connector does not support incremental output")
+    assert(configuredStream.exists(_.stream.supported_sync_modes.contains(SyncModeEnum.incremental)), s"$id Stream '$streamName' does not support incremental output")
+    this.state = state
+    configuredStream = configuredStream.map(_.copy(sync_mode = SyncModeEnum.incremental))
+  }
+
+  override def getState: Option[String] = {
+    assert(configuredStream.nonEmpty, s"($id) prepare must be called before getState")
+    assert(spec.flatMap(_.supportsIncremental).getOrElse(true), s"$id Connector does not support incremental output")
+    assert(state.isEmpty || configuredStream.exists(_.sync_mode == SyncModeEnum.incremental), s"$id Stream configuration must be set to SyncMode.Incremental by calling setState before")
+    state
+  }
+
+  final val configFilename = "config.json"
+  final val catalogFilename = "catalog.json"
+  final val stateFilename = "state.json"
+  final val containerConfigDir = "/mnt/config"
+
+  private def launchConnector(op: Operation.Operation, config: Option[Config] = None, catalog: Option[ConfiguredAirbyteCatalog] = None, state: Option[String] = None)(implicit context: ActionPipelineContext): Iterator[AirbyteMessage] = {
+    val errors = collection.mutable.Buffer[String]()
+    try {
+
+      // convert config and catalog
+      val configJson = config.map(configToJsonString)
+      val catalogJson = catalog.map(caseClassToJsonString)
+
+      // write interface files
+      val tempPath = Files.createTempDirectory(id.id)
+      configJson.map(s => Files.write(tempPath.resolve(configFilename), s.getBytes(StandardCharsets.UTF_8)))
+      catalogJson.map(s => Files.write(tempPath.resolve(catalogFilename), s.getBytes(StandardCharsets.UTF_8)))
+      state.map(s => Files.write(tempPath.resolve(stateFilename), s.getBytes(StandardCharsets.UTF_8)))
+
+      // prepare parameters
+      val parameters = cmd match {
+        case dockerCmd: DockerRunScript =>
+          val dockerParams = Seq("run", "--rm", "-v", s"${dockerCmd.preparePath(tempPath.toString)}:$containerConfigDir")
+          val runParams = Seq(
+            Some(Seq(op)),
+            configJson.map(_ => Seq("--config", s"$containerConfigDir/$configFilename")),
+            catalogJson.map(_ => Seq("--catalog", s"$containerConfigDir/$catalogFilename")),
+            state.map(_ => Seq("--state", s"$containerConfigDir/$stateFilename"))
+          ).flatten.flatten
+          dockerParams.zipWithIndex.map{ case (p,i) => (f"dockerParam$i%02d", p)} ++ runParams.zipWithIndex.map{ case (p,i) => (f"runParam$i%02d", p)}
+        case scriptCmd: CmdScript =>
+          val params = Seq(
+            Some(Seq(op)),
+            configJson.map(_ => Seq("--config", s"${scriptCmd.preparePath(tempPath.resolve(configFilename).toString)}")),
+            catalogJson.map(_ => Seq("--catalog", s"${scriptCmd.preparePath(tempPath.resolve(catalogFilename).toString)}")),
+            state.map(_ => Seq("--state", s"${scriptCmd.preparePath(tempPath.resolve(stateFilename).toString)}"))
+          ).flatten.flatten
+          params.zipWithIndex.map{ case (p,i) => (f"param$i%02d", p)}
+      }
+
+      //launch process
+      val linesStream = cmd.execStdOutStream(id, Seq(), parameters.toMap, errors)
+
+      // parse result
+      AirbyteMessage.parseOutput(linesStream, errors).iterator
+
+    } catch {
+      case ex: Exception => throw AirbyteConnectorException(s"($id) Could not launch connector: ${errors.mkString(", ")}, ${ex.getMessage}", ex)
+    }
+  }
+
+  private def findMsg[T <: AirbyteMessage : ClassTag](msgs: Iterator[AirbyteMessage]): T = {
+    val cls = classTag[T]
+    val msg = msgs.collectFirst{ case x: T => x }
+    msg.getOrElse(throw AirbyteConnectorException(s"($id) Expected message of type '${cls.runtimeClass.getSimpleName}' not found in connector output"))
+  }
+}
+
+object AirbyteDataObject extends FromConfigFactory[DataObject] {
+  override def fromConfig(config: Config)(implicit instanceRegistry: InstanceRegistry): AirbyteDataObject = {
+    extract[AirbyteDataObject](config)
+  }
+}
+
+private object Operation extends Enumeration {
+  type Operation = String
+  val spec = "spec"
+  val check = "check"
+  val discover = "discover"
+  val read = "read"
+}
+
+case class AirbyteConnectorException(msg: String, cause: Throwable = null) extends Exception(msg, cause)
+
+object JsonValidator {
+  private val validator = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7)
+  private val parser = new ObjectMapper().registerModule(new JavaTimeModule)
+  parser.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+  def getSchemaValidator(schema: String): JsonSchema = {
+    validator.getSchema(schema)
+  }
+  def validateJsonSchema(schema: String, data: String): Seq[ValidationMessage] = {
+    getSchemaValidator(schema).validate(parser.readTree(data)).asScala.toSeq
+  }
+  def validateJsonSchema(schema: JsonSchema, data: String): Seq[ValidationMessage] = {
+    schema.validate(parser.readTree(data)).asScala.toSeq
+  }
+}

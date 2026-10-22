@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,20 +16,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
 import io.smartdatalake.config.{ConfigHolder, ParsableFromConfig}
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
-import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.IS_EXEC
+import io.smartdatalake.workflow.action.generic.transformer.OptionsGenericDfsTransformer.{IS_EXEC, NB_OF_PARTITIONS}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
-import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
-import org.apache.spark.sql.DataFrame
 
-import scala.reflect.runtime.universe
 import scala.reflect.runtime.universe.{Type, typeOf}
 
 
@@ -61,7 +56,7 @@ trait GenericDfsTransformerDef extends PartitionValueTransformer {
    * Declare supported Language for transformation.
    * Can be DataFrameSubFeed to work with GenericDataFrame, or SparkSubFeed to work with Spark-DataFrames
    */
-  private[smartdatalake] def getSubFeedSupportedType: Type = typeOf[DataFrameSubFeed]
+  def getSubFeedSupportedType: Type = typeOf[DataFrameSubFeed]
 
   private[smartdatalake] def applyTransformation(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], executionModeResultOptions: Map[String,String], outputDataObjectIds: Seq[DataObjectId])(implicit context: ActionPipelineContext): (Map[String,GenericDataFrame], Seq[PartitionValues]) = {
     val transformedDfs = transform(actionId, partitionValues, dfs, executionModeResultOptions, outputDataObjectIds.map(_.id))
@@ -75,18 +70,6 @@ trait GenericDfsTransformerDef extends PartitionValueTransformer {
  * Interface to implement GenericDataFrame transformers working with many inputs and many outputs (n:m)
  */
 trait GenericDfsTransformer extends GenericDfsTransformerDef with ParsableFromConfig[GenericDfsTransformer] with ConfigHolder
-
-trait SparkDfsTransformer extends GenericDfsTransformer {
-  // Note: must have a different name as transform because signature is different only in subtypes of parameters.
-  def transformSpark(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, DataFrame])(implicit context: ActionPipelineContext): Map[String, DataFrame]
-  final override def transform(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String, GenericDataFrame], executionModeResultOptions: Map[String,String], outputDataObjectIds: Seq[String])(implicit context: ActionPipelineContext): Map[String, GenericDataFrame] = {
-    assert(dfs.values.forall(_.isInstanceOf[SparkDataFrame]), s"($actionId) Unsupported subFeedType(s) ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method transform")
-    val sparkDfs = dfs.mapValues(_.asInstanceOf[SparkDataFrame].inner).toMap
-    transformSpark(actionId, partitionValues, sparkDfs)
-      .mapValues(SparkDataFrame).toMap
-  }
-  override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
-}
 
 /**
  * Interface to implement GenericDataFrame transformers working with many inputs and many outputs (n:m)
@@ -127,40 +110,22 @@ trait OptionsGenericDfsTransformer extends GenericDfsTransformer {
     // prepare default options
     val defaultOptions = Seq(
       Some(IS_EXEC -> context.isExecPhase.toString),
+      Some(NB_OF_PARTITIONS -> partitionValues.size.toString),
       if (outputDataObjectIds.size == 1) Some(OptionsGenericDfsTransformer.OPTION_OUTPUT_DATAOBJECT_ID -> outputDataObjectIds.head) else None
     ).flatten.toMap
     // transform
     transformWithOptions(actionId, partitionValues, dfs, defaultOptions ++ options ++ runtimeOptionsReplaced ++ executionModeResultOptions)
   }
-  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[String,String] = {
-    lazy val data = DefaultExpressionData.from(context, partitionValues)
-    runtimeOptions.mapValues {
-      expr => SparkExpressionUtil.evaluateString(actionId, Some(s"transformations.$name.runtimeOptions"), expr, data)
-    }.filter(_._2.isDefined).mapValues(_.get).toMap
-  }
+
+  private def prepareRuntimeOptions(actionId: ActionId, partitionValues: Seq[PartitionValues])
+                                   (implicit context: ActionPipelineContext): Map[String, String] =
+    evaluateRuntimeOptions(actionId, name, runtimeOptions, partitionValues)
 }
 object OptionsGenericDfsTransformer {
   final val IS_EXEC = "isExec"
+  final val NB_OF_PARTITIONS = "nbOfPartitions"
   final val OPTION_OUTPUT_DATAOBJECT_ID = "outputDataObjectId"
 }
-
-/**
- * Interface to implement Spark-DataFrame transformers working with multiple inputs and outputs (n:m) and options.
- * This trait extends OptionsGenericDfsTransformer and passes a map of options as parameter to the transform function.
- * This is mainly used by custom transformers.
- */
-trait OptionsSparkDfsTransformer extends OptionsGenericDfsTransformer {
-  // Note: must have a different name as transform because signature is different only in subtypes of parameters.
-  def transformSparkWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,DataFrame], options: Map[String,String])(implicit context: ActionPipelineContext): Map[String,DataFrame]
-  override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], options: Map[String,String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
-    assert(dfs.values.forall(_.isInstanceOf[SparkDataFrame]), s"($actionId) Unsupported subFeedType(s) ${dfs.values.filterNot(_.isInstanceOf[SparkDataFrame]).map(_.subFeedType.typeSymbol.name).toSet.mkString(", ")} in method transform")
-    val sparkDfs = dfs.mapValues(_.asInstanceOf[SparkDataFrame].inner).toMap
-    transformSparkWithOptions(actionId, partitionValues, sparkDfs, options)
-      .mapValues(SparkDataFrame).toMap
-  }
-  override def getSubFeedSupportedType: universe.Type = typeOf[SparkSubFeed]
-}
-
 
 /**
  * Interface for transformers that can recompile their code from source files.

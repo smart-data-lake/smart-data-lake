@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,18 +22,16 @@ import io.smartdatalake.config.SdlConfigObject.{ConnectionId, DataObjectId}
 import io.smartdatalake.config._
 import io.smartdatalake.util.hdfs.PartitionValues
 import io.smartdatalake.util.misc.SmartDataLakeLogger
+import io.smartdatalake.workflow.ActionPipelineContext
 import io.smartdatalake.workflow.connection.Connection
-import io.smartdatalake.workflow.{ActionPipelineContext, AtlasExportable}
-import org.apache.spark.annotation.DeveloperApi
-
+import io.smartdatalake.workflow.dataobject.generic.{HousekeepingMode, SchemaValidation, UserDefinedSchema}
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 /**
  * This is the root trait for every DataObject.
  */
-@DeveloperApi
-trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] with SmartDataLakeLogger with AtlasExportable {
+trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] with SmartDataLakeLogger {
 
   /**
    * A unique identifier for this instance.
@@ -57,7 +55,7 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
    *
    * This runs during the "prepare" operation of the DAG.
    */
-  private[smartdatalake] def prepare(implicit context: ActionPipelineContext): Unit = {
+  def prepare(implicit context: ActionPipelineContext): Unit = {
     housekeepingMode.foreach(_.prepare(this))
     // check lazy parsed schema
     this match {
@@ -82,30 +80,31 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
   /**
    * Runs operations before reading from [[DataObject]]
    */
-  private[smartdatalake] def preRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
+  def preRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Runs operations after reading from [[DataObject]]
    */
-  private[smartdatalake] def postRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
+  def postRead(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Runs operations before writing to [[DataObject]]
-   * Note: As the transformed SubFeed doesnt yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
+   * Note: As the transformed SubFeed does not yet exist in Action.preWrite, no partition values can be passed as parameters as in preRead
    */
-  private[smartdatalake] def preWrite(implicit context: ActionPipelineContext): Unit = ()
+  def preWrite(implicit context: ActionPipelineContext): Unit = ()
 
   /**
    * Runs operations after writing to [[DataObject]]
    */
-  private[smartdatalake] def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
+  def postWrite(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Unit = {
     housekeepingMode.foreach(_.postWrite(this))
   }
 
   /**
    * Handle class cast exception when getting objects from instance registry
    */
-  protected def getConnection[T <: Connection : TypeTag : ClassTag](connectionId: ConnectionId)(implicit registry: InstanceRegistry): T = {
+  protected def getConnectionReg[T <: Connection](connectionId: ConnectionId, registry: InstanceRegistry)(implicit ct: ClassTag[T], tt: TypeTag[T]): T = {
+    implicit val registryImpl: InstanceRegistry = registry
     try {
       registry.get[T](connectionId)
     } catch {
@@ -114,10 +113,8 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
         throw ConfigurationException(s"($id) $connectionId of type ${currentClass.getSimpleName} does not implement expected connection type $expectedType")
     }
   }
-
-  protected def getConnectionReg[T <: Connection](connectionId: ConnectionId, registry: InstanceRegistry)(implicit ct: ClassTag[T], tt: TypeTag[T]): T = {
-    implicit val registryImpl: InstanceRegistry = registry
-    getConnection[T](connectionId)
+  protected def getConnection[T <: Connection](connectionId: ConnectionId)(implicit registry: InstanceRegistry, ct: ClassTag[T], tt: TypeTag[T]): T = {
+    getConnectionReg[T](connectionId, registry)
   }
 
   /**
@@ -140,8 +137,6 @@ trait DataObject extends SdlConfigObject with ParsableFromConfig[DataObject] wit
   def toStringShort: String = {
     s"$id[${this.getClass.getSimpleName}]"
   }
-
-  override def atlasName: String = id.id
 
 }
 

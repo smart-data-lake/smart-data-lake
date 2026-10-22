@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.generic.transformer
 
 import com.typesafe.config.Config
@@ -24,8 +23,7 @@ import io.smartdatalake.config.SdlConfigObject.ActionId
 import io.smartdatalake.config.{FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Environment
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.util.misc.{FileUtil, SmartDataLakeLogger}
-import io.smartdatalake.util.spark.{DefaultExpressionData, SparkExpressionUtil}
+import io.smartdatalake.util.misc.{DefaultExpressionData, FileUtil, SmartDataLakeLogger, ExpressionUtil}
 import io.smartdatalake.workflow.action.generic.transformer.SQLDfTransformer.INPUT_VIEW_NAME
 import io.smartdatalake.workflow.action.{Action, ActionHelper}
 import io.smartdatalake.workflow.dataframe.GenericDataFrame
@@ -45,6 +43,27 @@ import org.apache.hadoop.fs.Path
  *
  * Note that you can access arbitrary tables from the metastore in the SQL code, but this is against the principle of SDLB
  * to access data through DataObjects. Accessing tables directly in SQL code has a negative impact on the maintainability of the project.
+ *
+ * Use SQLDfsTransformer inside a [[io.smartdatalake.workflow.action.CustomDataFrameAction]] for joins, unions and
+ * fan-outs expressed in SQL. Either `code` or `files` must be non empty, and per output name only one of them may
+ * be defined. If this is the last transformer of the chain, its output names must match the Action's outputIds.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   join-departures-airports {
+ *     type = CustomDataFrameAction
+ *     inputIds = [stg-departures, int-airports]
+ *     outputIds = [btl-departures-airports]
+ *     transformers = [{
+ *       type = SQLDfsTransformer
+ *       code = {
+ *         btl-departures-airports = "select d.*, a.name from %{inputViewName_stg-departures} d join %{inputViewName_int-airports} a on d.estdepartureairport = a.ident"
+ *       }
+ *     }]
+ *   }
+ * }
+ * }}}
  *
  * @param name           name of the transformer
  * @param description    Optional description of the transformer
@@ -67,13 +86,18 @@ import org.apache.hadoop.fs.Path
  * @param options        Options to pass to the transformation
  * @param runtimeOptions optional tuples of [key, spark sql expression] to be added as additional options when executing transformation.
  *                       The spark sql expressions are evaluated against an instance of [[DefaultExpressionData]].
+ * @param sqlDialect     SQL dialect the SQL code is written in, default is `spark`. It is used by engines translating the
+ *                       SQL code for the database, e.g. the SQL engine of sdl-sql, which parses it with SQLGlot and
+ *                       supports the dialects listed in https://sqlglot.com/sqlglot/dialects.html.
+ *                       Spark engines expect Spark SQL and ignore it.
  */
 case class SQLDfsTransformer(override val name: String = "sqlTransform",
                              override val description: Option[String] = None,
                              files: Map[String, String] = Map(),
                              code: Map[String, String] = Map(),
                              options: Map[String, String] = Map(),
-                             runtimeOptions: Map[String, String] = Map())
+                             runtimeOptions: Map[String, String] = Map(),
+                             sqlDialect: String = SQLDfTransformer.DefaultSqlDialect)
   extends OptionsGenericDfsTransformer with SmartDataLakeLogger {
   assert(files.nonEmpty || code.nonEmpty, s"Either `files` or `code` must be non empty for SQLDfsTransformer")
   override def transformWithOptions(actionId: ActionId, partitionValues: Seq[PartitionValues], dfs: Map[String,GenericDataFrame], options: Map[String, String])(implicit context: ActionPipelineContext): Map[String,GenericDataFrame] = {
@@ -95,7 +119,7 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform",
         val sql = file.map(file => FileUtil.readFromPath(new Path(file)))
           .orElse(code).get
         val df = try {
-          var preparedSql = SparkExpressionUtil.substituteOptions(actionId, Some(s"transformers.$name.code"), sql, options ++ inputViewNameOptions)
+          var preparedSql = ExpressionUtil.substituteOptions(actionId, Some(s"transformers.$name.code"), sql, options ++ inputViewNameOptions)
           // for backward compatibility the temp view name from versions <= 2.2.x is replaced with the new temp view name including a postfix.
           if (Environment.replaceSqlTransformersOldTempViewName) {
             preparedSql = inputViewNameOptions.values.foldLeft(preparedSql) {
@@ -104,7 +128,7 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform",
           }
           // create DataFrame from SQL
           logger.debug(s"($actionId.transformers.$name) Preparing DataFrame $outputName from SQL statement: $preparedSql")
-          functions.sql(preparedSql, outputDataObjectId)
+          functions.sql(preparedSql, outputDataObjectId, sqlDialect)
         } catch {
           case e: Throwable => throw new SQLTransformationException(s"($actionId.transformers.$name) SQL query error for $outputName: ${e.getMessage}. Also note to use tokens '%{inputViewName_<inputName>}' as temporary view names in the SQL statement.", e)
         }
@@ -117,8 +141,6 @@ case class SQLDfsTransformer(override val name: String = "sqlTransform",
       yield (key, (map1.get(key), map2.get(key)))
     zipped.toMap
   }
-
-  override def factory: FromConfigFactory[GenericDfsTransformer] = SQLDfsTransformer
 }
 
 object SQLDfsTransformer extends FromConfigFactory[GenericDfsTransformer] {

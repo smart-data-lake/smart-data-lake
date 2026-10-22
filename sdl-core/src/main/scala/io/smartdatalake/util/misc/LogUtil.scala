@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,22 +19,8 @@
 package io.smartdatalake.util.misc
 
 import io.smartdatalake.util.dag.TaskFailedException
-import org.apache.spark.SparkContext
 
-/**
- * Provides utility functions for logging with Spark.
- */
 object LogUtil {
-
-  /**
-   * Overrides the Spark log level with system property "loglevel" if it is set.
-   * @param sparkContext [[SparkContext]] on which the loglevel should bet set
-   */
-  def setLogLevel(sparkContext: SparkContext): Unit = {
-    if (System.getProperty("logLevel") != null) {
-      sparkContext.setLogLevel(System.getProperty("logLevel"))
-    }
-  }
 
   /**
    * Simplify stack trace by removing unneeded entries

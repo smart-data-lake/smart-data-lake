@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.agent
 
 import com.typesafe.config.Config
@@ -35,12 +34,33 @@ import java.net.URI
  * Simple, unsecured SDLB Remote [[Agent]] for development use that communicates via a plain Jetty Websocket.
  * See the class SmartDataLakeBuilderAgentTest for an example.
  *
+ * An Agent lets a "main" SDLB instance delegate the execution of an Action to a remote SDLB instance, e.g. to read
+ * data from a source only the remote instance can reach. Actions are delegated by setting `agentId` on the Action.
+ * The `connections` defined on the agent override the connections with the same id on the remote instance, but only
+ * if the agent server is started with `useOnlyLocalConnectionConfig=false`. With the default `true` the agent server
+ * uses its own local connection configuration only and the connections defined here are ignored.
+ *
+ * Example:
+ * {{{
+ * agents = {
+ *   jetty-agent1 {
+ *     type = JettyAgent
+ *     url = "ws://localhost:4441/ws/"
+ *     connections {
+ *       remoteFile { id = remoteFile, type = HadoopFileConnection, pathPrefix = "target/remote" }
+ *     }
+ *   }
+ * }
+ * }}}
+ *
+ * @note The websocket connection is neither encrypted nor authenticated, so use this only for local development
+ *       and tests. For productive setups use [[StorageAgent]] or the AzureRelayAgent of the sdl-azure module.
+ * @note The `connections` block of the example is only taken into account if the agent server is started with
+ *       `useOnlyLocalConnectionConfig=false`, which is not the default for security reasons.
  * @param url Connection URL on how the agent can be reached, example: "ws://localhost:4441/ws/"
  */
 case class JettyAgent(override val id: AgentId, url: String, override val connections: Map[String, Connection] = Map())
   extends Agent with AgentClient with SmartDataLakeLogger {
-
-  override def factory: FromConfigFactory[Agent] = JettyAgent
 
   private val uri = URI.create(url)
 

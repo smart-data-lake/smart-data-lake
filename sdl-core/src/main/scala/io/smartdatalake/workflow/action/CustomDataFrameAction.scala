@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2020 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,15 +19,15 @@
 package io.smartdatalake.workflow.action
 
 import com.typesafe.config.Config
-import io.smartdatalake.config.SdlConfigObject.{ActionId, DataObjectId}
+import io.smartdatalake.config.SdlConfigObject.{ActionId, ConnectionId, DataObjectId}
 import io.smartdatalake.config.{ConfigurationException, FromConfigFactory, InstanceRegistry}
 import io.smartdatalake.definitions.Condition
 import io.smartdatalake.util.hdfs.PartitionValues
-import io.smartdatalake.workflow.action.executionMode.{ExecutionMode, SparkStreamingMode}
+import io.smartdatalake.workflow.action.executionMode.ExecutionMode
 import io.smartdatalake.workflow.action.generic.transformer.{GenericDfsTransformer, GenericDfsTransformerDef, SQLDfsTransformer}
-import io.smartdatalake.workflow.action.spark.customlogic.CustomDfsTransformerConfig
+import io.smartdatalake.workflow.dataobject.DataObject
 import io.smartdatalake.workflow.dataobject.expectation.ActionExpectation
-import io.smartdatalake.workflow.dataobject.{CanCreateDataFrame, CanWriteDataFrame, DataObject}
+import io.smartdatalake.workflow.dataobject.generic.{CanCreateDataFrame, CanWriteDataFrame}
 import io.smartdatalake.workflow.{ActionPipelineContext, DataFrameSubFeed}
 
 import scala.reflect.runtime.universe.{Type, typeOf}
@@ -39,9 +39,31 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * The input DataFrames might be transformed using SQL or DataFrame transformations.
  * When chaining multiple transformers, output DataFrames of previous transformers are available as input DataFrames for later transformers by their corresponding name.
  *
+ * Use CustomDataFrameAction for joins, unions and fan-outs. For simple 1:1 copies prefer [[CopyAction]],
+ * which derives more accurate lineage. Note that a transformer must return a result for every outputId,
+ * keyed by the output DataObject id, otherwise the Action fails with a configuration error.
+ *
+ * Example:
+ * {{{
+ * actions = {
+ *   join-departures-airports {
+ *     type = CustomDataFrameAction
+ *     inputIds = [stg-departures, int-airports]
+ *     outputIds = [btl-departures-arrivals-airports]
+ *     mainInputId = stg-departures
+ *     transformers = [{
+ *       type = SQLDfsTransformer
+ *       code = {
+ *         btl-departures-arrivals-airports = """select d.*, a.name from %{inputViewName_stg-departures} d
+ *           join %{inputViewName_int-airports} a on d.estdepartureairport = a.ident"""
+ *       }
+ *     }]
+ *   }
+ * }
+ * }}}
+ *
  * @param inputIds               input DataObject's
  * @param outputIds              output DataObject's
- * @param transformer            optional custom transformation for multiple dataframes to apply
  * @param transformers list of transformations to apply. See [[spark.transformer]] for a list of included Transformers.
  *                     The transformations are applied according to the ordering of the list.
  *                     Note that all outputs of previous transformers are kept as input for next transformer,
@@ -49,16 +71,14 @@ import scala.reflect.runtime.universe.{Type, typeOf}
  * @param mainInputId            optional selection of main inputId used for execution mode and partition values propagation. Only needed if there are multiple input DataObject's.
  * @param mainOutputId           optional selection of main outputId used for execution mode and partition values propagation. Only needed if there are multiple output DataObject's.
  * @param recursiveInputIds      output of action that are used as input in the same action
- * @param inputIdsToIgnoreFilter optional list of input ids to ignore filter (partition values & filter clause)
+ * @param inputIdsToIgnoreFilter optional list of input ids to ignore filter (partition values & column filters)
  */
 case class CustomDataFrameAction(override val id: ActionId,
                                  inputIds: Seq[DataObjectId],
                                  outputIds: Seq[DataObjectId],
-                                 @Deprecated @deprecated("Use transformers instead.", "2.0.5")
-                                 transformer: Option[CustomDfsTransformerConfig] = None,
                                  transformers: Seq[GenericDfsTransformer] = Seq(),
-                                 override val breakDataFrameLineage: Boolean = false,
-                                 override val persist: Boolean = false,
+                                 override val cacheOutput: Boolean = false,
+                                 override val cacheInput: Boolean = false,
                                  override val mainInputId: Option[DataObjectId] = None,
                                  override val mainOutputId: Option[DataObjectId] = None,
                                  override val executionMode: Option[ExecutionMode] = None,
@@ -67,25 +87,22 @@ case class CustomDataFrameAction(override val id: ActionId,
                                  override val expectations: Seq[ActionExpectation] = Seq(),
                                  override val metadata: Option[ActionMetadata] = None,
                                  recursiveInputIds: Seq[DataObjectId] = Seq(),
-                                 override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq()
-                             )(implicit instanceRegistry: InstanceRegistry) extends DataFrameActionImpl {
+                                 override val inputIdsToIgnoreFilter: Seq[DataObjectId] = Seq(),
+                                 override val engineConnectionId: Option[ConnectionId] = None
+                             )(implicit val instanceRegistry: InstanceRegistry) extends DataFrameActionImpl {
 
   override val recursiveInputs: Seq[DataObject with CanCreateDataFrame] = recursiveInputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
-  override val inputs: Seq[DataObject with CanCreateDataFrame] = inputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
-  override val outputs: Seq[DataObject with CanWriteDataFrame] = outputIds.map(getOutputDataObject[DataObject with CanWriteDataFrame])
+  override val dataFrameInputs: Seq[DataObject with CanCreateDataFrame] = inputIds.map(getInputDataObject[DataObject with CanCreateDataFrame])
+  override val dataFrameOutputs: Seq[DataObject with CanWriteDataFrame] = outputIds.map(getOutputDataObject[DataObject with CanWriteDataFrame])
 
-  if (executionMode.exists(_.isInstanceOf[SparkStreamingMode]) && (transformer.exists(_.sqlCode.nonEmpty) || transformers.exists(_.isInstanceOf[SQLDfsTransformer])))
+  if (executionMode.exists(_.isStreamingMode) && transformers.exists(_.isInstanceOf[SQLDfsTransformer]))
     logger.warn("Defining custom stateful streaming operations with sqlCode is not well supported by Spark and can create strange errors or effects. Use scalaCode to be safe.")
 
   validateConfig()
 
-  private[smartdatalake] def getTransformers(implicit context: ActionPipelineContext): Seq[GenericDfsTransformerDef] = {
-    transformers ++ transformer.map(_.impl)
-  }
-
   override def transform(inputSubFeeds: Seq[DataFrameSubFeed], outputSubFeeds: Seq[DataFrameSubFeed])(implicit context: ActionPipelineContext): Seq[DataFrameSubFeed] = {
     val partitionValues = getMainPartitionValues(inputSubFeeds)
-    val outputDfsMap = applyTransformers(getTransformers, partitionValues, inputSubFeeds)
+    val outputDfsMap = applyTransformers(transformers, partitionValues, inputSubFeeds)
     // create output subfeeds from transformed dataframes
     outputSubFeeds.map { subFeed=>
       val df = outputDfsMap.getOrElse(subFeed.dataObjectId.id, throw ConfigurationException(s"($id) No result found for output ${subFeed.dataObjectId}. Available results are ${outputDfsMap.keys.mkString(", ")}."))
@@ -98,21 +115,19 @@ case class CustomDataFrameAction(override val id: ActionId,
     transformerDefs.foreach(_.prepare(id))
   }
 
-  override def transformPartitionValues(partitionValues: Seq[PartitionValues])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
-    applyTransformers(transformers ++ transformer.map(_.impl).toSeq, partitionValues)
+  override def transformPartitionValues(partitionValues: Seq[PartitionValues], executionModeResultOptions: Map[String, String])(implicit context: ActionPipelineContext): Map[PartitionValues,PartitionValues] = {
+    applyTransformers(transformers, partitionValues, executionModeResultOptions)
   }
 
-  private val transformerDefs: Seq[GenericDfsTransformerDef] = transformer.map(t => t.impl).toSeq ++ transformers
+  private val transformerDefs: Seq[GenericDfsTransformerDef] = transformers
 
   override val transformerSubFeedType: Option[Type] = {
     val transformerTypeStats = transformerDefs.map(_.getSubFeedSupportedType)
       .filterNot(_ =:= typeOf[DataFrameSubFeed]) // ignore generic transformers
-      .groupBy(identity).mapValues(_.size).toSeq.sortBy(_._2)
+      .groupBy(identity).view.mapValues(_.size).toMap.toSeq.sortBy(_._2)
     assert(transformerTypeStats.size <= 1, s"No common transformer subFeedType type found: ${transformerTypeStats.map{case (tpe,cnt) => s"${tpe.typeSymbol.name}: $cnt"}.mkString(",")}")
     transformerTypeStats.map(_._1).headOption
   }
-
-  override def factory: FromConfigFactory[Action] = CustomDataFrameAction
 
 }
 

@@ -1,7 +1,7 @@
 /*
- * Smart Data Lake - Build your data lake the smart way.
+ * Smart Data Lake Builder - Build your data lake the smart way.
  *
- * Copyright © 2019-2021 ELCA Informatique SA (<https://www.elca.ch>)
+ * Copyright © 2019-2026 ELCA Informatique SA (<https://www.elca.ch>)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package io.smartdatalake.workflow.action.script
 
 import com.typesafe.config.Config
@@ -35,6 +34,29 @@ import java.nio.file.{FileSystems, Paths}
  * - 'dockerParam' will be added as parameter for the docker command, e.g. before the image name in the docker run command, sorted by their key.
  * This allows to customize execution behaviour through Actions or DataObjects using CmdScript.
  *
+ * A typical use case is launching an Airbyte connector image with AirbyteDataObject, but it can be used wherever a
+ * script definition is expected, e.g. in the `scripts` attribute of a CustomScriptAction.
+ *
+ * Example:
+ * {{{
+ * dataObjects = {
+ *   ext-postgres {
+ *     type = AirbyteDataObject
+ *     streamName = "airports"
+ *     cmd = {
+ *       type = DockerRunScript
+ *       image = "airbyte/source-postgres:1.0.17"
+ *       localDataDirToMount = "data"
+ *     }
+ *     # the entries of config are connector specific, see the documentation of the connector used
+ *     config = { host = "localhost", port = 5432, database = "airports", username = "sdlb", password = "###" }
+ *   }
+ * }
+ * }}}
+ *
+ * @note Docker must be installed and callable on the machine running the SDLB job (the driver). The container runs
+ *       locally, it is not distributed to Spark executors.
+ * @see [[CmdScript]] to execute a plain command line instead.
  * @param name                name of the transformer
  * @param description         Optional description of the transformer
  * @param image               Docker image to run
@@ -57,15 +79,13 @@ case class DockerRunScript(override val name: String = "docker-run", override va
     val localDataDirToMountAbsolut = localDataDirToMount.map(d => if (!Paths.get(d).isAbsolute) s"$workDir/$d" else d)
     val localDataDirToMountParameters = localDataDirToMountAbsolut.map(d => Seq("-v", s"${preparePath(d)}:$containerDataDir")).getOrElse(Seq())
     // prepare parameters
-    val dockerParameters = parameters.filterKeys(_.startsWith("dockerParam")).toSeq.sortBy(_._1).map(_._2) ++ localDataDirToMountParameters
-    val runParameters = parameters.filterKeys(_.startsWith("runParam")).toSeq.sortBy(_._1).map(_._2)
+    val dockerParameters = parameters.view.filterKeys(_.startsWith("dockerParam")).toSeq.sortBy(_._1).map(_._2) ++ localDataDirToMountParameters
+    val runParameters = parameters.view.filterKeys(_.startsWith("runParam")).toSeq.sortBy(_._1).map(_._2)
     // cmd must be split for windows but not for linux
     val cmd = if (EnvironmentUtil.isWindowsOS) Seq("cmd", "/C") ++ CmdScript.splitCmdParameters(winDockerCmd)
     else CmdScript.splitCmdParameters(linuxDockerCmd)
     cmd ++ dockerParameters ++ Seq(image) ++ runParameters
   }
-
-  override def factory: FromConfigFactory[ParsableScriptDef] = DockerRunScript
 
   override private[smartdatalake] def isWslCmd = EnvironmentUtil.isWindowsOS && winDockerCmd.startsWith("wsl")
 }
