@@ -186,7 +186,7 @@
 		<dependency>
 			<groupId>io.smartdatalake</groupId>
 			<artifactId>embedded-kafka-schema-registry-shaded</artifactId>
-			<version>${confluent.version}-SNAPSHOT</version>
+			<version>${confluent.version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>

@@ -426,7 +426,7 @@
         <scala.version>${scala.minor.version}.12</scala.version>
         <spark.version>4.1.3</spark.version>
         <!-- this sdl-specific extensions should match the minor version of property spark.version -->
-        <spark-extensions.version>4.1.0-SNAPSHOT</spark-extensions.version>
+        <spark-extensions.version>4.1.0</spark-extensions.version>
         <spark.minor.version>4.1</spark.minor.version>
 
         <!-- SPARK-PARENT start: properties copied from spark-parent pom version for spark-parent import in dependencyManagement -->
