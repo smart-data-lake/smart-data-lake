@@ -103,7 +103,7 @@ class ActionDAGTest extends AnyFunSuite with BeforeAndAfter {
     dag.exec(contextExec)
 
     // action a wrote 2 records, and action b picked that up from the runtime information of its predecessor
-    val result = tgt2DO.getSparkDataFrame()(contextExec).select($"cnt_a", $"state_a").distinct.as[(String, String)].collect().toSeq
+    val result = tgt2DO.getSparkDataFrame()(contextExec).select($"cnt_a", $"state_a").distinct().as[(String, String)].collect().toSeq
     assert(result == Seq(("2", "SUCCEEDED")))
   }
 

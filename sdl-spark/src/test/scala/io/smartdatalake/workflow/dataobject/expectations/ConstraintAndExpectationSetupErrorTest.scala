@@ -21,7 +21,7 @@ package io.smartdatalake.workflow.dataobject.expectations
 import io.smartdatalake.config.{ConfigurationException, InstanceRegistry}
 import io.smartdatalake.testutils.spark.{MockSparkDataObject, SparkTestUtil}
 import io.smartdatalake.workflow.ActionPipelineContext
-import io.smartdatalake.workflow.dataframe.spark.SparkDataFrame
+import io.smartdatalake.workflow.dataframe.spark.{SparkDataFrame, SparkSubFeed}
 import io.smartdatalake.workflow.dataobject.expectation.{ExpectationScope, SQLExpectation}
 import io.smartdatalake.workflow.dataobject.generic.Constraint
 import org.apache.spark.sql.SparkSession
@@ -88,7 +88,7 @@ class ConstraintAndExpectationSetupErrorTest extends AnyFunSuite {
     )
     val dataObject = MockSparkDataObject("tgt4", expectations = expectations)
 
-    val ex = intercept[ConfigurationException](dataObject.getScopeAllAggMetrics(df, expectations, Map()))
+    val ex = intercept[ConfigurationException](dataObject.getScopeAllAggMetrics(() => df, expectations, Map(), SparkSubFeed.subFeedType))
     assert(ex.getMessage.contains("Evaluating expectation 'countUnknown' failed"))
     assert(ex.getConfigurationPath.contains("expectations.countUnknown"))
   }
