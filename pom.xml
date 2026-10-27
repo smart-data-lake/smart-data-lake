@@ -408,7 +408,7 @@
                         <version>0.8.0</version>
                         <extensions>true</extensions>
                         <configuration>
-                            <publishingServerId>central</publishingServerId>
+                            <publishingServerId>sonatype-central</publishingServerId>
                             <autoPublish>false</autoPublish>
                         </configuration>
                     </plugin>
