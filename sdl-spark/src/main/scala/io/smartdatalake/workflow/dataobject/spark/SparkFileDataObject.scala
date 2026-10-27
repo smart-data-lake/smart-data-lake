@@ -394,7 +394,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
             partitions.foldLeft(reader.option("path", path.toString).load()) { // V1 sources only support one path, which must be given as option...
               case (df, partition) => df.withColumn(partition, lit(pv(partition).toString))
             }
-          }.reduce(_ unionByName _)
+          }.reduce(_.unionByName(_, allowMissingColumns = true))
         ) else None
         // filter DataFrames without partition columns as they are empty.
         // This might happen if there is no schema specified and the partition is empty.
@@ -465,7 +465,7 @@ trait SparkFileDataObject extends HadoopFileDataObject
           logger.error(s"${partitions.length} partitions: ${partitions.mkString(",")}")
           throw e
       }
-      }.reduce(_ unionByName _)
+      }.reduce(_.unionByName(_, allowMissingColumns = true))
     ) else None
     dfOpt.getOrElse {
       // if there are no paths to read for given partition values, handle no data
