@@ -10,6 +10,13 @@ on:
   push:
     branches:
       - 'develop-spark*'
+  pull_request:
+    branches:
+      - 'develop-spark*'
+    types: [ opened, synchronize ]
+    paths:
+      - 'sdl-spark/pyproject.toml'
+      - 'sdl-spark/uv.lock'
 
 # a newer run of the same branch supersedes a running one
 concurrency:
