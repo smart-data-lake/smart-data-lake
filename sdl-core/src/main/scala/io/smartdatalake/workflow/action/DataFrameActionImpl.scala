@@ -516,7 +516,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         val enrichmentFunc: Map[String, _] => Map[String, _] = if (isMainOutput) enrichMainInputMetrics else identity
         // evaluate and validate expectations
         var (metrics, expectationsResult, exceptions) = evDataObject
-          .validateExpectations(subFeedType, subFeed.dataFrame, evDataObject.getDataFrame(Seq(), subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics ++ actionExpectationsInputMetrics, if (isMainOutput) expectations else Seq(), enrichmentFunc, loggerContext = "output")
+          .validateExpectations(subFeedType, subFeed.dataFrame, () => evDataObject.getDataFrame(Seq(), subFeed.tpe), subFeed.partitionValues, scopeJobExpectationMetrics ++ actionExpectationsInputMetrics, if (isMainOutput) expectations else Seq(), enrichmentFunc, loggerContext = "output")
         // evaluate and validate expectations of input DataObjects to be validated on read
         val inputExpectationsToEvaluateOnRead = dataFrameInputs
           .filter(i => context.instanceRegistry.shouldValidateDataObjectOnRead(i.id))
@@ -527,7 +527,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
             .filter(_._1.endsWith(metricsSuffix)).map { case (k, v) => (k.stripSuffix(metricsSuffix), v) }
           if (inputMetrics.nonEmpty) {
             val (updatedInputMetrics, inputExpectationsResult, inputExceptions) = dataObject
-              .validateExpectations(subFeedType, None, dataObject.getDataFrame(Seq(), subFeed.tpe), partitionValues = Seq(), enrichmentFunc = identity, scopeJobAndInputMetrics = inputMetrics, loggerContext = s"input ${dataObject.id}")
+              .validateExpectations(subFeedType, None, () => dataObject.getDataFrame(Seq(), subFeed.tpe), partitionValues = Seq(), enrichmentFunc = identity, scopeJobAndInputMetrics = inputMetrics, loggerContext = s"input ${dataObject.id}")
             metrics = metrics ++ updatedInputMetrics.map { case (k, v) => (k + metricsSuffix, v) }
             expectationsResult = expectationsResult ++ inputExpectationsResult.map { case (k, v) => (k + metricsSuffix, v) }
             exceptions = exceptions ++ inputExceptions
@@ -576,7 +576,7 @@ abstract class DataFrameActionImpl extends ActionSubFeedsImpl[DataFrameSubFeed] 
         case evDataObject: DataObject with ExpectationValidation with CanCreateDataFrame => evDataObject
         case _ => throw new IllegalStateException(s"($id) Cannot calculate input metric on $dataObjectId not supporting ExpectationValidation")
       }
-      dataObject.calculateMetrics(dataObject.getDataFrame(Seq(), subFeed.tpe), aggExpressions, ExpectationScope.All)
+      dataObject.calculateMetrics(() => dataObject.getDataFrame(Seq(), subFeed.tpe), aggExpressions, ExpectationScope.All)
         .map { case (k, v) => (k + "#" + dataObjectId.id, v) }
     }
   }
