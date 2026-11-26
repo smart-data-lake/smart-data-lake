@@ -28,6 +28,10 @@ import scala.collection.mutable
 
 /**
  * Collect runtime data (events and metrics) for repeated execution of actions and asynchronous execution
+ *
+ * Note on thread-safety: events are added by the thread executing the action, while runtime information is read
+ * by other threads, e.g. when saving the state of the DAG after another action has started (see ActionDAGRun.saveState).
+ * Access to executions and the current/last execution is therefore synchronized on this RuntimeData instance.
  */
 private[smartdatalake] trait RuntimeData {
   // collect execution data
@@ -41,13 +45,21 @@ private[smartdatalake] trait RuntimeData {
   }
   def addEvent(executionId: ExecutionId, event: RuntimeEvent): Unit
   def addMetric(executionId: Option[ExecutionId], dataObjectId: DataObjectId, metric: ActionMetrics): Unit = throw new NotImplementedError()
-  def currentExecutionId: Option[ExecutionId] = currentExecution.map(_.id)
-  def lastExecutionId: Option[ExecutionId] = lastExecution.map(_.id)
-  def getLatestEventState: Option[RuntimeEventState] = lastExecution.flatMap(_.getLatestEvent.map(_.state))
-  def clear(): Unit = {
+  def currentExecutionId: Option[ExecutionId] = synchronized(currentExecution.map(_.id))
+  def lastExecutionId: Option[ExecutionId] = synchronized(lastExecution.map(_.id))
+  def getLatestEventState: Option[RuntimeEventState] = synchronized(lastExecution).flatMap(_.getLatestEvent.map(_.state))
+  def clear(): Unit = synchronized {
     executions.clear()
     currentExecution = None
     lastExecution = None
+  }
+
+  /**
+   * Find execution for given ExecutionId, or the last execution if ExecutionId is empty.
+   */
+  protected def findExecution(executionIdOpt: Option[ExecutionId]): Option[ExecutionData[ExecutionId]] = synchronized {
+    if (executionIdOpt.isEmpty) lastExecution
+    else executions.find(_.id == executionIdOpt.get)
   }
 
   /**
@@ -55,8 +67,7 @@ private[smartdatalake] trait RuntimeData {
    * If ExecutionId is empty, metrics for the current existing ExecutionId is returned.
    */
   def getEvents(executionIdOpt: Option[ExecutionId] = None): Seq[RuntimeEvent] = {
-    if (executionIdOpt.isEmpty) lastExecution.map(_.getEvents).getOrElse(Seq())
-    else executions.find(_.id == executionIdOpt.get).map(_.getEvents).getOrElse(Seq())
+    findExecution(executionIdOpt).map(_.getEvents).getOrElse(Seq())
   }
 
   /**
@@ -64,8 +75,7 @@ private[smartdatalake] trait RuntimeData {
    * If ExecutionId is empty, metrics for the current existing ExecutionId is returned.
    */
   def getMetrics(dataObjectId: DataObjectId, executionIdOpt: Option[ExecutionId] = None): Option[ActionMetrics] = {
-    if (executionIdOpt.isEmpty) lastExecution.flatMap(_.getLatestMetrics(dataObjectId))
-    else executions.find(_.id == executionIdOpt.get).flatMap(_.getLatestMetrics(dataObjectId))
+    findExecution(executionIdOpt).flatMap(_.getLatestMetrics(dataObjectId))
   }
 
   /**
@@ -73,11 +83,7 @@ private[smartdatalake] trait RuntimeData {
    * If ExecutionId is empty, metrics for the current existing ExecutionId is returned.
    */
   def getRuntimeInfo(inputIds: Seq[DataObjectId], outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState], executionIdOpt: Option[ExecutionId] = None): Option[RuntimeInfo] = {
-    if(executions.isEmpty) None
-    else {
-      if (executionIdOpt.isEmpty) lastExecution.flatMap(_.getRuntimeInfo(inputIds, outputIds, dataObjectsState))
-      else executions.find(_.id == executionIdOpt.get).flatMap(_.getRuntimeInfo(inputIds, outputIds, dataObjectsState))
-    }
+    findExecution(executionIdOpt).flatMap(_.getRuntimeInfo(inputIds, outputIds, dataObjectsState))
   }
 }
 
@@ -86,7 +92,7 @@ private[smartdatalake] trait RuntimeData {
  * Note that this does not support collecting metrics, as these are passed on directly in the corresponding SubFeed for synchronous Actions.
  */
 private[smartdatalake] case class SynchronousRuntimeData(override val numberOfExecutionToKeep: Int) extends RuntimeData {
-  override def addEvent(executionId: ExecutionId, event: RuntimeEvent): Unit = {
+  override def addEvent(executionId: ExecutionId, event: RuntimeEvent): Unit = synchronized {
     assert(lastExecutionId.forall(_ <= executionId), s"ExecutionId $executionId smaller than currentExecutionId $lastExecutionId")
     if (lastExecutionId.forall(_ < executionId)) {
       currentExecution = Some(ExecutionData(executionId))
@@ -108,7 +114,7 @@ private[smartdatalake] case class AsynchronousRuntimeData(override val numberOfE
   private val unassignedMetrics: mutable.Buffer[(DataObjectId,ActionMetrics)] = mutable.Buffer()
   // keep track of first SDLExecutionId for logic in getRuntimeInfo
   private var firstSDLExecutionId: Option[SDLExecutionId] = None
-  override def addEvent(executionId: ExecutionId, event: RuntimeEvent): Unit = {
+  override def addEvent(executionId: ExecutionId, event: RuntimeEvent): Unit = synchronized {
     executionId match {
       case sdlExecutionId: SDLExecutionId =>
         var execution = executions.find(_.id == executionId)
@@ -135,7 +141,7 @@ private[smartdatalake] case class AsynchronousRuntimeData(override val numberOfE
         doHousekeeping()
     }
   }
-  override def addMetric(executionId: Option[ExecutionId], dataObjectId: DataObjectId, metrics: ActionMetrics): Unit = {
+  override def addMetric(executionId: Option[ExecutionId], dataObjectId: DataObjectId, metrics: ActionMetrics): Unit = synchronized {
     assert(!executionId.exists(_.isInstanceOf[SDLExecutionId]), "Can not handle synchronous metrics")
     assert(currentExecutionId.isEmpty || executionId.isEmpty || currentExecutionId == executionId, s"New metric received for other than current ExecutionId: currentExecutionId=$currentExecutionId executionId=$executionId")
     if (currentExecution.isEmpty) unassignedMetrics.append((dataObjectId, metrics))
@@ -144,14 +150,14 @@ private[smartdatalake] case class AsynchronousRuntimeData(override val numberOfE
     firstSDLExecutionId.flatMap(id => executions.find(_.id == id))
       .filterNot(_.isFinal).foreach(_.addMetrics(dataObjectId, metrics))
   }
-  override def clear(): Unit = {
+  override def clear(): Unit = synchronized {
     super.clear()
     firstSDLExecutionId = None
   }
   override def getRuntimeInfo(inputIds: Seq[DataObjectId], outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState], executionIdOpt: Option[ExecutionId]): Option[RuntimeInfo] = {
     // report state as STREAMING after first SDLexecutionId only. This allows to skip first execution in recovery if SUCCEEDED.
     if (executionIdOpt.exists(_.isInstanceOf[SDLExecutionId])) {
-      if (executionIdOpt == firstSDLExecutionId) super.getRuntimeInfo(inputIds, outputIds, dataObjectsState, executionIdOpt)
+      if (executionIdOpt == synchronized(firstSDLExecutionId)) super.getRuntimeInfo(inputIds, outputIds, dataObjectsState, executionIdOpt)
       else super.getRuntimeInfo(inputIds, outputIds, dataObjectsState, None).map(_.copy(state = RuntimeEventState.STREAMING))
     } else {
       super.getRuntimeInfo(inputIds, outputIds, dataObjectsState, executionIdOpt)
@@ -161,22 +167,24 @@ private[smartdatalake] case class AsynchronousRuntimeData(override val numberOfE
 
 /**
  * A structure to collect events & metrics for one action execution
+ *
+ * Events and metrics are added by the thread executing the action, but read by other threads (e.g. ActionDAGRun.saveState).
+ * All access to the mutable collections is therefore synchronized on this ExecutionData instance,
+ * and readers work on immutable snapshots, see also issue #1195.
  */
 private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
   private val events: mutable.Buffer[RuntimeEvent] = mutable.Buffer()
   private val metricsMap: mutable.Map[DataObjectId,mutable.Buffer[ActionMetrics]] = mutable.Map()
   def isAsynchronous: Boolean = !id.isInstanceOf[SDLExecutionId]
-  def addEvent(event: RuntimeEvent): Unit = events.append(event)
-  def addMetrics(dataObjectId: DataObjectId, metrics: ActionMetrics): Unit = {
-    val dataObjectMetrics = metricsMap.getOrElseUpdate(dataObjectId, mutable.Buffer[ActionMetrics]())
-    dataObjectMetrics.synchronized {
-      dataObjectMetrics.append(metrics)
-    }
+  def addEvent(event: RuntimeEvent): Unit = synchronized(events.append(event))
+  def addMetrics(dataObjectId: DataObjectId, metrics: ActionMetrics): Unit = synchronized {
+    metricsMap.getOrElseUpdate(dataObjectId, mutable.Buffer[ActionMetrics]()).append(metrics)
   }
-  def getEvents: Seq[RuntimeEvent] = events.toSeq
-  def getLatestEvent: Option[RuntimeEvent] = {
-    events.lastOption
-  }
+  /**
+   * Returns an immutable snapshot of the events collected so far.
+   */
+  def getEvents: Seq[RuntimeEvent] = synchronized(events.toVector)
+  def getLatestEvent: Option[RuntimeEvent] = synchronized(events.lastOption)
   def isFinal: Boolean = {
     getLatestEvent.exists(e => RuntimeEventState.isFinal(e.state))
   }
@@ -187,11 +195,9 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
    * Use getRuntimeInfo instead, and extract metrics from results.
    */
   private[action] def getLatestMetrics(dataObjectId: DataObjectId): Option[ActionMetrics] = {
-    // combine latest metric for all types
-    val dataObjectMetrics = metricsMap.get(dataObjectId)
-    val metrics = dataObjectMetrics.synchronized { // avoid potential ConcurrentModificationException
-      dataObjectMetrics.map(_.groupBy(_.getClass).values.map(_.maxBy(_.getOrder).getMainInfos).reduceOption(_ ++ _).getOrElse(Map()))
-    }
+    // combine latest metric for all types, working on a snapshot to avoid ConcurrentModificationException
+    val dataObjectMetrics = synchronized(metricsMap.get(dataObjectId).map(_.toVector))
+    val metrics = dataObjectMetrics.map(_.groupBy(_.getClass).values.map(_.maxBy(_.getOrder).getMainInfos).reduceOption(_ ++ _).getOrElse(Map()))
     metrics.map(GenericMetrics("latest", 1, _))
   }
 
@@ -202,6 +208,8 @@ private[smartdatalake] case class ExecutionData[A <: ExecutionId](id: A) {
     }
   }
   def getRuntimeInfo(inputIds: Seq[DataObjectId], outputIds: Seq[DataObjectId], dataObjectsState: Seq[DataObjectState]): Option[RuntimeInfo] = {
+    // work on a snapshot of events, as they might be modified concurrently by the thread executing the action
+    val events = getEvents
     assert(events.nonEmpty, "Cannot getRuntimeInfo if events are empty")
     val lastEvent = events.last
     val lastResults = events.reverseIterator.map(_.results).find(_.nonEmpty) // on failed actions we take the results from initialization to store what partition values have been tried to process
