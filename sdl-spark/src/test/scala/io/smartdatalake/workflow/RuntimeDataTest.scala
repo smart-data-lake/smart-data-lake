@@ -110,4 +110,45 @@ class RuntimeDataTest extends AnyFunSuite {
     assert(runtimeData.getEvents(Some(SDLExecutionId(1))).isEmpty)
   }
 
+  test("concurrently adding events and reading runtime info does not fail (#1195)") {
+    // Simulates an action thread adding events while another thread saves the DAG state (ActionDAGRun.saveState).
+    val runtimeData = SynchronousRuntimeData(5)
+    val outputDataObjectId = DataObjectId("test")
+    val subFeeds = Seq(SparkSubFeed(None, outputDataObjectId, Seq()))
+    val nbOfEvents = 20000
+    runtimeData.addEvent(SDLExecutionId(1), RuntimeEvent(LocalDateTime.now(), ExecutionPhase.Init, RuntimeEventState.INITIALIZED, None, subFeeds))
+    @volatile var writerDone = false
+    @volatile var error: Option[Throwable] = None
+    val writer = new Thread(() => {
+      try {
+        (1 to nbOfEvents).foreach { i =>
+          // switch execution from time to time to also exercise modification of executions and housekeeping
+          val executionId = SDLExecutionId(1 + i / 1000)
+          val phase = if (i % 3 == 0) ExecutionPhase.Prepare else if (i % 3 == 1) ExecutionPhase.Init else ExecutionPhase.Exec
+          runtimeData.addEvent(executionId, RuntimeEvent(LocalDateTime.now(), phase, RuntimeEventState.RUNNING, None, subFeeds))
+        }
+      } catch {
+        case e: Throwable => error = Some(e)
+      } finally writerDone = true
+    })
+    val reader = new Thread(() => {
+      try {
+        while (!writerDone) {
+          val executionId = runtimeData.lastExecutionId
+          runtimeData.getRuntimeInfo(Seq(), Seq(outputDataObjectId), Seq(), executionId)
+          runtimeData.getEvents(executionId)
+          runtimeData.getLatestEventState
+        }
+      } catch {
+        case e: Throwable => error = Some(e)
+      }
+    })
+    reader.start()
+    writer.start()
+    writer.join()
+    reader.join()
+    error.foreach(e => fail(s"Concurrent access failed: $e", e))
+    assert(runtimeData.getLatestEventState.contains(RuntimeEventState.RUNNING))
+  }
+
 }
